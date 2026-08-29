@@ -1,0 +1,29 @@
+.DS_Store
+.idea/
+.vscode/
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+coverage.out
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Build artifacts
+dist/
+build/
+tmp/
+
+# Local env files
+.env
+.env.*
+
