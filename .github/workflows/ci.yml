@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Buf
+        if: ${{ hashFiles('**/*.proto') != '' }}
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.50.0
+
+      - name: Proto lint
+        if: ${{ hashFiles('**/*.proto') != '' }}
+        working-directory: .
+        run: buf lint
+
+      - name: Go format check
+        if: ${{ hashFiles('**/*.go') != '' }}
+        run: |
+          gofmt_output="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$gofmt_output" ]; then
+            printf '%s\n' "$gofmt_output"
+            exit 1
+          fi
+
+      - name: Go vet
+        if: ${{ hashFiles('**/*.go') != '' }}
+        run: go vet ./...
+
+      - name: Go unit test
+        if: ${{ hashFiles('**/*.go') != '' }}
+        run: go test ./...
+
+      - name: Go build
+        if: ${{ hashFiles('**/*.go') != '' }}
+        run: go build ./...
+
