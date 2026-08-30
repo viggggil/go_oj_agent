@@ -221,6 +221,23 @@ test(agent): add authorization eval
 
 Prefer PR + CI + Squash Merge into `main`.
 
+### 12.1 Change Routing
+
+Use the following routing rule to decide whether a change needs an Issue before implementation:
+
+| Change Type | Workflow |
+| --- | --- |
+| Small bug fixes | Branch -> PR -> CI -> Merge, usually without a separate Issue |
+| Simple configuration changes | Branch -> PR -> CI -> Merge, usually without a separate Issue |
+| Features, architecture changes, database changes, API changes | Issue -> Branch -> PR -> CI -> Review -> Merge |
+
+Guidelines:
+
+- Keep small updates lightweight when the scope is clear and the risk is low.
+- Use an Issue when the change affects contracts, data shape, service boundaries, or multi-step coordination.
+- Keep the Issue, branch name, commit, and PR title aligned for traceability.
+- Do not skip CI before merge, even for tiny changes.
+
 Do not force-push, rewrite history, merge PR, create tags/releases or push directly to `main` unless explicitly asked.
 
 ---
