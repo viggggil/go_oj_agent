@@ -6,4 +6,3 @@ const modulePath = "github.com/viggggil/go_oj_agent"
 func ModulePath() string {
 	return modulePath
 }
-
