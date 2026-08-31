@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package submission.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/submission/v1;submissionv1";
+
+import "common/v1/common.proto";
+
+service SubmissionService {
+  rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse);
+  rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
+  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
+  rpc ListRecentSubmissions(ListRecentSubmissionsRequest) returns (ListRecentSubmissionsResponse);
+  rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse);
+}
+
+enum SubmissionStatus {
+  SUBMISSION_STATUS_UNSPECIFIED = 0;
+  SUBMISSION_STATUS_QUEUED = 1;
+  SUBMISSION_STATUS_COMPILING = 2;
+  SUBMISSION_STATUS_RUNNING = 3;
+  SUBMISSION_STATUS_DONE = 4;
+}
+
+enum JudgeVerdict {
+  JUDGE_VERDICT_UNSPECIFIED = 0;
+  JUDGE_VERDICT_AC = 1;
+  JUDGE_VERDICT_WA = 2;
+  JUDGE_VERDICT_TLE = 3;
+  JUDGE_VERDICT_MLE = 4;
+  JUDGE_VERDICT_RE = 5;
+  JUDGE_VERDICT_CE = 6;
+}
+
+message Submission {
+  int64 id = 1;
+  int64 user_id = 2;
+  int64 problem_id = 3;
+  string language = 4;
+  string source_code = 5;
+  SubmissionStatus status = 6;
+  JudgeVerdict verdict = 7;
+  int32 time_ms = 8;
+  int32 memory_kb = 9;
+  int32 testcase_version = 10;
+}
+
+message SubmissionCaseResult {
+  int64 id = 1;
+  int64 submission_id = 2;
+  int32 case_no = 3;
+  JudgeVerdict verdict = 4;
+  int32 time_ms = 5;
+  int32 memory_kb = 6;
+  string message = 7;
+}
+
+message JudgeResult {
+  int64 submission_id = 1;
+  SubmissionStatus status = 2;
+  JudgeVerdict verdict = 3;
+  int32 time_ms = 4;
+  int32 memory_kb = 5;
+  repeated SubmissionCaseResult case_results = 6;
+}
+
+message CreateSubmissionRequest {
+  common.v1.RequestContext context = 1;
+  int64 problem_id = 2;
+  string language = 3;
+  string source_code = 4;
+}
+
+message CreateSubmissionResponse {
+  int64 submission_id = 1;
+  SubmissionStatus status = 2;
+}
+
+message GetSubmissionRequest {
+  common.v1.RequestContext context = 1;
+  int64 submission_id = 2;
+}
+
+message GetSubmissionResponse {
+  Submission submission = 1;
+}
+
+message ListSubmissionsRequest {
+  common.v1.RequestContext context = 1;
+  common.v1.PageRequest page = 2;
+  int64 problem_id = 3;
+  SubmissionStatus status = 4;
+  string language = 5;
+}
+
+message ListSubmissionsResponse {
+  repeated Submission items = 1;
+  common.v1.PageResponse page = 2;
+}
+
+message ListRecentSubmissionsRequest {
+  common.v1.RequestContext context = 1;
+  int64 user_id = 2;
+  int32 limit = 3;
+}
+
+message ListRecentSubmissionsResponse {
+  repeated Submission items = 1;
+}
+
+message GetJudgeResultRequest {
+  common.v1.RequestContext context = 1;
+  int64 submission_id = 2;
+}
+
+message GetJudgeResultResponse {
+  JudgeResult result = 1;
+}
+

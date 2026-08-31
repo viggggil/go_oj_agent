@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package judge.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/judge/v1;judgev1";
+
+service JudgeAdminService {
+  rpc GetWorkerStatus(GetWorkerStatusRequest) returns (GetWorkerStatusResponse);
+}
+
+enum WorkerStatus {
+  WORKER_STATUS_UNSPECIFIED = 0;
+  WORKER_STATUS_IDLE = 1;
+  WORKER_STATUS_BUSY = 2;
+  WORKER_STATUS_DRAINING = 3;
+  WORKER_STATUS_OFFLINE = 4;
+}
+
+enum JudgeVerdict {
+  JUDGE_VERDICT_UNSPECIFIED = 0;
+  JUDGE_VERDICT_AC = 1;
+  JUDGE_VERDICT_WA = 2;
+  JUDGE_VERDICT_TLE = 3;
+  JUDGE_VERDICT_MLE = 4;
+  JUDGE_VERDICT_RE = 5;
+  JUDGE_VERDICT_CE = 6;
+}
+
+message JudgeCaseResult {
+  int32 case_no = 1;
+  JudgeVerdict verdict = 2;
+  int32 time_ms = 3;
+  int32 memory_kb = 4;
+  string message = 5;
+}
+
+message JudgeResult {
+  int64 submission_id = 1;
+  JudgeVerdict verdict = 2;
+  int32 time_ms = 3;
+  int32 memory_kb = 4;
+  repeated JudgeCaseResult case_results = 5;
+}
+
+message GetWorkerStatusRequest {
+  string worker_id = 1;
+}
+
+message GetWorkerStatusResponse {
+  string worker_id = 1;
+  WorkerStatus status = 2;
+  repeated string supported_languages = 3;
+  int32 running_tasks = 4;
+}
+
