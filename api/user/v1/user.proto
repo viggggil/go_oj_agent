@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/user/v1;userv1";
+
+import "common/v1/common.proto";
+
+service UserService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+message User {
+  int64 id = 1;
+  string username = 2;
+  string email = 3;
+  string status = 4;
+  repeated string roles = 5;
+}
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterResponse {
+  User user = 1;
+}
+
+message LoginRequest {
+  string account = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+message GetCurrentUserRequest {
+  common.v1.RequestContext context = 1;
+}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  common.v1.RequestContext context = 1;
+  int64 user_id = 2;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+

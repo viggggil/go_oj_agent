@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/common/v1;commonv1";
+
+message PageRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message PageResponse {
+  int32 page = 1;
+  int32 page_size = 2;
+  int64 total = 3;
+}
+
+message RequestContext {
+  int64 user_id = 1;
+  repeated string roles = 2;
+  string request_id = 3;
+  string trace_id = 4;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+}
+

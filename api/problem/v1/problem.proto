@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package problem.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/problem/v1;problemv1";
+
+import "common/v1/common.proto";
+
+service ProblemService {
+  rpc CreateProblem(CreateProblemRequest) returns (CreateProblemResponse);
+  rpc UpdateProblem(UpdateProblemRequest) returns (UpdateProblemResponse);
+  rpc GetProblem(GetProblemRequest) returns (GetProblemResponse);
+  rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
+  rpc SearchProblems(SearchProblemsRequest) returns (SearchProblemsResponse);
+}
+
+enum ProblemDifficulty {
+  PROBLEM_DIFFICULTY_UNSPECIFIED = 0;
+  PROBLEM_DIFFICULTY_EASY = 1;
+  PROBLEM_DIFFICULTY_MEDIUM = 2;
+  PROBLEM_DIFFICULTY_HARD = 3;
+}
+
+enum ProblemStatus {
+  PROBLEM_STATUS_UNSPECIFIED = 0;
+  PROBLEM_STATUS_DRAFT = 1;
+  PROBLEM_STATUS_PUBLISHED = 2;
+  PROBLEM_STATUS_ARCHIVED = 3;
+}
+
+message Problem {
+  int64 id = 1;
+  string title = 2;
+  string slug = 3;
+  string description = 4;
+  ProblemDifficulty difficulty = 5;
+  int32 time_limit_ms = 6;
+  int32 memory_limit_kb = 7;
+  ProblemStatus status = 8;
+  int64 created_by = 9;
+  repeated Tag tags = 10;
+  repeated TestcaseMetadata testcases = 11;
+}
+
+message Tag {
+  int64 id = 1;
+  string name = 2;
+}
+
+message TestcaseMetadata {
+  int64 id = 1;
+  int64 problem_id = 2;
+  int32 version = 3;
+  int32 case_no = 4;
+  string input_object_key = 5;
+  string output_object_key = 6;
+  string input_sha256 = 7;
+  string output_sha256 = 8;
+  int64 size_bytes = 9;
+}
+
+message ProblemInput {
+  string title = 1;
+  string slug = 2;
+  string description = 3;
+  ProblemDifficulty difficulty = 4;
+  int32 time_limit_ms = 5;
+  int32 memory_limit_kb = 6;
+  ProblemStatus status = 7;
+  repeated string tags = 8;
+}
+
+message CreateProblemRequest {
+  common.v1.RequestContext context = 1;
+  ProblemInput problem = 2;
+}
+
+message CreateProblemResponse {
+  Problem problem = 1;
+}
+
+message UpdateProblemRequest {
+  common.v1.RequestContext context = 1;
+  int64 problem_id = 2;
+  ProblemInput problem = 3;
+}
+
+message UpdateProblemResponse {
+  Problem problem = 1;
+}
+
+message GetProblemRequest {
+  common.v1.RequestContext context = 1;
+  int64 problem_id = 2;
+}
+
+message GetProblemResponse {
+  Problem problem = 1;
+}
+
+message ListProblemsRequest {
+  common.v1.RequestContext context = 1;
+  common.v1.PageRequest page = 2;
+  ProblemDifficulty difficulty = 3;
+  string tag = 4;
+}
+
+message ListProblemsResponse {
+  repeated Problem items = 1;
+  common.v1.PageResponse page = 2;
+}
+
+message SearchProblemsRequest {
+  common.v1.RequestContext context = 1;
+  common.v1.PageRequest page = 2;
+  string keyword = 3;
+  ProblemDifficulty difficulty = 4;
+  string tag = 5;
+}
+
+message SearchProblemsResponse {
+  repeated Problem items = 1;
+  common.v1.PageResponse page = 2;
+}
+
