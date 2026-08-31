@@ -227,12 +227,14 @@ Use the following routing rule to decide whether a change needs an Issue before 
 
 | Change Type | Workflow |
 | --- | --- |
+| Documentation-only updates | Commit directly to `main` when the change does not affect code, contracts, database schema, CI behavior, or release process |
 | Small bug fixes | Branch -> PR -> CI -> Merge, usually without a separate Issue |
 | Simple configuration changes | Branch -> PR -> CI -> Merge, usually without a separate Issue |
 | Features, architecture changes, database changes, API changes | Issue -> Branch -> PR -> CI -> Review -> Merge |
 
 Guidelines:
 
+- Keep documentation updates direct when they only clarify project notes, plans, or guidance.
 - Keep small updates lightweight when the scope is clear and the risk is low.
 - Use an Issue when the change affects contracts, data shape, service boundaries, or multi-step coordination.
 - Keep the Issue, branch name, commit, and PR title aligned for traceability.
