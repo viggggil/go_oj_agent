@@ -1,0 +1,4 @@
+DROP DATABASE IF EXISTS oj_submission;
+DROP DATABASE IF EXISTS oj_problem;
+DROP DATABASE IF EXISTS oj_user;
+
