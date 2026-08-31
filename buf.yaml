@@ -1,5 +1,9 @@
 version: v1
 
+build:
+  roots:
+    - api
+
 lint:
   use:
     - STANDARD
