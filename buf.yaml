@@ -1,8 +1,7 @@
-version: v1
+version: v2
 
-build:
-  roots:
-    - api
+modules:
+  - path: api
 
 lint:
   use:
