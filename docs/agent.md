@@ -239,6 +239,7 @@ Guidelines:
 - Use an Issue when the change affects contracts, data shape, service boundaries, or multi-step coordination.
 - Keep the Issue, branch name, commit, and PR title aligned for traceability.
 - Do not skip CI before merge, even for tiny changes.
+- After a PR is merged remotely, fetch/prune and sync the local `main` branch to the latest `origin/main` before starting the next branch.
 
 Do not force-push, rewrite history, merge PR, create tags/releases or push directly to `main` unless explicitly asked.
 
