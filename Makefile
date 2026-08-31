@@ -1,25 +1,48 @@
-.PHONY: init proto fmt lint build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
+GO ?= go
+BUF ?= buf
+
+GO_PACKAGES := ./...
+GO_FILES := $(shell git ls-files '*.go')
+
+.PHONY: init proto fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
 
 init:
-	@echo "repository scaffold is ready"
+	@$(GO) version
+	@$(BUF) --version
 
 proto:
-	@echo "proto generation is not wired yet"
+	@$(BUF) lint
 
 fmt:
-	@echo "formatting is not wired yet"
+	@if [ -n "$(GO_FILES)" ]; then \
+		gofmt -w $(GO_FILES); \
+	fi
+
+fmt-check:
+	@if [ -n "$(GO_FILES)" ]; then \
+		unformatted="$$(gofmt -l $(GO_FILES))"; \
+		if [ -n "$$unformatted" ]; then \
+			printf 'gofmt required for:\n%s\n' "$$unformatted"; \
+			exit 1; \
+		fi; \
+	fi
 
 lint:
-	@echo "linting is not wired yet"
+	@$(MAKE) proto
+	@$(MAKE) fmt-check
+	@$(MAKE) vet
+
+vet:
+	@$(GO) vet $(GO_PACKAGES)
 
 build:
-	@echo "build is not wired yet"
+	@$(GO) build $(GO_PACKAGES)
 
 test:
-	@echo "tests are not wired yet"
+	@$(GO) test $(GO_PACKAGES)
 
 test-unit:
-	@echo "unit tests are not wired yet"
+	@$(GO) test $(GO_PACKAGES)
 
 test-integration:
 	@echo "integration tests are not wired yet"
@@ -38,4 +61,3 @@ infra-down:
 
 dev:
 	@echo "dev workflow is not wired yet"
-
