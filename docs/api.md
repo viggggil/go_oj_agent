@@ -412,16 +412,70 @@ syntax = "proto3";
 package user.v1;
 
 service UserService {
-  rpc GetUser(GetUserRequest) returns (GetUserReply);
-  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserReply);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
 }
 ```
 
-用途：
+User Service 第一阶段需要实现以下接口：
+
+### `Register`
+
+创建用户账户。
+
+- 校验用户名、邮箱和密码格式。
+- 检查用户名和邮箱是否已经存在。
+- 使用安全密码 Hash 保存密码，禁止保存明文密码。
+- 创建用户后分配默认 `user` 角色。
+- 返回新用户的基础资料，不返回 `password_hash`。
+
+### `Login`
+
+使用账号和密码登录。
+
+- `account` 可以匹配用户名或邮箱。
+- 校验密码 Hash。
+- 返回短生命周期 Access Token。
+- 返回 Refresh Token，Refresh Token 元数据优先保存到 Redis。
+- 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
+
+### `RefreshToken`
+
+使用 Refresh Token 获取新的 Access Token。
+
+- 校验 Refresh Token 是否存在、未过期、未撤销。
+- 必要时轮换 Refresh Token。
+- 轮换时撤销旧的 Refresh Token，避免重复使用。
+- 不允许通过 Refresh Token 直接改变用户身份或角色。
+
+### `GetCurrentUser`
+
+获取当前认证用户的基础资料。
+
+- 从受信任的内部 `RequestContext.user_id` 获取用户身份。
+- 不能直接信任外部客户端传入的同名 Header。
+- 返回用户基本信息和角色列表。
+- 用于 Gateway 和其他受控内部调用。
+
+### `GetUser`
+
+按用户 ID 获取最小必要的用户资料。
+
+- 最终权限校验由 User Service 执行。
+- 只返回调用方业务所需的最少字段。
+- 不返回密码 Hash、Refresh Token 或其他认证敏感数据。
+- Agent Tool 只能通过该 gRPC 契约获取被授权的用户上下文。
+
+接口用途：
 
 - Gateway 获取用户信息。
-- 其他服务按业务需要获取最少用户资料。
-- Agent Tool 获取当前用户上下文。
+- Gateway 调用 `Register`、`Login`、`RefreshToken` 和 `GetCurrentUser` 支持外部认证流程。
+- 其他服务按业务需要通过 `GetUser` 获取最少用户资料。
+- Agent Tool 通过 `GetCurrentUser` 或受控的 `GetUser` 获取当前用户上下文。
+- User Service 负责最终的用户资源权限校验，Gateway 和 Agent 不负责替代该校验。
 
 ---
 

@@ -163,6 +163,7 @@ Never delete or weaken a valid test just to make CI pass.
 - Use `reserved` for removed fields.
 - Event schema is independent from ORM models.
 - API changes must consider Go and Python clients.
+- 修改 API 或 Proto 时必须同步更新 `docs/api.md`，并检查对应的 Go Client、Python Client、Gateway 和 Agent Tool。
 
 ---
 
