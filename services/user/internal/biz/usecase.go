@@ -60,3 +60,28 @@ func NewUserUsecase(options UserUsecaseOptions) *UserUsecase {
 		passwordPolicy: policy,
 	}
 }
+
+func (uc *UserUsecase) Register(ctx context.Context, input RegisterInput) (User, error) {
+	if uc == nil || uc.users == nil || uc.passwords == nil {
+		return User{}, ErrInvalidArgument
+	}
+	if err := input.Validate(uc.passwordPolicy); err != nil {
+		return User{}, err
+	}
+
+	input = input.Normalize()
+	passwordHash, err := uc.passwords.Hash(input.Password)
+	if err != nil {
+		return User{}, err
+	}
+
+	user := User{
+		Username:     input.Username,
+		Email:        input.Email,
+		PasswordHash: passwordHash,
+		Status:       UserStatusActive,
+		Roles:        []RoleName{RoleUser},
+	}
+
+	return uc.users.CreateUser(ctx, user, RoleUser)
+}

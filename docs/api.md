@@ -426,9 +426,13 @@ User Service 第一阶段需要实现以下接口：
 
 创建用户账户。
 
+- 参数校验优先使用 `validate/validate.proto` 注解生成的 Go 校验代码。
 - 校验用户名、邮箱和密码格式。
+- username 注册前执行 trim + lowercase，按大小写不敏感处理。
+- email 注册前执行 trim + lowercase，按大小写不敏感处理。
+- 密码策略保持简单：trim 后不能为空，最小 8 个字符，最大 72 bytes。
 - 检查用户名和邮箱是否已经存在。
-- 使用安全密码 Hash 保存密码，禁止保存明文密码。
+- 使用 bcrypt 保存密码 Hash，默认 cost 为 12，禁止保存明文密码。
 - 创建用户后分配默认 `user` 角色。
 - 返回新用户的基础资料，不返回 `password_hash`。
 
@@ -438,8 +442,10 @@ User Service 第一阶段需要实现以下接口：
 
 - `account` 可以匹配用户名或邮箱。
 - 校验密码 Hash。
-- 返回短生命周期 Access Token。
-- 返回 Refresh Token，Refresh Token 元数据优先保存到 Redis。
+- 返回短生命周期 Access Token，默认 TTL 为 15 分钟。
+- Access Token 使用 JWT，签名算法为 HS256，payload 可以携带 `roles`。
+- HS256 secret 只允许 `user-service` 和 `gateway` 持有。
+- 返回 Refresh Token，Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
 
 ### `RefreshToken`
@@ -447,7 +453,7 @@ User Service 第一阶段需要实现以下接口：
 使用 Refresh Token 获取新的 Access Token。
 
 - 校验 Refresh Token 是否存在、未过期、未撤销。
-- 必要时轮换 Refresh Token。
+- 每次成功刷新时轮换 Refresh Token。
 - 轮换时撤销旧的 Refresh Token，避免重复使用。
 - 不允许通过 Refresh Token 直接改变用户身份或角色。
 

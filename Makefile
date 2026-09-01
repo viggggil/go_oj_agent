@@ -11,6 +11,7 @@ init:
 	@$(BUF) --version
 
 proto:
+	@$(BUF) dep update
 	@$(BUF) lint
 
 fmt:
