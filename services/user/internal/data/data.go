@@ -1,12 +1,6 @@
 package data
 
-type StoreSet struct {
-	UserRepository     any
-	RoleRepository     any
-	RefreshTokenStore  any
-	PasswordHashDriver any
-	TokenIssuer         any
-}
+type StoreSet struct{}
 
 func NewStoreSet() StoreSet {
 	return StoreSet{}
