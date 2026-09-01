@@ -5,6 +5,7 @@ package user.v1;
 option go_package = "github.com/viggggil/go_oj_agent/api/user/v1;userv1";
 
 import "common/v1/common.proto";
+import "validate/validate.proto";
 
 service UserService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
@@ -23,9 +24,9 @@ message User {
 }
 
 message RegisterRequest {
-  string username = 1;
-  string email = 2;
-  string password = 3;
+  string username = 1 [(validate.rules).string = {min_len: 1, max_len: 64}];
+  string email = 2 [(validate.rules).string = {email: true, max_len: 255}];
+  string password = 3 [(validate.rules).string = {min_len: 8, max_bytes: 72}];
 }
 
 message RegisterResponse {
@@ -33,8 +34,8 @@ message RegisterResponse {
 }
 
 message LoginRequest {
-  string account = 1;
-  string password = 2;
+  string account = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  string password = 2 [(validate.rules).string = {min_len: 1, max_bytes: 72}];
 }
 
 message LoginResponse {
@@ -44,7 +45,7 @@ message LoginResponse {
 }
 
 message RefreshTokenRequest {
-  string refresh_token = 1;
+  string refresh_token = 1 [(validate.rules).string = {min_len: 1, max_len: 2048}];
 }
 
 message RefreshTokenResponse {
@@ -69,4 +70,3 @@ message GetUserRequest {
 message GetUserResponse {
   User user = 1;
 }
-

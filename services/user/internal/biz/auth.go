@@ -15,12 +15,16 @@ type PasswordPolicy struct {
 
 func DefaultPasswordPolicy() PasswordPolicy {
 	return PasswordPolicy{
-		MinLength: 12,
+		MinLength: 8,
 		MaxBytes:  BcryptMaxPasswordBytes,
 	}
 }
 
 func (p PasswordPolicy) Validate(password string) error {
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return ErrInvalidArgument
+	}
 	if utf8.RuneCountInString(password) < p.MinLength {
 		return ErrInvalidArgument
 	}

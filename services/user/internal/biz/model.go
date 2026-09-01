@@ -44,5 +44,5 @@ func NormalizeEmail(email string) string {
 }
 
 func NormalizeUsername(username string) string {
-	return strings.TrimSpace(username)
+	return strings.ToLower(strings.TrimSpace(username))
 }

@@ -37,7 +37,7 @@ func DefaultConfig() Config {
 			Audience:        "go-oj-gateway",
 			Password: PasswordConfig{
 				BcryptCost: 12,
-				MinLength:  12,
+				MinLength:  8,
 				MaxBytes:   72,
 			},
 		},
