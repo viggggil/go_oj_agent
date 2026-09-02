@@ -242,6 +242,9 @@ Guidelines:
 - Keep the Issue, branch name, commit, and PR title aligned for traceability.
 - Do not skip CI before merge, even for tiny changes.
 - After a PR is merged remotely, fetch/prune and sync the local `main` branch to the latest `origin/main` before starting the next branch.
+- 一个 Issue 可以承载多次提交、多个阶段性 PR 和多次合并，不要求 Issue、提交和 PR 一一对应。
+- 小更新不需要为了形式单独创建 Issue；如果已有相关 Issue，应优先继续在原 Issue 下推进并保持关联。
+- 功能或架构工作可以拆成多个阶段性 PR，但每个 PR 都必须有清晰范围并通过 CI。
 
 Do not force-push, rewrite history, merge PR, create tags/releases or push directly to `main` unless explicitly asked.
 
