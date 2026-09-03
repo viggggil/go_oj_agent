@@ -4,7 +4,7 @@ BUF ?= buf
 GO_PACKAGES := ./...
 GO_FILES := $(shell git ls-files '*.go')
 
-.PHONY: init proto fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
+.PHONY: init proto generate fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
 
 init:
 	@$(GO) version
@@ -13,6 +13,10 @@ init:
 proto:
 	@$(BUF) dep update
 	@$(BUF) lint
+
+generate:
+	@$(BUF) dep update
+	@$(BUF) generate --path api/common/v1 --path api/user/v1
 
 fmt:
 	@if [ -n "$(GO_FILES)" ]; then \
