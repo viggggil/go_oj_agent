@@ -1,35 +1,15 @@
 package service
 
+import "github.com/viggggil/go_oj_agent/services/user/internal/biz"
+
 const Name = "user-service"
 
-type MethodName string
-
-const (
-	MethodRegister       MethodName = "Register"
-	MethodLogin          MethodName = "Login"
-	MethodRefreshToken   MethodName = "RefreshToken"
-	MethodGetCurrentUser MethodName = "GetCurrentUser"
-	MethodGetUser        MethodName = "GetUser"
-)
-
 type UserService struct {
-	methods []MethodName
+	uc *biz.UserUsecase
 }
 
-func NewUserService() *UserService {
+func NewUserService(uc *biz.UserUsecase) *UserService {
 	return &UserService{
-		methods: []MethodName{
-			MethodRegister,
-			MethodLogin,
-			MethodRefreshToken,
-			MethodGetCurrentUser,
-			MethodGetUser,
-		},
+		uc: uc,
 	}
-}
-
-func (s *UserService) Methods() []MethodName {
-	methods := make([]MethodName, len(s.methods))
-	copy(methods, s.methods)
-	return methods
 }

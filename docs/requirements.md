@@ -429,7 +429,7 @@ Pull Request 至少验证：
 - MySQL
 - Redis
 - gRPC
-- etcd
+- Consul
 
 ### Phase 2 — Distributed Judge
 

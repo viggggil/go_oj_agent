@@ -1,25 +1,16 @@
 package service
 
-import "testing"
+import (
+	"testing"
 
-func TestUserServiceMethods(t *testing.T) {
-	service := NewUserService()
-	methods := service.Methods()
+	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
+)
 
-	want := []MethodName{
-		MethodRegister,
-		MethodLogin,
-		MethodRefreshToken,
-		MethodGetCurrentUser,
-		MethodGetUser,
-	}
+func TestNewUserService(t *testing.T) {
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{})
+	service := NewUserService(usecase)
 
-	if len(methods) != len(want) {
-		t.Fatalf("len(Methods()) = %d, want %d", len(methods), len(want))
-	}
-	for i := range want {
-		if methods[i] != want[i] {
-			t.Fatalf("Methods()[%d] = %q, want %q", i, methods[i], want[i])
-		}
+	if service.uc != usecase {
+		t.Fatal("UserService did not keep the provided usecase")
 	}
 }

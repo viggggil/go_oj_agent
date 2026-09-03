@@ -49,7 +49,7 @@ flowchart TB
         Redis[("Redis")]
         RabbitMQ[("RabbitMQ")]
         MinIO[("MinIO")]
-        Etcd[("etcd")]
+        Consul[("Consul")]
     end
 
     subgraph Obs["Observability"]
@@ -93,11 +93,11 @@ flowchart TB
     Worker --> MinIO
     Agent --> MinIO
 
-    Gateway -.-> Etcd
-    User -.-> Etcd
-    Problem -.-> Etcd
-    Submission -.-> Etcd
-    Contest -.-> Etcd
+    Gateway -.-> Consul
+    User -.-> Consul
+    Problem -.-> Consul
+    Submission -.-> Consul
+    Contest -.-> Consul
 
     Gateway -. telemetry .-> OTel
     User -. telemetry .-> OTel
@@ -118,11 +118,11 @@ flowchart TB
 
 | Service | Technology | Responsibility | Main Dependencies |
 | --- | --- | --- | --- |
-| `gateway-service` | Go + Kratos | REST、SSE、认证入口、限流、路由、Trace | Redis、etcd |
-| `user-service` | Go + Kratos | 用户、认证、RBAC | MySQL、Redis |
-| `problem-service` | Go + Kratos | 题目、标签、测试点 Metadata | MySQL、Redis、MinIO |
-| `submission-service` | Go + Kratos | 提交、状态、结果、Outbox | MySQL、Redis、RabbitMQ |
-| `contest-service` | Go + Kratos | 比赛、作业、排行榜 | MySQL、Redis |
+| `gateway-service` | Go + Kratos | REST、SSE、认证入口、限流、路由、Trace | Redis、Consul |
+| `user-service` | Go + Kratos | 用户、认证、RBAC | MySQL、Redis、Consul |
+| `problem-service` | Go + Kratos | 题目、标签、测试点 Metadata | MySQL、Redis、MinIO、Consul |
+| `submission-service` | Go + Kratos | 提交、状态、结果、Outbox | MySQL、Redis、RabbitMQ、Consul |
+| `contest-service` | Go + Kratos | 比赛、作业、排行榜 | MySQL、Redis、Consul |
 | `judge-scheduler` | Go | Task 路由、优先级、Retry | RabbitMQ |
 | `judge-worker` | Go | 编译、Sandbox 执行、结果聚合 | RabbitMQ、MinIO |
 | `agent-service` | Python + FastAPI | Agent、RAG、Tool Calling、Streaming | gRPC、Vector DB、Redis |
@@ -632,7 +632,7 @@ Local：
 ```text
 Docker Compose
 +
-etcd
+Consul
 ```
 
 Production-like：
@@ -641,7 +641,7 @@ Production-like：
 Kubernetes
 ```
 
-本地开发可以使用 etcd 进行 Kratos 服务发现；进入 Kubernetes 后优先使用 Kubernetes Service Discovery，不强行叠加第二套发现机制。
+本地开发和非 Kubernetes 部署使用 Consul 提供服务注册与发现；进入 Kubernetes 后优先使用 Kubernetes Service Discovery，不强行叠加第二套发现机制。服务注册、健康检查、发现客户端和配置项将在对应服务接入阶段实现。
 
 ---
 
