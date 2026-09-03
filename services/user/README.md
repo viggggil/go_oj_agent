@@ -25,10 +25,9 @@
 
 ## 后续实现顺序
 
-1. 接入 MySQL，实现用户、角色和用户角色关系持久化。
-2. 接入 JWT，实现 Access Token 签发与校验。
-3. 接入 Redis，实现 Refresh Token 存储、轮换和撤销。
-4. 在 `internal/server` 接入真实运行时启动和服务注册中心。
+1. 接入 JWT，实现 Access Token 签发与校验。
+2. 接入 Redis，实现 Refresh Token 存储、轮换和撤销。
+3. 在 `internal/server` 接入真实运行时启动和服务注册中心。
 
 ## 角色
 

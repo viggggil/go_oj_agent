@@ -33,6 +33,9 @@ func TestRegisterInputNormalize(t *testing.T) {
 	if got.Email != "alice@example.com" {
 		t.Fatalf("Email = %q, want %q", got.Email, "alice@example.com")
 	}
+	if got.Password != "correct1" {
+		t.Fatalf("Password = %q, want %q", got.Password, "correct1")
+	}
 }
 
 func TestRegisterInputNormalizesUsernameCase(t *testing.T) {
@@ -145,6 +148,7 @@ func TestUserUsecaseRegister(t *testing.T) {
 type fakeUserRepository struct {
 	created     User
 	defaultRole RoleName
+	account     User
 }
 
 func (r *fakeUserRepository) CreateUser(_ context.Context, user User, defaultRole RoleName) (User, error) {
@@ -159,12 +163,16 @@ func (r *fakeUserRepository) FindByID(_ context.Context, userID int64) (User, er
 }
 
 func (r *fakeUserRepository) FindByAccount(_ context.Context, account string) (User, error) {
-	return User{Username: account}, nil
+	if r.account.ID == 0 && r.account.Username == "" && r.account.Email == "" {
+		return User{}, ErrUserNotFound
+	}
+	return r.account, nil
 }
 
 type fakePasswordHasher struct {
-	hash string
-	err  error
+	hash       string
+	err        error
+	compareErr error
 }
 
 func (h *fakePasswordHasher) Hash(string) (string, error) {
@@ -175,5 +183,77 @@ func (h *fakePasswordHasher) Hash(string) (string, error) {
 }
 
 func (h *fakePasswordHasher) Compare(string, string) error {
-	return errors.New("not implemented")
+	if h.compareErr != nil {
+		return h.compareErr
+	}
+	return nil
+}
+
+type fakeTokenIssuer struct {
+	pair TokenPair
+	err  error
+	user User
+}
+
+func (i *fakeTokenIssuer) Issue(_ context.Context, user User) (TokenPair, error) {
+	i.user = user
+	return i.pair, i.err
+}
+
+func TestUserUsecaseLogin(t *testing.T) {
+	repo := &fakeUserRepository{}
+	issuer := &fakeTokenIssuer{
+		pair: TokenPair{
+			AccessToken:  "access",
+			RefreshToken: "refresh",
+		},
+	}
+	uc := NewUserUsecase(UserUsecaseOptions{
+		Users:     repo,
+		Passwords: &fakePasswordHasher{hash: "hashed-password", compareErr: nil},
+		Tokens:    issuer,
+	})
+	repo.account = User{
+		ID:           1001,
+		Username:     "alice",
+		Email:        "alice@example.com",
+		PasswordHash: "hashed-password",
+		Status:       UserStatusActive,
+		Roles:        []RoleName{RoleUser},
+	}
+
+	got, err := uc.Login(context.Background(), LoginInput{
+		Account:  " ALICE@EXAMPLE.COM ",
+		Password: "correct1",
+	})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if got.AccessToken != "access" || got.RefreshToken != "refresh" {
+		t.Fatalf("TokenPair = %#v, want access/refresh", got)
+	}
+	if issuer.user.ID != 1001 || !issuer.user.HasRole(RoleUser) {
+		t.Fatalf("issued user = %#v, want loaded active user", issuer.user)
+	}
+}
+
+func TestUserUsecaseLoginRejectsInvalidCredential(t *testing.T) {
+	repo := &fakeUserRepository{
+		account: User{
+			PasswordHash: "hashed-password",
+			Status:       UserStatusActive,
+		},
+	}
+	uc := NewUserUsecase(UserUsecaseOptions{
+		Users:     repo,
+		Passwords: &fakePasswordHasher{compareErr: errors.New("mismatch")},
+		Tokens:    &fakeTokenIssuer{},
+	})
+
+	if _, err := uc.Login(context.Background(), LoginInput{
+		Account:  "alice",
+		Password: "wrong",
+	}); err != ErrInvalidCredential {
+		t.Fatalf("Login() error = %v, want ErrInvalidCredential", err)
+	}
 }

@@ -11,6 +11,7 @@ type RegisterInput struct {
 func (in RegisterInput) Normalize() RegisterInput {
 	in.Username = NormalizeUsername(in.Username)
 	in.Email = NormalizeEmail(in.Email)
+	in.Password = strings.TrimSpace(in.Password)
 	return in
 }
 
