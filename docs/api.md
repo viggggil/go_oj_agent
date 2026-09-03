@@ -435,6 +435,7 @@ User Service 第一阶段需要实现以下接口：
 - 使用 bcrypt 保存密码 Hash，默认 cost 为 12，禁止保存明文密码。
 - 创建用户后分配默认 `user` 角色。
 - 返回新用户的基础资料，不返回 `password_hash`。
+- 当前已接入 user-service 的 Proto handler 和 MySQL Repository。
 
 ### `Login`
 
@@ -447,6 +448,8 @@ User Service 第一阶段需要实现以下接口：
 - HS256 secret 只允许 `user-service` 和 `gateway` 持有。
 - 返回 Refresh Token，Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
+- 当前已接入账号查询、bcrypt 密码校验和 `TokenIssuer` 调用。
+- JWT 签发和 Refresh Token 持久化由后续认证实现阶段负责。
 
 ### `RefreshToken`
 

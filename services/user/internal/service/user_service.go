@@ -40,7 +40,7 @@ func (s *UserService) Register(
 		Password: req.GetPassword(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, toStatusError(err)
 	}
 
 	return &userv1.RegisterResponse{
@@ -49,10 +49,25 @@ func (s *UserService) Register(
 }
 
 func (s *UserService) Login(
-	context.Context,
-	*userv1.LoginRequest,
+	ctx context.Context,
+	req *userv1.LoginRequest,
 ) (*userv1.LoginResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "Login is not implemented")
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid login request")
+	}
+
+	tokens, err := s.uc.Login(ctx, biz.LoginInput{
+		Account:  req.GetAccount(),
+		Password: req.GetPassword(),
+	})
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+	return &userv1.LoginResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		ExpiresIn:    int64(tokens.ExpiresIn.Seconds()),
+	}, nil
 }
 
 func (s *UserService) RefreshToken(
@@ -87,5 +102,22 @@ func toProtoUser(user biz.User) *userv1.User {
 		Email:    user.Email,
 		Status:   string(user.Status),
 		Roles:    roles,
+	}
+}
+
+func toStatusError(err error) error {
+	switch err {
+	case biz.ErrInvalidArgument:
+		return status.Error(codes.InvalidArgument, err.Error())
+	case biz.ErrInvalidCredential:
+		return status.Error(codes.Unauthenticated, err.Error())
+	case biz.ErrUserAlreadyExists:
+		return status.Error(codes.AlreadyExists, err.Error())
+	case biz.ErrUserNotFound:
+		return status.Error(codes.NotFound, err.Error())
+	case biz.ErrUserInactive:
+		return status.Error(codes.PermissionDenied, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
 	}
 }

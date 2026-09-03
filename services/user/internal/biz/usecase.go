@@ -1,6 +1,9 @@
 package biz
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 type UserRepository interface {
 	CreateUser(ctx context.Context, user User, defaultRole RoleName) (User, error)
@@ -84,4 +87,36 @@ func (uc *UserUsecase) Register(ctx context.Context, input RegisterInput) (User,
 	}
 
 	return uc.users.CreateUser(ctx, user, RoleUser)
+}
+
+func (uc *UserUsecase) Login(ctx context.Context, input LoginInput) (TokenPair, error) {
+	if uc == nil || uc.users == nil || uc.passwords == nil || uc.tokens == nil {
+		return TokenPair{}, ErrInvalidArgument
+	}
+	if err := input.Validate(); err != nil {
+		return TokenPair{}, err
+	}
+
+	input = input.Normalize()
+	user, err := uc.users.FindByAccount(ctx, input.Account)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return TokenPair{}, ErrInvalidCredential
+		}
+		return TokenPair{}, err
+	}
+	if err := uc.passwords.Compare(user.PasswordHash, input.Password); err != nil {
+		return TokenPair{}, ErrInvalidCredential
+	}
+	if !user.IsActive() {
+		return TokenPair{}, ErrUserInactive
+	}
+
+	if len(user.Roles) == 0 && uc.roles != nil {
+		user.Roles, err = uc.roles.ListUserRoles(ctx, user.ID)
+		if err != nil {
+			return TokenPair{}, err
+		}
+	}
+	return uc.tokens.Issue(ctx, user)
 }
