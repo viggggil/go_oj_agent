@@ -14,10 +14,10 @@
 
 ## 当前范围
 
-本阶段只建立可编译、可测试的服务骨架：
+本阶段完成 Proto 代码生成和 gRPC handler 的基础接入：
 
 - `cmd/user-service`：服务入口、wire 注入和启动装配。
-- `internal/server`：HTTP / gRPC Server 构建、middleware 应用和 service 注册的传输层入口；当前保留启动装配边界，待生成 Proto Go 代码后接入真实 runtime。
+- `internal/server`：HTTP / gRPC Server 构建、middleware 应用和 service 注册的传输层入口。
 - `internal/conf`：认证相关配置结构。
 - `internal/biz`：领域模型、错误、校验逻辑和 usecase 依赖接口。
 - `internal/data`：后续 MySQL / Redis 数据实现的占位接口。
@@ -28,7 +28,7 @@
 1. 接入 MySQL，实现用户、角色和用户角色关系持久化。
 2. 接入 JWT，实现 Access Token 签发与校验。
 3. 接入 Redis，实现 Refresh Token 存储、轮换和撤销。
-4. 生成 protobuf Go 代码后，将 `internal/service` 实现为真实 gRPC handler，并在 `internal/server` 注册。
+4. 在 `internal/server` 接入真实运行时启动和服务注册中心。
 
 ## 角色
 
