@@ -26,7 +26,7 @@ MySQL
 Redis
 RabbitMQ
 MinIO
-etcd
+Consul
 Chroma / Qdrant
 
 OpenTelemetry
@@ -52,6 +52,8 @@ migrations/ database migrations
 deploy/     deployment files
 docs/       design documents
 ```
+
+Kratos-style service bootstrap files live under `services/<service>/cmd/<service>/`, with `main.go`, `wire.go`, and `wire_gen.go` placed together for each service entrypoint.
 
 ---
 

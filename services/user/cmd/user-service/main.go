@@ -1,11 +1,19 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/viggggil/go_oj_agent/services/user/internal/service"
+	"log"
 )
 
 func main() {
-	fmt.Printf("%s scaffold ready\n", service.Name)
+	app, cleanup, err := initApp()
+	if err != nil {
+		log.Fatalf("failed to initialize user-service: %v", err)
+	}
+	defer func() {
+		cleanup()
+	}()
+
+	if err := app.Run(); err != nil {
+		log.Fatalf("user-service exited with error: %v", err)
+	}
 }

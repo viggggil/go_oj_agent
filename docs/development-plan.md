@@ -340,7 +340,7 @@ MySQL
 Redis
 RabbitMQ
 MinIO
-etcd
+Consul
 ```
 
 ---
@@ -1800,7 +1800,6 @@ More Languages
 Kafka
 Istio
 Nacos
-Consul
 MongoDB
 ClickHouse
 Elasticsearch
@@ -2401,7 +2400,7 @@ Agent 可以通过受控 Tool Calling 使用后端能力
 - [ ] Redis
 - [ ] RabbitMQ
 - [ ] MinIO
-- [ ] etcd
+- [ ] Consul
 
 ## Reliability
 
