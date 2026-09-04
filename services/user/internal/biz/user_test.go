@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestRegisterInputValidate(t *testing.T) {
@@ -159,6 +160,9 @@ func (r *fakeUserRepository) CreateUser(_ context.Context, user User, defaultRol
 }
 
 func (r *fakeUserRepository) FindByID(_ context.Context, userID int64) (User, error) {
+	if r.account.ID != 0 {
+		return r.account, nil
+	}
 	return User{ID: userID}, nil
 }
 
@@ -190,28 +194,91 @@ func (h *fakePasswordHasher) Compare(string, string) error {
 }
 
 type fakeTokenIssuer struct {
-	pair TokenPair
-	err  error
-	user User
+	accessToken string
+	expiresIn   time.Duration
+	err         error
+	user        User
 }
 
-func (i *fakeTokenIssuer) Issue(_ context.Context, user User) (TokenPair, error) {
+func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, user User) (string, time.Duration, error) {
 	i.user = user
-	return i.pair, i.err
+	return i.accessToken, i.expiresIn, i.err
+}
+
+type fakeRefreshTokenManager struct {
+	raw    string
+	record RefreshTokenRecord
+}
+
+func (m *fakeRefreshTokenManager) Generate(
+	userID int64,
+	sessionID string,
+	rotatedFrom string,
+) (string, RefreshTokenRecord, error) {
+	record := m.record
+	record.UserID = userID
+	if record.SessionID == "" {
+		record.SessionID = sessionID
+	}
+	if record.RotatedFrom == "" {
+		record.RotatedFrom = rotatedFrom
+	}
+	if record.TokenHash == "" {
+		record.TokenHash = m.Hash(m.raw)
+	}
+	return m.raw, record, nil
+}
+
+func (*fakeRefreshTokenManager) Hash(token string) string {
+	return "hash:" + token
+}
+
+type fakeRefreshTokenStore struct {
+	saved          RefreshTokenRecord
+	found          RefreshTokenRecord
+	findErr        error
+	rotatedOldHash string
+	rotatedNext    RefreshTokenRecord
+}
+
+func (s *fakeRefreshTokenStore) Save(_ context.Context, record RefreshTokenRecord) error {
+	s.saved = record
+	return nil
+}
+
+func (s *fakeRefreshTokenStore) FindByHash(_ context.Context, tokenHash string) (RefreshTokenRecord, error) {
+	if s.findErr != nil {
+		return RefreshTokenRecord{}, s.findErr
+	}
+	if s.found.TokenHash != tokenHash {
+		return RefreshTokenRecord{}, ErrRefreshTokenDenied
+	}
+	return s.found, nil
+}
+
+func (s *fakeRefreshTokenStore) Rotate(_ context.Context, oldTokenHash string, next RefreshTokenRecord) error {
+	s.rotatedOldHash = oldTokenHash
+	s.rotatedNext = next
+	return nil
+}
+
+func (*fakeRefreshTokenStore) RevokeSession(context.Context, string) error {
+	return nil
 }
 
 func TestUserUsecaseLogin(t *testing.T) {
 	repo := &fakeUserRepository{}
 	issuer := &fakeTokenIssuer{
-		pair: TokenPair{
-			AccessToken:  "access",
-			RefreshToken: "refresh",
-		},
+		accessToken: "access",
+		expiresIn:   15 * time.Minute,
 	}
+	refreshStore := &fakeRefreshTokenStore{}
 	uc := NewUserUsecase(UserUsecaseOptions{
-		Users:     repo,
-		Passwords: &fakePasswordHasher{hash: "hashed-password", compareErr: nil},
-		Tokens:    issuer,
+		Users:         repo,
+		Passwords:     &fakePasswordHasher{hash: "hashed-password", compareErr: nil},
+		Tokens:        issuer,
+		RefreshToken:  &fakeRefreshTokenManager{raw: "refresh"},
+		RefreshTokens: refreshStore,
 	})
 	repo.account = User{
 		ID:           1001,
@@ -232,6 +299,12 @@ func TestUserUsecaseLogin(t *testing.T) {
 	if got.AccessToken != "access" || got.RefreshToken != "refresh" {
 		t.Fatalf("TokenPair = %#v, want access/refresh", got)
 	}
+	if got.ExpiresIn != 15*time.Minute {
+		t.Fatalf("ExpiresIn = %s, want 15m", got.ExpiresIn)
+	}
+	if refreshStore.saved.UserID != 1001 || refreshStore.saved.TokenHash != "hash:refresh" {
+		t.Fatalf("saved refresh token = %#v, want user 1001 hash:refresh", refreshStore.saved)
+	}
 	if issuer.user.ID != 1001 || !issuer.user.HasRole(RoleUser) {
 		t.Fatalf("issued user = %#v, want loaded active user", issuer.user)
 	}
@@ -245,9 +318,11 @@ func TestUserUsecaseLoginRejectsInvalidCredential(t *testing.T) {
 		},
 	}
 	uc := NewUserUsecase(UserUsecaseOptions{
-		Users:     repo,
-		Passwords: &fakePasswordHasher{compareErr: errors.New("mismatch")},
-		Tokens:    &fakeTokenIssuer{},
+		Users:         repo,
+		Passwords:     &fakePasswordHasher{compareErr: errors.New("mismatch")},
+		Tokens:        &fakeTokenIssuer{},
+		RefreshToken:  &fakeRefreshTokenManager{raw: "refresh"},
+		RefreshTokens: &fakeRefreshTokenStore{},
 	})
 
 	if _, err := uc.Login(context.Background(), LoginInput{
@@ -255,5 +330,72 @@ func TestUserUsecaseLoginRejectsInvalidCredential(t *testing.T) {
 		Password: "wrong",
 	}); err != ErrInvalidCredential {
 		t.Fatalf("Login() error = %v, want ErrInvalidCredential", err)
+	}
+}
+
+func TestUserUsecaseRefreshTokenRotatesToken(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &fakeUserRepository{
+		account: User{
+			ID:       1001,
+			Username: "alice",
+			Status:   UserStatusActive,
+			Roles:    []RoleName{RoleUser},
+		},
+	}
+	refreshStore := &fakeRefreshTokenStore{
+		found: RefreshTokenRecord{
+			UserID:    1001,
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			TokenHash: "hash:old-refresh",
+			ExpiresAt: now.Add(time.Hour),
+		},
+	}
+	uc := NewUserUsecase(UserUsecaseOptions{
+		Users:         repo,
+		Passwords:     &fakePasswordHasher{},
+		Tokens:        &fakeTokenIssuer{accessToken: "new-access", expiresIn: 15 * time.Minute},
+		RefreshToken:  &fakeRefreshTokenManager{raw: "new-refresh"},
+		RefreshTokens: refreshStore,
+	})
+
+	got, err := uc.RefreshToken(context.Background(), RefreshTokenInput{
+		RefreshToken: "old-refresh",
+	})
+	if err != nil {
+		t.Fatalf("RefreshToken() error = %v", err)
+	}
+	if got.AccessToken != "new-access" || got.RefreshToken != "new-refresh" {
+		t.Fatalf("TokenPair = %#v, want new-access/new-refresh", got)
+	}
+	if refreshStore.rotatedOldHash != "hash:old-refresh" {
+		t.Fatalf("rotated old hash = %q, want hash:old-refresh", refreshStore.rotatedOldHash)
+	}
+	if refreshStore.rotatedNext.SessionID != "session-1" || refreshStore.rotatedNext.RotatedFrom != "token-1" {
+		t.Fatalf("rotated next = %#v, want same session and rotated token", refreshStore.rotatedNext)
+	}
+}
+
+func TestUserUsecaseRefreshTokenRejectsRevokedToken(t *testing.T) {
+	refreshStore := &fakeRefreshTokenStore{
+		found: RefreshTokenRecord{
+			UserID:    1001,
+			TokenHash: "hash:old-refresh",
+			ExpiresAt: time.Now().Add(time.Hour),
+			Revoked:   true,
+		},
+	}
+	uc := NewUserUsecase(UserUsecaseOptions{
+		Users:         &fakeUserRepository{},
+		Tokens:        &fakeTokenIssuer{},
+		RefreshToken:  &fakeRefreshTokenManager{raw: "new-refresh"},
+		RefreshTokens: refreshStore,
+	})
+
+	if _, err := uc.RefreshToken(context.Background(), RefreshTokenInput{
+		RefreshToken: "old-refresh",
+	}); err != ErrRefreshTokenDenied {
+		t.Fatalf("RefreshToken() error = %v, want ErrRefreshTokenDenied", err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -60,15 +61,15 @@ func TestLoginMapsProtoRequestAndResponse(t *testing.T) {
 		},
 	}
 	issuer := &fakeTokenIssuer{
-		pair: biz.TokenPair{
-			AccessToken:  "access",
-			RefreshToken: "refresh",
-		},
+		accessToken: "access",
+		expiresIn:   15 * time.Minute,
 	}
 	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
-		Users:     repository,
-		Passwords: fakePasswordHasher{},
-		Tokens:    issuer,
+		Users:         repository,
+		Passwords:     fakePasswordHasher{},
+		Tokens:        issuer,
+		RefreshToken:  &fakeRefreshTokenManager{raw: "refresh"},
+		RefreshTokens: &fakeRefreshTokenStore{},
 	})
 	service := NewUserService(usecase)
 
@@ -82,6 +83,9 @@ func TestLoginMapsProtoRequestAndResponse(t *testing.T) {
 	if response.GetAccessToken() != "access" || response.GetRefreshToken() != "refresh" {
 		t.Fatalf("response tokens = %#v, want access/refresh", response)
 	}
+	if response.GetExpiresIn() != 900 {
+		t.Fatalf("expires_in = %d, want 900", response.GetExpiresIn())
+	}
 }
 
 func TestLoginMapsInvalidCredential(t *testing.T) {
@@ -92,8 +96,10 @@ func TestLoginMapsInvalidCredential(t *testing.T) {
 				Status:       biz.UserStatusActive,
 			},
 		},
-		Passwords: fakePasswordHasher{compareErr: errors.New("mismatch")},
-		Tokens:    &fakeTokenIssuer{},
+		Passwords:     fakePasswordHasher{compareErr: errors.New("mismatch")},
+		Tokens:        &fakeTokenIssuer{},
+		RefreshToken:  &fakeRefreshTokenManager{raw: "refresh"},
+		RefreshTokens: &fakeRefreshTokenStore{},
 	})
 
 	_, err := NewUserService(usecase).Login(context.Background(), &userv1.LoginRequest{
@@ -102,6 +108,38 @@ func TestLoginMapsInvalidCredential(t *testing.T) {
 	})
 	if got := status.Code(err); got != codes.Unauthenticated {
 		t.Fatalf("Login() status = %s, want %s", got, codes.Unauthenticated)
+	}
+}
+
+func TestRefreshTokenMapsProtoRequestAndResponse(t *testing.T) {
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		Users: &fakeUserRepository{
+			account: biz.User{
+				ID:       1001,
+				Username: "alice",
+				Status:   biz.UserStatusActive,
+				Roles:    []biz.RoleName{biz.RoleUser},
+			},
+		},
+		Tokens:       &fakeTokenIssuer{accessToken: "next-access", expiresIn: 15 * time.Minute},
+		RefreshToken: &fakeRefreshTokenManager{raw: "next-refresh"},
+		RefreshTokens: &fakeRefreshTokenStore{found: biz.RefreshTokenRecord{
+			UserID:    1001,
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			TokenHash: "hash:old-refresh",
+			ExpiresAt: time.Now().Add(time.Hour),
+		}},
+	})
+
+	response, err := NewUserService(usecase).RefreshToken(context.Background(), &userv1.RefreshTokenRequest{
+		RefreshToken: "old-refresh",
+	})
+	if err != nil {
+		t.Fatalf("RefreshToken() error = %v", err)
+	}
+	if response.GetAccessToken() != "next-access" || response.GetRefreshToken() != "next-refresh" {
+		t.Fatalf("response tokens = %#v, want next-access/next-refresh", response)
 	}
 }
 
@@ -117,6 +155,9 @@ func (r *fakeUserRepository) CreateUser(_ context.Context, user biz.User, _ biz.
 }
 
 func (r *fakeUserRepository) FindByID(_ context.Context, userID int64) (biz.User, error) {
+	if r.account.ID != 0 {
+		return r.account, nil
+	}
 	return biz.User{ID: userID}, nil
 }
 
@@ -140,9 +181,56 @@ func (h fakePasswordHasher) Compare(string, string) error {
 }
 
 type fakeTokenIssuer struct {
-	pair biz.TokenPair
+	accessToken string
+	expiresIn   time.Duration
 }
 
-func (i *fakeTokenIssuer) Issue(_ context.Context, _ biz.User) (biz.TokenPair, error) {
-	return i.pair, nil
+func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, _ biz.User) (string, time.Duration, error) {
+	return i.accessToken, i.expiresIn, nil
+}
+
+type fakeRefreshTokenManager struct {
+	raw string
+}
+
+func (m *fakeRefreshTokenManager) Generate(
+	userID int64,
+	sessionID string,
+	rotatedFrom string,
+) (string, biz.RefreshTokenRecord, error) {
+	return m.raw, biz.RefreshTokenRecord{
+		UserID:      userID,
+		SessionID:   sessionID,
+		TokenID:     "next-token",
+		TokenHash:   m.Hash(m.raw),
+		ExpiresAt:   time.Now().Add(time.Hour),
+		RotatedFrom: rotatedFrom,
+	}, nil
+}
+
+func (*fakeRefreshTokenManager) Hash(token string) string {
+	return "hash:" + token
+}
+
+type fakeRefreshTokenStore struct {
+	found biz.RefreshTokenRecord
+}
+
+func (*fakeRefreshTokenStore) Save(context.Context, biz.RefreshTokenRecord) error {
+	return nil
+}
+
+func (s *fakeRefreshTokenStore) FindByHash(_ context.Context, tokenHash string) (biz.RefreshTokenRecord, error) {
+	if s.found.TokenHash != tokenHash {
+		return biz.RefreshTokenRecord{}, biz.ErrRefreshTokenDenied
+	}
+	return s.found, nil
+}
+
+func (*fakeRefreshTokenStore) Rotate(context.Context, string, biz.RefreshTokenRecord) error {
+	return nil
+}
+
+func (*fakeRefreshTokenStore) RevokeSession(context.Context, string) error {
+	return nil
 }

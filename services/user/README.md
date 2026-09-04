@@ -25,9 +25,9 @@
 
 ## 后续实现顺序
 
-1. 接入 JWT，实现 Access Token 签发与校验。
-2. 接入 Redis，实现 Refresh Token 存储、轮换和撤销。
-3. 在 `internal/server` 接入真实运行时启动和服务注册中心。
+1. 接入管理员 bootstrap 命令。
+2. 在 `internal/server` 接入真实运行时启动和服务注册中心。
+3. 补齐配置加载、数据库连接和 Redis 连接的 Wire 装配。
 
 ## 角色
 
@@ -45,7 +45,7 @@ MVP 阶段只使用两个角色：
 - Access Token TTL 默认为 15 分钟。
 - JWT payload 可以携带 `roles`，但资源最终授权仍由资源所属服务执行。
 - Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
-- Refresh Token 后续实现轮换。
+- Refresh Token 成功刷新时执行轮换，旧 token 会被标记为撤销。
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
 - 密码策略保持简单：trim 后不能为空，最小 8 个字符，最大 72 bytes。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。

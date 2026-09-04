@@ -14,6 +14,7 @@ type ServiceConfig struct {
 type AuthConfig struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	AccessTokenKey  string
 	Issuer          string
 	Audience        string
 	Password        PasswordConfig
@@ -33,6 +34,7 @@ func DefaultConfig() Config {
 		Auth: AuthConfig{
 			AccessTokenTTL:  15 * time.Minute,
 			RefreshTokenTTL: 7 * 24 * time.Hour,
+			AccessTokenKey:  "",
 			Issuer:          "go-oj-agent",
 			Audience:        "go-oj-gateway",
 			Password: PasswordConfig{

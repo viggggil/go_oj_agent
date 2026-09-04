@@ -28,10 +28,10 @@ func (s *UserService) Register(
 	req *userv1.RegisterRequest,
 ) (*userv1.RegisterResponse, error) {
 	if req == nil {
-		return nil, biz.ErrInvalidArgument
+		return nil, status.Error(codes.InvalidArgument, "invalid register request")
 	}
 	if s == nil || s.uc == nil {
-		return nil, biz.ErrInvalidArgument
+		return nil, status.Error(codes.InvalidArgument, "invalid register request")
 	}
 
 	user, err := s.uc.Register(ctx, biz.RegisterInput{
@@ -71,10 +71,24 @@ func (s *UserService) Login(
 }
 
 func (s *UserService) RefreshToken(
-	context.Context,
-	*userv1.RefreshTokenRequest,
+	ctx context.Context,
+	req *userv1.RefreshTokenRequest,
 ) (*userv1.RefreshTokenResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "RefreshToken is not implemented")
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid refresh token request")
+	}
+
+	tokens, err := s.uc.RefreshToken(ctx, biz.RefreshTokenInput{
+		RefreshToken: req.GetRefreshToken(),
+	})
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+	return &userv1.RefreshTokenResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		ExpiresIn:    int64(tokens.ExpiresIn.Seconds()),
+	}, nil
 }
 
 func (s *UserService) GetCurrentUser(
@@ -110,6 +124,8 @@ func toStatusError(err error) error {
 	case biz.ErrInvalidArgument:
 		return status.Error(codes.InvalidArgument, err.Error())
 	case biz.ErrInvalidCredential:
+		return status.Error(codes.Unauthenticated, err.Error())
+	case biz.ErrRefreshTokenDenied:
 		return status.Error(codes.Unauthenticated, err.Error())
 	case biz.ErrUserAlreadyExists:
 		return status.Error(codes.AlreadyExists, err.Error())
