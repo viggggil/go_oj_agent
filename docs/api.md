@@ -461,6 +461,15 @@ User Service 第一阶段需要实现以下接口：
 - Redis 中只保存 Refresh Token 的 SHA-256 hash 对应记录，不保存原文。
 - 不允许通过 Refresh Token 直接改变用户身份或角色。
 
+### 管理员 bootstrap
+
+管理员账号不通过普通注册接口创建，使用一次性 bootstrap 命令初始化。
+
+- 从环境变量读取数据库 DSN、管理员用户名、邮箱和密码。
+- 密码使用 bcrypt 哈希后写入数据库。
+- 如果系统中已经存在 `admin` 角色用户，命令幂等跳过，不覆盖或增发管理员。
+- bootstrap 命令输出 JSON 结构化日志，普通日志走 stdout，错误日志走 stderr。
+
 ### `GetCurrentUser`
 
 获取当前认证用户的基础资料。

@@ -141,6 +141,7 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 		return TokenPair{}, err
 	}
 
+	// 刷新时用客户端 token 计算 hash 后查找记录，避免服务端存储或查询 refresh token 原文。
 	tokenHash := uc.refreshToken.Hash(input.RefreshToken)
 	record, err := uc.refreshTokens.FindByHash(ctx, tokenHash)
 	if err != nil {
@@ -169,6 +170,7 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 	if err != nil {
 		return TokenPair{}, err
 	}
+	// 成功刷新必须轮换 refresh token：新 token 继承同一个 session，旧 token 由 store 标记撤销。
 	nextRaw, nextRecord, err := uc.refreshToken.Generate(user.ID, record.SessionID, record.TokenID)
 	if err != nil {
 		return TokenPair{}, err
