@@ -70,6 +70,7 @@ func (s *RedisRefreshTokenStore) Rotate(
 	oldTokenHash string,
 	next biz.RefreshTokenRecord,
 ) error {
+	// 轮换先读取旧记录；如果旧记录已经撤销或锁定，视为异常重放并拒绝继续签发。
 	old, err := s.FindByHash(ctx, oldTokenHash)
 	if err != nil {
 		return err

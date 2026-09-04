@@ -33,6 +33,7 @@ func (s *StoreSet) CreateUser(
 		return biz.User{}, fmt.Errorf("user database is not configured")
 	}
 
+	// 创建用户和绑定默认角色必须在同一事务内完成，避免出现无角色用户。
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return biz.User{}, err
@@ -69,6 +70,74 @@ func (s *StoreSet) CreateUser(
 		INSERT INTO user_roles (user_id, role_id, created_at)
 		VALUES (?, ?, UTC_TIMESTAMP(3))
 	`, user.ID, roleID)
+	if err != nil {
+		return biz.User{}, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return biz.User{}, err
+	}
+	return user, nil
+}
+
+func (s *StoreSet) BootstrapAdmin(ctx context.Context, user biz.User) (created biz.User, err error) {
+	if s == nil || s.db == nil {
+		return biz.User{}, fmt.Errorf("user database is not configured")
+	}
+
+	// bootstrap 需要同时检查现有管理员、创建用户和绑定 admin 角色，必须保持事务一致性。
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return biz.User{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var adminRoleID int64
+	err = tx.QueryRowContext(ctx, `SELECT id FROM roles WHERE name = ?`, biz.RoleAdmin).Scan(&adminRoleID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return biz.User{}, fmt.Errorf("admin role is not seeded")
+	}
+	if err != nil {
+		return biz.User{}, err
+	}
+
+	// bootstrap 是一次性命令：如果系统中已有 admin 角色用户，直接拒绝，避免覆盖或增发管理员。
+	var existing int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM user_roles ur
+		INNER JOIN roles r ON r.id = ur.role_id
+		WHERE r.name = ?
+	`, biz.RoleAdmin).Scan(&existing)
+	if err != nil {
+		return biz.User{}, err
+	}
+	if existing > 0 {
+		return biz.User{}, biz.ErrAdminAlreadyExists
+	}
+
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO users (username, email, password_hash, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))
+	`, user.Username, user.Email, user.PasswordHash, user.Status)
+	if err != nil {
+		return biz.User{}, translateMySQLError(err)
+	}
+
+	user.ID, err = result.LastInsertId()
+	if err != nil {
+		return biz.User{}, err
+	}
+	user.Roles = []biz.RoleName{biz.RoleAdmin}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO user_roles (user_id, role_id, created_at)
+		VALUES (?, ?, UTC_TIMESTAMP(3))
+	`, user.ID, adminRoleID)
 	if err != nil {
 		return biz.User{}, err
 	}

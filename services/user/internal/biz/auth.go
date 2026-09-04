@@ -146,6 +146,7 @@ func (m *HMACTokenManager) ValidateAccessToken(token string) (AccessTokenClaims,
 		return AccessTokenClaims{}, ErrInvalidCredential
 	}
 
+	// 先按原始 header.payload 计算签名，再解析 claims，避免篡改 payload 后被继续使用。
 	signed := parts[0] + "." + parts[1]
 	want := signHS256([]byte(signed), m.secret)
 	if !hmac.Equal([]byte(parts[2]), []byte(want)) {
@@ -194,6 +195,7 @@ func (m *HMACTokenManager) Generate(
 		return "", RefreshTokenRecord{}, ErrInvalidArgument
 	}
 
+	// Refresh Token 只向客户端返回随机原文，服务端持久化时仅保存 SHA-256 hash。
 	raw, err := randomURLToken(32)
 	if err != nil {
 		return "", RefreshTokenRecord{}, err

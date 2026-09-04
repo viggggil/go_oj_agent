@@ -88,3 +88,64 @@ func TestFindByAccountLoadsRoles(t *testing.T) {
 		t.Fatalf("Roles = %#v, want [user admin]", got.Roles)
 	}
 }
+
+func TestBootstrapAdminCreatesAdminWhenNoAdminExists(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM roles WHERE name").
+		WithArgs(biz.RoleAdmin).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(20))
+	mock.ExpectQuery("SELECT COUNT").
+		WithArgs(biz.RoleAdmin).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs("admin", "admin@example.com", "hash", biz.UserStatusActive).
+		WillReturnResult(sqlmock.NewResult(1002, 1))
+	mock.ExpectExec("INSERT INTO user_roles").
+		WithArgs(int64(1002), int64(20)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	got, err := NewStoreSet(db).BootstrapAdmin(context.Background(), biz.User{
+		Username:     "admin",
+		Email:        "admin@example.com",
+		PasswordHash: "hash",
+		Status:       biz.UserStatusActive,
+	})
+	if err != nil {
+		t.Fatalf("BootstrapAdmin() error = %v", err)
+	}
+	if got.ID != 1002 || !got.HasRole(biz.RoleAdmin) {
+		t.Fatalf("admin = %#v, want id 1002 with admin role", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("SQL expectations: %v", err)
+	}
+}
+
+func TestBootstrapAdminRejectsExistingAdmin(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM roles WHERE name").
+		WithArgs(biz.RoleAdmin).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(20))
+	mock.ExpectQuery("SELECT COUNT").
+		WithArgs(biz.RoleAdmin).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectRollback()
+
+	_, err = NewStoreSet(db).BootstrapAdmin(context.Background(), biz.User{})
+	if err != biz.ErrAdminAlreadyExists {
+		t.Fatalf("BootstrapAdmin() error = %v, want ErrAdminAlreadyExists", err)
+	}
+}

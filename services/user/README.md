@@ -20,14 +20,33 @@
 - `internal/server`：HTTP / gRPC Server 构建、middleware 应用和 service 注册的传输层入口。
 - `internal/conf`：认证相关配置结构。
 - `internal/biz`：领域模型、错误、校验逻辑和 usecase 依赖接口。
-- `internal/data`：后续 MySQL / Redis 数据实现的占位接口。
+- `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
 
 ## 后续实现顺序
 
-1. 接入管理员 bootstrap 命令。
-2. 在 `internal/server` 接入真实运行时启动和服务注册中心。
-3. 补齐配置加载、数据库连接和 Redis 连接的 Wire 装配。
+1. 在 `internal/server` 接入真实运行时启动和服务注册中心。
+2. 补齐配置加载、数据库连接和 Redis 连接的 Wire 装配。
+
+## 管理员 bootstrap
+
+管理员用户通过一次性命令创建：
+
+```bash
+export USER_BOOTSTRAP_DSN='user:pass@tcp(127.0.0.1:3306)/oj_user?parseTime=true'
+export USER_BOOTSTRAP_ADMIN_USERNAME='admin'
+export USER_BOOTSTRAP_ADMIN_EMAIL='admin@example.com'
+read -r -s USER_BOOTSTRAP_ADMIN_PASSWORD
+export USER_BOOTSTRAP_ADMIN_PASSWORD
+go run ./services/user/cmd/user-bootstrap
+unset USER_BOOTSTRAP_ADMIN_PASSWORD
+```
+
+命令规则：
+
+- 密码使用 bcrypt 哈希后写入数据库，不保存明文。
+- 如果系统中已经存在 `admin` 角色用户，命令会输出结构化日志并跳过，不覆盖已有管理员。
+- 初始管理员参数只从环境变量读取。
 
 ## 角色
 
@@ -49,3 +68,10 @@ MVP 阶段只使用两个角色：
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
 - 密码策略保持简单：trim 后不能为空，最小 8 个字符，最大 72 bytes。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。
+
+## 日志
+
+- 服务和 bootstrap 命令使用 `slog` 输出 JSON 结构化日志。
+- 普通运行日志输出到 stdout。
+- 错误日志输出到 stderr。
+- 后续由 Alloy 统一采集日志，不在业务代码中写入本地日志文件。
