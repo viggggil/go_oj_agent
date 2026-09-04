@@ -181,7 +181,7 @@ Request：
 }
 ```
 
-Response：新的 Access Token；是否轮换 Refresh Token 由实现策略决定。
+Response：新的 Access Token 和轮换后的 Refresh Token。
 
 ---
 
@@ -449,7 +449,7 @@ User Service 第一阶段需要实现以下接口：
 - 返回 Refresh Token，Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
 - 当前已接入账号查询、bcrypt 密码校验和 `TokenIssuer` 调用。
-- JWT 签发和 Refresh Token 持久化由后续认证实现阶段负责。
+- 当前已接入 HS256 JWT 签发和 Redis Refresh Token 保存。
 
 ### `RefreshToken`
 
@@ -458,6 +458,7 @@ User Service 第一阶段需要实现以下接口：
 - 校验 Refresh Token 是否存在、未过期、未撤销。
 - 每次成功刷新时轮换 Refresh Token。
 - 轮换时撤销旧的 Refresh Token，避免重复使用。
+- Redis 中只保存 Refresh Token 的 SHA-256 hash 对应记录，不保存原文。
 - 不允许通过 Refresh Token 直接改变用户身份或角色。
 
 ### `GetCurrentUser`

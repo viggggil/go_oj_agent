@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 type UserRepository interface {
@@ -21,12 +22,18 @@ type PasswordHasher interface {
 }
 
 type TokenIssuer interface {
-	Issue(ctx context.Context, user User) (TokenPair, error)
+	IssueAccessToken(ctx context.Context, user User) (string, time.Duration, error)
+}
+
+type RefreshTokenGenerator interface {
+	Generate(userID int64, sessionID string, rotatedFrom string) (string, RefreshTokenRecord, error)
+	Hash(token string) string
 }
 
 type RefreshTokenStore interface {
 	Save(ctx context.Context, record RefreshTokenRecord) error
-	Rotate(ctx context.Context, oldToken string, next RefreshTokenRecord) error
+	FindByHash(ctx context.Context, tokenHash string) (RefreshTokenRecord, error)
+	Rotate(ctx context.Context, oldTokenHash string, next RefreshTokenRecord) error
 	RevokeSession(ctx context.Context, sessionID string) error
 }
 
@@ -35,6 +42,7 @@ type UserUsecase struct {
 	roles          RoleRepository
 	passwords      PasswordHasher
 	tokens         TokenIssuer
+	refreshToken   RefreshTokenGenerator
 	refreshTokens  RefreshTokenStore
 	passwordPolicy PasswordPolicy
 }
@@ -44,6 +52,7 @@ type UserUsecaseOptions struct {
 	Roles          RoleRepository
 	Passwords      PasswordHasher
 	Tokens         TokenIssuer
+	RefreshToken   RefreshTokenGenerator
 	RefreshTokens  RefreshTokenStore
 	PasswordPolicy PasswordPolicy
 }
@@ -59,6 +68,7 @@ func NewUserUsecase(options UserUsecaseOptions) *UserUsecase {
 		roles:          options.Roles,
 		passwords:      options.Passwords,
 		tokens:         options.Tokens,
+		refreshToken:   options.RefreshToken,
 		refreshTokens:  options.RefreshTokens,
 		passwordPolicy: policy,
 	}
@@ -90,7 +100,8 @@ func (uc *UserUsecase) Register(ctx context.Context, input RegisterInput) (User,
 }
 
 func (uc *UserUsecase) Login(ctx context.Context, input LoginInput) (TokenPair, error) {
-	if uc == nil || uc.users == nil || uc.passwords == nil || uc.tokens == nil {
+	if uc == nil || uc.users == nil || uc.passwords == nil || uc.tokens == nil ||
+		uc.refreshToken == nil || uc.refreshTokens == nil {
 		return TokenPair{}, ErrInvalidArgument
 	}
 	if err := input.Validate(); err != nil {
@@ -118,5 +129,81 @@ func (uc *UserUsecase) Login(ctx context.Context, input LoginInput) (TokenPair, 
 			return TokenPair{}, err
 		}
 	}
-	return uc.tokens.Issue(ctx, user)
+	return uc.issueTokenPair(ctx, user, "", "")
+}
+
+func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput) (TokenPair, error) {
+	if uc == nil || uc.users == nil || uc.tokens == nil ||
+		uc.refreshToken == nil || uc.refreshTokens == nil {
+		return TokenPair{}, ErrInvalidArgument
+	}
+	if err := input.Validate(); err != nil {
+		return TokenPair{}, err
+	}
+
+	tokenHash := uc.refreshToken.Hash(input.RefreshToken)
+	record, err := uc.refreshTokens.FindByHash(ctx, tokenHash)
+	if err != nil {
+		return TokenPair{}, ErrRefreshTokenDenied
+	}
+	now := time.Now()
+	if record.Revoked || record.ReplayLocked || !record.ExpiresAt.After(now) {
+		return TokenPair{}, ErrRefreshTokenDenied
+	}
+
+	user, err := uc.users.FindByID(ctx, record.UserID)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if !user.IsActive() {
+		return TokenPair{}, ErrUserInactive
+	}
+	if len(user.Roles) == 0 && uc.roles != nil {
+		user.Roles, err = uc.roles.ListUserRoles(ctx, user.ID)
+		if err != nil {
+			return TokenPair{}, err
+		}
+	}
+
+	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, user)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	nextRaw, nextRecord, err := uc.refreshToken.Generate(user.ID, record.SessionID, record.TokenID)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if err := uc.refreshTokens.Rotate(ctx, record.TokenHash, nextRecord); err != nil {
+		return TokenPair{}, err
+	}
+
+	return TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: nextRaw,
+		ExpiresIn:    expiresIn,
+	}, nil
+}
+
+func (uc *UserUsecase) issueTokenPair(
+	ctx context.Context,
+	user User,
+	sessionID string,
+	rotatedFrom string,
+) (TokenPair, error) {
+	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, user)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	refreshToken, record, err := uc.refreshToken.Generate(user.ID, sessionID, rotatedFrom)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if err := uc.refreshTokens.Save(ctx, record); err != nil {
+		return TokenPair{}, err
+	}
+	return TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    expiresIn,
+	}, nil
 }
