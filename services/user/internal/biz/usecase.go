@@ -4,6 +4,13 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/google/wire"
+)
+
+var ProviderSet = wire.NewSet(
+	NewHMACTokenManagerFromConfig,
+	NewUserUsecaseFromConfig,
 )
 
 type UserRepository interface {
@@ -184,6 +191,49 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 		RefreshToken: nextRaw,
 		ExpiresIn:    expiresIn,
 	}, nil
+}
+
+func (uc *UserUsecase) GetCurrentUser(ctx context.Context, requester RequestContext) (User, error) {
+	if uc == nil || uc.users == nil || requester.UserID <= 0 {
+		return User{}, ErrInvalidArgument
+	}
+	user, err := uc.users.FindByID(ctx, requester.UserID)
+	if err != nil {
+		return User{}, err
+	}
+	if !user.IsActive() {
+		return User{}, ErrUserInactive
+	}
+	if len(user.Roles) == 0 && uc.roles != nil {
+		user.Roles, err = uc.roles.ListUserRoles(ctx, user.ID)
+		if err != nil {
+			return User{}, err
+		}
+	}
+	return user, nil
+}
+
+func (uc *UserUsecase) GetUser(ctx context.Context, requester RequestContext, userID int64) (User, error) {
+	if uc == nil || uc.users == nil || userID <= 0 || requester.UserID <= 0 {
+		return User{}, ErrInvalidArgument
+	}
+	if requester.UserID != userID && !requester.IsAdmin() {
+		return User{}, ErrPermissionDenied
+	}
+	user, err := uc.users.FindByID(ctx, userID)
+	if err != nil {
+		return User{}, err
+	}
+	if !user.IsActive() {
+		return User{}, ErrUserInactive
+	}
+	if len(user.Roles) == 0 && uc.roles != nil {
+		user.Roles, err = uc.roles.ListUserRoles(ctx, user.ID)
+		if err != nil {
+			return User{}, err
+		}
+	}
+	return user, nil
 }
 
 func (uc *UserUsecase) issueTokenPair(

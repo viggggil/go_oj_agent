@@ -7,24 +7,46 @@
 package main
 
 import (
+	"github.com/go-kratos/kratos/v3"
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/user/internal/data"
 	"github.com/viggggil/go_oj_agent/services/user/internal/server"
 	"github.com/viggggil/go_oj_agent/services/user/internal/service"
 )
 
 // Injectors from wire.go:
 
-func initApp() (*App, func(), error) {
-	config := conf.DefaultConfig()
-	userUsecaseOptions := newUserUsecaseOptions(config)
-	userUsecase := biz.NewUserUsecase(userUsecaseOptions)
-	userService := service.NewUserService(userUsecase)
-	serverServer, err := server.New(config, userService)
+func initApp() (*kratos.App, func(), error) {
+	config, err := conf.LoadConfig()
 	if err != nil {
 		return nil, nil, err
 	}
-	app := NewApp(serverServer)
+	v := server.NewMiddlewares()
+	db, cleanup, err := data.NewMySQLDB(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	storeSet := data.NewStoreSet(db)
+	hmacTokenManager, err := biz.NewHMACTokenManagerFromConfig(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	client, cleanup2, err := data.NewRedisClient(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	redisRefreshTokenStore := data.NewRefreshTokenStore(client, config)
+	userUsecase := biz.NewUserUsecaseFromConfig(config, storeSet, storeSet, hmacTokenManager, redisRefreshTokenStore)
+	userService := service.NewUserService(userUsecase)
+	grpcServer := server.NewGRPCServer(config, v, userService)
+	registry := conf.NewRegistry(config)
+	consulRegistry := server.NewRegistrar(registry)
+	app := newApp(config, grpcServer, consulRegistry)
 	return app, func() {
+		cleanup2()
+		cleanup()
 	}, nil
 }

@@ -1,38 +1,43 @@
 package server
 
 import (
-	"fmt"
+	consul "github.com/go-kratos/kratos/contrib/registry/consul/v3"
+	"github.com/google/wire"
+	"github.com/hashicorp/consul/api"
 
 	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
-	userservice "github.com/viggggil/go_oj_agent/services/user/internal/service"
 )
 
-type Server struct {
-	cfg         conf.Config
-	userService *userservice.UserService
-}
+var ProviderSet = wire.NewSet(
+	conf.ProviderSet,
+	NewRegistrar,
+	NewGRPCServer,
+	NewMiddlewares,
+)
 
-func New(cfg conf.Config, userService *userservice.UserService) (*Server, error) {
-	if userService == nil {
-		return nil, fmt.Errorf("user service is required")
-	}
-
-	return &Server{
-		cfg:         cfg,
-		userService: userService,
-	}, nil
-}
-
-func (s *Server) Start() error {
-	if s == nil {
+// NewRegistrar 创建 Consul 服务注册器，注册和注销由 kratos.App 统一管理。
+func NewRegistrar(config *conf.Registry) *consul.Registry {
+	if config == nil || !config.Consul.Enabled {
 		return nil
 	}
-	if s.userService == nil {
-		return fmt.Errorf("user service is required")
-	}
-	return nil
-}
 
-func (s *Server) Stop() error {
-	return nil
+	cfg := api.DefaultConfig()
+	if config.Consul.Address != "" {
+		cfg.Address = config.Consul.Address
+	}
+	if config.Consul.Scheme != "" {
+		cfg.Scheme = config.Consul.Scheme
+	}
+	if config.Consul.Datacenter != "" {
+		cfg.Datacenter = config.Consul.Datacenter
+	}
+	if config.Consul.Token != "" {
+		cfg.Token = config.Consul.Token
+	}
+
+	client, err := api.NewClient(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return consul.New(client, consul.WithHealthCheck(true))
 }

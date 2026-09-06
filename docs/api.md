@@ -191,6 +191,8 @@ Response：新的 Access Token 和轮换后的 Refresh Token。
 
 获取当前用户信息。
 
+内部对应 `user.v1.UserService/GetCurrentUser`，请求上下文由 gateway 传递 `common.v1.RequestContext`。
+
 Response：
 
 ```json
@@ -367,6 +369,12 @@ Request：
   }
 }
 ```
+
+### GET `/api/v1/users/{user_id}`
+
+获取指定用户信息。
+
+内部对应 `user.v1.UserService/GetUser`。当请求用户不是目标用户本人时，必须携带 `admin` 角色上下文，否则返回权限拒绝。
 
 SSE：
 
