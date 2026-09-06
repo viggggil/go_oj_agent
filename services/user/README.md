@@ -14,19 +14,52 @@
 
 ## 当前范围
 
-本阶段完成 Proto 代码生成和 gRPC handler 的基础接入：
+当前阶段已完成 Proto 代码生成、gRPC handler、基础运行时和 Consul 服务注册：
 
 - `cmd/user-service`：服务入口、wire 注入和启动装配。
-- `internal/server`：HTTP / gRPC Server 构建、middleware 应用和 service 注册的传输层入口。
-- `internal/conf`：认证相关配置结构。
+- `internal/server/grpc.go`：构建 gRPC Server、应用 middleware、注册 service handler。
+- `internal/server/server.go`：创建 Consul Registrar；服务注册和注销由 `kratos.App` 统一管理。
+- `internal/conf`：环境变量配置加载和服务注册配置。
 - `internal/biz`：领域模型、错误、校验逻辑和 usecase 依赖接口。
 - `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
+  当前已实现注册、登录、刷新令牌、查询当前用户和按 ID 查询用户，权限判断由 `biz` 统一控制。
+
+## 运行时配置
+
+user-service 启动时从环境变量读取配置。以下配置必须提供：
+
+```bash
+export USER_MYSQL_DSN='user:pass@tcp(127.0.0.1:3306)/oj_user?parseTime=true'
+export USER_ACCESS_TOKEN_KEY='replace-with-a-long-random-secret'
+```
+
+常用配置：
+
+```text
+USER_SERVICE_NAME=user-service
+USER_SERVICE_GRPC_ADDR=:9001
+USER_REDIS_ADDR=127.0.0.1:6379
+USER_REDIS_PASSWORD=
+USER_REDIS_DB=0
+USER_REDIS_NAMESPACE=go_oj_agent:user
+USER_ACCESS_TOKEN_TTL=15m
+USER_REFRESH_TOKEN_TTL=168h
+USER_CONSUL_ENABLED=true
+USER_CONSUL_ADDR=127.0.0.1:8500
+USER_CONSUL_SCHEME=http
+USER_CONSUL_DATACENTER=
+USER_CONSUL_TOKEN=
+USER_CONSUL_SERVICE_ID=
+```
+
+`USER_CONSUL_ENABLED=false` 时不连接 Consul。启用时，`server.NewRegistrar` 使用 Kratos Consul contrib 注册器，并开启健康检查。`kratos.App.Run()` 在 gRPC Server 启动后执行注册，`kratos.App.Stop()` 负责注销服务。
 
 ## 后续实现顺序
 
-1. 在 `internal/server` 接入真实运行时启动和服务注册中心。
-2. 补齐配置加载、数据库连接和 Redis 连接的 Wire 装配。
+1. 补齐 `GetCurrentUser` 和 `GetUser` 的认证上下文与查询业务。
+2. 增加 gateway 对 user-service 的服务发现和鉴权中间件。
+3. 根据部署环境补充 Consul 健康检查、服务发现和运行配置。
 
 ## 管理员 bootstrap
 

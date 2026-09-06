@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 )
@@ -140,6 +141,61 @@ func TestRefreshTokenMapsProtoRequestAndResponse(t *testing.T) {
 	}
 	if response.GetAccessToken() != "next-access" || response.GetRefreshToken() != "next-refresh" {
 		t.Fatalf("response tokens = %#v, want next-access/next-refresh", response)
+	}
+}
+
+func TestGetCurrentUserMapsProtoRequestAndResponse(t *testing.T) {
+	repository := &fakeUserRepository{
+		account: biz.User{
+			ID:       1001,
+			Username: "alice",
+			Email:    "alice@example.com",
+			Status:   biz.UserStatusActive,
+			Roles:    []biz.RoleName{biz.RoleUser},
+		},
+	}
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		Users:     repository,
+		Passwords: fakePasswordHasher{},
+	})
+	service := NewUserService(usecase)
+
+	response, err := service.GetCurrentUser(context.Background(), &userv1.GetCurrentUserRequest{
+		Context: &commonv1.RequestContext{
+			UserId: 1001,
+			Roles:  []string{"user"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("GetCurrentUser() error = %v", err)
+	}
+	if response.GetUser().GetId() != 1001 {
+		t.Fatalf("response user id = %d, want 1001", response.GetUser().GetId())
+	}
+}
+
+func TestGetUserRejectsNonAdminForOtherUser(t *testing.T) {
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		Users: &fakeUserRepository{
+			account: biz.User{
+				ID:       1001,
+				Username: "alice",
+				Status:   biz.UserStatusActive,
+				Roles:    []biz.RoleName{biz.RoleUser},
+			},
+		},
+		Passwords: fakePasswordHasher{},
+	})
+
+	_, err := NewUserService(usecase).GetUser(context.Background(), &userv1.GetUserRequest{
+		Context: &commonv1.RequestContext{
+			UserId: 1001,
+			Roles:  []string{"user"},
+		},
+		UserId: 1002,
+	})
+	if got := status.Code(err); got != codes.PermissionDenied {
+		t.Fatalf("GetUser() status = %s, want %s", got, codes.PermissionDenied)
 	}
 }
 

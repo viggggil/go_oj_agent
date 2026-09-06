@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 
+	"github.com/google/wire"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 )
+
+var ProviderSet = wire.NewSet(NewUserService)
 
 const Name = "user-service"
 
@@ -92,17 +95,35 @@ func (s *UserService) RefreshToken(
 }
 
 func (s *UserService) GetCurrentUser(
-	context.Context,
-	*userv1.GetCurrentUserRequest,
+	ctx context.Context,
+	req *userv1.GetCurrentUserRequest,
 ) (*userv1.GetCurrentUserResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "GetCurrentUser is not implemented")
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid get current user request")
+	}
+	user, err := s.uc.GetCurrentUser(ctx, biz.NewRequestContext(req.GetContext()))
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+	return &userv1.GetCurrentUserResponse{
+		User: toProtoUser(user),
+	}, nil
 }
 
 func (s *UserService) GetUser(
-	context.Context,
-	*userv1.GetUserRequest,
+	ctx context.Context,
+	req *userv1.GetUserRequest,
 ) (*userv1.GetUserResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "GetUser is not implemented")
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid get user request")
+	}
+	user, err := s.uc.GetUser(ctx, biz.NewRequestContext(req.GetContext()), req.GetUserId())
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+	return &userv1.GetUserResponse{
+		User: toProtoUser(user),
+	}, nil
 }
 
 func toProtoUser(user biz.User) *userv1.User {
@@ -132,6 +153,8 @@ func toStatusError(err error) error {
 	case biz.ErrUserNotFound:
 		return status.Error(codes.NotFound, err.Error())
 	case biz.ErrUserInactive:
+		return status.Error(codes.PermissionDenied, err.Error())
+	case biz.ErrPermissionDenied:
 		return status.Error(codes.PermissionDenied, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
