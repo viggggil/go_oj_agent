@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package conf;
+
+option go_package = "github.com/viggggil/go_oj_agent/services/user/internal/conf;conf";
+
+message Bootstrap {
+  ServiceProto service = 1;
+  ServerProto server = 2;
+  DataProto data = 3;
+  AuthProto auth = 4;
+  RegistryProto registry = 5;
+}
+
+message ServiceProto {
+  string name = 1;
+}
+
+message ServerProto {
+  GRPCProto grpc = 1;
+}
+
+message GRPCProto {
+  string address = 1;
+}
+
+message DataProto {
+  string mysql_dsn = 1;
+  string redis_addr = 2;
+  string redis_password = 3;
+  int32 redis_db = 4;
+  string redis_namespace = 5;
+}
+
+message AuthProto {
+  string access_token_ttl = 1;
+  string refresh_token_ttl = 2;
+  string access_token_key = 3;
+  string issuer = 4;
+  string audience = 5;
+  PasswordProto password = 6;
+}
+
+message PasswordProto {
+  int32 bcrypt_cost = 1;
+  int32 min_length = 2;
+  int32 max_bytes = 3;
+}
+
+message RegistryProto {
+  ConsulProto consul = 1;
+}
+
+message ConsulProto {
+  bool enabled = 1;
+  string address = 2;
+  string scheme = 3;
+  string datacenter = 4;
+  string token = 5;
+  string service_id = 6;
+}

@@ -24,11 +24,11 @@ var ProviderSet = wire.NewSet(
 )
 
 // NewMySQLDB 创建 user-service 使用的 MySQL 连接池。
-func NewMySQLDB(config *conf.Config) (*sql.DB, func(), error) {
-	if config == nil || config.Data.MySQLDSN == "" {
+func NewMySQLDB(config *conf.Bootstrap) (*sql.DB, func(), error) {
+	if config == nil || config.GetData() == nil || config.GetData().GetMysqlDsn() == "" {
 		return nil, func() {}, fmt.Errorf("mysql dsn is required")
 	}
-	db, err := sql.Open("mysql", config.Data.MySQLDSN)
+	db, err := sql.Open("mysql", config.GetData().GetMysqlDsn())
 	if err != nil {
 		return nil, func() {}, err
 	}
@@ -43,14 +43,14 @@ func NewMySQLDB(config *conf.Config) (*sql.DB, func(), error) {
 }
 
 // NewRedisClient 创建 refresh token 使用的 Redis 客户端。
-func NewRedisClient(config *conf.Config) (*redis.Client, func(), error) {
-	if config == nil || config.Data.RedisAddr == "" {
+func NewRedisClient(config *conf.Bootstrap) (*redis.Client, func(), error) {
+	if config == nil || config.GetData() == nil || config.GetData().GetRedisAddr() == "" {
 		return nil, func() {}, fmt.Errorf("redis address is required")
 	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     config.Data.RedisAddr,
-		Password: config.Data.RedisPassword,
-		DB:       config.Data.RedisDB,
+		Addr:     config.GetData().GetRedisAddr(),
+		Password: config.GetData().GetRedisPassword(),
+		DB:       int(config.GetData().GetRedisDb()),
 	})
 	cleanup := func() {
 		_ = client.Close()
@@ -62,11 +62,11 @@ func NewRedisClient(config *conf.Config) (*redis.Client, func(), error) {
 	return client, cleanup, nil
 }
 
-func NewRefreshTokenStore(client *redis.Client, config *conf.Config) *RedisRefreshTokenStore {
-	if config == nil {
+func NewRefreshTokenStore(client *redis.Client, config *conf.Bootstrap) *RedisRefreshTokenStore {
+	if config == nil || config.GetData() == nil {
 		return NewRedisRefreshTokenStore(client, "", nil)
 	}
-	return NewRedisRefreshTokenStoreWithClock(client, config.Data.RedisNamespace)
+	return NewRedisRefreshTokenStoreWithClock(client, config.GetData().GetRedisNamespace())
 }
 
 func NewRedisRefreshTokenStoreWithClock(client *redis.Client, namespace string) *RedisRefreshTokenStore {

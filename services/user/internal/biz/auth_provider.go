@@ -1,37 +1,57 @@
 package biz
 
-import "github.com/viggggil/go_oj_agent/services/user/internal/conf"
+import (
+	"fmt"
+	"time"
 
-func NewHMACTokenManagerFromConfig(config *conf.Config) (*HMACTokenManager, error) {
-	if config == nil {
+	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
+)
+
+func NewHMACTokenManagerFromConfig(config *conf.Bootstrap) (*HMACTokenManager, error) {
+	if config == nil || config.GetAuth() == nil {
 		return nil, ErrInvalidArgument
 	}
+	accessTTL, err := time.ParseDuration(config.GetAuth().GetAccessTokenTtl())
+	if err != nil {
+		return nil, fmt.Errorf("auth.access_token_ttl is invalid: %w", err)
+	}
+	refreshTTL, err := time.ParseDuration(config.GetAuth().GetRefreshTokenTtl())
+	if err != nil {
+		return nil, fmt.Errorf("auth.refresh_token_ttl is invalid: %w", err)
+	}
 	return NewHMACTokenManager(TokenConfig{
-		Secret:          config.Auth.AccessTokenKey,
-		Issuer:          config.Auth.Issuer,
-		Audience:        config.Auth.Audience,
-		AccessTokenTTL:  config.Auth.AccessTokenTTL,
-		RefreshTokenTTL: config.Auth.RefreshTokenTTL,
+		Secret:          config.GetAuth().GetAccessTokenKey(),
+		Issuer:          config.GetAuth().GetIssuer(),
+		Audience:        config.GetAuth().GetAudience(),
+		AccessTokenTTL:  accessTTL,
+		RefreshTokenTTL: refreshTTL,
 	})
 }
 
 func NewUserUsecaseFromConfig(
-	config *conf.Config,
+	config *conf.Bootstrap,
 	users UserRepository,
 	roles RoleRepository,
 	tokens *HMACTokenManager,
 	refreshTokens RefreshTokenStore,
 ) *UserUsecase {
+	if config == nil || config.GetAuth() == nil {
+		return NewUserUsecase(UserUsecaseOptions{})
+	}
+	passwordCfg := config.GetAuth().GetPassword()
+	if passwordCfg == nil {
+		passwordCfg = &conf.PasswordProto{}
+	}
 	return NewUserUsecase(UserUsecaseOptions{
 		Users:         users,
 		Roles:         roles,
-		Passwords:     NewBcryptPasswordHasher(config.Auth.Password.BcryptCost),
+		Passwords:     NewBcryptPasswordHasher(int(passwordCfg.GetBcryptCost())),
 		Tokens:        tokens,
 		RefreshToken:  tokens,
 		RefreshTokens: refreshTokens,
 		PasswordPolicy: PasswordPolicy{
-			MinLength: config.Auth.Password.MinLength,
-			MaxBytes:  config.Auth.Password.MaxBytes,
+			MinLength: int(passwordCfg.GetMinLength()),
+			MaxBytes:  int(passwordCfg.GetMaxBytes()),
 		},
 	})
 }

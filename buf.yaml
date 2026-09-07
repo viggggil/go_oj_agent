@@ -2,12 +2,16 @@ version: v2
 
 modules:
   - path: api
+  - path: services/user/internal
 deps:
   - buf.build/envoyproxy/protoc-gen-validate
 
 lint:
   use:
     - STANDARD
+  ignore_only:
+    PACKAGE_VERSION_SUFFIX:
+      - services/user/internal/conf/conf.proto
 
 breaking:
   use:

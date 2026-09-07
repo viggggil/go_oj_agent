@@ -2,6 +2,7 @@ package server
 
 import (
 	consul "github.com/go-kratos/kratos/contrib/registry/consul/v3"
+	"github.com/go-kratos/kratos/v3/registry"
 	"github.com/google/wire"
 	"github.com/hashicorp/consul/api"
 
@@ -9,30 +10,30 @@ import (
 )
 
 var ProviderSet = wire.NewSet(
-	conf.ProviderSet,
 	NewRegistrar,
 	NewGRPCServer,
 	NewMiddlewares,
 )
 
 // NewRegistrar 创建 Consul 服务注册器，注册和注销由 kratos.App 统一管理。
-func NewRegistrar(config *conf.Registry) *consul.Registry {
-	if config == nil || !config.Consul.Enabled {
+func NewRegistrar(config *conf.Bootstrap) registry.Registrar {
+	if config == nil || config.GetRegistry() == nil || config.GetRegistry().GetConsul() == nil || !config.GetRegistry().GetConsul().GetEnabled() {
 		return nil
 	}
 
 	cfg := api.DefaultConfig()
-	if config.Consul.Address != "" {
-		cfg.Address = config.Consul.Address
+	consulCfg := config.GetRegistry().GetConsul()
+	if consulCfg.GetAddress() != "" {
+		cfg.Address = consulCfg.GetAddress()
 	}
-	if config.Consul.Scheme != "" {
-		cfg.Scheme = config.Consul.Scheme
+	if consulCfg.GetScheme() != "" {
+		cfg.Scheme = consulCfg.GetScheme()
 	}
-	if config.Consul.Datacenter != "" {
-		cfg.Datacenter = config.Consul.Datacenter
+	if consulCfg.GetDatacenter() != "" {
+		cfg.Datacenter = consulCfg.GetDatacenter()
 	}
-	if config.Consul.Token != "" {
-		cfg.Token = config.Consul.Token
+	if consulCfg.GetToken() != "" {
+		cfg.Token = consulCfg.GetToken()
 	}
 
 	client, err := api.NewClient(cfg)
