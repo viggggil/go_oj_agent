@@ -108,6 +108,7 @@ MVP 阶段只使用两个角色：
 - JWT secret 只允许 `user-service` 和 `gateway` 持有。
 - Access Token TTL 默认为 15 分钟。
 - JWT payload 可以携带 `roles`，但资源最终授权仍由资源所属服务执行。
+- Access Token Claims 与 HS256 校验语义由 `pkg/auth` 维护，便于 Gateway 复用；user-service 仍负责签发 Access Token。
 - Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - Refresh Token 成功刷新时执行轮换，旧 token 会被标记为撤销。
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
