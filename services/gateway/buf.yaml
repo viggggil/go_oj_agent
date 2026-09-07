@@ -1,0 +1,15 @@
+version: v2
+
+modules:
+  - path: internal
+
+lint:
+  use:
+    - STANDARD
+  ignore_only:
+    PACKAGE_VERSION_SUFFIX:
+      - internal/conf/conf.proto
+
+breaking:
+  use:
+    - FILE

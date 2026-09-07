@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package conf;
+
+option go_package = "github.com/viggggil/go_oj_agent/services/gateway/internal/conf;conf";
+
+message Bootstrap {
+  ServiceProto service = 1;
+  ServerProto server = 2;
+  AuthProto auth = 3;
+  ClientsProto clients = 4;
+  RegistryProto registry = 5;
+}
+
+message ServiceProto {
+  string name = 1;
+}
+
+message ServerProto {
+  HTTPProto http = 1;
+}
+
+message HTTPProto {
+  string address = 1;
+  string timeout = 2;
+}
+
+message AuthProto {
+  string access_token_key = 1;
+  string issuer = 2;
+  string audience = 3;
+}
+
+message ClientsProto {
+  ClientProto user = 1;
+  ClientProto problem = 2;
+  ClientProto submission = 3;
+}
+
+message ClientProto {
+  string name = 1;
+  string endpoint = 2;
+  string timeout = 3;
+}
+
+message RegistryProto {
+  ConsulProto consul = 1;
+}
+
+message ConsulProto {
+  bool enabled = 1;
+  string address = 2;
+  string scheme = 3;
+  string datacenter = 4;
+  string token = 5;
+  string service_id = 6;
+}

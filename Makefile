@@ -13,10 +13,12 @@ init:
 proto:
 	@$(BUF) dep update
 	@$(BUF) lint
+	@cd services/gateway && $(BUF) lint
 
 generate:
 	@$(BUF) dep update
-	@$(BUF) generate --path api/common/v1 --path api/user/v1
+	@$(BUF) generate --path api/common/v1 --path api/user/v1 --path api/gateway/v1
+	@cd services/gateway && $(BUF) generate
 
 fmt:
 	@if [ -n "$(GO_FILES)" ]; then \
