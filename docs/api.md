@@ -454,6 +454,7 @@ User Service 第一阶段需要实现以下接口：
 - 返回短生命周期 Access Token，默认 TTL 为 15 分钟。
 - Access Token 使用 JWT，签名算法为 HS256，payload 可以携带 `roles`。
 - HS256 secret 只允许 `user-service` 和 `gateway` 持有。
+- Access Token Claims 与 HS256 校验语义由公共 Go 包 `pkg/auth` 维护，Gateway 后续复用该 verifier 生成可信请求上下文。
 - 返回 Refresh Token，Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
 - 当前已接入账号查询、bcrypt 密码校验和 `TokenIssuer` 调用。

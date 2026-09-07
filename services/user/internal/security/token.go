@@ -8,8 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
+
+	pkgauth "github.com/viggggil/go_oj_agent/pkg/auth"
 )
 
 type TokenPair struct {
@@ -18,16 +21,7 @@ type TokenPair struct {
 	ExpiresIn    time.Duration
 }
 
-type AccessTokenClaims struct {
-	Subject   int64    `json:"sub"`
-	Username  string   `json:"username"`
-	Roles     []string `json:"roles"`
-	Issuer    string   `json:"iss"`
-	Audience  string   `json:"aud"`
-	IssuedAt  int64    `json:"iat"`
-	ExpiresAt int64    `json:"exp"`
-	TokenID   string   `json:"jti"`
-}
+type AccessTokenClaims = pkgauth.AccessTokenClaims
 
 type RefreshTokenRecord struct {
 	UserID       int64
@@ -115,50 +109,24 @@ func (m *HMACTokenManager) IssueAccessToken(_ context.Context, subject TokenSubj
 }
 
 func (m *HMACTokenManager) ValidateAccessToken(token string) (AccessTokenClaims, error) {
-	if m == nil || len(m.secret) == 0 {
+	if m == nil {
 		return AccessTokenClaims{}, ErrInvalidCredential
 	}
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-
-	// 先按原始 header.payload 计算签名，再解析 claims，避免篡改 payload 后被继续使用。
-	signed := parts[0] + "." + parts[1]
-	want := signHS256([]byte(signed), m.secret)
-	if !hmac.Equal([]byte(parts[2]), []byte(want)) {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	verifier, err := pkgauth.NewHMACVerifier(pkgauth.HMACVerifierConfig{
+		Secret:   string(m.secret),
+		Issuer:   m.issuer,
+		Audience: m.audience,
+		Now:      m.now,
+	})
 	if err != nil {
 		return AccessTokenClaims{}, ErrInvalidCredential
 	}
-	header, err := base64.RawURLEncoding.DecodeString(parts[0])
+	claims, err := verifier.Verify(token)
 	if err != nil {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-	var jwtHeader map[string]string
-	if err := json.Unmarshal(header, &jwtHeader); err != nil {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-	if jwtHeader["alg"] != "HS256" || jwtHeader["typ"] != "JWT" {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-
-	var claims AccessTokenClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-	now := m.now().UTC().Unix()
-	if claims.ExpiresAt <= now {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-	if m.issuer != "" && claims.Issuer != m.issuer {
-		return AccessTokenClaims{}, ErrInvalidCredential
-	}
-	if m.audience != "" && claims.Audience != m.audience {
-		return AccessTokenClaims{}, ErrInvalidCredential
+		if errors.Is(err, pkgauth.ErrInvalidToken) || errors.Is(err, pkgauth.ErrExpiredToken) {
+			return AccessTokenClaims{}, ErrInvalidCredential
+		}
+		return AccessTokenClaims{}, err
 	}
 	return claims, nil
 }
