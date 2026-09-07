@@ -12,7 +12,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
-	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/user/internal/data"
 )
 
@@ -40,8 +39,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	cfg := conf.DefaultConfig()
-	hasher := biz.NewBcryptPasswordHasher(cfg.Auth.Password.BcryptCost)
+	hasher := biz.NewBcryptPasswordHasher(12)
 	passwordHash, err := hasher.Hash(input.password)
 	if err != nil {
 		return err

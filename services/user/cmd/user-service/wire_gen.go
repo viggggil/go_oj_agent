@@ -17,34 +17,29 @@ import (
 
 // Injectors from wire.go:
 
-func initApp() (*kratos.App, func(), error) {
-	config, err := conf.LoadConfig()
-	if err != nil {
-		return nil, nil, err
-	}
+func initApp(bc *conf.Bootstrap) (*kratos.App, func(), error) {
 	v := server.NewMiddlewares()
-	db, cleanup, err := data.NewMySQLDB(config)
+	db, cleanup, err := data.NewMySQLDB(bc)
 	if err != nil {
 		return nil, nil, err
 	}
 	storeSet := data.NewStoreSet(db)
-	hmacTokenManager, err := biz.NewHMACTokenManagerFromConfig(config)
+	hmacTokenManager, err := biz.NewHMACTokenManagerFromConfig(bc)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	client, cleanup2, err := data.NewRedisClient(config)
+	client, cleanup2, err := data.NewRedisClient(bc)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	redisRefreshTokenStore := data.NewRefreshTokenStore(client, config)
-	userUsecase := biz.NewUserUsecaseFromConfig(config, storeSet, storeSet, hmacTokenManager, redisRefreshTokenStore)
+	redisRefreshTokenStore := data.NewRefreshTokenStore(client, bc)
+	userUsecase := biz.NewUserUsecaseFromConfig(bc, storeSet, storeSet, hmacTokenManager, redisRefreshTokenStore)
 	userService := service.NewUserService(userUsecase)
-	grpcServer := server.NewGRPCServer(config, v, userService)
-	registry := conf.NewRegistry(config)
-	consulRegistry := server.NewRegistrar(registry)
-	app := newApp(config, grpcServer, consulRegistry)
+	grpcServer := server.NewGRPCServer(bc, v, userService)
+	registrar := server.NewRegistrar(bc)
+	app := newApp(bc, grpcServer, registrar)
 	return app, func() {
 		cleanup2()
 		cleanup()

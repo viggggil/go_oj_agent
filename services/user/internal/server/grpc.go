@@ -11,13 +11,13 @@ import (
 
 // NewGRPCServer 构建 gRPC Server，并注册 user-service handler。
 func NewGRPCServer(
-	config *conf.Config,
+	config *conf.Bootstrap,
 	middlewares []middleware.Middleware,
 	userService *userservice.UserService,
 ) *kgrpc.Server {
 	address := ":9001"
-	if config != nil && config.Server.GRPC.Address != "" {
-		address = config.Server.GRPC.Address
+	if config != nil && config.GetServer() != nil && config.GetServer().GetGrpc() != nil && config.GetServer().GetGrpc().GetAddress() != "" {
+		address = config.GetServer().GetGrpc().GetAddress()
 	}
 	options := []kgrpc.ServerOption{kgrpc.Address(address)}
 	if len(middlewares) > 0 {

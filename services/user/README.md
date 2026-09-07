@@ -19,7 +19,7 @@
 - `cmd/user-service`：服务入口、wire 注入和启动装配。
 - `internal/server/grpc.go`：构建 gRPC Server、应用 middleware、注册 service handler。
 - `internal/server/server.go`：创建 Consul Registrar；服务注册和注销由 `kratos.App` 统一管理。
-- `internal/conf`：环境变量配置加载和服务注册配置。
+- `internal/conf`：`conf.proto`、`conf.pb.go`，定义配置结构。
 - `internal/biz`：领域模型、错误、校验逻辑和 usecase 依赖接口。
 - `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
@@ -27,33 +27,44 @@
 
 ## 运行时配置
 
-user-service 启动时从环境变量读取配置。以下配置必须提供：
+user-service 默认从 `services/user/configs/config.yaml` 读取配置，入口在 `cmd/user-service/main.go`，由 `kratos config.New -> Load -> Scan` 组装到 `conf.Bootstrap`。也可以通过启动参数覆盖：
 
 ```bash
-export USER_MYSQL_DSN='user:pass@tcp(127.0.0.1:3306)/oj_user?parseTime=true'
-export USER_ACCESS_TOKEN_KEY='replace-with-a-long-random-secret'
+go run ./services/user/cmd/user-service -conf services/user/configs/config.yaml
 ```
 
-常用配置：
+配置格式由 `services/user/internal/conf/conf.proto` 定义，生成文件是 `services/user/internal/conf/conf.pb.go`。当前配置分为五块：
 
-```text
-USER_SERVICE_NAME=user-service
-USER_SERVICE_GRPC_ADDR=:9001
-USER_REDIS_ADDR=127.0.0.1:6379
-USER_REDIS_PASSWORD=
-USER_REDIS_DB=0
-USER_REDIS_NAMESPACE=go_oj_agent:user
-USER_ACCESS_TOKEN_TTL=15m
-USER_REFRESH_TOKEN_TTL=168h
-USER_CONSUL_ENABLED=true
-USER_CONSUL_ADDR=127.0.0.1:8500
-USER_CONSUL_SCHEME=http
-USER_CONSUL_DATACENTER=
-USER_CONSUL_TOKEN=
-USER_CONSUL_SERVICE_ID=
+```yaml
+service:
+  name: user-service
+server:
+  grpc:
+    address: ":9001"
+data:
+  mysql_dsn: "user:pass@tcp(127.0.0.1:3306)/oj_user?parseTime=true"
+  redis_addr: "127.0.0.1:6379"
+  redis_password: ""
+  redis_db: 0
+  redis_namespace: "go_oj_agent:user"
+auth:
+  access_token_ttl: "15m"
+  refresh_token_ttl: "168h"
+  access_token_key: "replace-with-a-long-random-secret"
+  issuer: "go-oj-agent"
+  audience: "go-oj-gateway"
+  password:
+    bcrypt_cost: 12
+    min_length: 8
+    max_bytes: 72
+registry:
+  consul:
+    enabled: true
+    address: "127.0.0.1:8500"
+    scheme: "http"
 ```
 
-`USER_CONSUL_ENABLED=false` 时不连接 Consul。启用时，`server.NewRegistrar` 使用 Kratos Consul contrib 注册器，并开启健康检查。`kratos.App.Run()` 在 gRPC Server 启动后执行注册，`kratos.App.Stop()` 负责注销服务。
+`registry.consul.enabled=false` 时不连接 Consul。启用时，`server.NewRegistrar` 使用 Kratos Consul contrib 注册器，并开启健康检查。`kratos.App.Run()` 在 gRPC Server 启动后执行注册，`kratos.App.Stop()` 负责注销服务。
 
 ## 后续实现顺序
 

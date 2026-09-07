@@ -1,0 +1,29 @@
+service:
+  name: user-service
+server:
+  grpc:
+    address: ":9001"
+data:
+  mysql_dsn: "user:pass@tcp(127.0.0.1:3306)/oj_user?parseTime=true"
+  redis_addr: "127.0.0.1:6379"
+  redis_password: ""
+  redis_db: 0
+  redis_namespace: "go_oj_agent:user"
+auth:
+  access_token_ttl: "15m"
+  refresh_token_ttl: "168h"
+  access_token_key: "replace-with-a-long-random-secret"
+  issuer: "go-oj-agent"
+  audience: "go-oj-gateway"
+  password:
+    bcrypt_cost: 12
+    min_length: 8
+    max_bytes: 72
+registry:
+  consul:
+    enabled: true
+    address: "127.0.0.1:8500"
+    scheme: "http"
+    datacenter: ""
+    token: ""
+    service_id: ""
