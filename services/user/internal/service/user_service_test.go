@@ -12,6 +12,7 @@ import (
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
+	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
 func TestNewUserService(t *testing.T) {
@@ -241,7 +242,7 @@ type fakeTokenIssuer struct {
 	expiresIn   time.Duration
 }
 
-func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, _ biz.User) (string, time.Duration, error) {
+func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, _ security.TokenSubject) (string, time.Duration, error) {
 	return i.accessToken, i.expiresIn, nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/user/internal/data"
+	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 	"github.com/viggggil/go_oj_agent/services/user/internal/server"
 	"github.com/viggggil/go_oj_agent/services/user/internal/service"
 )
@@ -24,7 +25,7 @@ func initApp(bc *conf.Bootstrap) (*kratos.App, func(), error) {
 		return nil, nil, err
 	}
 	storeSet := data.NewStoreSet(db)
-	hmacTokenManager, err := biz.NewHMACTokenManagerFromConfig(bc)
+	hmacTokenManager, err := security.NewHMACTokenManagerFromConfig(bc)
 	if err != nil {
 		cleanup()
 		return nil, nil, err

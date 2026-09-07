@@ -20,7 +20,8 @@
 - `internal/server/grpc.go`：构建 gRPC Server、应用 middleware、注册 service handler。
 - `internal/server/server.go`：创建 Consul Registrar；服务注册和注销由 `kratos.App` 统一管理。
 - `internal/conf`：`conf.proto`、`conf.pb.go`，定义配置结构。
-- `internal/biz`：领域模型、错误、校验逻辑和 usecase 依赖接口。
+- `internal/biz`：用户领域模型、认证输入、错误、校验逻辑、用例和仓储依赖接口。
+- `internal/security`：密码哈希、密码策略、JWT/Refresh Token 实现及其配置装配。`biz` 只依赖安全能力的接口和安全数据类型，不直接承载密码或令牌实现。
 - `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
   当前已实现注册、登录、刷新令牌、查询当前用户和按 ID 查询用户，权限判断由 `biz` 统一控制。
@@ -112,6 +113,28 @@ MVP 阶段只使用两个角色：
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
 - 密码策略保持简单：trim 后不能为空，最小 8 个字符，最大 72 bytes。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。
+
+## 内部目录分层
+
+```text
+internal/
+├── biz/
+│   ├── user.go       # 用户模型、角色、请求上下文
+│   ├── auth.go       # 注册、登录、刷新令牌输入
+│   ├── usecase.go    # UserUsecase 与仓储/安全依赖接口
+│   └── errors.go     # 领域错误
+└── security/
+    ├── token.go      # JWT 与 Refresh Token
+    ├── password.go   # bcrypt 与密码策略
+    └── security.go   # 安全组件配置装配
+```
+
+依赖方向保持为：
+
+```text
+service -> biz -> security
+data    -> biz / security data types
+```
 
 ## 日志
 

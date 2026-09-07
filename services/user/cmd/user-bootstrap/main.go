@@ -13,6 +13,7 @@ import (
 
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/user/internal/data"
+	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
 const (
@@ -39,7 +40,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	hasher := biz.NewBcryptPasswordHasher(12)
+	hasher := security.NewBcryptPasswordHasher(12)
 	passwordHash, err := hasher.Hash(input.password)
 	if err != nil {
 		return err
@@ -93,7 +94,7 @@ func loadBootstrapInput() (bootstrapInput, error) {
 	if input.email == "" {
 		return bootstrapInput{}, fmt.Errorf("%s is required", envBootstrapEmail)
 	}
-	if err := biz.DefaultPasswordPolicy().Validate(input.password); err != nil {
+	if err := security.DefaultPasswordPolicy().Validate(input.password); err != nil {
 		return bootstrapInput{}, fmt.Errorf("%s is invalid: %w", envBootstrapPassword, err)
 	}
 	return input, nil

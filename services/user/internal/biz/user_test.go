@@ -5,10 +5,12 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
 func TestRegisterInputValidate(t *testing.T) {
-	policy := DefaultPasswordPolicy()
+	policy := security.DefaultPasswordPolicy()
 	input := RegisterInput{
 		Username: " alice ",
 		Email:    " ALICE@example.com ",
@@ -53,7 +55,7 @@ func TestRegisterInputNormalizesUsernameCase(t *testing.T) {
 }
 
 func TestPasswordPolicyRejectsShortPassword(t *testing.T) {
-	policy := DefaultPasswordPolicy()
+	policy := security.DefaultPasswordPolicy()
 
 	if err := policy.Validate("short"); err == nil {
 		t.Fatal("Validate() error = nil, want non-nil")
@@ -61,7 +63,7 @@ func TestPasswordPolicyRejectsShortPassword(t *testing.T) {
 }
 
 func TestPasswordPolicyRejectsBlankAfterTrim(t *testing.T) {
-	policy := DefaultPasswordPolicy()
+	policy := security.DefaultPasswordPolicy()
 
 	if err := policy.Validate("        "); err == nil {
 		t.Fatal("Validate() error = nil, want non-nil")
@@ -69,11 +71,11 @@ func TestPasswordPolicyRejectsBlankAfterTrim(t *testing.T) {
 }
 
 func TestPasswordPolicyRejectsBcryptOverflow(t *testing.T) {
-	policy := DefaultPasswordPolicy()
+	policy := security.DefaultPasswordPolicy()
 	password := "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstu"
 
-	if len(password) <= BcryptMaxPasswordBytes {
-		t.Fatalf("test password length = %d, want greater than %d", len(password), BcryptMaxPasswordBytes)
+	if len(password) <= security.BcryptMaxPasswordBytes {
+		t.Fatalf("test password length = %d, want greater than %d", len(password), security.BcryptMaxPasswordBytes)
 	}
 	if err := policy.Validate(password); err == nil {
 		t.Fatal("Validate() error = nil, want non-nil")
@@ -95,7 +97,7 @@ func TestUserHasRole(t *testing.T) {
 }
 
 func TestBcryptPasswordHasher(t *testing.T) {
-	hasher := NewBcryptPasswordHasher(4)
+	hasher := security.NewBcryptPasswordHasher(4)
 	password := "correct1"
 
 	hash, err := hasher.Hash(password)
@@ -200,8 +202,11 @@ type fakeTokenIssuer struct {
 	user        User
 }
 
-func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, user User) (string, time.Duration, error) {
-	i.user = user
+func (i *fakeTokenIssuer) IssueAccessToken(_ context.Context, subject security.TokenSubject) (string, time.Duration, error) {
+	i.user = User{ID: subject.ID, Username: subject.Username}
+	for _, role := range subject.Roles {
+		i.user.Roles = append(i.user.Roles, RoleName(role))
+	}
 	return i.accessToken, i.expiresIn, i.err
 }
 
