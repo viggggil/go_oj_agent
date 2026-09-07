@@ -20,6 +20,8 @@ Go Services / Agent Tools
 
 本文件定义 v0 阶段的接口边界。最终字段以 `api/*/v1/*.proto` 和生成的 OpenAPI 为准。
 
+Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。当前阶段先定义认证与用户相关 HTTP DTO，Problem、Submission 等后续模块接入时继续扩展。
+
 ---
 
 ## 2. 通用规范
@@ -35,6 +37,7 @@ External：
 Protobuf：
 
 ```text
+gateway.v1
 user.v1
 problem.v1
 submission.v1

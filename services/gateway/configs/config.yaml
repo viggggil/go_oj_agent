@@ -1,0 +1,28 @@
+service:
+  name: gateway-service
+server:
+  http:
+    address: ":8080"
+    timeout: "3s"
+auth:
+  access_token_key: "replace-with-the-same-secret-as-user-service"
+  issuer: "go-oj-agent"
+  audience: "go-oj-gateway"
+clients:
+  user:
+    name: "user-service"
+    endpoint: "127.0.0.1:9001"
+    timeout: "3s"
+  problem:
+    name: "problem-service"
+    endpoint: ""
+    timeout: "3s"
+  submission:
+    name: "submission-service"
+    endpoint: ""
+    timeout: "3s"
+registry:
+  consul:
+    enabled: false
+    address: "127.0.0.1:8500"
+    scheme: "http"
