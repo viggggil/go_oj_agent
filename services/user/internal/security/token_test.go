@@ -1,4 +1,4 @@
-package biz
+package security
 
 import (
 	"context"
@@ -23,10 +23,10 @@ func TestHMACTokenManagerIssueAndValidateAccessToken(t *testing.T) {
 		t.Fatalf("NewHMACTokenManager() error = %v", err)
 	}
 
-	token, expiresIn, err := manager.IssueAccessToken(context.Background(), User{
+	token, expiresIn, err := manager.IssueAccessToken(context.Background(), TokenSubject{
 		ID:       1001,
 		Username: "alice",
-		Roles:    []RoleName{RoleUser, RoleAdmin},
+		Roles:    []string{"user", "admin"},
 	})
 	if err != nil {
 		t.Fatalf("IssueAccessToken() error = %v", err)
@@ -42,7 +42,7 @@ func TestHMACTokenManagerIssueAndValidateAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateAccessToken() error = %v", err)
 	}
-	if claims.Subject != 1001 || claims.Username != "alice" || !containsRole(claims.Roles, RoleAdmin) {
+	if claims.Subject != 1001 || claims.Username != "alice" || !containsRole(claims.Roles, "admin") {
 		t.Fatalf("claims = %#v, want alice admin", claims)
 	}
 	if claims.Issuer != "go-oj-agent" || claims.Audience != "go-oj-gateway" {
@@ -60,7 +60,7 @@ func TestHMACTokenManagerRejectsTamperedAccessToken(t *testing.T) {
 		t.Fatalf("NewHMACTokenManager() error = %v", err)
 	}
 
-	token, _, err := manager.IssueAccessToken(context.Background(), User{ID: 1001})
+	token, _, err := manager.IssueAccessToken(context.Background(), TokenSubject{ID: 1001})
 	if err != nil {
 		t.Fatalf("IssueAccessToken() error = %v", err)
 	}
@@ -99,7 +99,7 @@ func TestHMACTokenManagerGeneratesRefreshTokenRecord(t *testing.T) {
 	}
 }
 
-func containsRole(roles []RoleName, want RoleName) bool {
+func containsRole(roles []string, want string) bool {
 	for _, role := range roles {
 		if role == want {
 			return true

@@ -6,12 +6,18 @@ import (
 	"time"
 
 	"github.com/google/wire"
+
+	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
 var ProviderSet = wire.NewSet(
-	NewHMACTokenManagerFromConfig,
 	NewUserUsecaseFromConfig,
 )
+
+type PasswordPolicy = security.PasswordPolicy
+type TokenPair = security.TokenPair
+type RefreshTokenRecord = security.RefreshTokenRecord
 
 type UserRepository interface {
 	CreateUser(ctx context.Context, user User, defaultRole RoleName) (User, error)
@@ -29,7 +35,7 @@ type PasswordHasher interface {
 }
 
 type TokenIssuer interface {
-	IssueAccessToken(ctx context.Context, user User) (string, time.Duration, error)
+	IssueAccessToken(ctx context.Context, subject security.TokenSubject) (string, time.Duration, error)
 }
 
 type RefreshTokenGenerator interface {
@@ -67,7 +73,7 @@ type UserUsecaseOptions struct {
 func NewUserUsecase(options UserUsecaseOptions) *UserUsecase {
 	policy := options.PasswordPolicy
 	if policy.MinLength == 0 || policy.MaxBytes == 0 {
-		policy = DefaultPasswordPolicy()
+		policy = security.DefaultPasswordPolicy()
 	}
 
 	return &UserUsecase{
@@ -173,7 +179,9 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 		}
 	}
 
-	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, user)
+	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, security.TokenSubject{
+		ID: user.ID, Username: user.Username, Roles: roleNames(user.Roles),
+	})
 	if err != nil {
 		return TokenPair{}, err
 	}
@@ -191,6 +199,42 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 		RefreshToken: nextRaw,
 		ExpiresIn:    expiresIn,
 	}, nil
+}
+
+func roleNames(roles []RoleName) []string {
+	names := make([]string, 0, len(roles))
+	for _, role := range roles {
+		names = append(names, string(role))
+	}
+	return names
+}
+
+func NewUserUsecaseFromConfig(
+	config *conf.Bootstrap,
+	users UserRepository,
+	roles RoleRepository,
+	tokens *security.HMACTokenManager,
+	refreshTokens RefreshTokenStore,
+) *UserUsecase {
+	if config == nil || config.GetAuth() == nil {
+		return NewUserUsecase(UserUsecaseOptions{})
+	}
+	passwordCfg := config.GetAuth().GetPassword()
+	if passwordCfg == nil {
+		passwordCfg = &conf.PasswordProto{}
+	}
+	return NewUserUsecase(UserUsecaseOptions{
+		Users:         users,
+		Roles:         roles,
+		Passwords:     security.NewBcryptPasswordHasher(int(passwordCfg.GetBcryptCost())),
+		Tokens:        tokens,
+		RefreshToken:  tokens,
+		RefreshTokens: refreshTokens,
+		PasswordPolicy: security.PasswordPolicy{
+			MinLength: int(passwordCfg.GetMinLength()),
+			MaxBytes:  int(passwordCfg.GetMaxBytes()),
+		},
+	})
 }
 
 func (uc *UserUsecase) GetCurrentUser(ctx context.Context, requester RequestContext) (User, error) {
@@ -242,7 +286,9 @@ func (uc *UserUsecase) issueTokenPair(
 	sessionID string,
 	rotatedFrom string,
 ) (TokenPair, error) {
-	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, user)
+	accessToken, expiresIn, err := uc.tokens.IssueAccessToken(ctx, security.TokenSubject{
+		ID: user.ID, Username: user.Username, Roles: roleNames(user.Roles),
+	})
 	if err != nil {
 		return TokenPair{}, err
 	}

@@ -1,11 +1,20 @@
-package biz
+package security
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/wire"
 	"github.com/viggggil/go_oj_agent/services/user/internal/conf"
 )
+
+var (
+	ErrInvalidArgument   = errors.New("invalid argument")
+	ErrInvalidCredential = errors.New("invalid credential")
+)
+
+var ProviderSet = wire.NewSet(NewHMACTokenManagerFromConfig)
 
 func NewHMACTokenManagerFromConfig(config *conf.Bootstrap) (*HMACTokenManager, error) {
 	if config == nil || config.GetAuth() == nil {
@@ -25,33 +34,5 @@ func NewHMACTokenManagerFromConfig(config *conf.Bootstrap) (*HMACTokenManager, e
 		Audience:        config.GetAuth().GetAudience(),
 		AccessTokenTTL:  accessTTL,
 		RefreshTokenTTL: refreshTTL,
-	})
-}
-
-func NewUserUsecaseFromConfig(
-	config *conf.Bootstrap,
-	users UserRepository,
-	roles RoleRepository,
-	tokens *HMACTokenManager,
-	refreshTokens RefreshTokenStore,
-) *UserUsecase {
-	if config == nil || config.GetAuth() == nil {
-		return NewUserUsecase(UserUsecaseOptions{})
-	}
-	passwordCfg := config.GetAuth().GetPassword()
-	if passwordCfg == nil {
-		passwordCfg = &conf.PasswordProto{}
-	}
-	return NewUserUsecase(UserUsecaseOptions{
-		Users:         users,
-		Roles:         roles,
-		Passwords:     NewBcryptPasswordHasher(int(passwordCfg.GetBcryptCost())),
-		Tokens:        tokens,
-		RefreshToken:  tokens,
-		RefreshTokens: refreshTokens,
-		PasswordPolicy: PasswordPolicy{
-			MinLength: int(passwordCfg.GetMinLength()),
-			MaxBytes:  int(passwordCfg.GetMaxBytes()),
-		},
 	})
 }

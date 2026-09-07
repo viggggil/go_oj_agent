@@ -1,56 +1,81 @@
 package biz
 
-import "strings"
+import (
+	"strings"
 
-type RegisterInput struct {
-	Username string
-	Email    string
-	Password string
+	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
+)
+
+type RoleName string
+
+const (
+	RoleUser  RoleName = "user"
+	RoleAdmin RoleName = "admin"
+)
+
+type UserStatus string
+
+const (
+	UserStatusActive   UserStatus = "active"
+	UserStatusDisabled UserStatus = "disabled"
+	UserStatusLocked   UserStatus = "locked"
+)
+
+type User struct {
+	ID           int64
+	Username     string
+	Email        string
+	PasswordHash string
+	Status       UserStatus
+	Roles        []RoleName
 }
 
-func (in RegisterInput) Normalize() RegisterInput {
-	in.Username = NormalizeUsername(in.Username)
-	in.Email = NormalizeEmail(in.Email)
-	in.Password = strings.TrimSpace(in.Password)
-	return in
+func (u User) IsActive() bool {
+	return u.Status == UserStatusActive
 }
 
-func (in RegisterInput) Validate(policy PasswordPolicy) error {
-	in = in.Normalize()
-	if IsBlank(in.Username) || IsBlank(in.Email) {
-		return ErrInvalidArgument
+func (u User) HasRole(role RoleName) bool {
+	for _, current := range u.Roles {
+		if current == role {
+			return true
+		}
 	}
-	if !strings.Contains(in.Email, "@") {
-		return ErrInvalidArgument
+	return false
+}
+
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func NormalizeUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
+}
+
+type RequestContext struct {
+	UserID int64
+	Roles  []RoleName
+}
+
+func NewRequestContext(ctx *commonv1.RequestContext) RequestContext {
+	if ctx == nil {
+		return RequestContext{}
 	}
-	return policy.Validate(in.Password)
-}
-
-type LoginInput struct {
-	Account  string
-	Password string
-}
-
-func (in LoginInput) Normalize() LoginInput {
-	in.Account = strings.TrimSpace(in.Account)
-	return in
-}
-
-func (in LoginInput) Validate() error {
-	in = in.Normalize()
-	if IsBlank(in.Account) || IsBlank(in.Password) {
-		return ErrInvalidCredential
+	roles := make([]RoleName, 0, len(ctx.GetRoles()))
+	for _, role := range ctx.GetRoles() {
+		roles = append(roles, RoleName(role))
 	}
-	return nil
+	return RequestContext{UserID: ctx.GetUserId(), Roles: roles}
 }
 
-type RefreshTokenInput struct {
-	RefreshToken string
-}
-
-func (in RefreshTokenInput) Validate() error {
-	if IsBlank(in.RefreshToken) {
-		return ErrRefreshTokenDenied
+func (c RequestContext) IsAdmin() bool {
+	for _, role := range c.Roles {
+		if role == RoleAdmin {
+			return true
+		}
 	}
-	return nil
+	return false
+}
+
+func IsBlank(value string) bool {
+	return strings.TrimSpace(value) == ""
 }
