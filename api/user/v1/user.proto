@@ -4,7 +4,7 @@ package user.v1;
 
 option go_package = "github.com/viggggil/go_oj_agent/api/user/v1;userv1";
 
-import "common/v1/common.proto";
+import "api/common/v1/common.proto";
 import "validate/validate.proto";
 
 service UserService {
@@ -55,7 +55,7 @@ message RefreshTokenResponse {
 }
 
 message GetCurrentUserRequest {
-  common.v1.RequestContext context = 1;
+  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
 }
 
 message GetCurrentUserResponse {
@@ -63,8 +63,8 @@ message GetCurrentUserResponse {
 }
 
 message GetUserRequest {
-  common.v1.RequestContext context = 1;
-  int64 user_id = 2;
+  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  int64 user_id = 2 [(validate.rules).int64.gt = 0];
 }
 
 message GetUserResponse {

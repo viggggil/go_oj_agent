@@ -1,30 +1,6 @@
 package security
 
-import (
-	"strings"
-	"unicode/utf8"
-
-	"golang.org/x/crypto/bcrypt"
-)
-
-const BcryptMaxPasswordBytes = 72
-
-type PasswordPolicy struct {
-	MinLength int
-	MaxBytes  int
-}
-
-func DefaultPasswordPolicy() PasswordPolicy {
-	return PasswordPolicy{MinLength: 8, MaxBytes: BcryptMaxPasswordBytes}
-}
-
-func (p PasswordPolicy) Validate(password string) error {
-	password = strings.TrimSpace(password)
-	if password == "" || utf8.RuneCountInString(password) < p.MinLength || len(password) > p.MaxBytes {
-		return ErrInvalidArgument
-	}
-	return nil
-}
+import "golang.org/x/crypto/bcrypt"
 
 type BcryptPasswordHasher struct {
 	cost int

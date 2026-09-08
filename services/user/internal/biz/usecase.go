@@ -15,7 +15,6 @@ var ProviderSet = wire.NewSet(
 	NewUserUsecaseFromConfig,
 )
 
-type PasswordPolicy = security.PasswordPolicy
 type TokenPair = security.TokenPair
 type RefreshTokenRecord = security.RefreshTokenRecord
 
@@ -51,39 +50,31 @@ type RefreshTokenStore interface {
 }
 
 type UserUsecase struct {
-	users          UserRepository
-	roles          RoleRepository
-	passwords      PasswordHasher
-	tokens         TokenIssuer
-	refreshToken   RefreshTokenGenerator
-	refreshTokens  RefreshTokenStore
-	passwordPolicy PasswordPolicy
+	users         UserRepository
+	roles         RoleRepository
+	passwords     PasswordHasher
+	tokens        TokenIssuer
+	refreshToken  RefreshTokenGenerator
+	refreshTokens RefreshTokenStore
 }
 
 type UserUsecaseOptions struct {
-	Users          UserRepository
-	Roles          RoleRepository
-	Passwords      PasswordHasher
-	Tokens         TokenIssuer
-	RefreshToken   RefreshTokenGenerator
-	RefreshTokens  RefreshTokenStore
-	PasswordPolicy PasswordPolicy
+	Users         UserRepository
+	Roles         RoleRepository
+	Passwords     PasswordHasher
+	Tokens        TokenIssuer
+	RefreshToken  RefreshTokenGenerator
+	RefreshTokens RefreshTokenStore
 }
 
 func NewUserUsecase(options UserUsecaseOptions) *UserUsecase {
-	policy := options.PasswordPolicy
-	if policy.MinLength == 0 || policy.MaxBytes == 0 {
-		policy = security.DefaultPasswordPolicy()
-	}
-
 	return &UserUsecase{
-		users:          options.Users,
-		roles:          options.Roles,
-		passwords:      options.Passwords,
-		tokens:         options.Tokens,
-		refreshToken:   options.RefreshToken,
-		refreshTokens:  options.RefreshTokens,
-		passwordPolicy: policy,
+		users:         options.Users,
+		roles:         options.Roles,
+		passwords:     options.Passwords,
+		tokens:        options.Tokens,
+		refreshToken:  options.RefreshToken,
+		refreshTokens: options.RefreshTokens,
 	}
 }
 
@@ -91,10 +82,6 @@ func (uc *UserUsecase) Register(ctx context.Context, input RegisterInput) (User,
 	if uc == nil || uc.users == nil || uc.passwords == nil {
 		return User{}, ErrInvalidArgument
 	}
-	if err := input.Validate(uc.passwordPolicy); err != nil {
-		return User{}, err
-	}
-
 	input = input.Normalize()
 	passwordHash, err := uc.passwords.Hash(input.Password)
 	if err != nil {
@@ -117,10 +104,6 @@ func (uc *UserUsecase) Login(ctx context.Context, input LoginInput) (TokenPair, 
 		uc.refreshToken == nil || uc.refreshTokens == nil {
 		return TokenPair{}, ErrInvalidArgument
 	}
-	if err := input.Validate(); err != nil {
-		return TokenPair{}, err
-	}
-
 	input = input.Normalize()
 	user, err := uc.users.FindByAccount(ctx, input.Account)
 	if err != nil {
@@ -150,10 +133,6 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 		uc.refreshToken == nil || uc.refreshTokens == nil {
 		return TokenPair{}, ErrInvalidArgument
 	}
-	if err := input.Validate(); err != nil {
-		return TokenPair{}, err
-	}
-
 	// 刷新时用客户端 token 计算 hash 后查找记录，避免服务端存储或查询 refresh token 原文。
 	tokenHash := uc.refreshToken.Hash(input.RefreshToken)
 	record, err := uc.refreshTokens.FindByHash(ctx, tokenHash)
@@ -230,10 +209,6 @@ func NewUserUsecaseFromConfig(
 		Tokens:        tokens,
 		RefreshToken:  tokens,
 		RefreshTokens: refreshTokens,
-		PasswordPolicy: security.PasswordPolicy{
-			MinLength: int(passwordCfg.GetMinLength()),
-			MaxBytes:  int(passwordCfg.GetMaxBytes()),
-		},
 	})
 }
 

@@ -51,6 +51,22 @@ func TestRegisterMapsProtoRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestRegisterRejectsRequestUsingGeneratedProtoValidation(t *testing.T) {
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		Users:     &fakeUserRepository{},
+		Passwords: fakePasswordHasher{},
+	})
+
+	_, err := NewUserService(usecase).Register(context.Background(), &userv1.RegisterRequest{
+		Username: "alice",
+		Email:    "not-an-email",
+		Password: "short",
+	})
+	if got := status.Code(err); got != codes.InvalidArgument {
+		t.Fatalf("Register() status = %s, want %s", got, codes.InvalidArgument)
+	}
+}
+
 func TestLoginMapsProtoRequestAndResponse(t *testing.T) {
 	repository := &fakeUserRepository{
 		account: biz.User{
@@ -110,6 +126,21 @@ func TestLoginMapsInvalidCredential(t *testing.T) {
 	})
 	if got := status.Code(err); got != codes.Unauthenticated {
 		t.Fatalf("Login() status = %s, want %s", got, codes.Unauthenticated)
+	}
+}
+
+func TestGetUserRejectsInvalidRequestUsingGeneratedProtoValidation(t *testing.T) {
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		Users:     &fakeUserRepository{},
+		Passwords: fakePasswordHasher{},
+	})
+
+	_, err := NewUserService(usecase).GetUser(context.Background(), &userv1.GetUserRequest{
+		Context: nil,
+		UserId:  0,
+	})
+	if got := status.Code(err); got != codes.InvalidArgument {
+		t.Fatalf("GetUser() status = %s, want %s", got, codes.InvalidArgument)
 	}
 }
 

@@ -4,7 +4,7 @@ package problem.v1;
 
 option go_package = "github.com/viggggil/go_oj_agent/api/problem/v1;problemv1";
 
-import "common/v1/common.proto";
+import "api/common/v1/common.proto";
 
 service ProblemService {
   rpc CreateProblem(CreateProblemRequest) returns (CreateProblemResponse);
@@ -122,4 +122,3 @@ message SearchProblemsResponse {
   repeated Problem items = 1;
   common.v1.PageResponse page = 2;
 }
-

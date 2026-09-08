@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: gateway/v1/gateway.proto
+// source: api/gateway/v1/gateway.proto
 
 package gatewayv1
 
@@ -31,7 +31,7 @@ type APIResponse struct {
 
 func (x *APIResponse) Reset() {
 	*x = APIResponse{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[0]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *APIResponse) String() string {
 func (*APIResponse) ProtoMessage() {}
 
 func (x *APIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[0]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *APIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use APIResponse.ProtoReflect.Descriptor instead.
 func (*APIResponse) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{0}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *APIResponse) GetRequestId() string {
@@ -77,7 +77,7 @@ type APIError struct {
 
 func (x *APIError) Reset() {
 	*x = APIError{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[1]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -89,7 +89,7 @@ func (x *APIError) String() string {
 func (*APIError) ProtoMessage() {}
 
 func (x *APIError) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[1]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -102,7 +102,7 @@ func (x *APIError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use APIError.ProtoReflect.Descriptor instead.
 func (*APIError) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{1}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *APIError) GetCode() string {
@@ -139,7 +139,7 @@ type UserSummary struct {
 
 func (x *UserSummary) Reset() {
 	*x = UserSummary{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -151,7 +151,7 @@ func (x *UserSummary) String() string {
 func (*UserSummary) ProtoMessage() {}
 
 func (x *UserSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -164,7 +164,7 @@ func (x *UserSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSummary.ProtoReflect.Descriptor instead.
 func (*UserSummary) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UserSummary) GetId() int64 {
@@ -213,7 +213,7 @@ type RegisterHTTPRequest struct {
 
 func (x *RegisterHTTPRequest) Reset() {
 	*x = RegisterHTTPRequest{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[3]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -225,7 +225,7 @@ func (x *RegisterHTTPRequest) String() string {
 func (*RegisterHTTPRequest) ProtoMessage() {}
 
 func (x *RegisterHTTPRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[3]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -238,7 +238,7 @@ func (x *RegisterHTTPRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterHTTPRequest.ProtoReflect.Descriptor instead.
 func (*RegisterHTTPRequest) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{3}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RegisterHTTPRequest) GetUsername() string {
@@ -271,7 +271,7 @@ type RegisterHTTPResponse struct {
 
 func (x *RegisterHTTPResponse) Reset() {
 	*x = RegisterHTTPResponse{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[4]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +283,7 @@ func (x *RegisterHTTPResponse) String() string {
 func (*RegisterHTTPResponse) ProtoMessage() {}
 
 func (x *RegisterHTTPResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[4]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,7 +296,7 @@ func (x *RegisterHTTPResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterHTTPResponse.ProtoReflect.Descriptor instead.
 func (*RegisterHTTPResponse) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{4}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RegisterHTTPResponse) GetUser() *UserSummary {
@@ -316,7 +316,7 @@ type LoginHTTPRequest struct {
 
 func (x *LoginHTTPRequest) Reset() {
 	*x = LoginHTTPRequest{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[5]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +328,7 @@ func (x *LoginHTTPRequest) String() string {
 func (*LoginHTTPRequest) ProtoMessage() {}
 
 func (x *LoginHTTPRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[5]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +341,7 @@ func (x *LoginHTTPRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginHTTPRequest.ProtoReflect.Descriptor instead.
 func (*LoginHTTPRequest) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{5}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LoginHTTPRequest) GetAccount() string {
@@ -369,7 +369,7 @@ type TokenHTTPResponse struct {
 
 func (x *TokenHTTPResponse) Reset() {
 	*x = TokenHTTPResponse{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[6]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +381,7 @@ func (x *TokenHTTPResponse) String() string {
 func (*TokenHTTPResponse) ProtoMessage() {}
 
 func (x *TokenHTTPResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[6]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +394,7 @@ func (x *TokenHTTPResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenHTTPResponse.ProtoReflect.Descriptor instead.
 func (*TokenHTTPResponse) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{6}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TokenHTTPResponse) GetAccessToken() string {
@@ -427,7 +427,7 @@ type RefreshTokenHTTPRequest struct {
 
 func (x *RefreshTokenHTTPRequest) Reset() {
 	*x = RefreshTokenHTTPRequest{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[7]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -439,7 +439,7 @@ func (x *RefreshTokenHTTPRequest) String() string {
 func (*RefreshTokenHTTPRequest) ProtoMessage() {}
 
 func (x *RefreshTokenHTTPRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[7]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -452,7 +452,7 @@ func (x *RefreshTokenHTTPRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshTokenHTTPRequest.ProtoReflect.Descriptor instead.
 func (*RefreshTokenHTTPRequest) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{7}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RefreshTokenHTTPRequest) GetRefreshToken() string {
@@ -471,7 +471,7 @@ type GetCurrentUserHTTPResponse struct {
 
 func (x *GetCurrentUserHTTPResponse) Reset() {
 	*x = GetCurrentUserHTTPResponse{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[8]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -483,7 +483,7 @@ func (x *GetCurrentUserHTTPResponse) String() string {
 func (*GetCurrentUserHTTPResponse) ProtoMessage() {}
 
 func (x *GetCurrentUserHTTPResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[8]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -496,7 +496,7 @@ func (x *GetCurrentUserHTTPResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentUserHTTPResponse.ProtoReflect.Descriptor instead.
 func (*GetCurrentUserHTTPResponse) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{8}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetCurrentUserHTTPResponse) GetUser() *UserSummary {
@@ -515,7 +515,7 @@ type GetUserHTTPResponse struct {
 
 func (x *GetUserHTTPResponse) Reset() {
 	*x = GetUserHTTPResponse{}
-	mi := &file_gateway_v1_gateway_proto_msgTypes[9]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -527,7 +527,7 @@ func (x *GetUserHTTPResponse) String() string {
 func (*GetUserHTTPResponse) ProtoMessage() {}
 
 func (x *GetUserHTTPResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gateway_v1_gateway_proto_msgTypes[9]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -540,7 +540,7 @@ func (x *GetUserHTTPResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserHTTPResponse.ProtoReflect.Descriptor instead.
 func (*GetUserHTTPResponse) Descriptor() ([]byte, []int) {
-	return file_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetUserHTTPResponse) GetUser() *UserSummary {
@@ -550,11 +550,11 @@ func (x *GetUserHTTPResponse) GetUser() *UserSummary {
 	return nil
 }
 
-var File_gateway_v1_gateway_proto protoreflect.FileDescriptor
+var File_api_gateway_v1_gateway_proto protoreflect.FileDescriptor
 
-const file_gateway_v1_gateway_proto_rawDesc = "" +
+const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\x18gateway/v1/gateway.proto\x12\n" +
+	"\x1capi/gateway/v1/gateway.proto\x12\n" +
 	"gateway.v1\x1a\x17validate/validate.proto\",\n" +
 	"\vAPIResponse\x12\x1d\n" +
 	"\n" +
@@ -595,19 +595,19 @@ const file_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04userB:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
 
 var (
-	file_gateway_v1_gateway_proto_rawDescOnce sync.Once
-	file_gateway_v1_gateway_proto_rawDescData []byte
+	file_api_gateway_v1_gateway_proto_rawDescOnce sync.Once
+	file_api_gateway_v1_gateway_proto_rawDescData []byte
 )
 
-func file_gateway_v1_gateway_proto_rawDescGZIP() []byte {
-	file_gateway_v1_gateway_proto_rawDescOnce.Do(func() {
-		file_gateway_v1_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gateway_v1_gateway_proto_rawDesc), len(file_gateway_v1_gateway_proto_rawDesc)))
+func file_api_gateway_v1_gateway_proto_rawDescGZIP() []byte {
+	file_api_gateway_v1_gateway_proto_rawDescOnce.Do(func() {
+		file_api_gateway_v1_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_gateway_v1_gateway_proto_rawDesc), len(file_api_gateway_v1_gateway_proto_rawDesc)))
 	})
-	return file_gateway_v1_gateway_proto_rawDescData
+	return file_api_gateway_v1_gateway_proto_rawDescData
 }
 
-var file_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_gateway_v1_gateway_proto_goTypes = []any{
+var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_api_gateway_v1_gateway_proto_goTypes = []any{
 	(*APIResponse)(nil),                // 0: gateway.v1.APIResponse
 	(*APIError)(nil),                   // 1: gateway.v1.APIError
 	(*UserSummary)(nil),                // 2: gateway.v1.UserSummary
@@ -619,7 +619,7 @@ var file_gateway_v1_gateway_proto_goTypes = []any{
 	(*GetCurrentUserHTTPResponse)(nil), // 8: gateway.v1.GetCurrentUserHTTPResponse
 	(*GetUserHTTPResponse)(nil),        // 9: gateway.v1.GetUserHTTPResponse
 }
-var file_gateway_v1_gateway_proto_depIdxs = []int32{
+var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
 	2, // 0: gateway.v1.RegisterHTTPResponse.user:type_name -> gateway.v1.UserSummary
 	2, // 1: gateway.v1.GetCurrentUserHTTPResponse.user:type_name -> gateway.v1.UserSummary
 	2, // 2: gateway.v1.GetUserHTTPResponse.user:type_name -> gateway.v1.UserSummary
@@ -630,26 +630,26 @@ var file_gateway_v1_gateway_proto_depIdxs = []int32{
 	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_gateway_v1_gateway_proto_init() }
-func file_gateway_v1_gateway_proto_init() {
-	if File_gateway_v1_gateway_proto != nil {
+func init() { file_api_gateway_v1_gateway_proto_init() }
+func file_api_gateway_v1_gateway_proto_init() {
+	if File_api_gateway_v1_gateway_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gateway_v1_gateway_proto_rawDesc), len(file_gateway_v1_gateway_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_gateway_v1_gateway_proto_rawDesc), len(file_api_gateway_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_gateway_v1_gateway_proto_goTypes,
-		DependencyIndexes: file_gateway_v1_gateway_proto_depIdxs,
-		MessageInfos:      file_gateway_v1_gateway_proto_msgTypes,
+		GoTypes:           file_api_gateway_v1_gateway_proto_goTypes,
+		DependencyIndexes: file_api_gateway_v1_gateway_proto_depIdxs,
+		MessageInfos:      file_api_gateway_v1_gateway_proto_msgTypes,
 	}.Build()
-	File_gateway_v1_gateway_proto = out.File
-	file_gateway_v1_gateway_proto_goTypes = nil
-	file_gateway_v1_gateway_proto_depIdxs = nil
+	File_api_gateway_v1_gateway_proto = out.File
+	file_api_gateway_v1_gateway_proto_goTypes = nil
+	file_api_gateway_v1_gateway_proto_depIdxs = nil
 }

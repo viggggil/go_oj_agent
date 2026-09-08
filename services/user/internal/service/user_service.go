@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/wire"
 	"google.golang.org/grpc/codes"
@@ -33,6 +34,9 @@ func (s *UserService) Register(
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid register request")
 	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	if s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid register request")
 	}
@@ -58,6 +62,9 @@ func (s *UserService) Login(
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid login request")
 	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	tokens, err := s.uc.Login(ctx, biz.LoginInput{
 		Account:  req.GetAccount(),
@@ -80,6 +87,9 @@ func (s *UserService) RefreshToken(
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid refresh token request")
 	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	tokens, err := s.uc.RefreshToken(ctx, biz.RefreshTokenInput{
 		RefreshToken: req.GetRefreshToken(),
@@ -101,6 +111,9 @@ func (s *UserService) GetCurrentUser(
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid get current user request")
 	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	user, err := s.uc.GetCurrentUser(ctx, biz.NewRequestContext(req.GetContext()))
 	if err != nil {
 		return nil, toStatusError(err)
@@ -116,6 +129,9 @@ func (s *UserService) GetUser(
 ) (*userv1.GetUserResponse, error) {
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid get user request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	user, err := s.uc.GetUser(ctx, biz.NewRequestContext(req.GetContext()), req.GetUserId())
 	if err != nil {
@@ -141,22 +157,9 @@ func toProtoUser(user biz.User) *userv1.User {
 }
 
 func toStatusError(err error) error {
-	switch err {
-	case biz.ErrInvalidArgument:
-		return status.Error(codes.InvalidArgument, err.Error())
-	case biz.ErrInvalidCredential:
-		return status.Error(codes.Unauthenticated, err.Error())
-	case biz.ErrRefreshTokenDenied:
-		return status.Error(codes.Unauthenticated, err.Error())
-	case biz.ErrUserAlreadyExists:
-		return status.Error(codes.AlreadyExists, err.Error())
-	case biz.ErrUserNotFound:
-		return status.Error(codes.NotFound, err.Error())
-	case biz.ErrUserInactive:
-		return status.Error(codes.PermissionDenied, err.Error())
-	case biz.ErrPermissionDenied:
-		return status.Error(codes.PermissionDenied, err.Error())
-	default:
-		return status.Error(codes.Internal, err.Error())
+	var domainErr *biz.Error
+	if errors.As(err, &domainErr) {
+		return domainErr
 	}
+	return status.Error(codes.Internal, err.Error())
 }
