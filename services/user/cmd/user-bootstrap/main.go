@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
 	"github.com/viggggil/go_oj_agent/services/user/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/user/internal/data"
 	"github.com/viggggil/go_oj_agent/services/user/internal/security"
@@ -94,7 +95,11 @@ func loadBootstrapInput() (bootstrapInput, error) {
 	if input.email == "" {
 		return bootstrapInput{}, fmt.Errorf("%s is required", envBootstrapEmail)
 	}
-	if err := security.DefaultPasswordPolicy().Validate(input.password); err != nil {
+	if err := (&userv1.RegisterRequest{
+		Username: input.username,
+		Email:    input.email,
+		Password: input.password,
+	}).Validate(); err != nil {
 		return bootstrapInput{}, fmt.Errorf("%s is invalid: %w", envBootstrapPassword, err)
 	}
 	return input, nil

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: common/v1/common.proto
+// source: api/common/v1/common.proto
 
 package commonv1
 
@@ -31,7 +31,7 @@ type PageRequest struct {
 
 func (x *PageRequest) Reset() {
 	*x = PageRequest{}
-	mi := &file_common_v1_common_proto_msgTypes[0]
+	mi := &file_api_common_v1_common_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *PageRequest) String() string {
 func (*PageRequest) ProtoMessage() {}
 
 func (x *PageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_common_v1_common_proto_msgTypes[0]
+	mi := &file_api_common_v1_common_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *PageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageRequest.ProtoReflect.Descriptor instead.
 func (*PageRequest) Descriptor() ([]byte, []int) {
-	return file_common_v1_common_proto_rawDescGZIP(), []int{0}
+	return file_api_common_v1_common_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *PageRequest) GetPage() int32 {
@@ -84,7 +84,7 @@ type PageResponse struct {
 
 func (x *PageResponse) Reset() {
 	*x = PageResponse{}
-	mi := &file_common_v1_common_proto_msgTypes[1]
+	mi := &file_api_common_v1_common_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -96,7 +96,7 @@ func (x *PageResponse) String() string {
 func (*PageResponse) ProtoMessage() {}
 
 func (x *PageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_common_v1_common_proto_msgTypes[1]
+	mi := &file_api_common_v1_common_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -109,7 +109,7 @@ func (x *PageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageResponse.ProtoReflect.Descriptor instead.
 func (*PageResponse) Descriptor() ([]byte, []int) {
-	return file_common_v1_common_proto_rawDescGZIP(), []int{1}
+	return file_api_common_v1_common_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PageResponse) GetPage() int32 {
@@ -145,7 +145,7 @@ type RequestContext struct {
 
 func (x *RequestContext) Reset() {
 	*x = RequestContext{}
-	mi := &file_common_v1_common_proto_msgTypes[2]
+	mi := &file_api_common_v1_common_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -157,7 +157,7 @@ func (x *RequestContext) String() string {
 func (*RequestContext) ProtoMessage() {}
 
 func (x *RequestContext) ProtoReflect() protoreflect.Message {
-	mi := &file_common_v1_common_proto_msgTypes[2]
+	mi := &file_api_common_v1_common_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +170,7 @@ func (x *RequestContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestContext.ProtoReflect.Descriptor instead.
 func (*RequestContext) Descriptor() ([]byte, []int) {
-	return file_common_v1_common_proto_rawDescGZIP(), []int{2}
+	return file_api_common_v1_common_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RequestContext) GetUserId() int64 {
@@ -209,7 +209,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_common_v1_common_proto_msgTypes[3]
+	mi := &file_api_common_v1_common_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +221,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_common_v1_common_proto_msgTypes[3]
+	mi := &file_api_common_v1_common_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +234,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_common_v1_common_proto_rawDescGZIP(), []int{3}
+	return file_api_common_v1_common_proto_rawDescGZIP(), []int{3}
 }
 
 type HealthCheckResponse struct {
@@ -246,7 +246,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_common_v1_common_proto_msgTypes[4]
+	mi := &file_api_common_v1_common_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -258,7 +258,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_common_v1_common_proto_msgTypes[4]
+	mi := &file_api_common_v1_common_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -271,7 +271,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_common_v1_common_proto_rawDescGZIP(), []int{4}
+	return file_api_common_v1_common_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HealthCheckResponse) GetStatus() string {
@@ -281,11 +281,11 @@ func (x *HealthCheckResponse) GetStatus() string {
 	return ""
 }
 
-var File_common_v1_common_proto protoreflect.FileDescriptor
+var File_api_common_v1_common_proto protoreflect.FileDescriptor
 
-const file_common_v1_common_proto_rawDesc = "" +
+const file_api_common_v1_common_proto_rawDesc = "" +
 	"\n" +
-	"\x16common/v1/common.proto\x12\tcommon.v1\">\n" +
+	"\x1aapi/common/v1/common.proto\x12\tcommon.v1\">\n" +
 	"\vPageRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\"U\n" +
@@ -304,26 +304,26 @@ const file_common_v1_common_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06statusB8Z6github.com/viggggil/go_oj_agent/api/common/v1;commonv1b\x06proto3"
 
 var (
-	file_common_v1_common_proto_rawDescOnce sync.Once
-	file_common_v1_common_proto_rawDescData []byte
+	file_api_common_v1_common_proto_rawDescOnce sync.Once
+	file_api_common_v1_common_proto_rawDescData []byte
 )
 
-func file_common_v1_common_proto_rawDescGZIP() []byte {
-	file_common_v1_common_proto_rawDescOnce.Do(func() {
-		file_common_v1_common_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_common_v1_common_proto_rawDesc), len(file_common_v1_common_proto_rawDesc)))
+func file_api_common_v1_common_proto_rawDescGZIP() []byte {
+	file_api_common_v1_common_proto_rawDescOnce.Do(func() {
+		file_api_common_v1_common_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_common_v1_common_proto_rawDesc), len(file_api_common_v1_common_proto_rawDesc)))
 	})
-	return file_common_v1_common_proto_rawDescData
+	return file_api_common_v1_common_proto_rawDescData
 }
 
-var file_common_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
-var file_common_v1_common_proto_goTypes = []any{
+var file_api_common_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_api_common_v1_common_proto_goTypes = []any{
 	(*PageRequest)(nil),         // 0: common.v1.PageRequest
 	(*PageResponse)(nil),        // 1: common.v1.PageResponse
 	(*RequestContext)(nil),      // 2: common.v1.RequestContext
 	(*HealthCheckRequest)(nil),  // 3: common.v1.HealthCheckRequest
 	(*HealthCheckResponse)(nil), // 4: common.v1.HealthCheckResponse
 }
-var file_common_v1_common_proto_depIdxs = []int32{
+var file_api_common_v1_common_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -331,26 +331,26 @@ var file_common_v1_common_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_common_v1_common_proto_init() }
-func file_common_v1_common_proto_init() {
-	if File_common_v1_common_proto != nil {
+func init() { file_api_common_v1_common_proto_init() }
+func file_api_common_v1_common_proto_init() {
+	if File_api_common_v1_common_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_common_v1_common_proto_rawDesc), len(file_common_v1_common_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_common_v1_common_proto_rawDesc), len(file_api_common_v1_common_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_common_v1_common_proto_goTypes,
-		DependencyIndexes: file_common_v1_common_proto_depIdxs,
-		MessageInfos:      file_common_v1_common_proto_msgTypes,
+		GoTypes:           file_api_common_v1_common_proto_goTypes,
+		DependencyIndexes: file_api_common_v1_common_proto_depIdxs,
+		MessageInfos:      file_api_common_v1_common_proto_msgTypes,
 	}.Build()
-	File_common_v1_common_proto = out.File
-	file_common_v1_common_proto_goTypes = nil
-	file_common_v1_common_proto_depIdxs = nil
+	File_api_common_v1_common_proto = out.File
+	file_api_common_v1_common_proto_goTypes = nil
+	file_api_common_v1_common_proto_depIdxs = nil
 }

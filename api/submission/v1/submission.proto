@@ -4,7 +4,7 @@ package submission.v1;
 
 option go_package = "github.com/viggggil/go_oj_agent/api/submission/v1;submissionv1";
 
-import "common/v1/common.proto";
+import "api/common/v1/common.proto";
 
 service SubmissionService {
   rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse);
@@ -116,4 +116,3 @@ message GetJudgeResultRequest {
 message GetJudgeResultResponse {
   JudgeResult result = 1;
 }
-

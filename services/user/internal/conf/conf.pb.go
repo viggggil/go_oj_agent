@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: conf/conf.proto
+// source: services/user/internal/conf/conf.proto
 
 package conf
 
@@ -34,7 +34,7 @@ type Bootstrap struct {
 
 func (x *Bootstrap) Reset() {
 	*x = Bootstrap{}
-	mi := &file_conf_conf_proto_msgTypes[0]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +46,7 @@ func (x *Bootstrap) String() string {
 func (*Bootstrap) ProtoMessage() {}
 
 func (x *Bootstrap) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[0]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -59,7 +59,7 @@ func (x *Bootstrap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Bootstrap.ProtoReflect.Descriptor instead.
 func (*Bootstrap) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{0}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Bootstrap) GetService() *ServiceProto {
@@ -106,7 +106,7 @@ type ServiceProto struct {
 
 func (x *ServiceProto) Reset() {
 	*x = ServiceProto{}
-	mi := &file_conf_conf_proto_msgTypes[1]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -118,7 +118,7 @@ func (x *ServiceProto) String() string {
 func (*ServiceProto) ProtoMessage() {}
 
 func (x *ServiceProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[1]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -131,7 +131,7 @@ func (x *ServiceProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceProto.ProtoReflect.Descriptor instead.
 func (*ServiceProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{1}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ServiceProto) GetName() string {
@@ -150,7 +150,7 @@ type ServerProto struct {
 
 func (x *ServerProto) Reset() {
 	*x = ServerProto{}
-	mi := &file_conf_conf_proto_msgTypes[2]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -162,7 +162,7 @@ func (x *ServerProto) String() string {
 func (*ServerProto) ProtoMessage() {}
 
 func (x *ServerProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[2]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +175,7 @@ func (x *ServerProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerProto.ProtoReflect.Descriptor instead.
 func (*ServerProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{2}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ServerProto) GetGrpc() *GRPCProto {
@@ -194,7 +194,7 @@ type GRPCProto struct {
 
 func (x *GRPCProto) Reset() {
 	*x = GRPCProto{}
-	mi := &file_conf_conf_proto_msgTypes[3]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -206,7 +206,7 @@ func (x *GRPCProto) String() string {
 func (*GRPCProto) ProtoMessage() {}
 
 func (x *GRPCProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[3]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -219,7 +219,7 @@ func (x *GRPCProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GRPCProto.ProtoReflect.Descriptor instead.
 func (*GRPCProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{3}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GRPCProto) GetAddress() string {
@@ -242,7 +242,7 @@ type DataProto struct {
 
 func (x *DataProto) Reset() {
 	*x = DataProto{}
-	mi := &file_conf_conf_proto_msgTypes[4]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -254,7 +254,7 @@ func (x *DataProto) String() string {
 func (*DataProto) ProtoMessage() {}
 
 func (x *DataProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[4]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -267,7 +267,7 @@ func (x *DataProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataProto.ProtoReflect.Descriptor instead.
 func (*DataProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{4}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DataProto) GetMysqlDsn() string {
@@ -319,7 +319,7 @@ type AuthProto struct {
 
 func (x *AuthProto) Reset() {
 	*x = AuthProto{}
-	mi := &file_conf_conf_proto_msgTypes[5]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -331,7 +331,7 @@ func (x *AuthProto) String() string {
 func (*AuthProto) ProtoMessage() {}
 
 func (x *AuthProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[5]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -344,7 +344,7 @@ func (x *AuthProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthProto.ProtoReflect.Descriptor instead.
 func (*AuthProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{5}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AuthProto) GetAccessTokenTtl() string {
@@ -392,15 +392,13 @@ func (x *AuthProto) GetPassword() *PasswordProto {
 type PasswordProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BcryptCost    int32                  `protobuf:"varint,1,opt,name=bcrypt_cost,json=bcryptCost,proto3" json:"bcrypt_cost,omitempty"`
-	MinLength     int32                  `protobuf:"varint,2,opt,name=min_length,json=minLength,proto3" json:"min_length,omitempty"`
-	MaxBytes      int32                  `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PasswordProto) Reset() {
 	*x = PasswordProto{}
-	mi := &file_conf_conf_proto_msgTypes[6]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +410,7 @@ func (x *PasswordProto) String() string {
 func (*PasswordProto) ProtoMessage() {}
 
 func (x *PasswordProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[6]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,26 +423,12 @@ func (x *PasswordProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasswordProto.ProtoReflect.Descriptor instead.
 func (*PasswordProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{6}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PasswordProto) GetBcryptCost() int32 {
 	if x != nil {
 		return x.BcryptCost
-	}
-	return 0
-}
-
-func (x *PasswordProto) GetMinLength() int32 {
-	if x != nil {
-		return x.MinLength
-	}
-	return 0
-}
-
-func (x *PasswordProto) GetMaxBytes() int32 {
-	if x != nil {
-		return x.MaxBytes
 	}
 	return 0
 }
@@ -458,7 +442,7 @@ type RegistryProto struct {
 
 func (x *RegistryProto) Reset() {
 	*x = RegistryProto{}
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +454,7 @@ func (x *RegistryProto) String() string {
 func (*RegistryProto) ProtoMessage() {}
 
 func (x *RegistryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +467,7 @@ func (x *RegistryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegistryProto.ProtoReflect.Descriptor instead.
 func (*RegistryProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RegistryProto) GetConsul() *ConsulProto {
@@ -507,7 +491,7 @@ type ConsulProto struct {
 
 func (x *ConsulProto) Reset() {
 	*x = ConsulProto{}
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +503,7 @@ func (x *ConsulProto) String() string {
 func (*ConsulProto) ProtoMessage() {}
 
 func (x *ConsulProto) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_services_user_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +516,7 @@ func (x *ConsulProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsulProto.ProtoReflect.Descriptor instead.
 func (*ConsulProto) Descriptor() ([]byte, []int) {
-	return file_conf_conf_proto_rawDescGZIP(), []int{8}
+	return file_services_user_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ConsulProto) GetEnabled() bool {
@@ -577,21 +561,21 @@ func (x *ConsulProto) GetServiceId() string {
 	return ""
 }
 
-var File_conf_conf_proto protoreflect.FileDescriptor
+var File_services_user_internal_conf_conf_proto protoreflect.FileDescriptor
 
-const file_conf_conf_proto_rawDesc = "" +
+const file_services_user_internal_conf_conf_proto_rawDesc = "" +
 	"\n" +
-	"\x0fconf/conf.proto\x12\x04conf\"\xdf\x01\n" +
-	"\tBootstrap\x12,\n" +
-	"\aservice\x18\x01 \x01(\v2\x12.conf.ServiceProtoR\aservice\x12)\n" +
-	"\x06server\x18\x02 \x01(\v2\x11.conf.ServerProtoR\x06server\x12#\n" +
-	"\x04data\x18\x03 \x01(\v2\x0f.conf.DataProtoR\x04data\x12#\n" +
-	"\x04auth\x18\x04 \x01(\v2\x0f.conf.AuthProtoR\x04auth\x12/\n" +
-	"\bregistry\x18\x05 \x01(\v2\x13.conf.RegistryProtoR\bregistry\"\"\n" +
+	"&services/user/internal/conf/conf.proto\x12\tuser.conf\"\xf8\x01\n" +
+	"\tBootstrap\x121\n" +
+	"\aservice\x18\x01 \x01(\v2\x17.user.conf.ServiceProtoR\aservice\x12.\n" +
+	"\x06server\x18\x02 \x01(\v2\x16.user.conf.ServerProtoR\x06server\x12(\n" +
+	"\x04data\x18\x03 \x01(\v2\x14.user.conf.DataProtoR\x04data\x12(\n" +
+	"\x04auth\x18\x04 \x01(\v2\x14.user.conf.AuthProtoR\x04auth\x124\n" +
+	"\bregistry\x18\x05 \x01(\v2\x18.user.conf.RegistryProtoR\bregistry\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"2\n" +
-	"\vServerProto\x12#\n" +
-	"\x04grpc\x18\x01 \x01(\v2\x0f.conf.GRPCProtoR\x04grpc\"%\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"7\n" +
+	"\vServerProto\x12(\n" +
+	"\x04grpc\x18\x01 \x01(\v2\x14.user.conf.GRPCProtoR\x04grpc\"%\n" +
 	"\tGRPCProto\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\"\xb2\x01\n" +
 	"\tDataProto\x12\x1b\n" +
@@ -600,22 +584,19 @@ const file_conf_conf_proto_rawDesc = "" +
 	"redis_addr\x18\x02 \x01(\tR\tredisAddr\x12%\n" +
 	"\x0eredis_password\x18\x03 \x01(\tR\rredisPassword\x12\x19\n" +
 	"\bredis_db\x18\x04 \x01(\x05R\aredisDb\x12'\n" +
-	"\x0fredis_namespace\x18\x05 \x01(\tR\x0eredisNamespace\"\xf0\x01\n" +
+	"\x0fredis_namespace\x18\x05 \x01(\tR\x0eredisNamespace\"\xf5\x01\n" +
 	"\tAuthProto\x12(\n" +
 	"\x10access_token_ttl\x18\x01 \x01(\tR\x0eaccessTokenTtl\x12*\n" +
 	"\x11refresh_token_ttl\x18\x02 \x01(\tR\x0frefreshTokenTtl\x12(\n" +
 	"\x10access_token_key\x18\x03 \x01(\tR\x0eaccessTokenKey\x12\x16\n" +
 	"\x06issuer\x18\x04 \x01(\tR\x06issuer\x12\x1a\n" +
-	"\baudience\x18\x05 \x01(\tR\baudience\x12/\n" +
-	"\bpassword\x18\x06 \x01(\v2\x13.conf.PasswordProtoR\bpassword\"l\n" +
+	"\baudience\x18\x05 \x01(\tR\baudience\x124\n" +
+	"\bpassword\x18\x06 \x01(\v2\x18.user.conf.PasswordProtoR\bpassword\"0\n" +
 	"\rPasswordProto\x12\x1f\n" +
 	"\vbcrypt_cost\x18\x01 \x01(\x05R\n" +
-	"bcryptCost\x12\x1d\n" +
-	"\n" +
-	"min_length\x18\x02 \x01(\x05R\tminLength\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\x05R\bmaxBytes\":\n" +
-	"\rRegistryProto\x12)\n" +
-	"\x06consul\x18\x01 \x01(\v2\x11.conf.ConsulProtoR\x06consul\"\xae\x01\n" +
+	"bcryptCost\"?\n" +
+	"\rRegistryProto\x12.\n" +
+	"\x06consul\x18\x01 \x01(\v2\x16.user.conf.ConsulProtoR\x06consul\"\xae\x01\n" +
 	"\vConsulProto\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x16\n" +
@@ -628,38 +609,38 @@ const file_conf_conf_proto_rawDesc = "" +
 	"service_id\x18\x06 \x01(\tR\tserviceIdBBZ@github.com/viggggil/go_oj_agent/services/user/internal/conf;confb\x06proto3"
 
 var (
-	file_conf_conf_proto_rawDescOnce sync.Once
-	file_conf_conf_proto_rawDescData []byte
+	file_services_user_internal_conf_conf_proto_rawDescOnce sync.Once
+	file_services_user_internal_conf_conf_proto_rawDescData []byte
 )
 
-func file_conf_conf_proto_rawDescGZIP() []byte {
-	file_conf_conf_proto_rawDescOnce.Do(func() {
-		file_conf_conf_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_conf_conf_proto_rawDesc), len(file_conf_conf_proto_rawDesc)))
+func file_services_user_internal_conf_conf_proto_rawDescGZIP() []byte {
+	file_services_user_internal_conf_conf_proto_rawDescOnce.Do(func() {
+		file_services_user_internal_conf_conf_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_services_user_internal_conf_conf_proto_rawDesc), len(file_services_user_internal_conf_conf_proto_rawDesc)))
 	})
-	return file_conf_conf_proto_rawDescData
+	return file_services_user_internal_conf_conf_proto_rawDescData
 }
 
-var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_conf_conf_proto_goTypes = []any{
-	(*Bootstrap)(nil),     // 0: conf.Bootstrap
-	(*ServiceProto)(nil),  // 1: conf.ServiceProto
-	(*ServerProto)(nil),   // 2: conf.ServerProto
-	(*GRPCProto)(nil),     // 3: conf.GRPCProto
-	(*DataProto)(nil),     // 4: conf.DataProto
-	(*AuthProto)(nil),     // 5: conf.AuthProto
-	(*PasswordProto)(nil), // 6: conf.PasswordProto
-	(*RegistryProto)(nil), // 7: conf.RegistryProto
-	(*ConsulProto)(nil),   // 8: conf.ConsulProto
+var file_services_user_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_services_user_internal_conf_conf_proto_goTypes = []any{
+	(*Bootstrap)(nil),     // 0: user.conf.Bootstrap
+	(*ServiceProto)(nil),  // 1: user.conf.ServiceProto
+	(*ServerProto)(nil),   // 2: user.conf.ServerProto
+	(*GRPCProto)(nil),     // 3: user.conf.GRPCProto
+	(*DataProto)(nil),     // 4: user.conf.DataProto
+	(*AuthProto)(nil),     // 5: user.conf.AuthProto
+	(*PasswordProto)(nil), // 6: user.conf.PasswordProto
+	(*RegistryProto)(nil), // 7: user.conf.RegistryProto
+	(*ConsulProto)(nil),   // 8: user.conf.ConsulProto
 }
-var file_conf_conf_proto_depIdxs = []int32{
-	1, // 0: conf.Bootstrap.service:type_name -> conf.ServiceProto
-	2, // 1: conf.Bootstrap.server:type_name -> conf.ServerProto
-	4, // 2: conf.Bootstrap.data:type_name -> conf.DataProto
-	5, // 3: conf.Bootstrap.auth:type_name -> conf.AuthProto
-	7, // 4: conf.Bootstrap.registry:type_name -> conf.RegistryProto
-	3, // 5: conf.ServerProto.grpc:type_name -> conf.GRPCProto
-	6, // 6: conf.AuthProto.password:type_name -> conf.PasswordProto
-	8, // 7: conf.RegistryProto.consul:type_name -> conf.ConsulProto
+var file_services_user_internal_conf_conf_proto_depIdxs = []int32{
+	1, // 0: user.conf.Bootstrap.service:type_name -> user.conf.ServiceProto
+	2, // 1: user.conf.Bootstrap.server:type_name -> user.conf.ServerProto
+	4, // 2: user.conf.Bootstrap.data:type_name -> user.conf.DataProto
+	5, // 3: user.conf.Bootstrap.auth:type_name -> user.conf.AuthProto
+	7, // 4: user.conf.Bootstrap.registry:type_name -> user.conf.RegistryProto
+	3, // 5: user.conf.ServerProto.grpc:type_name -> user.conf.GRPCProto
+	6, // 6: user.conf.AuthProto.password:type_name -> user.conf.PasswordProto
+	8, // 7: user.conf.RegistryProto.consul:type_name -> user.conf.ConsulProto
 	8, // [8:8] is the sub-list for method output_type
 	8, // [8:8] is the sub-list for method input_type
 	8, // [8:8] is the sub-list for extension type_name
@@ -667,26 +648,26 @@ var file_conf_conf_proto_depIdxs = []int32{
 	0, // [0:8] is the sub-list for field type_name
 }
 
-func init() { file_conf_conf_proto_init() }
-func file_conf_conf_proto_init() {
-	if File_conf_conf_proto != nil {
+func init() { file_services_user_internal_conf_conf_proto_init() }
+func file_services_user_internal_conf_conf_proto_init() {
+	if File_services_user_internal_conf_conf_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conf_conf_proto_rawDesc), len(file_conf_conf_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_user_internal_conf_conf_proto_rawDesc), len(file_services_user_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_conf_conf_proto_goTypes,
-		DependencyIndexes: file_conf_conf_proto_depIdxs,
-		MessageInfos:      file_conf_conf_proto_msgTypes,
+		GoTypes:           file_services_user_internal_conf_conf_proto_goTypes,
+		DependencyIndexes: file_services_user_internal_conf_conf_proto_depIdxs,
+		MessageInfos:      file_services_user_internal_conf_conf_proto_msgTypes,
 	}.Build()
-	File_conf_conf_proto = out.File
-	file_conf_conf_proto_goTypes = nil
-	file_conf_conf_proto_depIdxs = nil
+	File_services_user_internal_conf_conf_proto = out.File
+	file_services_user_internal_conf_conf_proto_goTypes = nil
+	file_services_user_internal_conf_conf_proto_depIdxs = nil
 }

@@ -2,8 +2,6 @@ package biz
 
 import (
 	"strings"
-
-	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
 type RegisterInput struct {
@@ -19,17 +17,6 @@ func (in RegisterInput) Normalize() RegisterInput {
 	return in
 }
 
-func (in RegisterInput) Validate(policy security.PasswordPolicy) error {
-	in = in.Normalize()
-	if IsBlank(in.Username) || IsBlank(in.Email) {
-		return ErrInvalidArgument
-	}
-	if !strings.Contains(in.Email, "@") {
-		return ErrInvalidArgument
-	}
-	return policy.Validate(in.Password)
-}
-
 type LoginInput struct {
 	Account  string
 	Password string
@@ -40,21 +27,6 @@ func (in LoginInput) Normalize() LoginInput {
 	return in
 }
 
-func (in LoginInput) Validate() error {
-	in = in.Normalize()
-	if IsBlank(in.Account) || IsBlank(in.Password) {
-		return ErrInvalidCredential
-	}
-	return nil
-}
-
 type RefreshTokenInput struct {
 	RefreshToken string
-}
-
-func (in RefreshTokenInput) Validate() error {
-	if IsBlank(in.RefreshToken) {
-		return ErrRefreshTokenDenied
-	}
-	return nil
 }

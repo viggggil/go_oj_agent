@@ -9,19 +9,6 @@ import (
 	"github.com/viggggil/go_oj_agent/services/user/internal/security"
 )
 
-func TestRegisterInputValidate(t *testing.T) {
-	policy := security.DefaultPasswordPolicy()
-	input := RegisterInput{
-		Username: " alice ",
-		Email:    " ALICE@example.com ",
-		Password: "correct1",
-	}
-
-	if err := input.Validate(policy); err != nil {
-		t.Fatalf("Validate() error = %v", err)
-	}
-}
-
 func TestRegisterInputNormalize(t *testing.T) {
 	input := RegisterInput{
 		Username: " alice ",
@@ -54,34 +41,6 @@ func TestRegisterInputNormalizesUsernameCase(t *testing.T) {
 	}
 }
 
-func TestPasswordPolicyRejectsShortPassword(t *testing.T) {
-	policy := security.DefaultPasswordPolicy()
-
-	if err := policy.Validate("short"); err == nil {
-		t.Fatal("Validate() error = nil, want non-nil")
-	}
-}
-
-func TestPasswordPolicyRejectsBlankAfterTrim(t *testing.T) {
-	policy := security.DefaultPasswordPolicy()
-
-	if err := policy.Validate("        "); err == nil {
-		t.Fatal("Validate() error = nil, want non-nil")
-	}
-}
-
-func TestPasswordPolicyRejectsBcryptOverflow(t *testing.T) {
-	policy := security.DefaultPasswordPolicy()
-	password := "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstu"
-
-	if len(password) <= security.BcryptMaxPasswordBytes {
-		t.Fatalf("test password length = %d, want greater than %d", len(password), security.BcryptMaxPasswordBytes)
-	}
-	if err := policy.Validate(password); err == nil {
-		t.Fatal("Validate() error = nil, want non-nil")
-	}
-}
-
 func TestUserHasRole(t *testing.T) {
 	user := User{
 		ID:    1001,
@@ -93,25 +52,6 @@ func TestUserHasRole(t *testing.T) {
 	}
 	if user.HasRole(RoleName("unknown")) {
 		t.Fatal("HasRole(unknown) = true, want false")
-	}
-}
-
-func TestBcryptPasswordHasher(t *testing.T) {
-	hasher := security.NewBcryptPasswordHasher(4)
-	password := "correct1"
-
-	hash, err := hasher.Hash(password)
-	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
-	}
-	if hash == password {
-		t.Fatal("Hash() returned plaintext password")
-	}
-	if err := hasher.Compare(hash, password); err != nil {
-		t.Fatalf("Compare() error = %v", err)
-	}
-	if err := hasher.Compare(hash, "wrong-password"); err == nil {
-		t.Fatal("Compare() error = nil, want non-nil")
 	}
 }
 

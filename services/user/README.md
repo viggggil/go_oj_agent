@@ -20,11 +20,15 @@
 - `internal/server/grpc.go`：构建 gRPC Server、应用 middleware、注册 service handler。
 - `internal/server/server.go`：创建 Consul Registrar；服务注册和注销由 `kratos.App` 统一管理。
 - `internal/conf`：`conf.proto`、`conf.pb.go`，定义配置结构。
-- `internal/biz`：用户领域模型、认证输入、错误、校验逻辑、用例和仓储依赖接口。
-- `internal/security`：密码哈希、密码策略、JWT/Refresh Token 实现及其配置装配。`biz` 只依赖安全能力的接口和安全数据类型，不直接承载密码或令牌实现。
+- `internal/biz`：用户领域模型、认证输入、Proto 错误适配、用例和仓储依赖接口。
+- `internal/security`：密码哈希、JWT/Refresh Token 实现及其配置装配。请求字段校验不在这里重复实现。
 - `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
   当前已实现注册、登录、刷新令牌、查询当前用户和按 ID 查询用户，权限判断由 `biz` 统一控制。
+- `api/user/v1/user.pb.validate.go`：由 Proto `validate.rules` 生成的请求参数校验代码，service 层在进入 usecase 前调用 `Validate()`。
+- `api/user/v1/errors.pb.go`：由 `api/user/v1/errors.proto` 生成的错误 reason；对应 gRPC code 通过 Proto option 生成的 descriptor 读取。
+
+Proto 生成统一由仓库根目录的 `buf.yaml` 和 `buf.gen.yaml` 管理，不再在 user-service 目录维护独立 Buf 配置。修改 Proto 后可在仓库根目录执行 `make generate`；只生成 API 参数校验时执行 `make validate`。
 
 ## 运行时配置
 
@@ -56,8 +60,6 @@ auth:
   audience: "go-oj-gateway"
   password:
     bcrypt_cost: 12
-    min_length: 8
-    max_bytes: 72
 registry:
   consul:
     enabled: true
@@ -112,7 +114,7 @@ MVP 阶段只使用两个角色：
 - Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - Refresh Token 成功刷新时执行轮换，旧 token 会被标记为撤销。
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
-- 密码策略保持简单：trim 后不能为空，最小 8 个字符，最大 72 bytes。
+- 注册、登录和刷新令牌的字段长度、格式和必填规则由 `api/user/v1/user.proto` 的 `validate.rules` 定义。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。
 
 ## 内部目录分层
@@ -123,7 +125,7 @@ internal/
 │   ├── user.go       # 用户模型、角色、请求上下文
 │   ├── auth.go       # 注册、登录、刷新令牌输入
 │   ├── usecase.go    # UserUsecase 与仓储/安全依赖接口
-│   └── errors.go     # 领域错误
+│   └── error.go      # Proto 错误 reason 到 gRPC status 的通用适配
 └── security/
     ├── token.go      # JWT 与 Refresh Token
     ├── password.go   # bcrypt 与密码策略

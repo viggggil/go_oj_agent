@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package common.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/common/v1;commonv1";
+
+import "google/protobuf/descriptor.proto";
+
+// grpc_code 声明错误 reason 对应的 gRPC status code。
+extend google.protobuf.EnumValueOptions {
+  int32 grpc_code = 50001;
+}

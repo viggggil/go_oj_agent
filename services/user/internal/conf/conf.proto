@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package conf;
+package user.conf;
 
 option go_package = "github.com/viggggil/go_oj_agent/services/user/internal/conf;conf";
 
@@ -43,8 +43,6 @@ message AuthProto {
 
 message PasswordProto {
   int32 bcrypt_cost = 1;
-  int32 min_length = 2;
-  int32 max_bytes = 3;
 }
 
 message RegistryProto {

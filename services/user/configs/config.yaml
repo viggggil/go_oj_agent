@@ -17,8 +17,6 @@ auth:
   audience: "go-oj-gateway"
   password:
     bcrypt_cost: 12
-    min_length: 8
-    max_bytes: 72
 registry:
   consul:
     enabled: true
