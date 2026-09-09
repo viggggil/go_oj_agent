@@ -7,7 +7,7 @@
 package userv1
 
 import (
-	_ "github.com/viggggil/go_oj_agent/api/common/v1"
+	_ "github.com/go-kratos/kratos/v3/errors"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -94,17 +94,17 @@ var File_api_user_v1_errors_proto protoreflect.FileDescriptor
 
 const file_api_user_v1_errors_proto_rawDesc = "" +
 	"\n" +
-	"\x18api/user/v1/errors.proto\x12\auser.v1\x1a\x1aapi/common/v1/errors.proto*\x9e\x03\n" +
+	"\x18api/user/v1/errors.proto\x12\auser.v1\x1a\x13errors/errors.proto*\x9e\x03\n" +
 	"\x0fUserErrorReason\x12!\n" +
 	"\x1dUSER_ERROR_REASON_UNSPECIFIED\x10\x00\x12,\n" +
-	"\"USER_ERROR_REASON_INVALID_ARGUMENT\x10\x01\x1a\x04\x88\xb5\x18\x03\x12.\n" +
-	"$USER_ERROR_REASON_INVALID_CREDENTIAL\x10\x02\x1a\x04\x88\xb5\x18\x10\x12*\n" +
-	" USER_ERROR_REASON_ALREADY_EXISTS\x10\x03\x1a\x04\x88\xb5\x18\x06\x12%\n" +
-	"\x1bUSER_ERROR_REASON_NOT_FOUND\x10\x04\x1a\x04\x88\xb5\x18\x05\x120\n" +
-	"&USER_ERROR_REASON_ADMIN_ALREADY_EXISTS\x10\x05\x1a\x04\x88\xb5\x18\x06\x12$\n" +
-	"\x1aUSER_ERROR_REASON_INACTIVE\x10\x06\x1a\x04\x88\xb5\x18\a\x12-\n" +
-	"#USER_ERROR_REASON_PERMISSION_DENIED\x10\a\x1a\x04\x88\xb5\x18\a\x120\n" +
-	"&USER_ERROR_REASON_REFRESH_TOKEN_DENIED\x10\b\x1a\x04\x88\xb5\x18\x10B4Z2github.com/viggggil/go_oj_agent/api/user/v1;userv1b\x06proto3"
+	"\"USER_ERROR_REASON_INVALID_ARGUMENT\x10\x01\x1a\x04\xa8E\x90\x03\x12.\n" +
+	"$USER_ERROR_REASON_INVALID_CREDENTIAL\x10\x02\x1a\x04\xa8E\x91\x03\x12*\n" +
+	" USER_ERROR_REASON_ALREADY_EXISTS\x10\x03\x1a\x04\xa8E\x99\x03\x12%\n" +
+	"\x1bUSER_ERROR_REASON_NOT_FOUND\x10\x04\x1a\x04\xa8E\x94\x03\x120\n" +
+	"&USER_ERROR_REASON_ADMIN_ALREADY_EXISTS\x10\x05\x1a\x04\xa8E\x99\x03\x12$\n" +
+	"\x1aUSER_ERROR_REASON_INACTIVE\x10\x06\x1a\x04\xa8E\x93\x03\x12-\n" +
+	"#USER_ERROR_REASON_PERMISSION_DENIED\x10\a\x1a\x04\xa8E\x93\x03\x120\n" +
+	"&USER_ERROR_REASON_REFRESH_TOKEN_DENIED\x10\b\x1a\x04\xa8E\x91\x03B4Z2github.com/viggggil/go_oj_agent/api/user/v1;userv1b\x06proto3"
 
 var (
 	file_api_user_v1_errors_proto_rawDescOnce sync.Once

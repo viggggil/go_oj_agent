@@ -1,76 +1,57 @@
 package biz
 
 import (
-	"errors"
-	"fmt"
-
-	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
+	kerrors "github.com/go-kratos/kratos/v3/errors"
 	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
-
-// Error 是 user-service 的领域错误，原因和 gRPC code 均由 Proto 契约定义。
-type Error struct {
-	Reason userv1.UserErrorReason
-	Cause  error
-}
 
 var (
-	ErrInvalidArgument    = NewError(userv1.UserErrorReason_USER_ERROR_REASON_INVALID_ARGUMENT)
-	ErrInvalidCredential  = NewError(userv1.UserErrorReason_USER_ERROR_REASON_INVALID_CREDENTIAL)
-	ErrUserAlreadyExists  = NewError(userv1.UserErrorReason_USER_ERROR_REASON_ALREADY_EXISTS)
-	ErrUserNotFound       = NewError(userv1.UserErrorReason_USER_ERROR_REASON_NOT_FOUND)
-	ErrAdminAlreadyExists = NewError(userv1.UserErrorReason_USER_ERROR_REASON_ADMIN_ALREADY_EXISTS)
-	ErrUserInactive       = NewError(userv1.UserErrorReason_USER_ERROR_REASON_INACTIVE)
-	ErrPermissionDenied   = NewError(userv1.UserErrorReason_USER_ERROR_REASON_PERMISSION_DENIED)
-	ErrRefreshTokenDenied = NewError(userv1.UserErrorReason_USER_ERROR_REASON_REFRESH_TOKEN_DENIED)
+	ErrInvalidArgument    = userv1.ErrorUserErrorReasonInvalidArgument("参数不合法")
+	ErrInvalidCredential  = userv1.ErrorUserErrorReasonInvalidCredential("认证凭据无效")
+	ErrUserAlreadyExists  = userv1.ErrorUserErrorReasonAlreadyExists("用户已存在")
+	ErrUserNotFound       = userv1.ErrorUserErrorReasonNotFound("用户不存在")
+	ErrAdminAlreadyExists = userv1.ErrorUserErrorReasonAdminAlreadyExists("管理员已存在")
+	ErrUserInactive       = userv1.ErrorUserErrorReasonInactive("用户已禁用")
+	ErrPermissionDenied   = userv1.ErrorUserErrorReasonPermissionDenied("权限不足")
+	ErrRefreshTokenDenied = userv1.ErrorUserErrorReasonRefreshTokenDenied("刷新令牌无效")
 )
 
-func (e *Error) Error() string {
-	if e == nil {
-		return ""
-	}
-	if e.Cause == nil {
-		return e.Reason.String()
-	}
-	return fmt.Sprintf("%s: %v", e.Reason.String(), e.Cause)
+func IsUserNotFound(err error) bool {
+	return userv1.IsUserErrorReasonNotFound(err)
 }
 
-func (e *Error) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.Cause
+func IsAdminAlreadyExists(err error) bool {
+	return userv1.IsUserErrorReasonAdminAlreadyExists(err)
 }
 
-func NewError(reason userv1.UserErrorReason) *Error {
-	return &Error{Reason: reason}
+func InvalidArgument(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonInvalidArgument(format, args...)
 }
 
-func (e *Error) Is(target error) bool {
-	var other *Error
-	return errors.As(target, &other) && e != nil && other != nil && e.Reason == other.Reason
+func InvalidCredential(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonInvalidCredential(format, args...)
 }
 
-// GRPCStatus 使用 Proto enum option 中生成的 grpc_code，避免维护手写 reason/code 映射。
-func (e *Error) GRPCStatus() *status.Status {
-	code := codes.Internal
-	if e != nil {
-		if descriptor := userv1.File_api_user_v1_errors_proto.Enums().ByName("UserErrorReason"); descriptor != nil {
-			value := descriptor.Values().ByNumber(protoreflect.EnumNumber(e.Reason))
-			if value != nil {
-				options := value.Options()
-				if proto.HasExtension(options, commonv1.E_GrpcCode) {
-					if grpcCode, ok := proto.GetExtension(options, commonv1.E_GrpcCode).(int32); ok {
-						code = codes.Code(grpcCode)
-					}
-				}
-			}
-		}
-	}
-	message := e.Error()
-	return status.New(code, message)
+func UserAlreadyExists(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonAlreadyExists(format, args...)
+}
+
+func UserNotFound(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonNotFound(format, args...)
+}
+
+func AdminAlreadyExists(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonAdminAlreadyExists(format, args...)
+}
+
+func UserInactive(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonInactive(format, args...)
+}
+
+func PermissionDenied(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonPermissionDenied(format, args...)
+}
+
+func RefreshTokenDenied(format string, args ...interface{}) *kerrors.Error {
+	return userv1.ErrorUserErrorReasonRefreshTokenDenied(format, args...)
 }

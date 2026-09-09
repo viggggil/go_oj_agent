@@ -10,8 +10,8 @@ lint:
     - STANDARD
   ignore_only:
     PACKAGE_DIRECTORY_MATCH:
+      - errors/errors.proto
       - api/common/v1/common.proto
-      - api/common/v1/errors.proto
       - api/gateway/v1/gateway.proto
       - api/judge/v1/judge.proto
       - api/problem/v1/problem.proto
@@ -21,6 +21,7 @@ lint:
       - services/gateway/internal/conf/conf.proto
       - services/user/internal/conf/conf.proto
     PACKAGE_VERSION_SUFFIX:
+      - errors/errors.proto
       - services/user/internal/conf/conf.proto
       - services/gateway/internal/conf/conf.proto
 

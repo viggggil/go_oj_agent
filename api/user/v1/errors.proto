@@ -4,17 +4,17 @@ package user.v1;
 
 option go_package = "github.com/viggggil/go_oj_agent/api/user/v1;userv1";
 
-import "api/common/v1/errors.proto";
+import "errors/errors.proto";
 
 // UserErrorReason 定义 user-service 对外稳定的业务错误原因。
 enum UserErrorReason {
   USER_ERROR_REASON_UNSPECIFIED = 0;
-  USER_ERROR_REASON_INVALID_ARGUMENT = 1 [(common.v1.grpc_code) = 3];
-  USER_ERROR_REASON_INVALID_CREDENTIAL = 2 [(common.v1.grpc_code) = 16];
-  USER_ERROR_REASON_ALREADY_EXISTS = 3 [(common.v1.grpc_code) = 6];
-  USER_ERROR_REASON_NOT_FOUND = 4 [(common.v1.grpc_code) = 5];
-  USER_ERROR_REASON_ADMIN_ALREADY_EXISTS = 5 [(common.v1.grpc_code) = 6];
-  USER_ERROR_REASON_INACTIVE = 6 [(common.v1.grpc_code) = 7];
-  USER_ERROR_REASON_PERMISSION_DENIED = 7 [(common.v1.grpc_code) = 7];
-  USER_ERROR_REASON_REFRESH_TOKEN_DENIED = 8 [(common.v1.grpc_code) = 16];
+  USER_ERROR_REASON_INVALID_ARGUMENT = 1 [(errors.code) = 400];
+  USER_ERROR_REASON_INVALID_CREDENTIAL = 2 [(errors.code) = 401];
+  USER_ERROR_REASON_ALREADY_EXISTS = 3 [(errors.code) = 409];
+  USER_ERROR_REASON_NOT_FOUND = 4 [(errors.code) = 404];
+  USER_ERROR_REASON_ADMIN_ALREADY_EXISTS = 5 [(errors.code) = 409];
+  USER_ERROR_REASON_INACTIVE = 6 [(errors.code) = 403];
+  USER_ERROR_REASON_PERMISSION_DENIED = 7 [(errors.code) = 403];
+  USER_ERROR_REASON_REFRESH_TOKEN_DENIED = 8 [(errors.code) = 401];
 }
