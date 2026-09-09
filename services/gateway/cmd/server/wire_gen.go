@@ -7,7 +7,7 @@
 package main
 
 import (
-	"github.com/go-kratos/kratos/v3"
+	"github.com/viggggil/go_oj_agent/services/gateway/internal/client"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/middleware"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/server"
@@ -16,18 +16,25 @@ import (
 
 // Injectors from wire.go:
 
-func initApp(bc *conf.Bootstrap) (*kratos.App, func(), error) {
+func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	authMiddleware, err := middleware.NewAuthMiddleware(bc)
 	if err != nil {
 		return nil, nil, err
 	}
-	authService := service.NewAuthService()
+	context := client.NewClientContext()
+	userClient, cleanup, err := client.NewUserClient(context, bc)
+	if err != nil {
+		return nil, nil, err
+	}
+	userServiceClient := client.ProvideUserServiceClient(userClient)
+	authService := service.NewAuthService(userServiceClient)
 	userService := service.NewUserService()
 	problemService := service.NewProblemService()
 	submissionService := service.NewSubmissionService()
 	httpServer := server.NewHTTPServer(bc, authMiddleware, authService, userService, problemService, submissionService)
 	registrar := server.NewRegistrar(bc)
-	app := newApp(bc, httpServer, registrar)
-	return app, func() {
+	v := newApp(bc, httpServer, registrar)
+	return v, func() {
+		cleanup()
 	}, nil
 }

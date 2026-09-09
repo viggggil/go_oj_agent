@@ -32,13 +32,13 @@ func (s *UserService) Register(
 	req *userv1.RegisterRequest,
 ) (*userv1.RegisterResponse, error) {
 	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid register request")
+		return nil, biz.InvalidArgument("invalid register request")
 	}
 	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, biz.InvalidArgument("%s", err.Error())
 	}
 	if s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid register request")
+		return nil, biz.InvalidArgument("invalid register request")
 	}
 
 	user, err := s.uc.Register(ctx, biz.RegisterInput{
@@ -60,10 +60,10 @@ func (s *UserService) Login(
 	req *userv1.LoginRequest,
 ) (*userv1.LoginResponse, error) {
 	if req == nil || s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid login request")
+		return nil, biz.InvalidArgument("invalid login request")
 	}
 	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, biz.InvalidArgument("%s", err.Error())
 	}
 
 	tokens, err := s.uc.Login(ctx, biz.LoginInput{
@@ -85,10 +85,10 @@ func (s *UserService) RefreshToken(
 	req *userv1.RefreshTokenRequest,
 ) (*userv1.RefreshTokenResponse, error) {
 	if req == nil || s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid refresh token request")
+		return nil, biz.InvalidArgument("invalid refresh token request")
 	}
 	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, biz.InvalidArgument("%s", err.Error())
 	}
 
 	tokens, err := s.uc.RefreshToken(ctx, biz.RefreshTokenInput{
@@ -109,10 +109,10 @@ func (s *UserService) GetCurrentUser(
 	req *userv1.GetCurrentUserRequest,
 ) (*userv1.GetCurrentUserResponse, error) {
 	if req == nil || s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid get current user request")
+		return nil, biz.InvalidArgument("invalid get current user request")
 	}
 	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, biz.InvalidArgument("%s", err.Error())
 	}
 	user, err := s.uc.GetCurrentUser(ctx, biz.NewRequestContext(req.GetContext()))
 	if err != nil {
@@ -128,10 +128,10 @@ func (s *UserService) GetUser(
 	req *userv1.GetUserRequest,
 ) (*userv1.GetUserResponse, error) {
 	if req == nil || s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid get user request")
+		return nil, biz.InvalidArgument("invalid get user request")
 	}
 	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, biz.InvalidArgument("%s", err.Error())
 	}
 	user, err := s.uc.GetUser(ctx, biz.NewRequestContext(req.GetContext()), req.GetUserId())
 	if err != nil {

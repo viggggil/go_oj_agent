@@ -25,6 +25,7 @@
 - `internal/data`：MySQL 用户仓储和 Redis Refresh Token 存储实现。
 - `internal/service`：接收 proto request、做简单参数转换、调用 `biz.UserUsecase`、返回 proto response。
   当前已实现注册、登录、刷新令牌、查询当前用户和按 ID 查询用户，权限判断由 `biz` 统一控制。
+  service 层入口参数错误统一返回 `biz.InvalidArgument(...)`，确保 gRPC code 和 Kratos reason 一致。
 - `api/user/v1/user.pb.validate.go`：由 Proto `validate.rules` 生成的请求参数校验代码，service 层在进入 usecase 前调用 `Validate()`。
 - `api/user/v1/errors.pb.go`：由 `api/user/v1/errors.proto` 生成的错误 reason。
 - `api/user/v1/errors_errors.pb.go`：由 Kratos `protoc-gen-go-errors/v3` 生成的 `*errors.Error` 构造和匹配函数。
