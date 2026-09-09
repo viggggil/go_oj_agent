@@ -15,20 +15,31 @@ import (
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 )
 
-var ProviderSet = wire.NewSet()
+var ProviderSet = wire.NewSet(NewClientContext, NewUserClient, ProvideUserServiceClient)
 
 type UserClient struct {
 	userv1.UserServiceClient
 	conn *grpc.ClientConn
 }
 
+func NewClientContext() context.Context {
+	return context.Background()
+}
+
 func NewUserClient(ctx context.Context, config *conf.Bootstrap) (*UserClient, func(), error) {
+	if config == nil || config.GetClients() == nil {
+		return nil, nil, fmt.Errorf("gateway user client config is required")
+	}
 	clientConfig := config.GetClients().GetUser()
 	conn, cleanup, err := newGRPCConn(ctx, clientConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 	return &UserClient{UserServiceClient: userv1.NewUserServiceClient(conn), conn: conn}, cleanup, nil
+}
+
+func ProvideUserServiceClient(client *UserClient) userv1.UserServiceClient {
+	return client.UserServiceClient
 }
 
 func newGRPCConn(ctx context.Context, config *conf.ClientProto) (*grpc.ClientConn, func(), error) {

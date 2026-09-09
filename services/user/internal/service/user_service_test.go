@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	kerrors "github.com/go-kratos/kratos/v3/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -64,6 +65,9 @@ func TestRegisterRejectsRequestUsingGeneratedProtoValidation(t *testing.T) {
 	})
 	if got := status.Code(err); got != codes.InvalidArgument {
 		t.Fatalf("Register() status = %s, want %s", got, codes.InvalidArgument)
+	}
+	if got := kerrors.Reason(err); got != userv1.UserErrorReason_USER_ERROR_REASON_INVALID_ARGUMENT.String() {
+		t.Fatalf("Register() reason = %s, want invalid argument", got)
 	}
 }
 
@@ -141,6 +145,9 @@ func TestGetUserRejectsInvalidRequestUsingGeneratedProtoValidation(t *testing.T)
 	})
 	if got := status.Code(err); got != codes.InvalidArgument {
 		t.Fatalf("GetUser() status = %s, want %s", got, codes.InvalidArgument)
+	}
+	if got := kerrors.Reason(err); got != userv1.UserErrorReason_USER_ERROR_REASON_INVALID_ARGUMENT.String() {
+		t.Fatalf("GetUser() reason = %s, want invalid argument", got)
 	}
 }
 

@@ -168,12 +168,19 @@ Response：
 ```json
 {
   "data": {
-    "user_id": 1001,
-    "username": "alice"
+    "user": {
+      "id": 1001,
+      "username": "alice",
+      "email": "alice@example.com",
+      "status": "active",
+      "roles": ["user"]
+    }
   },
   "request_id": "..."
 }
 ```
+
+当前 Gateway 已接入该接口，内部转发到 `user.v1.UserService/Register`。
 
 ### POST `/api/v1/auth/login`
 
@@ -210,6 +217,8 @@ Request：
 ```
 
 Response：新的 Access Token 和轮换后的 Refresh Token。
+
+当前 Gateway 已接入注册、登录和刷新令牌三个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则和 Refresh Token 策略仍由 user-service 执行。
 
 ---
 
