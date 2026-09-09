@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/wire"
@@ -107,7 +106,7 @@ func (uc *UserUsecase) Login(ctx context.Context, input LoginInput) (TokenPair, 
 	input = input.Normalize()
 	user, err := uc.users.FindByAccount(ctx, input.Account)
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
+		if IsUserNotFound(err) {
 			return TokenPair{}, ErrInvalidCredential
 		}
 		return TokenPair{}, err

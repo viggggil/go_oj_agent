@@ -7,6 +7,7 @@ GO_ERRORS_PLUGIN ?= github.com/go-kratos/kratos/cmd/protoc-gen-go-errors/v3@v3.0
 GO_PACKAGES := ./...
 GO_FILES := $(shell git ls-files '*.go')
 API_PROTO_FILES := $(shell find api -name '*.proto' -type f | sort)
+BUF_GENERATE_PATHS := --path api --path services/user/internal/conf --path services/gateway/internal/conf
 
 .PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
 
@@ -20,7 +21,8 @@ proto:
 
 generate:
 	@$(BUF) dep update
-	@$(BUF) generate
+	@GOBIN=/tmp $(GO) install $(GO_ERRORS_PLUGIN)
+	@PATH=/tmp:$$PATH $(BUF) generate $(BUF_GENERATE_PATHS)
 
 # 使用 protoc 生成 API 参数校验代码。
 validate:

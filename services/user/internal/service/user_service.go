@@ -2,8 +2,8 @@ package service
 
 import (
 	"context"
-	"errors"
 
+	kerrors "github.com/go-kratos/kratos/v3/errors"
 	"github.com/google/wire"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -157,9 +157,8 @@ func toProtoUser(user biz.User) *userv1.User {
 }
 
 func toStatusError(err error) error {
-	var domainErr *biz.Error
-	if errors.As(err, &domainErr) {
-		return domainErr
+	if kerrors.FromError(err).Reason != kerrors.UnknownReason {
+		return err
 	}
 	return status.Error(codes.Internal, err.Error())
 }

@@ -45,17 +45,17 @@ contest.v1
 judge.v1
 ```
 
-user-service 的请求字段校验由 `validate.rules` 定义，Go 代码由 `validate-go` 生成，服务端直接调用请求对象的 `Validate()`。user-service 的业务错误 reason 定义在 `api/user/v1/errors.proto`，对应 gRPC code 通过 Proto option 声明。
+user-service 的请求字段校验由 `validate.rules` 定义，Go 代码由 `validate-go` 生成，服务端直接调用请求对象的 `Validate()`。user-service 的业务错误 reason 定义在 `api/user/v1/errors.proto`，错误码使用 Kratos v3 标准的 `errors.code` 注解声明，并由 `protoc-gen-go-errors/v3` 生成 `*kratos/errors.Error` 构造和匹配函数。
 
 仓库只使用根目录的 `buf.yaml` 和 `buf.gen.yaml` 管理全部 Proto，包括 API 契约和各服务配置。常用生成命令如下：
 
 ```bash
-make generate  # 使用 Buf 生成全部 Proto Go 代码
+make generate  # 使用 Buf 生成全部 Proto Go 代码，并安装固定版本 Kratos errors 插件
 make validate  # 使用 protoc 生成 API 参数校验代码
 make errors    # 使用 Kratos errors 插件生成错误代码
 ```
 
-服务配置 Proto 使用服务专属的 Proto 包名以避免单一 Buf module 中的符号冲突，但 Go 包导入路径保持不变。
+服务配置 Proto 使用服务专属的 Proto 包名以避免单一 Buf module 中的符号冲突，但 Go 包导入路径保持不变。Kratos 的 `errors/errors.proto` 作为生成期契约保存在仓库根目录，运行时仍依赖 `github.com/go-kratos/kratos/v3/errors`。
 
 ### 2.2 Content Type
 

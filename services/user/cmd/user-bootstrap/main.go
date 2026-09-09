@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -61,7 +60,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		Status:       biz.UserStatusActive,
 	})
 	if err != nil {
-		if errors.Is(err, biz.ErrAdminAlreadyExists) {
+		if biz.IsAdminAlreadyExists(err) {
 			logger.Info("admin bootstrap skipped", "reason", "admin already exists")
 			return nil
 		}
