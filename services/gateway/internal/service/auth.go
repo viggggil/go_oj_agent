@@ -30,9 +30,6 @@ func (s *AuthService) Register(ctx context.Context, req *gatewayv1.RegisterReque
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
 	}
-	if err := req.Validate(); err != nil {
-		return nil, ErrInvalidRequest(err)
-	}
 	resp, err := s.users.Register(ctx, &userv1.RegisterRequest{
 		Username: req.GetUsername(),
 		Email:    req.GetEmail(),
@@ -47,9 +44,6 @@ func (s *AuthService) Register(ctx context.Context, req *gatewayv1.RegisterReque
 func (s *AuthService) Login(ctx context.Context, req *gatewayv1.LoginRequest) (*gatewayv1.LoginResponse, error) {
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
-	}
-	if err := req.Validate(); err != nil {
-		return nil, ErrInvalidRequest(err)
 	}
 	resp, err := s.users.Login(ctx, &userv1.LoginRequest{
 		Account:  req.GetAccount(),
@@ -68,9 +62,6 @@ func (s *AuthService) Login(ctx context.Context, req *gatewayv1.LoginRequest) (*
 func (s *AuthService) RefreshToken(ctx context.Context, req *gatewayv1.RefreshTokenRequest) (*gatewayv1.RefreshTokenResponse, error) {
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
-	}
-	if err := req.Validate(); err != nil {
-		return nil, ErrInvalidRequest(err)
 	}
 	resp, err := s.users.RefreshToken(ctx, &userv1.RefreshTokenRequest{
 		RefreshToken: req.GetRefreshToken(),

@@ -123,7 +123,8 @@ func TestHTTPServerLoginMapsUserServiceError(t *testing.T) {
 }
 
 func TestHTTPServerRegisterRejectsInvalidRequest(t *testing.T) {
-	server := newTestHTTPServer(t, &fakeUserClient{})
+	userClient := &fakeUserClient{}
+	server := newTestHTTPServer(t, userClient)
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{
@@ -140,8 +141,11 @@ func TestHTTPServerRegisterRejectsInvalidRequest(t *testing.T) {
 	}
 	var body kratosErrorResponse
 	decodeResponse(t, response.Body, &body)
-	if body.Reason != "GATEWAY_INVALID_ARGUMENT" || response.Header().Get("X-Request-ID") != "req-invalid" {
-		t.Fatalf("body = %#v, want gateway invalid argument", body)
+	if body.Reason != "VALIDATOR" || response.Header().Get("X-Request-ID") != "req-invalid" {
+		t.Fatalf("body = %#v, want validator error", body)
+	}
+	if userClient.registerRequest != nil {
+		t.Fatal("参数校验失败时不应调用 user-service")
 	}
 }
 

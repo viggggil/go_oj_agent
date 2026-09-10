@@ -48,7 +48,7 @@ go run ./services/gateway/cmd/server -conf services/gateway/configs/config.yaml
 curl http://127.0.0.1:8080/healthz
 ```
 
-HTTP API 由 `api/gateway/v1/gateway.proto` 中的 `service GatewayService` 和 `google.api.http` 定义，通过 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，并使用 `RegisterGatewayServiceHTTPServer` 注册到 Kratos HTTP Server。请求参数校验使用同一 Proto 生成的 `Validate()`。
+HTTP API 由 `api/gateway/v1/gateway.proto` 中的 `service GatewayService` 和 `google.api.http` 定义，通过 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，并使用 `RegisterGatewayServiceHTTPServer` 注册到 Kratos HTTP Server。请求参数校验统一由全局 `validate.Validator()` middleware 调用 Proto 生成的 `Validate()`，Gateway service 不再重复校验。
 
 ```bash
 curl -X POST http://127.0.0.1:8080/api/v1/auth/login \
@@ -83,5 +83,6 @@ curl http://127.0.0.1:8080/api/v1/users/1001 \
 - Gateway 公开认证接口只做 HTTP DTO 校验、请求转换和 gRPC 转发。
 - Gateway 使用公共包 `pkg/auth` 验证 Access Token，将 claims 转换为 `common.v1.RequestContext`，并传递给 user-service。
 - Gateway 使用 Kratos `middleware.Middleware` 和 `server.Use` 按 operation 保护用户接口，不使用原生 `HandleFunc` 或 `khttp.Filter` 实现业务路由和认证。
+- Gateway HTTP Server 全局启用 `recovery.Recovery()` 和 `validate.Validator()`，分别负责 panic 恢复和 Proto 参数校验。
 - Gateway 不复制 user-service 的资源授权规则；用户本人或管理员权限由 user-service 最终判断。
 - Gateway 到内部服务统一走 gRPC。
