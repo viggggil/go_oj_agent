@@ -17,3 +17,7 @@ plugins:
     out: .
     opt:
       - paths=source_relative
+  - local: protoc-gen-go-http
+    out: .
+    opt:
+      - paths=source_relative

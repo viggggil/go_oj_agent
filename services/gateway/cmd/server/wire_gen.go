@@ -28,10 +28,9 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	}
 	userServiceClient := client.ProvideUserServiceClient(userClient)
 	authService := service.NewAuthService(userServiceClient)
-	userService := service.NewUserService()
-	problemService := service.NewProblemService()
-	submissionService := service.NewSubmissionService()
-	httpServer := server.NewHTTPServer(bc, authMiddleware, authService, userService, problemService, submissionService)
+	userService := service.NewUserService(userServiceClient)
+	gatewayService := service.NewGatewayService(authService, userService)
+	httpServer := server.NewHTTPServer(bc, authMiddleware, gatewayService)
 	registrar := server.NewRegistrar(bc)
 	v := newApp(bc, httpServer, registrar)
 	return v, func() {
