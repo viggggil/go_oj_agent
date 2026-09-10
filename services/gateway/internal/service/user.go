@@ -42,9 +42,6 @@ func (s *UserService) GetUser(ctx context.Context, req *gatewayv1.GetUserRequest
 	if req == nil {
 		return nil, ErrInvalidRequest(fmt.Errorf("user request is required"))
 	}
-	if err := req.Validate(); err != nil {
-		return nil, ErrInvalidRequest(err)
-	}
 	if s == nil || s.users == nil || requestContext == nil {
 		return nil, fmt.Errorf("gateway user service is not configured")
 	}

@@ -3,6 +3,8 @@ package server
 import (
 	"time"
 
+	"github.com/go-kratos/kratos/v3/middleware/recovery"
+	"github.com/go-kratos/kratos/v3/middleware/validate"
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
@@ -30,7 +32,11 @@ func NewHTTPServer(
 	server := khttp.NewServer(
 		khttp.Address(address),
 		khttp.Timeout(timeout),
-		khttp.Middleware(gatewaymw.RequestIDMiddleware()),
+		khttp.Middleware(
+			gatewaymw.RequestIDMiddleware(),
+			recovery.Recovery(),
+			validate.Validator(),
+		),
 	)
 	gatewayv1.RegisterGatewayServiceHTTPServer(server, gatewayService)
 	server.Use(
