@@ -8,6 +8,7 @@ package gatewayv1
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,110 +23,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type APIResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *APIResponse) Reset() {
-	*x = APIResponse{}
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *APIResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*APIResponse) ProtoMessage() {}
-
-func (x *APIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use APIResponse.ProtoReflect.Descriptor instead.
-func (*APIResponse) Descriptor() ([]byte, []int) {
-	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *APIResponse) GetRequestId() string {
-	if x != nil {
-		return x.RequestId
-	}
-	return ""
-}
-
-type APIError struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	RequestId     string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *APIError) Reset() {
-	*x = APIError{}
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *APIError) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*APIError) ProtoMessage() {}
-
-func (x *APIError) ProtoReflect() protoreflect.Message {
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use APIError.ProtoReflect.Descriptor instead.
-func (*APIError) Descriptor() ([]byte, []int) {
-	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *APIError) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *APIError) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *APIError) GetRequestId() string {
-	if x != nil {
-		return x.RequestId
-	}
-	return ""
-}
-
 type UserSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -139,7 +36,7 @@ type UserSummary struct {
 
 func (x *UserSummary) Reset() {
 	*x = UserSummary{}
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -151,7 +48,7 @@ func (x *UserSummary) String() string {
 func (*UserSummary) ProtoMessage() {}
 
 func (x *UserSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -164,7 +61,7 @@ func (x *UserSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSummary.ProtoReflect.Descriptor instead.
 func (*UserSummary) Descriptor() ([]byte, []int) {
-	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *UserSummary) GetId() int64 {
@@ -202,7 +99,87 @@ func (x *UserSummary) GetRoles() []string {
 	return nil
 }
 
-type RegisterHTTPRequest struct {
+type HealthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthRequest) Reset() {
+	*x = HealthRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthRequest) ProtoMessage() {}
+
+func (x *HealthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
+func (*HealthRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{1}
+}
+
+type HealthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthResponse) Reset() {
+	*x = HealthResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthResponse) ProtoMessage() {}
+
+func (x *HealthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
+func (*HealthResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *HealthResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type RegisterRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
@@ -211,20 +188,20 @@ type RegisterHTTPRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RegisterHTTPRequest) Reset() {
-	*x = RegisterHTTPRequest{}
+func (x *RegisterRequest) Reset() {
+	*x = RegisterRequest{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RegisterHTTPRequest) String() string {
+func (x *RegisterRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegisterHTTPRequest) ProtoMessage() {}
+func (*RegisterRequest) ProtoMessage() {}
 
-func (x *RegisterHTTPRequest) ProtoReflect() protoreflect.Message {
+func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -236,53 +213,53 @@ func (x *RegisterHTTPRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterHTTPRequest.ProtoReflect.Descriptor instead.
-func (*RegisterHTTPRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
+func (*RegisterRequest) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *RegisterHTTPRequest) GetUsername() string {
+func (x *RegisterRequest) GetUsername() string {
 	if x != nil {
 		return x.Username
 	}
 	return ""
 }
 
-func (x *RegisterHTTPRequest) GetEmail() string {
+func (x *RegisterRequest) GetEmail() string {
 	if x != nil {
 		return x.Email
 	}
 	return ""
 }
 
-func (x *RegisterHTTPRequest) GetPassword() string {
+func (x *RegisterRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
 	}
 	return ""
 }
 
-type RegisterHTTPResponse struct {
+type RegisterResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	User          *UserSummary           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RegisterHTTPResponse) Reset() {
-	*x = RegisterHTTPResponse{}
+func (x *RegisterResponse) Reset() {
+	*x = RegisterResponse{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RegisterHTTPResponse) String() string {
+func (x *RegisterResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegisterHTTPResponse) ProtoMessage() {}
+func (*RegisterResponse) ProtoMessage() {}
 
-func (x *RegisterHTTPResponse) ProtoReflect() protoreflect.Message {
+func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -294,19 +271,19 @@ func (x *RegisterHTTPResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterHTTPResponse.ProtoReflect.Descriptor instead.
-func (*RegisterHTTPResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResponse) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *RegisterHTTPResponse) GetUser() *UserSummary {
+func (x *RegisterResponse) GetUser() *UserSummary {
 	if x != nil {
 		return x.User
 	}
 	return nil
 }
 
-type LoginHTTPRequest struct {
+type LoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Account       string                 `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
@@ -314,20 +291,20 @@ type LoginHTTPRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LoginHTTPRequest) Reset() {
-	*x = LoginHTTPRequest{}
+func (x *LoginRequest) Reset() {
+	*x = LoginRequest{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LoginHTTPRequest) String() string {
+func (x *LoginRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LoginHTTPRequest) ProtoMessage() {}
+func (*LoginRequest) ProtoMessage() {}
 
-func (x *LoginHTTPRequest) ProtoReflect() protoreflect.Message {
+func (x *LoginRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -339,26 +316,26 @@ func (x *LoginHTTPRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoginHTTPRequest.ProtoReflect.Descriptor instead.
-func (*LoginHTTPRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
+func (*LoginRequest) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *LoginHTTPRequest) GetAccount() string {
+func (x *LoginRequest) GetAccount() string {
 	if x != nil {
 		return x.Account
 	}
 	return ""
 }
 
-func (x *LoginHTTPRequest) GetPassword() string {
+func (x *LoginRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
 	}
 	return ""
 }
 
-type TokenHTTPResponse struct {
+type LoginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
 	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
@@ -367,20 +344,20 @@ type TokenHTTPResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TokenHTTPResponse) Reset() {
-	*x = TokenHTTPResponse{}
+func (x *LoginResponse) Reset() {
+	*x = LoginResponse{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TokenHTTPResponse) String() string {
+func (x *LoginResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TokenHTTPResponse) ProtoMessage() {}
+func (*LoginResponse) ProtoMessage() {}
 
-func (x *TokenHTTPResponse) ProtoReflect() protoreflect.Message {
+func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -392,53 +369,53 @@ func (x *TokenHTTPResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TokenHTTPResponse.ProtoReflect.Descriptor instead.
-func (*TokenHTTPResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
+func (*LoginResponse) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *TokenHTTPResponse) GetAccessToken() string {
+func (x *LoginResponse) GetAccessToken() string {
 	if x != nil {
 		return x.AccessToken
 	}
 	return ""
 }
 
-func (x *TokenHTTPResponse) GetRefreshToken() string {
+func (x *LoginResponse) GetRefreshToken() string {
 	if x != nil {
 		return x.RefreshToken
 	}
 	return ""
 }
 
-func (x *TokenHTTPResponse) GetExpiresIn() int64 {
+func (x *LoginResponse) GetExpiresIn() int64 {
 	if x != nil {
 		return x.ExpiresIn
 	}
 	return 0
 }
 
-type RefreshTokenHTTPRequest struct {
+type RefreshTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RefreshTokenHTTPRequest) Reset() {
-	*x = RefreshTokenHTTPRequest{}
+func (x *RefreshTokenRequest) Reset() {
+	*x = RefreshTokenRequest{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RefreshTokenHTTPRequest) String() string {
+func (x *RefreshTokenRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RefreshTokenHTTPRequest) ProtoMessage() {}
+func (*RefreshTokenRequest) ProtoMessage() {}
 
-func (x *RefreshTokenHTTPRequest) ProtoReflect() protoreflect.Message {
+func (x *RefreshTokenRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -450,39 +427,41 @@ func (x *RefreshTokenHTTPRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RefreshTokenHTTPRequest.ProtoReflect.Descriptor instead.
-func (*RefreshTokenHTTPRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use RefreshTokenRequest.ProtoReflect.Descriptor instead.
+func (*RefreshTokenRequest) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *RefreshTokenHTTPRequest) GetRefreshToken() string {
+func (x *RefreshTokenRequest) GetRefreshToken() string {
 	if x != nil {
 		return x.RefreshToken
 	}
 	return ""
 }
 
-type GetCurrentUserHTTPResponse struct {
+type RefreshTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *UserSummary           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	ExpiresIn     int64                  `protobuf:"varint,3,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetCurrentUserHTTPResponse) Reset() {
-	*x = GetCurrentUserHTTPResponse{}
+func (x *RefreshTokenResponse) Reset() {
+	*x = RefreshTokenResponse{}
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetCurrentUserHTTPResponse) String() string {
+func (x *RefreshTokenResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetCurrentUserHTTPResponse) ProtoMessage() {}
+func (*RefreshTokenResponse) ProtoMessage() {}
 
-func (x *GetCurrentUserHTTPResponse) ProtoReflect() protoreflect.Message {
+func (x *RefreshTokenResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_gateway_v1_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -494,40 +473,178 @@ func (x *GetCurrentUserHTTPResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetCurrentUserHTTPResponse.ProtoReflect.Descriptor instead.
-func (*GetCurrentUserHTTPResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RefreshTokenResponse.ProtoReflect.Descriptor instead.
+func (*RefreshTokenResponse) Descriptor() ([]byte, []int) {
 	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetCurrentUserHTTPResponse) GetUser() *UserSummary {
+func (x *RefreshTokenResponse) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *RefreshTokenResponse) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *RefreshTokenResponse) GetExpiresIn() int64 {
+	if x != nil {
+		return x.ExpiresIn
+	}
+	return 0
+}
+
+type GetCurrentUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentUserRequest) Reset() {
+	*x = GetCurrentUserRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentUserRequest) ProtoMessage() {}
+
+func (x *GetCurrentUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentUserRequest.ProtoReflect.Descriptor instead.
+func (*GetCurrentUserRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
+}
+
+type GetUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserRequest) Reset() {
+	*x = GetUserRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserRequest) ProtoMessage() {}
+
+func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
+func (*GetUserRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetUserRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type GetCurrentUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *UserSummary           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentUserResponse) Reset() {
+	*x = GetCurrentUserResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentUserResponse) ProtoMessage() {}
+
+func (x *GetCurrentUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentUserResponse.ProtoReflect.Descriptor instead.
+func (*GetCurrentUserResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetCurrentUserResponse) GetUser() *UserSummary {
 	if x != nil {
 		return x.User
 	}
 	return nil
 }
 
-type GetUserHTTPResponse struct {
+type GetUserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	User          *UserSummary           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetUserHTTPResponse) Reset() {
-	*x = GetUserHTTPResponse{}
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
+func (x *GetUserResponse) Reset() {
+	*x = GetUserResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetUserHTTPResponse) String() string {
+func (x *GetUserResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUserHTTPResponse) ProtoMessage() {}
+func (*GetUserResponse) ProtoMessage() {}
 
-func (x *GetUserHTTPResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_gateway_v1_gateway_proto_msgTypes[9]
+func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -538,12 +655,12 @@ func (x *GetUserHTTPResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUserHTTPResponse.ProtoReflect.Descriptor instead.
-func (*GetUserHTTPResponse) Descriptor() ([]byte, []int) {
-	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{9}
+// Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
+func (*GetUserResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *GetUserHTTPResponse) GetUser() *UserSummary {
+func (x *GetUserResponse) GetUser() *UserSummary {
 	if x != nil {
 		return x.User
 	}
@@ -555,44 +672,55 @@ var File_api_gateway_v1_gateway_proto protoreflect.FileDescriptor
 const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"\x1capi/gateway/v1/gateway.proto\x12\n" +
-	"gateway.v1\x1a\x17validate/validate.proto\",\n" +
-	"\vAPIResponse\x12\x1d\n" +
-	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"W\n" +
-	"\bAPIError\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1d\n" +
-	"\n" +
-	"request_id\x18\x03 \x01(\tR\trequestId\"}\n" +
+	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17validate/validate.proto\"}\n" +
 	"\vUserSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12\x14\n" +
-	"\x05roles\x18\x05 \x03(\tR\x05roles\"\x85\x01\n" +
-	"\x13RegisterHTTPRequest\x12%\n" +
+	"\x05roles\x18\x05 \x03(\tR\x05roles\"\x0f\n" +
+	"\rHealthRequest\"(\n" +
+	"\x0eHealthResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"\x81\x01\n" +
+	"\x0fRegisterRequest\x12%\n" +
 	"\busername\x18\x01 \x01(\tB\t\xfaB\x06r\x04\x10\x01\x18@R\busername\x12 \n" +
 	"\x05email\x18\x02 \x01(\tB\n" +
 	"\xfaB\ar\x05\x18\xff\x01`\x01R\x05email\x12%\n" +
-	"\bpassword\x18\x03 \x01(\tB\t\xfaB\x06r\x04\x10\b(HR\bpassword\"C\n" +
-	"\x14RegisterHTTPResponse\x12+\n" +
-	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\"_\n" +
-	"\x10LoginHTTPRequest\x12$\n" +
+	"\bpassword\x18\x03 \x01(\tB\t\xfaB\x06r\x04\x10\b(HR\bpassword\"?\n" +
+	"\x10RegisterResponse\x12+\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\"[\n" +
+	"\fLoginRequest\x12$\n" +
 	"\aaccount\x18\x01 \x01(\tB\n" +
 	"\xfaB\ar\x05\x10\x01\x18\xff\x01R\aaccount\x12%\n" +
-	"\bpassword\x18\x02 \x01(\tB\t\xfaB\x06r\x04\x10\x01(HR\bpassword\"z\n" +
-	"\x11TokenHTTPResponse\x12!\n" +
+	"\bpassword\x18\x02 \x01(\tB\t\xfaB\x06r\x04\x10\x01(HR\bpassword\"v\n" +
+	"\rLoginResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\x03 \x01(\x03R\texpiresIn\"J\n" +
-	"\x17RefreshTokenHTTPRequest\x12/\n" +
+	"expires_in\x18\x03 \x01(\x03R\texpiresIn\"F\n" +
+	"\x13RefreshTokenRequest\x12/\n" +
 	"\rrefresh_token\x18\x01 \x01(\tB\n" +
-	"\xfaB\ar\x05\x10\x01\x18\x80\x10R\frefreshToken\"I\n" +
-	"\x1aGetCurrentUserHTTPResponse\x12+\n" +
-	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\"B\n" +
-	"\x13GetUserHTTPResponse\x12+\n" +
-	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04userB:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
+	"\xfaB\ar\x05\x10\x01\x18\x80\x10R\frefreshToken\"}\n" +
+	"\x14RefreshTokenResponse\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
+	"\n" +
+	"expires_in\x18\x03 \x01(\x03R\texpiresIn\"\x17\n" +
+	"\x15GetCurrentUserRequest\")\n" +
+	"\x0eGetUserRequest\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x02id\"E\n" +
+	"\x16GetCurrentUserResponse\x12+\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\">\n" +
+	"\x0fGetUserResponse\x12+\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user2\xf0\x04\n" +
+	"\x0eGatewayService\x12Q\n" +
+	"\x06Health\x12\x19.gateway.v1.HealthRequest\x1a\x1a.gateway.v1.HealthResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
+	"\x12\b/healthz\x12g\n" +
+	"\bRegister\x12\x1b.gateway.v1.RegisterRequest\x1a\x1c.gateway.v1.RegisterResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/auth/register\x12[\n" +
+	"\x05Login\x12\x18.gateway.v1.LoginRequest\x1a\x19.gateway.v1.LoginResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/auth/login\x12r\n" +
+	"\fRefreshToken\x12\x1f.gateway.v1.RefreshTokenRequest\x1a .gateway.v1.RefreshTokenResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/auth/refresh\x12q\n" +
+	"\x0eGetCurrentUser\x12!.gateway.v1.GetCurrentUserRequest\x1a\".gateway.v1.GetCurrentUserResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/users/me\x12^\n" +
+	"\aGetUser\x12\x1a.gateway.v1.GetUserRequest\x1a\x1b.gateway.v1.GetUserResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/users/{id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
 
 var (
 	file_api_gateway_v1_gateway_proto_rawDescOnce sync.Once
@@ -606,28 +734,43 @@ func file_api_gateway_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_api_gateway_v1_gateway_proto_rawDescData
 }
 
-var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_api_gateway_v1_gateway_proto_goTypes = []any{
-	(*APIResponse)(nil),                // 0: gateway.v1.APIResponse
-	(*APIError)(nil),                   // 1: gateway.v1.APIError
-	(*UserSummary)(nil),                // 2: gateway.v1.UserSummary
-	(*RegisterHTTPRequest)(nil),        // 3: gateway.v1.RegisterHTTPRequest
-	(*RegisterHTTPResponse)(nil),       // 4: gateway.v1.RegisterHTTPResponse
-	(*LoginHTTPRequest)(nil),           // 5: gateway.v1.LoginHTTPRequest
-	(*TokenHTTPResponse)(nil),          // 6: gateway.v1.TokenHTTPResponse
-	(*RefreshTokenHTTPRequest)(nil),    // 7: gateway.v1.RefreshTokenHTTPRequest
-	(*GetCurrentUserHTTPResponse)(nil), // 8: gateway.v1.GetCurrentUserHTTPResponse
-	(*GetUserHTTPResponse)(nil),        // 9: gateway.v1.GetUserHTTPResponse
+	(*UserSummary)(nil),            // 0: gateway.v1.UserSummary
+	(*HealthRequest)(nil),          // 1: gateway.v1.HealthRequest
+	(*HealthResponse)(nil),         // 2: gateway.v1.HealthResponse
+	(*RegisterRequest)(nil),        // 3: gateway.v1.RegisterRequest
+	(*RegisterResponse)(nil),       // 4: gateway.v1.RegisterResponse
+	(*LoginRequest)(nil),           // 5: gateway.v1.LoginRequest
+	(*LoginResponse)(nil),          // 6: gateway.v1.LoginResponse
+	(*RefreshTokenRequest)(nil),    // 7: gateway.v1.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),   // 8: gateway.v1.RefreshTokenResponse
+	(*GetCurrentUserRequest)(nil),  // 9: gateway.v1.GetCurrentUserRequest
+	(*GetUserRequest)(nil),         // 10: gateway.v1.GetUserRequest
+	(*GetCurrentUserResponse)(nil), // 11: gateway.v1.GetCurrentUserResponse
+	(*GetUserResponse)(nil),        // 12: gateway.v1.GetUserResponse
 }
 var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
-	2, // 0: gateway.v1.RegisterHTTPResponse.user:type_name -> gateway.v1.UserSummary
-	2, // 1: gateway.v1.GetCurrentUserHTTPResponse.user:type_name -> gateway.v1.UserSummary
-	2, // 2: gateway.v1.GetUserHTTPResponse.user:type_name -> gateway.v1.UserSummary
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: gateway.v1.RegisterResponse.user:type_name -> gateway.v1.UserSummary
+	0,  // 1: gateway.v1.GetCurrentUserResponse.user:type_name -> gateway.v1.UserSummary
+	0,  // 2: gateway.v1.GetUserResponse.user:type_name -> gateway.v1.UserSummary
+	1,  // 3: gateway.v1.GatewayService.Health:input_type -> gateway.v1.HealthRequest
+	3,  // 4: gateway.v1.GatewayService.Register:input_type -> gateway.v1.RegisterRequest
+	5,  // 5: gateway.v1.GatewayService.Login:input_type -> gateway.v1.LoginRequest
+	7,  // 6: gateway.v1.GatewayService.RefreshToken:input_type -> gateway.v1.RefreshTokenRequest
+	9,  // 7: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
+	10, // 8: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
+	2,  // 9: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
+	4,  // 10: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
+	6,  // 11: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
+	8,  // 12: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
+	11, // 13: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
+	12, // 14: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
+	9,  // [9:15] is the sub-list for method output_type
+	3,  // [3:9] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_api_gateway_v1_gateway_proto_init() }
@@ -641,9 +784,9 @@ func file_api_gateway_v1_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_gateway_v1_gateway_proto_rawDesc), len(file_api_gateway_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   13,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_api_gateway_v1_gateway_proto_goTypes,
 		DependencyIndexes: file_api_gateway_v1_gateway_proto_depIdxs,

@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -24,10 +27,10 @@ func TestHTTPServerHealthz(t *testing.T) {
 	server := NewHTTPServer(
 		testConfig(),
 		authMiddleware,
-		service.NewAuthService(&fakeUserClient{}),
-		service.NewUserService(),
-		service.NewProblemService(),
-		service.NewSubmissionService(),
+		service.NewGatewayService(
+			service.NewAuthService(&fakeUserClient{}),
+			service.NewUserService(&fakeUserClient{}),
+		),
 	)
 
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -39,15 +42,12 @@ func TestHTTPServerHealthz(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 	var body struct {
-		Data struct {
-			Status string `json:"status"`
-		} `json:"data"`
-		RequestID string `json:"request_id"`
+		Status string `json:"status"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Data.Status != "ok" || body.RequestID != "req-test" {
+	if body.Status != "ok" || response.Header().Get("X-Request-ID") != "req-test" {
 		t.Fatalf("body = %#v, want ok with req-test", body)
 	}
 }
@@ -72,6 +72,7 @@ func TestHTTPServerRegisterForwardsToUserService(t *testing.T) {
 		"email": "alice@example.com",
 		"password": "correct1"
 	}`))
+	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Request-ID", "req-register")
 	server.ServeHTTP(response, request)
 
@@ -82,19 +83,16 @@ func TestHTTPServerRegisterForwardsToUserService(t *testing.T) {
 		t.Fatalf("forwarded username = %q, want alice", userClient.registerRequest.GetUsername())
 	}
 	var body struct {
-		Data struct {
-			User struct {
-				ID       int64    `json:"id"`
-				Username string   `json:"username"`
-				Email    string   `json:"email"`
-				Status   string   `json:"status"`
-				Roles    []string `json:"roles"`
-			} `json:"user"`
-		} `json:"data"`
-		RequestID string `json:"request_id"`
+		User struct {
+			ID       int64    `json:"id"`
+			Username string   `json:"username"`
+			Email    string   `json:"email"`
+			Status   string   `json:"status"`
+			Roles    []string `json:"roles"`
+		} `json:"user"`
 	}
 	decodeResponse(t, response.Body, &body)
-	if body.Data.User.ID != 1001 || body.Data.User.Username != "alice" || body.RequestID != "req-register" {
+	if body.User.ID != 1001 || body.User.Username != "alice" || response.Header().Get("X-Request-ID") != "req-register" {
 		t.Fatalf("body = %#v, want registered alice with request id", body)
 	}
 }
@@ -110,15 +108,16 @@ func TestHTTPServerLoginMapsUserServiceError(t *testing.T) {
 		"account": "alice",
 		"password": "wrong"
 	}`))
+	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Request-ID", "req-login")
 	server.ServeHTTP(response, request)
 
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
-	var body service.ErrorEnvelope
+	var body kratosErrorResponse
 	decodeResponse(t, response.Body, &body)
-	if body.Code != userv1.UserErrorReason_USER_ERROR_REASON_INVALID_CREDENTIAL.String() || body.RequestID != "req-login" {
+	if body.Reason != userv1.UserErrorReason_USER_ERROR_REASON_INVALID_CREDENTIAL.String() || response.Header().Get("X-Request-ID") != "req-login" {
 		t.Fatalf("body = %#v, want invalid credential with request id", body)
 	}
 }
@@ -132,16 +131,92 @@ func TestHTTPServerRegisterRejectsInvalidRequest(t *testing.T) {
 		"email": "not-an-email",
 		"password": "short"
 	}`))
+	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Request-ID", "req-invalid")
 	server.ServeHTTP(response, request)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
-	var body service.ErrorEnvelope
+	var body kratosErrorResponse
 	decodeResponse(t, response.Body, &body)
-	if body.Code != "GATEWAY_INVALID_ARGUMENT" || body.RequestID != "req-invalid" {
+	if body.Reason != "GATEWAY_INVALID_ARGUMENT" || response.Header().Get("X-Request-ID") != "req-invalid" {
 		t.Fatalf("body = %#v, want gateway invalid argument", body)
+	}
+}
+
+func TestHTTPServerProtectedUserRequiresToken(t *testing.T) {
+	server := newTestHTTPServer(t, &fakeUserClient{})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
+	request.Header.Set("X-Request-ID", "req-me")
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body kratosErrorResponse
+	decodeResponse(t, response.Body, &body)
+	if body.Reason != "GATEWAY_UNAUTHENTICATED" || response.Header().Get("X-Request-ID") != "req-me" {
+		t.Fatalf("body = %#v, want unauthenticated error", body)
+	}
+}
+
+func TestHTTPServerCurrentUserForwardsAuthenticatedContext(t *testing.T) {
+	userClient := &fakeUserClient{
+		currentUserResponse: &userv1.GetCurrentUserResponse{
+			User: &userv1.User{Id: 1001, Username: "alice", Status: "active", Roles: []string{"user"}},
+		},
+	}
+	server := newTestHTTPServer(t, userClient)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
+	request.Header.Set("Authorization", "Bearer "+testAccessToken(t))
+	request.Header.Set("X-Request-ID", "req-me")
+	request.Header.Set("X-Trace-ID", "trace-me")
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if got := userClient.currentUserRequest.GetContext().GetUserId(); got != 1001 {
+		t.Fatalf("user id = %d, want 1001", got)
+	}
+	if got := userClient.currentUserRequest.GetContext().GetRequestId(); got != "req-me" {
+		t.Fatalf("request id = %q, want req-me", got)
+	}
+	if got := userClient.currentUserRequest.GetContext().GetTraceId(); got != "trace-me" {
+		t.Fatalf("trace id = %q, want trace-me", got)
+	}
+	if got := userClient.currentUserRequest.GetContext().GetRoles(); len(got) != 2 || got[0] != "user" || got[1] != "admin" {
+		t.Fatalf("roles = %#v, want user/admin", got)
+	}
+}
+
+func TestHTTPServerGetUserForwardsPathIDAndContext(t *testing.T) {
+	userClient := &fakeUserClient{
+		userResponse: &userv1.GetUserResponse{
+			User: &userv1.User{Id: 1002, Username: "bob", Status: "active", Roles: []string{"user"}},
+		},
+	}
+	server := newTestHTTPServer(t, userClient)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/1002", nil)
+	request.Header.Set("Authorization", "Bearer "+testAccessToken(t))
+	request.Header.Set("X-Request-ID", "req-user")
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if userClient.userRequest.GetUserId() != 1002 {
+		t.Fatalf("user id = %d, want 1002", userClient.userRequest.GetUserId())
+	}
+	if userClient.userRequest.GetContext().GetUserId() != 1001 {
+		t.Fatalf("requester id = %d, want 1001", userClient.userRequest.GetContext().GetUserId())
 	}
 }
 
@@ -154,11 +229,17 @@ func newTestHTTPServer(t *testing.T, userClient userv1.UserServiceClient) http.H
 	return NewHTTPServer(
 		testConfig(),
 		authMiddleware,
-		service.NewAuthService(userClient),
-		service.NewUserService(),
-		service.NewProblemService(),
-		service.NewSubmissionService(),
+		service.NewGatewayService(
+			service.NewAuthService(userClient),
+			service.NewUserService(userClient),
+		),
 	)
+}
+
+type kratosErrorResponse struct {
+	Code    int32  `json:"code"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
 }
 
 func decodeResponse(t *testing.T, body io.Reader, target any) {
@@ -181,15 +262,21 @@ func testConfig() *conf.Bootstrap {
 }
 
 type fakeUserClient struct {
-	registerRequest  *userv1.RegisterRequest
-	registerResponse *userv1.RegisterResponse
-	registerError    error
-	loginRequest     *userv1.LoginRequest
-	loginResponse    *userv1.LoginResponse
-	loginError       error
-	refreshRequest   *userv1.RefreshTokenRequest
-	refreshResponse  *userv1.RefreshTokenResponse
-	refreshError     error
+	registerRequest     *userv1.RegisterRequest
+	registerResponse    *userv1.RegisterResponse
+	registerError       error
+	loginRequest        *userv1.LoginRequest
+	loginResponse       *userv1.LoginResponse
+	loginError          error
+	refreshRequest      *userv1.RefreshTokenRequest
+	refreshResponse     *userv1.RefreshTokenResponse
+	refreshError        error
+	currentUserRequest  *userv1.GetCurrentUserRequest
+	currentUserResponse *userv1.GetCurrentUserResponse
+	currentUserError    error
+	userRequest         *userv1.GetUserRequest
+	userResponse        *userv1.GetUserResponse
+	userError           error
 }
 
 func (c *fakeUserClient) Register(_ context.Context, req *userv1.RegisterRequest, _ ...grpc.CallOption) (*userv1.RegisterResponse, error) {
@@ -225,10 +312,36 @@ func (c *fakeUserClient) RefreshToken(_ context.Context, req *userv1.RefreshToke
 	return &userv1.RefreshTokenResponse{}, nil
 }
 
-func (*fakeUserClient) GetCurrentUser(context.Context, *userv1.GetCurrentUserRequest, ...grpc.CallOption) (*userv1.GetCurrentUserResponse, error) {
-	return nil, userv1.ErrorUserErrorReasonPermissionDenied("未接入当前用户接口")
+func (c *fakeUserClient) GetCurrentUser(_ context.Context, req *userv1.GetCurrentUserRequest, _ ...grpc.CallOption) (*userv1.GetCurrentUserResponse, error) {
+	c.currentUserRequest = req
+	if c.currentUserError != nil {
+		return nil, c.currentUserError
+	}
+	if c.currentUserResponse != nil {
+		return c.currentUserResponse, nil
+	}
+	return &userv1.GetCurrentUserResponse{}, nil
 }
 
-func (*fakeUserClient) GetUser(context.Context, *userv1.GetUserRequest, ...grpc.CallOption) (*userv1.GetUserResponse, error) {
-	return nil, userv1.ErrorUserErrorReasonPermissionDenied("未接入用户查询接口")
+func (c *fakeUserClient) GetUser(_ context.Context, req *userv1.GetUserRequest, _ ...grpc.CallOption) (*userv1.GetUserResponse, error) {
+	c.userRequest = req
+	if c.userError != nil {
+		return nil, c.userError
+	}
+	if c.userResponse != nil {
+		return c.userResponse, nil
+	}
+	return &userv1.GetUserResponse{}, nil
+}
+
+func testAccessToken(t *testing.T) string {
+	t.Helper()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	claims := `{"sub":1001,"username":"alice","roles":["user","admin"],"iss":"go-oj-agent","aud":"go-oj-gateway","iat":4102444800,"exp":4102448400,"jti":"test-token"}`
+	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
+	signed := header + "." + payload
+	mac := hmac.New(sha256.New, []byte("test-secret"))
+	_, _ = mac.Write([]byte(signed))
+	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return signed + "." + signature
 }

@@ -13,6 +13,7 @@ import (
 var ProviderSet = wire.NewSet(
 	NewAuthService,
 	NewUserService,
+	NewGatewayService,
 	NewProblemService,
 	NewSubmissionService,
 )
@@ -25,9 +26,12 @@ func NewAuthService(users userv1.UserServiceClient) *AuthService {
 	return &AuthService{users: users}
 }
 
-func (s *AuthService) Register(ctx context.Context, req *gatewayv1.RegisterHTTPRequest) (*gatewayv1.RegisterHTTPResponse, error) {
+func (s *AuthService) Register(ctx context.Context, req *gatewayv1.RegisterRequest) (*gatewayv1.RegisterResponse, error) {
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, ErrInvalidRequest(err)
 	}
 	resp, err := s.users.Register(ctx, &userv1.RegisterRequest{
 		Username: req.GetUsername(),
@@ -37,12 +41,15 @@ func (s *AuthService) Register(ctx context.Context, req *gatewayv1.RegisterHTTPR
 	if err != nil {
 		return nil, err
 	}
-	return &gatewayv1.RegisterHTTPResponse{User: toGatewayUser(resp.GetUser())}, nil
+	return &gatewayv1.RegisterResponse{User: toGatewayUser(resp.GetUser())}, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, req *gatewayv1.LoginHTTPRequest) (*gatewayv1.TokenHTTPResponse, error) {
+func (s *AuthService) Login(ctx context.Context, req *gatewayv1.LoginRequest) (*gatewayv1.LoginResponse, error) {
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, ErrInvalidRequest(err)
 	}
 	resp, err := s.users.Login(ctx, &userv1.LoginRequest{
 		Account:  req.GetAccount(),
@@ -51,16 +58,19 @@ func (s *AuthService) Login(ctx context.Context, req *gatewayv1.LoginHTTPRequest
 	if err != nil {
 		return nil, err
 	}
-	return &gatewayv1.TokenHTTPResponse{
+	return &gatewayv1.LoginResponse{
 		AccessToken:  resp.GetAccessToken(),
 		RefreshToken: resp.GetRefreshToken(),
 		ExpiresIn:    resp.GetExpiresIn(),
 	}, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, req *gatewayv1.RefreshTokenHTTPRequest) (*gatewayv1.TokenHTTPResponse, error) {
+func (s *AuthService) RefreshToken(ctx context.Context, req *gatewayv1.RefreshTokenRequest) (*gatewayv1.RefreshTokenResponse, error) {
 	if s == nil || s.users == nil || req == nil {
 		return nil, fmt.Errorf("gateway auth service is not configured")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, ErrInvalidRequest(err)
 	}
 	resp, err := s.users.RefreshToken(ctx, &userv1.RefreshTokenRequest{
 		RefreshToken: req.GetRefreshToken(),
@@ -68,7 +78,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gatewayv1.RefreshTo
 	if err != nil {
 		return nil, err
 	}
-	return &gatewayv1.TokenHTTPResponse{
+	return &gatewayv1.RefreshTokenResponse{
 		AccessToken:  resp.GetAccessToken(),
 		RefreshToken: resp.GetRefreshToken(),
 		ExpiresIn:    resp.GetExpiresIn(),

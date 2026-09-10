@@ -15,7 +15,7 @@ func TestAuthServiceRegisterForwardsRequest(t *testing.T) {
 			User: &userv1.User{Id: 1001, Username: "alice", Email: "alice@example.com", Status: "active", Roles: []string{"user"}},
 		},
 	}
-	resp, err := NewAuthService(client).Register(context.Background(), &gatewayv1.RegisterHTTPRequest{
+	resp, err := NewAuthService(client).Register(context.Background(), &gatewayv1.RegisterRequest{
 		Username: "alice",
 		Email:    "alice@example.com",
 		Password: "correct1",
@@ -35,7 +35,7 @@ func TestAuthServiceLoginForwardsRequest(t *testing.T) {
 	client := &fakeUserServiceClient{
 		loginResponse: &userv1.LoginResponse{AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 900},
 	}
-	resp, err := NewAuthService(client).Login(context.Background(), &gatewayv1.LoginHTTPRequest{
+	resp, err := NewAuthService(client).Login(context.Background(), &gatewayv1.LoginRequest{
 		Account:  "alice",
 		Password: "correct1",
 	})
@@ -54,7 +54,7 @@ func TestAuthServiceRefreshTokenForwardsRequest(t *testing.T) {
 	client := &fakeUserServiceClient{
 		refreshResponse: &userv1.RefreshTokenResponse{AccessToken: "next-access", RefreshToken: "next-refresh", ExpiresIn: 900},
 	}
-	resp, err := NewAuthService(client).RefreshToken(context.Background(), &gatewayv1.RefreshTokenHTTPRequest{
+	resp, err := NewAuthService(client).RefreshToken(context.Background(), &gatewayv1.RefreshTokenRequest{
 		RefreshToken: "old-refresh",
 	})
 	if err != nil {
@@ -71,7 +71,7 @@ func TestAuthServiceRefreshTokenForwardsRequest(t *testing.T) {
 func TestAuthServiceReturnsUserServiceError(t *testing.T) {
 	want := userv1.ErrorUserErrorReasonInvalidCredential("认证凭据无效")
 	client := &fakeUserServiceClient{loginError: want}
-	_, err := NewAuthService(client).Login(context.Background(), &gatewayv1.LoginHTTPRequest{
+	_, err := NewAuthService(client).Login(context.Background(), &gatewayv1.LoginRequest{
 		Account:  "alice",
 		Password: "wrong",
 	})

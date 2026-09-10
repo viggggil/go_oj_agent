@@ -3,6 +3,7 @@ BUF ?= buf
 PROTOC ?= protoc
 KRATOS_THIRD_PARTY ?= $(shell $(GO) env GOPATH)/pkg/mod/github.com/go-kratos/kratos/v3@v3.0.0
 GO_ERRORS_PLUGIN ?= github.com/go-kratos/kratos/cmd/protoc-gen-go-errors/v3@v3.0.0-20260626125723-668db92c2c00
+GO_HTTP_PLUGIN ?= github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v3@v3.0.0-20260626125723-668db92c2c00
 
 GO_PACKAGES := ./...
 GO_FILES := $(shell git ls-files '*.go')
@@ -22,6 +23,7 @@ proto:
 generate:
 	@$(BUF) dep update
 	@GOBIN=/tmp $(GO) install $(GO_ERRORS_PLUGIN)
+	@GOBIN=/tmp $(GO) install $(GO_HTTP_PLUGIN)
 	@PATH=/tmp:$$PATH $(BUF) generate $(BUF_GENERATE_PATHS)
 
 # 使用 protoc 生成 API 参数校验代码。

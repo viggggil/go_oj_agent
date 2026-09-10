@@ -20,7 +20,7 @@ Go Services / Agent Tools
 
 本文件定义 v0 阶段的接口边界。最终字段以 `api/*/v1/*.proto` 和生成的 OpenAPI 为准。
 
-Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。当前阶段先定义认证与用户相关 HTTP DTO，Problem、Submission 等后续模块接入时继续扩展。
+Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。当前阶段先定义认证与用户相关 HTTP DTO，Problem、Submission 等后续模块接入时继续扩展。
 
 ---
 
@@ -93,22 +93,27 @@ service identity
 
 ### 2.4 HTTP Response
 
-成功：
+成功响应直接编码 Proto response：
 
 ```json
 {
-  "data": {},
-  "request_id": "..."
+  "status": "ok"
 }
 ```
 
-失败：
+请求 ID：
+
+```http
+X-Request-ID: <request_id>
+```
+
+失败响应使用 Kratos 标准错误结构：
 
 ```json
 {
-  "code": "NOT_FOUND",
-  "message": "resource not found",
-  "request_id": "..."
+  "code": 400,
+  "reason": "GATEWAY_INVALID_ARGUMENT",
+  "message": "request is invalid"
 }
 ```
 
@@ -149,6 +154,8 @@ USER_ERROR_REASON_REFRESH_TOKEN_DENIED
 
 ## 3.1 Auth
 
+认证接口由 `GatewayService` 的 HTTP 生成代码注册，不需要 Bearer Token。用户接口通过 Kratos operation middleware 校验 Bearer Token，并由 Gateway 将 token claims 转换为 `common.v1.RequestContext` 后传递给 user-service；资源权限仍由 user-service 判断。
+
 ### POST `/api/v1/auth/register`
 
 创建用户。
@@ -167,16 +174,13 @@ Response：
 
 ```json
 {
-  "data": {
-    "user": {
-      "id": 1001,
-      "username": "alice",
-      "email": "alice@example.com",
-      "status": "active",
-      "roles": ["user"]
-    }
-  },
-  "request_id": "..."
+  "user": {
+    "id": 1001,
+    "username": "alice",
+    "email": "alice@example.com",
+    "status": "active",
+    "roles": ["user"]
+  }
 }
 ```
 
@@ -197,12 +201,9 @@ Response：
 
 ```json
 {
-  "data": {
-    "access_token": "...",
-    "refresh_token": "...",
-    "expires_in": 3600
-  },
-  "request_id": "..."
+  "access_token": "...",
+  "refresh_token": "...",
+  "expires_in": 3600
 }
 ```
 
@@ -228,19 +229,37 @@ Response：新的 Access Token 和轮换后的 Refresh Token。
 
 获取当前用户信息。
 
-内部对应 `user.v1.UserService/GetCurrentUser`，请求上下文由 gateway 传递 `common.v1.RequestContext`。
+需要 `Authorization: Bearer <access_token>`。Gateway 使用 `pkg/auth` 验证 Access Token，并将 claims、request id 和 trace id 转换为 `common.v1.RequestContext`，内部对应 `user.v1.UserService/GetCurrentUser`。
 
 Response：
 
 ```json
 {
-  "data": {
+  "user": {
     "id": 1001,
     "username": "alice",
     "email": "alice@example.com",
+    "status": "active",
     "roles": ["user"]
-  },
-  "request_id": "..."
+  }
+}
+```
+
+### GET `/api/v1/users/{id}`
+
+按用户 ID 获取用户信息。
+
+需要 `Authorization: Bearer <access_token>`，内部对应 `user.v1.UserService/GetUser`。Gateway 只传递请求者上下文和目标用户 ID，是否允许访问由 user-service 最终判断。
+
+```json
+{
+  "user": {
+    "id": 1001,
+    "username": "alice",
+    "email": "alice@example.com",
+    "status": "active",
+    "roles": ["user"]
+  }
 }
 ```
 

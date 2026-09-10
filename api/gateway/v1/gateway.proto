@@ -4,16 +4,48 @@ package gateway.v1;
 
 option go_package = "github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1";
 
+import "google/api/annotations.proto";
 import "validate/validate.proto";
 
-message APIResponse {
-  string request_id = 1;
-}
+service GatewayService {
+  rpc Health(HealthRequest) returns (HealthResponse) {
+    option (google.api.http) = {
+      get: "/healthz"
+    };
+  }
 
-message APIError {
-  string code = 1;
-  string message = 2;
-  string request_id = 3;
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/me"
+    };
+  }
+
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{id}"
+    };
+  }
 }
 
 message UserSummary {
@@ -24,35 +56,53 @@ message UserSummary {
   repeated string roles = 5;
 }
 
-message RegisterHTTPRequest {
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+}
+
+message RegisterRequest {
   string username = 1 [(validate.rules).string = {min_len: 1, max_len: 64}];
   string email = 2 [(validate.rules).string = {email: true, max_len: 255}];
   string password = 3 [(validate.rules).string = {min_len: 8, max_bytes: 72}];
 }
 
-message RegisterHTTPResponse {
+message RegisterResponse {
   UserSummary user = 1;
 }
 
-message LoginHTTPRequest {
+message LoginRequest {
   string account = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
   string password = 2 [(validate.rules).string = {min_len: 1, max_bytes: 72}];
 }
 
-message TokenHTTPResponse {
+message LoginResponse {
   string access_token = 1;
   string refresh_token = 2;
   int64 expires_in = 3;
 }
 
-message RefreshTokenHTTPRequest {
+message RefreshTokenRequest {
   string refresh_token = 1 [(validate.rules).string = {min_len: 1, max_len: 2048}];
 }
 
-message GetCurrentUserHTTPResponse {
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+message GetCurrentUserRequest {}
+
+message GetUserRequest {
+  int64 id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message GetCurrentUserResponse {
   UserSummary user = 1;
 }
 
-message GetUserHTTPResponse {
+message GetUserResponse {
   UserSummary user = 1;
 }
