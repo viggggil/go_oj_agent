@@ -87,7 +87,7 @@ test-unit:
 	@$(GO) test $(GO_PACKAGES)
 
 test-integration:
-	@./tests/integration/run.sh
+	@echo "integration tests are not wired yet"
 
 test-e2e:
 	@echo "e2e tests are not wired yet"
