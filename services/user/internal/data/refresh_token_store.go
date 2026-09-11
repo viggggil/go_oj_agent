@@ -13,6 +13,45 @@ import (
 
 const defaultRedisNamespace = "go_oj_agent:user"
 
+var rotateRefreshTokenScript = redis.NewScript(`
+local raw = redis.call("GET", KEYS[1])
+if not raw then
+  return -1
+end
+
+local old = cjson.decode(raw)
+local old_ttl = redis.call("PTTL", KEYS[1])
+if old_ttl <= 0 then
+  return -1
+end
+
+if old.Revoked == true or old.ReplayLocked == true then
+  old.ReplayLocked = true
+  redis.call("SET", KEYS[1], cjson.encode(old), "PX", old_ttl)
+  return 0
+end
+
+local next = cjson.decode(ARGV[1])
+old.Revoked = true
+old.LastUsedAt = ARGV[2]
+next.LastUsedAt = ARGV[2]
+
+local session_key = KEYS[3]
+if not next.SessionID or next.SessionID == "" then
+  next.SessionID = old.SessionID
+  session_key = ARGV[4] .. old.SessionID
+end
+if not next.RotatedFrom or next.RotatedFrom == "" then
+  next.RotatedFrom = old.TokenID
+end
+
+redis.call("SET", KEYS[1], cjson.encode(old), "PX", old_ttl)
+redis.call("SET", KEYS[2], cjson.encode(next), "PX", ARGV[3])
+redis.call("SADD", session_key, next.TokenHash)
+redis.call("PEXPIRE", session_key, ARGV[3])
+return 1
+`)
+
 type RedisRefreshTokenStore struct {
 	client    *redis.Client
 	namespace string
@@ -70,32 +109,42 @@ func (s *RedisRefreshTokenStore) Rotate(
 	oldTokenHash string,
 	next biz.RefreshTokenRecord,
 ) error {
-	// 轮换先读取旧记录；如果旧记录已经撤销或锁定，视为异常重放并拒绝继续签发。
-	old, err := s.FindByHash(ctx, oldTokenHash)
-	if err != nil {
-		return err
-	}
-	if old.Revoked || old.ReplayLocked {
-		old.ReplayLocked = true
-		_ = s.save(ctx, old)
+	if s == nil || s.client == nil || oldTokenHash == "" ||
+		next.TokenHash == "" {
 		return biz.ErrRefreshTokenDenied
 	}
 
 	now := s.now().UTC()
-	old.Revoked = true
-	old.LastUsedAt = now
 	next.LastUsedAt = now
-	if next.SessionID == "" {
-		next.SessionID = old.SessionID
+	nextTTL := next.ExpiresAt.Sub(now)
+	if nextTTL <= 0 {
+		return biz.ErrRefreshTokenDenied
 	}
-	if next.RotatedFrom == "" {
-		next.RotatedFrom = old.TokenID
-	}
-
-	if err := s.save(ctx, old); err != nil {
+	nextPayload, err := json.Marshal(next)
+	if err != nil {
 		return err
 	}
-	return s.save(ctx, next)
+
+	result, err := rotateRefreshTokenScript.Run(
+		ctx,
+		s.client,
+		[]string{
+			s.tokenKey(oldTokenHash),
+			s.tokenKey(next.TokenHash),
+			s.sessionKey(next.SessionID),
+		},
+		nextPayload,
+		now.Format(time.RFC3339Nano),
+		nextTTL.Milliseconds(),
+		s.namespace+":refresh_session:",
+	).Int()
+	if err != nil {
+		return err
+	}
+	if result != 1 {
+		return biz.ErrRefreshTokenDenied
+	}
+	return nil
 }
 
 func (s *RedisRefreshTokenStore) RevokeSession(ctx context.Context, sessionID string) error {
