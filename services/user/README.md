@@ -115,6 +115,7 @@ MVP 阶段只使用两个角色：
 - Access Token Claims 与 HS256 校验语义由 `pkg/auth` 维护，便于 Gateway 复用；user-service 仍负责签发 Access Token。
 - Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - Refresh Token 成功刷新时执行轮换，旧 token 会被标记为撤销。
+- Redis 使用 Lua compare-and-rotate 原子完成旧 Token 状态检查、撤销、新 Token 保存和 Session 索引更新；并发使用同一个 Refresh Token 时最多一个请求成功。
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
 - 注册、登录和刷新令牌的字段长度、格式和必填规则由 `api/user/v1/user.proto` 的 `validate.rules` 定义。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。
