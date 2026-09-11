@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+agent
+deploy
+docs
+tests
+tmp
+build
+dist
+coverage.out
+*.md
+.env
+.env.*
