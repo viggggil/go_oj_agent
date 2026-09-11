@@ -4,6 +4,8 @@ PROTOC ?= protoc
 KRATOS_THIRD_PARTY ?= $(shell $(GO) env GOPATH)/pkg/mod/github.com/go-kratos/kratos/v3@v3.0.0
 GO_ERRORS_PLUGIN ?= github.com/go-kratos/kratos/cmd/protoc-gen-go-errors/v3@v3.0.0-20260626125723-668db92c2c00
 GO_HTTP_PLUGIN ?= github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v3@v3.0.0-20260626125723-668db92c2c00
+COMPOSE ?= docker compose
+COMPOSE_FILE ?= deploy/compose/compose.yaml
 
 GO_PACKAGES := ./...
 GO_FILES := $(shell git ls-files '*.go')
@@ -94,10 +96,10 @@ agent-eval:
 	@echo "agent evaluation is not wired yet"
 
 infra-up:
-	@echo "infra bootstrap is not wired yet"
+	@$(COMPOSE) -f $(COMPOSE_FILE) up --build --detach --wait
 
 infra-down:
-	@echo "infra teardown is not wired yet"
+	@$(COMPOSE) -f $(COMPOSE_FILE) down
 
 dev:
 	@echo "dev workflow is not wired yet"

@@ -1,0 +1,26 @@
+service:
+  name: gateway-service
+server:
+  http:
+    address: "${SERVER_HTTP_ADDRESS}"
+    timeout: "3s"
+auth:
+  access_token_key: "${AUTH_ACCESS_TOKEN_KEY}"
+  issuer: "${AUTH_ISSUER}"
+  audience: "${AUTH_AUDIENCE}"
+clients:
+  user:
+    name: user-service
+    endpoint: "${CLIENTS_USER_ENDPOINT}"
+    timeout: "3s"
+  problem:
+    name: problem-service
+    endpoint: ""
+    timeout: "3s"
+  submission:
+    name: submission-service
+    endpoint: ""
+    timeout: "3s"
+registry:
+  consul:
+    enabled: false

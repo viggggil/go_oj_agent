@@ -1,0 +1,104 @@
+name: go-oj-auth
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-password}
+      MYSQL_DATABASE: oj_user
+      MYSQL_USER: ${MYSQL_USER:-oj_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-user-password}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../../migrations/mysql/000001_create_schemas.up.sql:/docker-entrypoint-initdb.d/001_create_schemas.sql:ro
+      - ../../migrations/user/000001_create_users.up.sql:/docker-entrypoint-initdb.d/101_create_users.sql:ro
+      - ../../migrations/user/000002_create_roles.up.sql:/docker-entrypoint-initdb.d/102_create_roles.sql:ro
+      - ../../migrations/user/000003_create_user_roles.up.sql:/docker-entrypoint-initdb.d/103_create_user_roles.sql:ro
+      - ../../migrations/user/000004_seed_default_roles.up.sql:/docker-entrypoint-initdb.d/104_seed_default_roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ../..
+      dockerfile: services/user/Dockerfile
+    environment:
+      KRATOS_SERVER_GRPC_ADDRESS: ":9001"
+      KRATOS_DATA_MYSQL_DSN: "${MYSQL_USER:-oj_user}:${MYSQL_PASSWORD:-local-user-password}@tcp(mysql:3306)/oj_user?parseTime=true"
+      KRATOS_DATA_REDIS_ADDR: "redis:6379"
+      KRATOS_DATA_REDIS_PASSWORD: ""
+      KRATOS_DATA_REDIS_DB: "0"
+      KRATOS_DATA_REDIS_NAMESPACE: "go_oj_agent:user"
+      KRATOS_AUTH_ACCESS_TOKEN_TTL: "${ACCESS_TOKEN_TTL:-15m}"
+      KRATOS_AUTH_REFRESH_TOKEN_TTL: "${REFRESH_TOKEN_TTL:-168h}"
+      KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
+      KRATOS_AUTH_ISSUER: "go-oj-agent"
+      KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${USER_GRPC_PORT:-9001}:9001"
+    volumes:
+      - ./configs/user.yaml:/app/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9001"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  gateway-service:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      KRATOS_SERVER_HTTP_ADDRESS: ":8080"
+      KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
+      KRATOS_AUTH_ISSUER: "go-oj-agent"
+      KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
+      KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${GATEWAY_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./configs/gateway.yaml:/app/config.yaml:ro
+    depends_on:
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:

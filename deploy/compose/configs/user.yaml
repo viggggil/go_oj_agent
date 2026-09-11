@@ -1,0 +1,22 @@
+service:
+  name: user-service
+server:
+  grpc:
+    address: "${SERVER_GRPC_ADDRESS}"
+data:
+  mysql_dsn: "${DATA_MYSQL_DSN}"
+  redis_addr: "${DATA_REDIS_ADDR}"
+  redis_password: "${DATA_REDIS_PASSWORD}"
+  redis_db: 0
+  redis_namespace: "${DATA_REDIS_NAMESPACE}"
+auth:
+  access_token_ttl: "${AUTH_ACCESS_TOKEN_TTL}"
+  refresh_token_ttl: "${AUTH_REFRESH_TOKEN_TTL}"
+  access_token_key: "${AUTH_ACCESS_TOKEN_KEY}"
+  issuer: "${AUTH_ISSUER}"
+  audience: "${AUTH_AUDIENCE}"
+  password:
+    bcrypt_cost: 12
+registry:
+  consul:
+    enabled: false
