@@ -316,6 +316,10 @@ func (c *fakeUserClient) RefreshToken(_ context.Context, req *userv1.RefreshToke
 	return &userv1.RefreshTokenResponse{}, nil
 }
 
+func (*fakeUserClient) Logout(context.Context, *userv1.LogoutRequest, ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+	return &userv1.LogoutResponse{}, nil
+}
+
 func (c *fakeUserClient) GetCurrentUser(_ context.Context, req *userv1.GetCurrentUserRequest, _ ...grpc.CallOption) (*userv1.GetCurrentUserResponse, error) {
 	c.currentUserRequest = req
 	if c.currentUserError != nil {

@@ -184,6 +184,8 @@ type fakeRefreshTokenStore struct {
 	findErr        error
 	rotatedOldHash string
 	rotatedNext    RefreshTokenRecord
+	revokedSession string
+	revokeErr      error
 }
 
 func (s *fakeRefreshTokenStore) Save(_ context.Context, record RefreshTokenRecord) error {
@@ -207,8 +209,9 @@ func (s *fakeRefreshTokenStore) Rotate(_ context.Context, oldTokenHash string, n
 	return nil
 }
 
-func (*fakeRefreshTokenStore) RevokeSession(context.Context, string) error {
-	return nil
+func (s *fakeRefreshTokenStore) RevokeSession(_ context.Context, sessionID string) error {
+	s.revokedSession = sessionID
+	return s.revokeErr
 }
 
 func TestUserUsecaseLogin(t *testing.T) {
@@ -342,5 +345,50 @@ func TestUserUsecaseRefreshTokenRejectsRevokedToken(t *testing.T) {
 		RefreshToken: "old-refresh",
 	}); err != ErrRefreshTokenDenied {
 		t.Fatalf("RefreshToken() error = %v, want ErrRefreshTokenDenied", err)
+	}
+}
+
+func TestUserUsecaseLogoutRevokesRefreshSession(t *testing.T) {
+	refreshStore := &fakeRefreshTokenStore{found: RefreshTokenRecord{
+		TokenHash: "hash:refresh",
+		SessionID: "session-1",
+	}}
+	uc := NewUserUsecase(UserUsecaseOptions{
+		RefreshToken:  &fakeRefreshTokenManager{},
+		RefreshTokens: refreshStore,
+	})
+
+	if err := uc.Logout(context.Background(), LogoutInput{RefreshToken: "refresh"}); err != nil {
+		t.Fatalf("Logout() error = %v", err)
+	}
+	if refreshStore.revokedSession != "session-1" {
+		t.Fatalf("revoked session = %q, want session-1", refreshStore.revokedSession)
+	}
+}
+
+func TestUserUsecaseLogoutIsIdempotentForUnknownToken(t *testing.T) {
+	uc := NewUserUsecase(UserUsecaseOptions{
+		RefreshToken: &fakeRefreshTokenManager{},
+		RefreshTokens: &fakeRefreshTokenStore{
+			findErr: ErrRefreshTokenDenied,
+		},
+	})
+
+	if err := uc.Logout(context.Background(), LogoutInput{RefreshToken: "unknown"}); err != nil {
+		t.Fatalf("Logout() error = %v, want nil", err)
+	}
+}
+
+func TestUserUsecaseLogoutReturnsStoreError(t *testing.T) {
+	want := errors.New("redis unavailable")
+	uc := NewUserUsecase(UserUsecaseOptions{
+		RefreshToken: &fakeRefreshTokenManager{},
+		RefreshTokens: &fakeRefreshTokenStore{
+			findErr: want,
+		},
+	})
+
+	if err := uc.Logout(context.Background(), LogoutInput{RefreshToken: "refresh"}); !errors.Is(err, want) {
+		t.Fatalf("Logout() error = %v, want %v", err, want)
 	}
 }

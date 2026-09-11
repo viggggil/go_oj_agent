@@ -479,6 +479,7 @@ service UserService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
 }
@@ -525,6 +526,16 @@ User Service 第一阶段需要实现以下接口：
 - 轮换时撤销旧的 Refresh Token，避免重复使用。
 - Redis 中只保存 Refresh Token 的 SHA-256 hash 对应记录，不保存原文。
 - 不允许通过 Refresh Token 直接改变用户身份或角色。
+
+### `Logout`
+
+使用 Refresh Token 注销登录 Session。
+
+- 对 Refresh Token 计算 SHA-256 hash 后读取服务端记录，不存储或记录 Token 原文。
+- 撤销同一 Session 下的全部 Refresh Token，而不只撤销请求中携带的 Token。
+- 对已撤销、已过期或未知 Token 保持幂等成功。
+- Redis 或其他内部依赖故障仍返回内部错误，不伪装成注销成功。
+- 无状态 Access Token 不进入 Redis denylist，继续依赖短 TTL 到期。
 
 ### 管理员 bootstrap
 

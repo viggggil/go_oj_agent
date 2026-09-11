@@ -24,6 +24,10 @@ func IsAdminAlreadyExists(err error) bool {
 	return userv1.IsUserErrorReasonAdminAlreadyExists(err)
 }
 
+func IsRefreshTokenDenied(err error) bool {
+	return userv1.IsUserErrorReasonRefreshTokenDenied(err)
+}
+
 func InvalidArgument(format string, args ...interface{}) *kerrors.Error {
 	return userv1.ErrorUserErrorReasonInvalidArgument(format, args...)
 }

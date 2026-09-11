@@ -183,6 +183,40 @@ func TestRefreshTokenMapsProtoRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestLogoutRevokesSessionAndReturnsOK(t *testing.T) {
+	refreshStore := &fakeRefreshTokenStore{found: biz.RefreshTokenRecord{
+		TokenHash: "hash:refresh",
+		SessionID: "session-1",
+	}}
+	usecase := biz.NewUserUsecase(biz.UserUsecaseOptions{
+		RefreshToken:  &fakeRefreshTokenManager{},
+		RefreshTokens: refreshStore,
+	})
+
+	response, err := NewUserService(usecase).Logout(context.Background(), &userv1.LogoutRequest{
+		RefreshToken: "refresh",
+	})
+	if err != nil {
+		t.Fatalf("Logout() error = %v", err)
+	}
+	if response.GetStatus() != "ok" {
+		t.Fatalf("Logout() status = %q, want ok", response.GetStatus())
+	}
+	if refreshStore.revokedSession != "session-1" {
+		t.Fatalf("revoked session = %q, want session-1", refreshStore.revokedSession)
+	}
+}
+
+func TestLogoutRejectsInvalidRequest(t *testing.T) {
+	_, err := NewUserService(biz.NewUserUsecase(biz.UserUsecaseOptions{})).Logout(
+		context.Background(),
+		&userv1.LogoutRequest{},
+	)
+	if got := status.Code(err); got != codes.InvalidArgument {
+		t.Fatalf("Logout() status = %s, want %s", got, codes.InvalidArgument)
+	}
+}
+
 func TestGetCurrentUserMapsProtoRequestAndResponse(t *testing.T) {
 	repository := &fakeUserRepository{
 		account: biz.User{
@@ -308,7 +342,8 @@ func (*fakeRefreshTokenManager) Hash(token string) string {
 }
 
 type fakeRefreshTokenStore struct {
-	found biz.RefreshTokenRecord
+	found          biz.RefreshTokenRecord
+	revokedSession string
 }
 
 func (*fakeRefreshTokenStore) Save(context.Context, biz.RefreshTokenRecord) error {
@@ -326,6 +361,7 @@ func (*fakeRefreshTokenStore) Rotate(context.Context, string, biz.RefreshTokenRe
 	return nil
 }
 
-func (*fakeRefreshTokenStore) RevokeSession(context.Context, string) error {
+func (s *fakeRefreshTokenStore) RevokeSession(_ context.Context, sessionID string) error {
+	s.revokedSession = sessionID
 	return nil
 }

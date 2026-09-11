@@ -104,6 +104,23 @@ func (s *UserService) RefreshToken(
 	}, nil
 }
 
+func (s *UserService) Logout(
+	ctx context.Context,
+	req *userv1.LogoutRequest,
+) (*userv1.LogoutResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.InvalidArgument("invalid logout request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.InvalidArgument("%s", err.Error())
+	}
+
+	if err := s.uc.Logout(ctx, biz.LogoutInput{RefreshToken: req.GetRefreshToken()}); err != nil {
+		return nil, toStatusError(err)
+	}
+	return &userv1.LogoutResponse{Status: "ok"}, nil
+}
+
 func (s *UserService) GetCurrentUser(
 	ctx context.Context,
 	req *userv1.GetCurrentUserRequest,

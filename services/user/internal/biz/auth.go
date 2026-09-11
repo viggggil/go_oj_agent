@@ -30,3 +30,7 @@ func (in LoginInput) Normalize() LoginInput {
 type RefreshTokenInput struct {
 	RefreshToken string
 }
+
+type LogoutInput struct {
+	RefreshToken string
+}

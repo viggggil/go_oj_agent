@@ -125,6 +125,10 @@ func (c *fakeUserServiceClient) RefreshToken(_ context.Context, req *userv1.Refr
 	return &userv1.RefreshTokenResponse{}, nil
 }
 
+func (*fakeUserServiceClient) Logout(context.Context, *userv1.LogoutRequest, ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+	return &userv1.LogoutResponse{}, nil
+}
+
 func (*fakeUserServiceClient) GetCurrentUser(context.Context, *userv1.GetCurrentUserRequest, ...grpc.CallOption) (*userv1.GetCurrentUserResponse, error) {
 	return nil, userv1.ErrorUserErrorReasonPermissionDenied("未接入当前用户接口")
 }
