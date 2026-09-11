@@ -76,6 +76,19 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gatewayv1.RefreshTo
 	}, nil
 }
 
+func (s *AuthService) Logout(ctx context.Context, req *gatewayv1.LogoutRequest) (*gatewayv1.LogoutResponse, error) {
+	if s == nil || s.users == nil || req == nil {
+		return nil, fmt.Errorf("gateway auth service is not configured")
+	}
+	resp, err := s.users.Logout(ctx, &userv1.LogoutRequest{
+		RefreshToken: req.GetRefreshToken(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &gatewayv1.LogoutResponse{Status: resp.GetStatus()}, nil
+}
+
 func toGatewayUser(user *userv1.User) *gatewayv1.UserSummary {
 	if user == nil {
 		return nil

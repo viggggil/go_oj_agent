@@ -17,6 +17,7 @@
 - `POST /api/v1/auth/register`：转发到 `user.v1.UserService/Register`。
 - `POST /api/v1/auth/login`：转发到 `user.v1.UserService/Login`。
 - `POST /api/v1/auth/refresh`：转发到 `user.v1.UserService/RefreshToken`。
+- `POST /api/v1/auth/logout`：转发到 `user.v1.UserService/Logout`，按 Refresh Token 注销登录 Session。
 - `GET /api/v1/users/me`：需要 Bearer Token，转发到 `user.v1.UserService/GetCurrentUser`。
 - `GET /api/v1/users/{id}`：需要 Bearer Token，转发到 `user.v1.UserService/GetUser`。
 
@@ -55,6 +56,16 @@ curl -X POST http://127.0.0.1:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"account":"alice@example.com","password":"correct1"}'
 ```
+
+退出登录不要求 Bearer Access Token，因此 Access Token 过期后仍可使用 Refresh Token 注销：
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/v1/auth/logout \
+  -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"${REFRESH_TOKEN}\"}"
+```
+
+该接口会注销 Refresh Token 所属 Session，并对未知、过期或已撤销的 Token 幂等返回成功。Access Token 是无状态 JWT，不会被立即加入拒绝列表，仍按其短 TTL 自然过期；客户端收到成功响应后应清除本地 Access Token、Refresh Token 和用户状态。
 
 受保护用户接口需要 Access Token：
 

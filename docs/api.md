@@ -219,7 +219,29 @@ Request：
 
 Response：新的 Access Token 和轮换后的 Refresh Token。
 
-当前 Gateway 已接入注册、登录和刷新令牌三个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则和 Refresh Token 策略仍由 user-service 执行。
+### POST `/api/v1/auth/logout`
+
+使用 Refresh Token 注销其所属的登录 Session。该接口不要求 `Authorization: Bearer <access_token>`，因此 Access Token 过期后仍可退出登录。
+
+Request：
+
+```json
+{
+  "refresh_token": "..."
+}
+```
+
+Response：
+
+```json
+{
+  "status": "ok"
+}
+```
+
+user-service 会撤销同一 Session 下的全部 Refresh Token。对未知、过期或已撤销的 Refresh Token 幂等返回成功；内部依赖故障仍返回错误。Access Token 是无状态 JWT，退出登录不会使已签发的 Access Token 立即失效，它仍按短 TTL 自然过期。客户端收到成功响应后必须清除本地 Access Token、Refresh Token 和用户状态。
+
+当前 Gateway 已接入注册、登录、刷新令牌和退出登录四个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则、Refresh Token 策略和 Session 注销仍由 user-service 执行。
 
 ---
 
@@ -567,7 +589,7 @@ User Service 第一阶段需要实现以下接口：
 接口用途：
 
 - Gateway 获取用户信息。
-- Gateway 调用 `Register`、`Login`、`RefreshToken` 和 `GetCurrentUser` 支持外部认证流程。
+- Gateway 调用 `Register`、`Login`、`RefreshToken`、`Logout` 和 `GetCurrentUser` 支持外部认证流程。
 - 其他服务按业务需要通过 `GetUser` 获取最少用户资料。
 - Agent Tool 通过 `GetCurrentUser` 或受控的 `GetUser` 获取当前用户上下文。
 - User Service 负责最终的用户资源权限校验，Gateway 和 Agent 不负责替代该校验。

@@ -21,6 +21,7 @@ const OperationGatewayServiceGetCurrentUser = "/gateway.v1.GatewayService/GetCur
 const OperationGatewayServiceGetUser = "/gateway.v1.GatewayService/GetUser"
 const OperationGatewayServiceHealth = "/gateway.v1.GatewayService/Health"
 const OperationGatewayServiceLogin = "/gateway.v1.GatewayService/Login"
+const OperationGatewayServiceLogout = "/gateway.v1.GatewayService/Logout"
 const OperationGatewayServiceRefreshToken = "/gateway.v1.GatewayService/RefreshToken"
 const OperationGatewayServiceRegister = "/gateway.v1.GatewayService/Register"
 
@@ -29,6 +30,7 @@ type GatewayServiceHTTPServer interface {
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
+	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 }
@@ -39,6 +41,7 @@ func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServ
 	r.Handle("POST", "/api/v1/auth/register", _GatewayService_Register0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/login", _GatewayService_Login0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/auth/refresh", _GatewayService_RefreshToken0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/auth/logout", _GatewayService_Logout0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/users/me", _GatewayService_GetCurrentUser0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/users/{id}", _GatewayService_GetUser0_HTTP_Handler(srv))
 }
@@ -119,6 +122,25 @@ func _GatewayService_RefreshToken0_HTTP_Handler(srv GatewayServiceHTTPServer) fu
 	}
 }
 
+func _GatewayService_Logout0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in LogoutRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceLogout)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.Logout(ctx, req.(*LogoutRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*LogoutResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _GatewayService_GetCurrentUser0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in GetCurrentUserRequest
@@ -165,6 +187,7 @@ type GatewayServiceHTTPClient interface {
 	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *GetUserResponse, err error)
 	Health(ctx context.Context, req *HealthRequest, opts ...http.CallOption) (rsp *HealthResponse, err error)
 	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
+	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
 	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenResponse, err error)
 	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterResponse, err error)
 }
@@ -233,6 +256,23 @@ func (c *GatewayServiceHTTPClientImpl) Login(ctx context.Context, in *LoginReque
 		http.Accept("application/protojson"),
 		http.ContentType("application/protojson"),
 		http.Operation(OperationGatewayServiceLogin),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) Logout(ctx context.Context, in *LogoutRequest, opts ...http.CallOption) (*LogoutResponse, error) {
+	var out LogoutResponse
+	pattern := "/api/v1/auth/logout"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceLogout),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)

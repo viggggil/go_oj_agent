@@ -149,6 +149,60 @@ func TestHTTPServerRegisterRejectsInvalidRequest(t *testing.T) {
 	}
 }
 
+func TestHTTPServerLogoutForwardsToUserService(t *testing.T) {
+	userClient := &fakeUserClient{
+		logoutResponse: &userv1.LogoutResponse{Status: "ok"},
+	}
+	server := newTestHTTPServer(t, userClient)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", strings.NewReader(`{
+		"refresh_token": "refresh-token"
+	}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", "req-logout")
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if userClient.logoutRequest.GetRefreshToken() != "refresh-token" {
+		t.Fatalf("forwarded refresh token = %q, want refresh-token", userClient.logoutRequest.GetRefreshToken())
+	}
+	var body struct {
+		Status string `json:"status"`
+	}
+	decodeResponse(t, response.Body, &body)
+	if body.Status != "ok" || response.Header().Get("X-Request-ID") != "req-logout" {
+		t.Fatalf("body = %#v, want ok with request id", body)
+	}
+}
+
+func TestHTTPServerLogoutRejectsEmptyRefreshToken(t *testing.T) {
+	userClient := &fakeUserClient{}
+	server := newTestHTTPServer(t, userClient)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", strings.NewReader(`{
+		"refresh_token": ""
+	}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", "req-invalid-logout")
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body kratosErrorResponse
+	decodeResponse(t, response.Body, &body)
+	if body.Reason != "VALIDATOR" || response.Header().Get("X-Request-ID") != "req-invalid-logout" {
+		t.Fatalf("body = %#v, want validator error", body)
+	}
+	if userClient.logoutRequest != nil {
+		t.Fatal("参数校验失败时不应调用 user-service")
+	}
+}
+
 func TestHTTPServerProtectedUserRequiresToken(t *testing.T) {
 	server := newTestHTTPServer(t, &fakeUserClient{})
 
@@ -275,6 +329,9 @@ type fakeUserClient struct {
 	refreshRequest      *userv1.RefreshTokenRequest
 	refreshResponse     *userv1.RefreshTokenResponse
 	refreshError        error
+	logoutRequest       *userv1.LogoutRequest
+	logoutResponse      *userv1.LogoutResponse
+	logoutError         error
 	currentUserRequest  *userv1.GetCurrentUserRequest
 	currentUserResponse *userv1.GetCurrentUserResponse
 	currentUserError    error
@@ -316,7 +373,14 @@ func (c *fakeUserClient) RefreshToken(_ context.Context, req *userv1.RefreshToke
 	return &userv1.RefreshTokenResponse{}, nil
 }
 
-func (*fakeUserClient) Logout(context.Context, *userv1.LogoutRequest, ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+func (c *fakeUserClient) Logout(_ context.Context, req *userv1.LogoutRequest, _ ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+	c.logoutRequest = req
+	if c.logoutError != nil {
+		return nil, c.logoutError
+	}
+	if c.logoutResponse != nil {
+		return c.logoutResponse, nil
+	}
 	return &userv1.LogoutResponse{}, nil
 }
 
