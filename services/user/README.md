@@ -4,11 +4,12 @@
 
 ## 第一阶段接口
 
-当前服务骨架面向 `api/user/v1/user.proto` 中的 5 个 RPC：
+当前服务骨架面向 `api/user/v1/user.proto` 中的 6 个 RPC：
 
 - `Register`
 - `Login`
 - `RefreshToken`
+- `Logout`
 - `GetCurrentUser`
 - `GetUser`
 
@@ -115,6 +116,8 @@ MVP 阶段只使用两个角色：
 - Access Token Claims 与 HS256 校验语义由 `pkg/auth` 维护，便于 Gateway 复用；user-service 仍负责签发 Access Token。
 - Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - Refresh Token 成功刷新时执行轮换，旧 token 会被标记为撤销。
+- Logout 使用 Refresh Token 撤销其所属 Session 下的全部 Refresh Token；未知、过期或已撤销 Token 按幂等成功处理。
+- Logout 不维护 Access Token denylist，已经签发的无状态 Access Token 在短 TTL 后自然过期。
 - 密码使用 bcrypt 哈希，默认 cost 为 12。
 - 注册、登录和刷新令牌的字段长度、格式和必填规则由 `api/user/v1/user.proto` 的 `validate.rules` 定义。
 - username 和 email 都按大小写不敏感处理，注册前执行 trim + lowercase。

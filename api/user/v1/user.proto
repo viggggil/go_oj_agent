@@ -11,6 +11,7 @@ service UserService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
 }
@@ -52,6 +53,14 @@ message RefreshTokenResponse {
   string access_token = 1;
   string refresh_token = 2;
   int64 expires_in = 3;
+}
+
+message LogoutRequest {
+  string refresh_token = 1 [(validate.rules).string = {min_len: 1, max_len: 2048}];
+}
+
+message LogoutResponse {
+  string status = 1;
 }
 
 message GetCurrentUserRequest {

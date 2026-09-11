@@ -179,6 +179,21 @@ func (uc *UserUsecase) RefreshToken(ctx context.Context, input RefreshTokenInput
 	}, nil
 }
 
+func (uc *UserUsecase) Logout(ctx context.Context, input LogoutInput) error {
+	if uc == nil || uc.refreshToken == nil || uc.refreshTokens == nil {
+		return ErrInvalidArgument
+	}
+
+	record, err := uc.refreshTokens.FindByHash(ctx, uc.refreshToken.Hash(input.RefreshToken))
+	if err != nil {
+		if IsRefreshTokenDenied(err) {
+			return nil
+		}
+		return err
+	}
+	return uc.refreshTokens.RevokeSession(ctx, record.SessionID)
+}
+
 func roleNames(roles []RoleName) []string {
 	names := make([]string, 0, len(roles))
 	for _, role := range roles {
