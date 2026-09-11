@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,7 +41,7 @@ func TestRedisRefreshTokenStoreRotateRevokesOldToken(t *testing.T) {
 		t.Fatalf("Save(old) error = %v", err)
 	}
 	nextRecord := testRefreshTokenRecord("next-hash")
-	nextRecord.SessionID = oldRecord.SessionID
+	nextRecord.SessionID = ""
 
 	if err := store.Rotate(ctx, oldRecord.TokenHash, nextRecord); err != nil {
 		t.Fatalf("Rotate() error = %v", err)
@@ -58,6 +60,80 @@ func TestRedisRefreshTokenStoreRotateRevokesOldToken(t *testing.T) {
 	}
 	if next.RotatedFrom != oldRecord.TokenID {
 		t.Fatalf("next RotatedFrom = %q, want %q", next.RotatedFrom, oldRecord.TokenID)
+	}
+	if next.SessionID != oldRecord.SessionID {
+		t.Fatalf("next SessionID = %q, want %q", next.SessionID, oldRecord.SessionID)
+	}
+	hashes, err := store.client.SMembers(ctx, store.sessionKey(oldRecord.SessionID)).Result()
+	if err != nil {
+		t.Fatalf("SMembers(session) error = %v", err)
+	}
+	if !contains(hashes, nextRecord.TokenHash) {
+		t.Fatalf("session hashes = %v, want next token hash", hashes)
+	}
+}
+
+func TestRedisRefreshTokenStoreRotateAllowsOnlyOneConcurrentSuccess(t *testing.T) {
+	store, cleanup := newTestRefreshTokenStore(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	oldRecord := testRefreshTokenRecord("old-hash")
+	if err := store.Save(ctx, oldRecord); err != nil {
+		t.Fatalf("Save(old) error = %v", err)
+	}
+
+	const attempts = 16
+	start := make(chan struct{})
+	errors := make(chan error, attempts)
+	var waitGroup sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		waitGroup.Add(1)
+		go func(index int) {
+			defer waitGroup.Done()
+			next := testRefreshTokenRecord(fmt.Sprintf("next-hash-%d", index))
+			next.TokenID = fmt.Sprintf("next-token-%d", index)
+			next.SessionID = oldRecord.SessionID
+			<-start
+			errors <- store.Rotate(ctx, oldRecord.TokenHash, next)
+		}(i)
+	}
+	close(start)
+	waitGroup.Wait()
+	close(errors)
+
+	successes := 0
+	denied := 0
+	for err := range errors {
+		switch err {
+		case nil:
+			successes++
+		case biz.ErrRefreshTokenDenied:
+			denied++
+		default:
+			t.Fatalf("Rotate() unexpected error = %v", err)
+		}
+	}
+	if successes != 1 || denied != attempts-1 {
+		t.Fatalf("Rotate() successes = %d, denied = %d, want 1 and %d", successes, denied, attempts-1)
+	}
+
+	old, err := store.FindByHash(ctx, oldRecord.TokenHash)
+	if err != nil {
+		t.Fatalf("FindByHash(old) error = %v", err)
+	}
+	if !old.Revoked || !old.ReplayLocked {
+		t.Fatalf("old token state = revoked:%t replay_locked:%t, want both true", old.Revoked, old.ReplayLocked)
+	}
+
+	storedNextTokens := 0
+	for i := 0; i < attempts; i++ {
+		if _, err := store.FindByHash(ctx, fmt.Sprintf("next-hash-%d", i)); err == nil {
+			storedNextTokens++
+		}
+	}
+	if storedNextTokens != 1 {
+		t.Fatalf("stored next tokens = %d, want 1", storedNextTokens)
 	}
 }
 
@@ -108,4 +184,13 @@ func testRefreshTokenRecord(hash string) biz.RefreshTokenRecord {
 		CreatedAt: now,
 		ExpiresAt: now.Add(time.Hour),
 	}
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
