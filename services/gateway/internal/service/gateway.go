@@ -35,6 +35,10 @@ func (s *GatewayService) RefreshToken(ctx context.Context, req *gatewayv1.Refres
 	return s.auth.RefreshToken(ctx, req)
 }
 
+func (s *GatewayService) Logout(ctx context.Context, req *gatewayv1.LogoutRequest) (*gatewayv1.LogoutResponse, error) {
+	return s.auth.Logout(ctx, req)
+}
+
 func (s *GatewayService) GetCurrentUser(ctx context.Context, req *gatewayv1.GetCurrentUserRequest) (*gatewayv1.GetCurrentUserResponse, error) {
 	return s.user.GetCurrentUser(ctx, req)
 }

@@ -35,6 +35,13 @@ service GatewayService {
     };
   }
 
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/logout"
+      body: "*"
+    };
+  }
+
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {
     option (google.api.http) = {
       get: "/api/v1/users/me"
@@ -91,6 +98,14 @@ message RefreshTokenResponse {
   string access_token = 1;
   string refresh_token = 2;
   int64 expires_in = 3;
+}
+
+message LogoutRequest {
+  string refresh_token = 1 [(validate.rules).string = {min_len: 1, max_len: 2048}];
+}
+
+message LogoutResponse {
+  string status = 1;
 }
 
 message GetCurrentUserRequest {}

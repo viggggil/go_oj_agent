@@ -68,6 +68,35 @@ func TestAuthServiceRefreshTokenForwardsRequest(t *testing.T) {
 	}
 }
 
+func TestAuthServiceLogoutForwardsRequest(t *testing.T) {
+	client := &fakeUserServiceClient{
+		logoutResponse: &userv1.LogoutResponse{Status: "ok"},
+	}
+	resp, err := NewAuthService(client).Logout(context.Background(), &gatewayv1.LogoutRequest{
+		RefreshToken: "refresh-token",
+	})
+	if err != nil {
+		t.Fatalf("Logout() error = %v", err)
+	}
+	if client.logoutRequest.GetRefreshToken() != "refresh-token" {
+		t.Fatalf("forwarded request = %#v", client.logoutRequest)
+	}
+	if resp.GetStatus() != "ok" {
+		t.Fatalf("response = %#v", resp)
+	}
+}
+
+func TestAuthServiceLogoutReturnsUserServiceError(t *testing.T) {
+	want := context.Canceled
+	client := &fakeUserServiceClient{logoutError: want}
+	_, err := NewAuthService(client).Logout(context.Background(), &gatewayv1.LogoutRequest{
+		RefreshToken: "refresh-token",
+	})
+	if err != want {
+		t.Fatalf("Logout() error = %v, want %v", err, want)
+	}
+}
+
 func TestAuthServiceReturnsUserServiceError(t *testing.T) {
 	want := userv1.ErrorUserErrorReasonInvalidCredential("认证凭据无效")
 	client := &fakeUserServiceClient{loginError: want}
@@ -90,6 +119,9 @@ type fakeUserServiceClient struct {
 	refreshRequest   *userv1.RefreshTokenRequest
 	refreshResponse  *userv1.RefreshTokenResponse
 	refreshError     error
+	logoutRequest    *userv1.LogoutRequest
+	logoutResponse   *userv1.LogoutResponse
+	logoutError      error
 }
 
 func (c *fakeUserServiceClient) Register(_ context.Context, req *userv1.RegisterRequest, _ ...grpc.CallOption) (*userv1.RegisterResponse, error) {
@@ -125,7 +157,14 @@ func (c *fakeUserServiceClient) RefreshToken(_ context.Context, req *userv1.Refr
 	return &userv1.RefreshTokenResponse{}, nil
 }
 
-func (*fakeUserServiceClient) Logout(context.Context, *userv1.LogoutRequest, ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+func (c *fakeUserServiceClient) Logout(_ context.Context, req *userv1.LogoutRequest, _ ...grpc.CallOption) (*userv1.LogoutResponse, error) {
+	c.logoutRequest = req
+	if c.logoutError != nil {
+		return nil, c.logoutError
+	}
+	if c.logoutResponse != nil {
+		return c.logoutResponse, nil
+	}
 	return &userv1.LogoutResponse{}, nil
 }
 
