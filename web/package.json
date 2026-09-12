@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@vitejs/plugin-vue": "latest",
@@ -18,5 +20,7 @@
     "typescript": "latest",
     "vue-tsc": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "prettier": "latest"
+  }
 }
