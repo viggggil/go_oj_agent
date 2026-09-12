@@ -21,6 +21,7 @@ make infra-up
 | 服务 | 地址 | 用途 |
 | --- | --- | --- |
 | Gateway | `http://127.0.0.1:8080` | 外部 REST API |
+| Web | `http://127.0.0.1:5173` | Vue 3 认证前端 |
 | user-service | `127.0.0.1:9001` | 内部 gRPC，仅用于本地调试 |
 | MySQL | `127.0.0.1:3306` | `oj_user` 数据库 |
 | Redis | `127.0.0.1:6379` | Refresh Token 元数据 |
@@ -31,6 +32,8 @@ make infra-up
 docker compose -f deploy/compose/compose.yaml ps
 curl http://127.0.0.1:8080/healthz
 ```
+
+浏览器访问 `http://127.0.0.1:5173` 可使用注册、登录和个人资料页面。Compose 构建时通过 `WEB_API_BASE_URL` 注入 Gateway 地址；如果修改了 `GATEWAY_HTTP_PORT`，应同步设置 `WEB_API_BASE_URL`，例如 `WEB_API_BASE_URL=http://127.0.0.1:18080 GATEWAY_HTTP_PORT=18080 make infra-up`。
 
 停止服务但保留 MySQL 和 Redis 数据：
 

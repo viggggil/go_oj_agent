@@ -99,6 +99,19 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile
+      args:
+        VITE_API_BASE_URL: "${WEB_API_BASE_URL:-}"
+    ports:
+      - "127.0.0.1:${WEB_HTTP_PORT:-5173}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   mysql-data:
   redis-data:

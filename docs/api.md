@@ -243,6 +243,10 @@ user-service 会撤销同一 Session 下的全部 Refresh Token。对未知、�
 
 当前 Gateway 已接入注册、登录、刷新令牌和退出登录四个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则、Refresh Token 策略和 Session 注销仍由 user-service 执行。
 
+### 前端认证流程
+
+`web/` 提供基于 Vue 3 + Pinia + Axios 的参考客户端：注册成功后进入登录页；登录成功后保存 Token 并获取当前用户；访问受保护接口时自动携带 Access Token；Access Token 返回 401 时通过 Refresh Token 单飞刷新并重放请求；刷新失败则清理状态并回到登录页；退出登录调用本接口后清理本地 Token 和用户状态。
+
 ---
 
 ## 3.2 User

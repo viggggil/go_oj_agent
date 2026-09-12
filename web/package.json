@@ -1,0 +1,22 @@
+{
+  "name": "go-oj-agent-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "axios": "latest",
+    "pinia": "latest",
+    "vite": "latest",
+    "vue": "latest",
+    "vue-router": "latest",
+    "typescript": "latest",
+    "vue-tsc": "latest"
+  },
+  "devDependencies": {}
+}
