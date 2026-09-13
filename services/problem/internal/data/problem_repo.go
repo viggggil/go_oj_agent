@@ -178,3 +178,55 @@ func (s *StoreSet) List(ctx context.Context, page, pageSize int32, includeArchiv
 	}
 	return items, total, rows.Err()
 }
+
+func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []string) (updated biz.Problem, err error) {
+	if s == nil || s.db == nil {
+		return biz.Problem{}, biz.ErrorInternal("problem database is not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	result, err := tx.ExecContext(ctx, `
+		UPDATE problems SET title = ?, slug = ?, description = ?, difficulty = ?,
+		       time_limit_ms = ?, memory_limit_kb = ?, updated_at = UTC_TIMESTAMP(3)
+		WHERE id = ? AND status = ?
+	`, problem.Title, problem.Slug, problem.Description, problem.Difficulty.String(), problem.TimeLimitMs,
+		problem.MemoryLimitKb, problem.ID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String())
+	if err != nil {
+		return biz.Problem{}, translateMySQLError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	if affected == 0 {
+		return biz.Problem{}, biz.ErrorInvalidStatus("problem is not updateable")
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM problem_tags WHERE problem_id = ?`, problem.ID); err != nil {
+		return biz.Problem{}, err
+	}
+	problem.Tags = make([]biz.Tag, 0, len(tags))
+	for _, name := range tags {
+		tag, findErr := findOrCreateTag(ctx, tx, name)
+		if findErr != nil {
+			return biz.Problem{}, findErr
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO problem_tags (problem_id, tag_id) VALUES (?, ?)`, problem.ID, tag.ID); err != nil {
+			return biz.Problem{}, translateMySQLError(err)
+		}
+		problem.Tags = append(problem.Tags, tag)
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT updated_at FROM problems WHERE id = ?`, problem.ID).Scan(&problem.UpdatedAt); err != nil {
+		return biz.Problem{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return biz.Problem{}, err
+	}
+	return problem, nil
+}

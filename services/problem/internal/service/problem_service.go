@@ -82,3 +82,21 @@ func (s *ProblemService) ListProblems(ctx context.Context, req *problemv1.ListPr
 	}
 	return &problemv1.ListProblemsResponse{Items: items, Page: &commonv1.PageResponse{Page: page.Page, PageSize: page.PageSize, Total: page.Total}}, nil
 }
+
+func (s *ProblemService) UpdateProblem(ctx context.Context, req *problemv1.UpdateProblemRequest) (*problemv1.UpdateProblemResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid update problem request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	in := req.GetProblem()
+	problem, err := s.uc.Update(ctx, req.GetContext(), req.GetProblemId(), biz.Problem{
+		Title: in.GetTitle(), Description: in.GetDescription(), Slug: in.GetSlug(), Difficulty: in.GetDifficulty(),
+		TimeLimitMs: in.GetTimeLimitMs(), MemoryLimitKb: in.GetMemoryLimitKb(),
+	}, in.GetTags())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.UpdateProblemResponse{Problem: toProtoProblem(problem)}, nil
+}

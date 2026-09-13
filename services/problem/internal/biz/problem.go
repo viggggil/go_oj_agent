@@ -42,6 +42,31 @@ type ProblemRepository interface {
 	Create(context.Context, Problem, []string) (Problem, error)
 	FindByID(context.Context, int64) (Problem, error)
 	List(context.Context, int32, int32, bool) ([]Problem, int64, error)
+	Update(context.Context, Problem, []string) (Problem, error)
+}
+
+func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64, input Problem, tags []string) (Problem, error) {
+	if uc == nil || uc.repo == nil {
+		return Problem{}, ErrorInternal("problem repository is not configured")
+	}
+	if err := requireAdmin(requestContext); err != nil {
+		return Problem{}, err
+	}
+	current, err := uc.repo.FindByID(ctx, problemID)
+	if err != nil {
+		return Problem{}, err
+	}
+	if current.Status == problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED {
+		return Problem{}, ErrorInvalidStatus("archived problem cannot be updated")
+	}
+	input.ID = problemID
+	input.Title = strings.TrimSpace(input.Title)
+	input.Slug = strings.TrimSpace(input.Slug)
+	input.Description = strings.TrimSpace(input.Description)
+	input.Status = current.Status
+	input.CreatedBy = current.CreatedBy
+	input.CreatedAt = current.CreatedAt
+	return uc.repo.Update(ctx, input, normalizeTags(tags))
 }
 
 type ProblemPage struct {
