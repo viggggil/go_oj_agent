@@ -146,3 +146,17 @@ func (s *ProblemService) ListProblemTestcases(ctx context.Context, req *problemv
 	}
 	return &problemv1.ListProblemTestcasesResponse{Items: response}, nil
 }
+
+func (s *ProblemService) ArchiveTestcase(ctx context.Context, req *problemv1.ArchiveTestcaseRequest) (*problemv1.ArchiveTestcaseResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid archive testcase request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	item, err := s.uc.ArchiveTestcase(ctx, req.GetContext(), req.GetProblemId(), req.GetTestcaseId())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.ArchiveTestcaseResponse{Testcase: toProtoTestcase(item)}, nil
+}

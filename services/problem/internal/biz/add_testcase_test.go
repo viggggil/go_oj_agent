@@ -62,6 +62,12 @@ func (r *fakeTestcaseRepository) AddTestcase(_ context.Context, t Testcase) (Tes
 func (r *fakeTestcaseRepository) ListTestcases(context.Context, int64, bool) ([]Testcase, error) {
 	return []Testcase{r.created}, r.err
 }
+func (r *fakeTestcaseRepository) ArchiveTestcase(_ context.Context, problemID, testcaseID int64) (Testcase, error) {
+	r.created.ID = testcaseID
+	r.created.ProblemID = problemID
+	r.created.Status = problemv1.TestcaseStatus_TESTCASE_STATUS_ARCHIVED
+	return r.created, r.err
+}
 
 type fakeObjectStore struct {
 	puts, deletes []string
