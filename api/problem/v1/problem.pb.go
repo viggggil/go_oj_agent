@@ -440,7 +440,6 @@ type TestcaseMetadata struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	ProblemId       int64                  `protobuf:"varint,2,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
-	Version         int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
 	CaseNo          int32                  `protobuf:"varint,4,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
 	InputObjectKey  string                 `protobuf:"bytes,5,opt,name=input_object_key,json=inputObjectKey,proto3" json:"input_object_key,omitempty"`
 	OutputObjectKey string                 `protobuf:"bytes,6,opt,name=output_object_key,json=outputObjectKey,proto3" json:"output_object_key,omitempty"`
@@ -495,13 +494,6 @@ func (x *TestcaseMetadata) GetId() int64 {
 func (x *TestcaseMetadata) GetProblemId() int64 {
 	if x != nil {
 		return x.ProblemId
-	}
-	return 0
-}
-
-func (x *TestcaseMetadata) GetVersion() int32 {
-	if x != nil {
-		return x.Version
 	}
 	return 0
 }
@@ -1628,12 +1620,11 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\")\n" +
 	"\x03Tag\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\x94\x04\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x89\x04\n" +
 	"\x10TestcaseMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
 	"\n" +
-	"problem_id\x18\x02 \x01(\x03R\tproblemId\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\x05R\aversion\x12\x17\n" +
+	"problem_id\x18\x02 \x01(\x03R\tproblemId\x12\x17\n" +
 	"\acase_no\x18\x04 \x01(\x05R\x06caseNo\x12(\n" +
 	"\x10input_object_key\x18\x05 \x01(\tR\x0einputObjectKey\x12*\n" +
 	"\x11output_object_key\x18\x06 \x01(\tR\x0foutputObjectKey\x12!\n" +
@@ -1646,7 +1637,7 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
 	"\varchived_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"archivedAt\"\xf4\x02\n" +
+	"archivedAtJ\x04\b\x03\x10\x04R\aversion\"\xf4\x02\n" +
 	"\fProblemInput\x12 \n" +
 	"\x05title\x18\x01 \x01(\tB\n" +
 	"\xfaB\ar\x05\x10\x01\x18\xff\x01R\x05title\x12:\n" +

@@ -31,9 +31,21 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
 	in := req.GetProblem()
-	p, err := s.uc.Create(ctx, biz.CreateProblemInput{Context: req.GetContext(), Title: in.GetTitle(), Slug: in.GetSlug(), Description: in.GetDescription(), Difficulty: in.GetDifficulty(), TimeLimitMs: in.GetTimeLimitMs(), MemoryLimitKb: in.GetMemoryLimitKb(), Tags: in.GetTags()})
+	p, err := s.uc.Create(ctx, biz.CreateProblemInput{
+		Context: req.GetContext(),
+		Problem: biz.Problem{
+			Title:         in.GetTitle(),
+			Slug:          in.GetSlug(),
+			Description:   in.GetDescription(),
+			Difficulty:    in.GetDifficulty(),
+			TimeLimitMs:   in.GetTimeLimitMs(),
+			MemoryLimitKb: in.GetMemoryLimitKb(),
+		},
+		Tags:         in.GetTags(),
+		HasTestcases: len(req.GetTestcases()) > 0,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &problemv1.CreateProblemResponse{Problem: &problemv1.Problem{Id: p.ID, Title: p.Title, Slug: p.Slug, Description: p.Description, Difficulty: p.Difficulty, TimeLimitMs: p.TimeLimitMs, MemoryLimitKb: p.MemoryLimitKb, Status: p.Status, CreatedBy: p.CreatedBy}}, nil
+	return &problemv1.CreateProblemResponse{Problem: toProtoProblem(p)}, nil
 }
