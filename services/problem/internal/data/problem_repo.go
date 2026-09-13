@@ -230,3 +230,22 @@ func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []strin
 	}
 	return problem, nil
 }
+
+func (s *StoreSet) Archive(ctx context.Context, problemID int64) (biz.Problem, error) {
+	if s == nil || s.db == nil {
+		return biz.Problem{}, biz.ErrorInternal("problem database is not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE problems SET status = ?, updated_at = UTC_TIMESTAMP(3) WHERE id = ? AND status = ?`,
+		problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED.String(), problemID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String())
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	if affected == 0 {
+		return biz.Problem{}, biz.ErrorNotFound("problem not found")
+	}
+	return s.FindByID(ctx, problemID)
+}

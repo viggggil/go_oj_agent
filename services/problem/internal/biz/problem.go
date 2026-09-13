@@ -43,6 +43,24 @@ type ProblemRepository interface {
 	FindByID(context.Context, int64) (Problem, error)
 	List(context.Context, int32, int32, bool) ([]Problem, int64, error)
 	Update(context.Context, Problem, []string) (Problem, error)
+	Archive(context.Context, int64) (Problem, error)
+}
+
+func (uc *ProblemUsecase) Archive(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64) (Problem, error) {
+	if uc == nil || uc.repo == nil {
+		return Problem{}, ErrorInternal("problem repository is not configured")
+	}
+	if err := requireAdmin(requestContext); err != nil {
+		return Problem{}, err
+	}
+	problem, err := uc.repo.FindByID(ctx, problemID)
+	if err != nil {
+		return Problem{}, err
+	}
+	if problem.Status == problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED {
+		return problem, nil
+	}
+	return uc.repo.Archive(ctx, problemID)
 }
 
 func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64, input Problem, tags []string) (Problem, error) {

@@ -63,10 +63,11 @@ func validCreateInput() CreateProblemInput {
 }
 
 type fakeProblemRepository struct {
-	input   Problem
-	tags    []string
-	created Problem
-	err     error
+	input    Problem
+	tags     []string
+	created  Problem
+	err      error
+	archived bool
 }
 
 func (r *fakeProblemRepository) Create(_ context.Context, problem Problem, tags []string) (Problem, error) {
@@ -91,4 +92,9 @@ func (r *fakeProblemRepository) List(context.Context, int32, int32, bool) ([]Pro
 func (r *fakeProblemRepository) Update(_ context.Context, problem Problem, tags []string) (Problem, error) {
 	r.input, r.tags = problem, tags
 	return problem, r.err
+}
+func (r *fakeProblemRepository) Archive(context.Context, int64) (Problem, error) {
+	r.archived = true
+	r.created.Status = problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED
+	return r.created, r.err
 }

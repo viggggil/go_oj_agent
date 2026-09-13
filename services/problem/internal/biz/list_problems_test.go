@@ -36,3 +36,4 @@ func (r *listRepository) List(_ context.Context, _, _ int32, includeArchived boo
 func (*listRepository) Update(context.Context, Problem, []string) (Problem, error) {
 	return Problem{}, nil
 }
+func (*listRepository) Archive(context.Context, int64) (Problem, error) { return Problem{}, nil }

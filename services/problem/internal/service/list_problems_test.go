@@ -37,3 +37,6 @@ func (*listServiceRepository) List(context.Context, int32, int32, bool) ([]biz.P
 func (*listServiceRepository) Update(context.Context, biz.Problem, []string) (biz.Problem, error) {
 	return biz.Problem{}, nil
 }
+func (*listServiceRepository) Archive(context.Context, int64) (biz.Problem, error) {
+	return biz.Problem{}, nil
+}

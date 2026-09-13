@@ -100,3 +100,17 @@ func (s *ProblemService) UpdateProblem(ctx context.Context, req *problemv1.Updat
 	}
 	return &problemv1.UpdateProblemResponse{Problem: toProtoProblem(problem)}, nil
 }
+
+func (s *ProblemService) ArchiveProblem(ctx context.Context, req *problemv1.ArchiveProblemRequest) (*problemv1.ArchiveProblemResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid archive problem request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	problem, err := s.uc.Archive(ctx, req.GetContext(), req.GetProblemId())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.ArchiveProblemResponse{Problem: toProtoProblem(problem)}, nil
+}
