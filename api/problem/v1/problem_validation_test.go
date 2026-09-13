@@ -12,7 +12,6 @@ func TestAddTestcaseRequestValidate(t *testing.T) {
 	valid := &AddTestcaseRequest{
 		Context:        &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}},
 		ProblemId:      10,
-		Version:        1,
 		CaseNo:         1,
 		InputFilename:  "001.in",
 		InputContent:   []byte("1 2\n"),

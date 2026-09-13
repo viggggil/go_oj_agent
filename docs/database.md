@@ -156,7 +156,7 @@ Refresh Token 元数据优先放 Redis；如果后续需要长期审计，再新
 | `difficulty` | VARCHAR(32) | NOT NULL |
 | `time_limit_ms` | INT | NOT NULL |
 | `memory_limit_kb` | INT | NOT NULL |
-| `status` | VARCHAR(32) | draft / published / archived |
+| `status` | VARCHAR(32) | normal / archived |
 | `created_by` | BIGINT | User ID reference only; no cross-DB FK |
 | `created_at` | DATETIME(3) | NOT NULL |
 | `updated_at` | DATETIME(3) | NOT NULL |
@@ -198,7 +198,6 @@ PRIMARY KEY(problem_id, tag_id)
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `problem_id` | BIGINT | FK |
-| `version` | INT | NOT NULL |
 | `case_no` | INT | NOT NULL |
 | `input_object_key` | VARCHAR(512) | MinIO key |
 | `output_object_key` | VARCHAR(512) | MinIO key |
@@ -214,11 +213,11 @@ PRIMARY KEY(problem_id, tag_id)
 约束：
 
 ```text
-UNIQUE(problem_id, version, case_no)
-INDEX(problem_id, status, version, case_no)
+UNIQUE(problem_id, case_no)
+INDEX(problem_id, status, case_no)
 ```
 
-保留 `version + sha256` 以支持历史判题复现。测试用例删除使用
+保留 hash 以支持对象完整性校验和历史判题复现。测试用例删除使用
 `status=archived` 标记，不物理删除 MySQL 元信息或 MinIO 对象。
 
 ---
@@ -238,7 +237,6 @@ INDEX(problem_id, status, version, case_no)
 | `verdict` | VARCHAR(32) | AC / WA / TLE / MLE / RE / CE |
 | `time_ms` | INT | Nullable |
 | `memory_kb` | INT | Nullable |
-| `testcase_version` | INT | 判题使用的数据版本 |
 | `created_at` | DATETIME(3) | NOT NULL |
 | `judged_at` | DATETIME(3) | Nullable |
 | `updated_at` | DATETIME(3) | NOT NULL |
@@ -467,9 +465,8 @@ Redis 不作为唯一业务事实来源。
 ```text
 problem-data/
   problem-{problem_id}/
-    v{version}/
-      input/
-      output/
+    input/
+    output/
 
 submission-artifacts/
   submission-{submission_id}/
@@ -487,7 +484,6 @@ rag-documents/
 object_key
 sha256
 size
-version
 metadata
 ```
 

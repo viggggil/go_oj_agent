@@ -972,6 +972,51 @@ func (m *CreateProblemRequest) validate(all bool) error {
 		}
 	}
 
+	if len(m.GetTestcases()) > 100 {
+		err := CreateProblemRequestValidationError{
+			field:  "Testcases",
+			reason: "value must contain no more than 100 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetTestcases() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateProblemRequestValidationError{
+						field:  fmt.Sprintf("Testcases[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateProblemRequestValidationError{
+						field:  fmt.Sprintf("Testcases[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateProblemRequestValidationError{
+					field:  fmt.Sprintf("Testcases[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return CreateProblemRequestMultiError(errors)
 	}
@@ -1506,290 +1551,6 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UpdateProblemResponseValidationError{}
-
-// Validate checks the field values on PublishProblemRequest with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PublishProblemRequest) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on PublishProblemRequest with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PublishProblemRequestMultiError, or nil if none found.
-func (m *PublishProblemRequest) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *PublishProblemRequest) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if m.GetContext() == nil {
-		err := PublishProblemRequestValidationError{
-			field:  "Context",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, PublishProblemRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, PublishProblemRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return PublishProblemRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if m.GetProblemId() <= 0 {
-		err := PublishProblemRequestValidationError{
-			field:  "ProblemId",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if len(errors) > 0 {
-		return PublishProblemRequestMultiError(errors)
-	}
-
-	return nil
-}
-
-// PublishProblemRequestMultiError is an error wrapping multiple validation
-// errors returned by PublishProblemRequest.ValidateAll() if the designated
-// constraints aren't met.
-type PublishProblemRequestMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m PublishProblemRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m PublishProblemRequestMultiError) AllErrors() []error { return m }
-
-// PublishProblemRequestValidationError is the validation error returned by
-// PublishProblemRequest.Validate if the designated constraints aren't met.
-type PublishProblemRequestValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e PublishProblemRequestValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e PublishProblemRequestValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e PublishProblemRequestValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e PublishProblemRequestValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e PublishProblemRequestValidationError) ErrorName() string {
-	return "PublishProblemRequestValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e PublishProblemRequestValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sPublishProblemRequest.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = PublishProblemRequestValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = PublishProblemRequestValidationError{}
-
-// Validate checks the field values on PublishProblemResponse with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PublishProblemResponse) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on PublishProblemResponse with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PublishProblemResponseMultiError, or nil if none found.
-func (m *PublishProblemResponse) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *PublishProblemResponse) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if all {
-		switch v := interface{}(m.GetProblem()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, PublishProblemResponseValidationError{
-					field:  "Problem",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, PublishProblemResponseValidationError{
-					field:  "Problem",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetProblem()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return PublishProblemResponseValidationError{
-				field:  "Problem",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return PublishProblemResponseMultiError(errors)
-	}
-
-	return nil
-}
-
-// PublishProblemResponseMultiError is an error wrapping multiple validation
-// errors returned by PublishProblemResponse.ValidateAll() if the designated
-// constraints aren't met.
-type PublishProblemResponseMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m PublishProblemResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m PublishProblemResponseMultiError) AllErrors() []error { return m }
-
-// PublishProblemResponseValidationError is the validation error returned by
-// PublishProblemResponse.Validate if the designated constraints aren't met.
-type PublishProblemResponseValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e PublishProblemResponseValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e PublishProblemResponseValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e PublishProblemResponseValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e PublishProblemResponseValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e PublishProblemResponseValidationError) ErrorName() string {
-	return "PublishProblemResponseValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e PublishProblemResponseValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sPublishProblemResponse.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = PublishProblemResponseValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = PublishProblemResponseValidationError{}
 
 // Validate checks the field values on ArchiveProblemRequest with the rules
 // defined in the proto definition for this message. If any rules are
@@ -2779,17 +2540,6 @@ func (m *AddTestcaseRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if m.GetVersion() <= 0 {
-		err := AddTestcaseRequestValidationError{
-			field:  "Version",
-			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
 	if m.GetCaseNo() <= 0 {
 		err := AddTestcaseRequestValidationError{
 			field:  "CaseNo",
@@ -2950,6 +2700,187 @@ var _ interface {
 var _AddTestcaseRequest_InputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.in$")
 
 var _AddTestcaseRequest_OutputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.out$")
+
+// Validate checks the field values on TestcaseInput with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *TestcaseInput) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on TestcaseInput with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in TestcaseInputMultiError, or
+// nil if none found.
+func (m *TestcaseInput) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *TestcaseInput) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetCaseNo() <= 0 {
+		err := TestcaseInputValidationError{
+			field:  "CaseNo",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := utf8.RuneCountInString(m.GetInputFilename()); l < 4 || l > 255 {
+		err := TestcaseInputValidationError{
+			field:  "InputFilename",
+			reason: "value length must be between 4 and 255 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if !_TestcaseInput_InputFilename_Pattern.MatchString(m.GetInputFilename()) {
+		err := TestcaseInputValidationError{
+			field:  "InputFilename",
+			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.in$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetInputContent()); l < 1 || l > 16777216 {
+		err := TestcaseInputValidationError{
+			field:  "InputContent",
+			reason: "value length must be between 1 and 16777216 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := utf8.RuneCountInString(m.GetOutputFilename()); l < 5 || l > 255 {
+		err := TestcaseInputValidationError{
+			field:  "OutputFilename",
+			reason: "value length must be between 5 and 255 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if !_TestcaseInput_OutputFilename_Pattern.MatchString(m.GetOutputFilename()) {
+		err := TestcaseInputValidationError{
+			field:  "OutputFilename",
+			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.out$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := len(m.GetOutputContent()); l < 1 || l > 16777216 {
+		err := TestcaseInputValidationError{
+			field:  "OutputContent",
+			reason: "value length must be between 1 and 16777216 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return TestcaseInputMultiError(errors)
+	}
+
+	return nil
+}
+
+// TestcaseInputMultiError is an error wrapping multiple validation errors
+// returned by TestcaseInput.ValidateAll() if the designated constraints
+// aren't met.
+type TestcaseInputMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m TestcaseInputMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m TestcaseInputMultiError) AllErrors() []error { return m }
+
+// TestcaseInputValidationError is the validation error returned by
+// TestcaseInput.Validate if the designated constraints aren't met.
+type TestcaseInputValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e TestcaseInputValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e TestcaseInputValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e TestcaseInputValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e TestcaseInputValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e TestcaseInputValidationError) ErrorName() string { return "TestcaseInputValidationError" }
+
+// Error satisfies the builtin error interface
+func (e TestcaseInputValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sTestcaseInput.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = TestcaseInputValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = TestcaseInputValidationError{}
+
+var _TestcaseInput_InputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.in$")
+
+var _TestcaseInput_OutputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.out$")
 
 // Validate checks the field values on AddTestcaseResponse with the rules
 // defined in the proto definition for this message. If any rules are
@@ -3443,17 +3374,6 @@ func (m *ListProblemTestcasesRequest) validate(all bool) error {
 		err := ListProblemTestcasesRequestValidationError{
 			field:  "ProblemId",
 			reason: "value must be greater than 0",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if m.GetVersion() < 0 {
-		err := ListProblemTestcasesRequestValidationError{
-			field:  "Version",
-			reason: "value must be greater than or equal to 0",
 		}
 		if !all {
 			return err

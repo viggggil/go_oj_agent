@@ -21,7 +21,6 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ProblemService_CreateProblem_FullMethodName        = "/problem.v1.ProblemService/CreateProblem"
 	ProblemService_UpdateProblem_FullMethodName        = "/problem.v1.ProblemService/UpdateProblem"
-	ProblemService_PublishProblem_FullMethodName       = "/problem.v1.ProblemService/PublishProblem"
 	ProblemService_ArchiveProblem_FullMethodName       = "/problem.v1.ProblemService/ArchiveProblem"
 	ProblemService_GetProblem_FullMethodName           = "/problem.v1.ProblemService/GetProblem"
 	ProblemService_ListProblems_FullMethodName         = "/problem.v1.ProblemService/ListProblems"
@@ -36,7 +35,6 @@ const (
 type ProblemServiceClient interface {
 	CreateProblem(ctx context.Context, in *CreateProblemRequest, opts ...grpc.CallOption) (*CreateProblemResponse, error)
 	UpdateProblem(ctx context.Context, in *UpdateProblemRequest, opts ...grpc.CallOption) (*UpdateProblemResponse, error)
-	PublishProblem(ctx context.Context, in *PublishProblemRequest, opts ...grpc.CallOption) (*PublishProblemResponse, error)
 	ArchiveProblem(ctx context.Context, in *ArchiveProblemRequest, opts ...grpc.CallOption) (*ArchiveProblemResponse, error)
 	GetProblem(ctx context.Context, in *GetProblemRequest, opts ...grpc.CallOption) (*GetProblemResponse, error)
 	ListProblems(ctx context.Context, in *ListProblemsRequest, opts ...grpc.CallOption) (*ListProblemsResponse, error)
@@ -70,16 +68,6 @@ func (c *problemServiceClient) UpdateProblem(ctx context.Context, in *UpdateProb
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateProblemResponse)
 	err := c.cc.Invoke(ctx, ProblemService_UpdateProblem_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *problemServiceClient) PublishProblem(ctx context.Context, in *PublishProblemRequest, opts ...grpc.CallOption) (*PublishProblemResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PublishProblemResponse)
-	err := c.cc.Invoke(ctx, ProblemService_PublishProblem_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +140,6 @@ func (c *problemServiceClient) ListProblemTestcases(ctx context.Context, in *Lis
 type ProblemServiceServer interface {
 	CreateProblem(context.Context, *CreateProblemRequest) (*CreateProblemResponse, error)
 	UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error)
-	PublishProblem(context.Context, *PublishProblemRequest) (*PublishProblemResponse, error)
 	ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error)
 	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
 	ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error)
@@ -177,9 +164,6 @@ func (UnimplementedProblemServiceServer) CreateProblem(context.Context, *CreateP
 }
 func (UnimplementedProblemServiceServer) UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateProblem not implemented")
-}
-func (UnimplementedProblemServiceServer) PublishProblem(context.Context, *PublishProblemRequest) (*PublishProblemResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PublishProblem not implemented")
 }
 func (UnimplementedProblemServiceServer) ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ArchiveProblem not implemented")
@@ -252,24 +236,6 @@ func _ProblemService_UpdateProblem_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProblemServiceServer).UpdateProblem(ctx, req.(*UpdateProblemRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProblemService_PublishProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishProblemRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProblemServiceServer).PublishProblem(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProblemService_PublishProblem_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProblemServiceServer).PublishProblem(ctx, req.(*PublishProblemRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -396,10 +362,6 @@ var ProblemService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateProblem",
 			Handler:    _ProblemService_UpdateProblem_Handler,
-		},
-		{
-			MethodName: "PublishProblem",
-			Handler:    _ProblemService_PublishProblem_Handler,
 		},
 		{
 			MethodName: "ArchiveProblem",
