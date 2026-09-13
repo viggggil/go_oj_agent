@@ -80,3 +80,7 @@ func (r *fakeProblemRepository) Create(_ context.Context, problem Problem, tags 
 	}
 	return r.created, nil
 }
+
+func (r *fakeProblemRepository) FindByID(context.Context, int64) (Problem, error) {
+	return r.created, r.err
+}

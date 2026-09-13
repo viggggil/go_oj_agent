@@ -40,6 +40,26 @@ type CreateProblemInput struct {
 
 type ProblemRepository interface {
 	Create(context.Context, Problem, []string) (Problem, error)
+	FindByID(context.Context, int64) (Problem, error)
+}
+
+func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64) (Problem, error) {
+	if uc == nil || uc.repo == nil {
+		return Problem{}, ErrorInternal("problem repository is not configured")
+	}
+	if requestContext == nil || requestContext.GetUserId() <= 0 || problemID <= 0 {
+		return Problem{}, ErrorInvalidArgument("invalid get problem request")
+	}
+	problem, err := uc.repo.FindByID(ctx, problemID)
+	if err != nil {
+		return Problem{}, err
+	}
+	if problem.Status == problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED {
+		if err := requireAdmin(requestContext); err != nil {
+			return Problem{}, ErrorNotFound("problem not found")
+		}
+	}
+	return problem, nil
 }
 
 type ProblemUsecase struct {

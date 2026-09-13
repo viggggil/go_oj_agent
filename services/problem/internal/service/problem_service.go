@@ -49,3 +49,17 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 	}
 	return &problemv1.CreateProblemResponse{Problem: toProtoProblem(p)}, nil
 }
+
+func (s *ProblemService) GetProblem(ctx context.Context, req *problemv1.GetProblemRequest) (*problemv1.GetProblemResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid get problem request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	problem, err := s.uc.Get(ctx, req.GetContext(), req.GetProblemId())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.GetProblemResponse{Problem: toProtoProblem(problem)}, nil
+}

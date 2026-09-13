@@ -33,9 +33,16 @@ func TestCreateProblemHandlerValidatesRequest(t *testing.T) {
 	}
 }
 
-type serviceFakeRepository struct{}
+type serviceFakeRepository struct {
+	found biz.Problem
+	err   error
+}
 
 func (*serviceFakeRepository) Create(_ context.Context, problem biz.Problem, _ []string) (biz.Problem, error) {
 	problem.ID = 101
 	return problem, nil
+}
+
+func (r *serviceFakeRepository) FindByID(context.Context, int64) (biz.Problem, error) {
+	return r.found, r.err
 }
