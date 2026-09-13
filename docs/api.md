@@ -300,30 +300,38 @@ Query：
 ```text
 page
 page_size
-keyword
-difficulty
-tag
 ```
+
+当前版本只实现分页。名称搜索、难度筛选和标签筛选在后续版本增加。
 
 Response：
 
 ```json
 {
-  "data": {
-    "items": [],
+  "items": [
+    {
+      "id": 1001,
+      "title": "Two Sum",
+      "slug": "two-sum",
+      "difficulty": "PROBLEM_DIFFICULTY_EASY",
+      "status": "PROBLEM_STATUS_PUBLISHED"
+    }
+  ],
+  "page": {
     "page": 1,
     "page_size": 20,
-    "total": 0
-  },
-  "request_id": "..."
+    "total": 1
+  }
 }
 ```
+
+列表项使用 `ProblemSummary`，不包含题面正文、标签详情或测试用例元信息。
 
 ### GET `/api/v1/problems/{problem_id}`
 
 返回题面、限制、标签等公开信息。
 
-普通用户接口不返回隐藏测试数据正文。
+普通用户接口不返回测试用例元信息、MinIO object key 或隐藏测试数据正文。
 
 ### POST `/api/v1/problems`
 
@@ -332,6 +340,32 @@ Response：
 ### PATCH `/api/v1/problems/{problem_id}`
 
 管理员更新题目。
+
+### POST `/api/v1/problems/{problem_id}/publish`
+
+管理员发布草稿题目。
+
+### DELETE `/api/v1/problems/{problem_id}`
+
+管理员归档题目。该操作将状态改为 `ARCHIVED`，不物理删除题目。
+
+### POST `/api/v1/problems/{problem_id}/testcases`
+
+管理员以 `multipart/form-data` 一次提交配对的 `.in` 和 `.out` 文件及
+`version`、`case_no`。Gateway 读取文件后调用内部 `AddTestcase` RPC；
+Problem Service 在同一次业务操作中完成 MinIO 上传、SHA-256 计算和 MySQL
+元信息落库，不提供单独的上传完成确认 API。每个文件当前最大 16 MiB。
+
+### GET `/api/v1/problems/{problem_id}/testcases`
+
+管理员展示某题测试用例元信息时使用。内部对应的
+`ListProblemTestcases` RPC 同时供可信 Judge 调用方复用。默认只返回
+`ACTIVE` 测试用例，可以按 `version` 查询；管理员可以显式包含归档项。
+
+### DELETE `/api/v1/problems/{problem_id}/testcases/{testcase_id}`
+
+管理员归档测试用例。该操作不物理删除 MySQL 元信息或 MinIO 对象，保证
+历史判题仍可按照测试用例版本复现。
 
 ---
 
@@ -608,18 +642,33 @@ syntax = "proto3";
 package problem.v1;
 
 service ProblemService {
-  rpc GetProblem(GetProblemRequest) returns (GetProblemReply);
-  rpc ListProblems(ListProblemsRequest) returns (ListProblemsReply);
-  rpc SearchProblems(SearchProblemsRequest) returns (SearchProblemsReply);
+  rpc CreateProblem(CreateProblemRequest) returns (CreateProblemResponse);
+  rpc UpdateProblem(UpdateProblemRequest) returns (UpdateProblemResponse);
+  rpc PublishProblem(PublishProblemRequest) returns (PublishProblemResponse);
+  rpc ArchiveProblem(ArchiveProblemRequest) returns (ArchiveProblemResponse);
+  rpc GetProblem(GetProblemRequest) returns (GetProblemResponse);
+  rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
+  rpc AddTestcase(AddTestcaseRequest) returns (AddTestcaseResponse);
+  rpc ArchiveTestcase(ArchiveTestcaseRequest) returns (ArchiveTestcaseResponse);
+  rpc ListProblemTestcases(ListProblemTestcasesRequest)
+      returns (ListProblemTestcasesResponse);
 }
 ```
+
+`AddTestcase` 的内部请求携带配对文件名和文件 bytes。`.in/.out` 后缀、文件
+大小、题目 ID、版本和序号由生成的校验代码检查；Problem Service 负责生成
+MinIO object key，数据库只保存 object key、hash、大小、版本、序号和状态。
+
+`ListProblemTestcases` 是管理员页面与 Judge 的共享数据能力。具体授权仍在
+Problem Service 内完成：管理员身份来自可信用户上下文，Judge 身份来自后续
+内部服务认证，不能信任外部调用者伪造角色。
 
 Agent Tool 映射：
 
 ```text
 get_problem      -> GetProblem
-search_problems  -> SearchProblems
-recommend_problem -> Search/List + Agent strategy
+search_problems  -> 后续扩展 ListProblems 筛选能力
+recommend_problem -> 后续使用 List + Agent strategy
 ```
 
 ---

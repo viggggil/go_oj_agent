@@ -15,16 +15,19 @@ lint:
       - api/common/v1/common.proto
       - api/gateway/v1/gateway.proto
       - api/judge/v1/judge.proto
+      - api/problem/v1/errors.proto
       - api/problem/v1/problem.proto
       - api/submission/v1/submission.proto
       - api/user/v1/errors.proto
       - api/user/v1/user.proto
       - services/gateway/internal/conf/conf.proto
+      - services/problem/internal/conf/conf.proto
       - services/user/internal/conf/conf.proto
     PACKAGE_VERSION_SUFFIX:
       - errors/errors.proto
       - services/user/internal/conf/conf.proto
       - services/gateway/internal/conf/conf.proto
+      - services/problem/internal/conf/conf.proto
 
 breaking:
   use:

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package problem.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/problem/v1;problemv1";
+
+import "errors/errors.proto";
+
+// ProblemErrorReason defines stable business errors for problem-service.
+enum ProblemErrorReason {
+  PROBLEM_ERROR_REASON_UNSPECIFIED = 0;
+  PROBLEM_ERROR_REASON_INVALID_ARGUMENT = 1 [(errors.code) = 400];
+  PROBLEM_ERROR_REASON_NOT_FOUND = 2 [(errors.code) = 404];
+  PROBLEM_ERROR_REASON_ALREADY_EXISTS = 3 [(errors.code) = 409];
+  PROBLEM_ERROR_REASON_PERMISSION_DENIED = 4 [(errors.code) = 403];
+  PROBLEM_ERROR_REASON_INVALID_STATUS = 5 [(errors.code) = 412];
+  PROBLEM_ERROR_REASON_TESTCASE_NOT_FOUND = 6 [(errors.code) = 404];
+  PROBLEM_ERROR_REASON_TESTCASE_ALREADY_EXISTS = 7 [(errors.code) = 409];
+  PROBLEM_ERROR_REASON_STORAGE_UNAVAILABLE = 8 [(errors.code) = 503];
+}

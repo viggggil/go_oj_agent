@@ -1,0 +1,27 @@
+service:
+  name: problem-service
+server:
+  grpc:
+    address: ":9002"
+    max_receive_message_bytes: 35651584
+data:
+  mysql_dsn: "user:pass@tcp(127.0.0.1:3306)/oj_problem?parseTime=true"
+  redis_addr: "127.0.0.1:6379"
+  redis_password: ""
+  redis_db: 0
+  redis_namespace: "go_oj_agent:problem"
+storage:
+  minio:
+    endpoint: "127.0.0.1:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    bucket: "problem-data"
+    use_ssl: false
+registry:
+  consul:
+    enabled: false
+    address: "127.0.0.1:8500"
+    scheme: "http"
+    datacenter: ""
+    token: ""
+    service_id: ""
