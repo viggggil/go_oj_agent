@@ -53,3 +53,7 @@ func (r *serviceFakeRepository) List(context.Context, int32, int32, bool) ([]biz
 func (r *serviceFakeRepository) Update(_ context.Context, problem biz.Problem, _ []string) (biz.Problem, error) {
 	return problem, r.err
 }
+func (r *serviceFakeRepository) Archive(context.Context, int64) (biz.Problem, error) {
+	r.found.Status = problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED
+	return r.found, r.err
+}
