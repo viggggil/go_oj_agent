@@ -46,3 +46,7 @@ func (*serviceFakeRepository) Create(_ context.Context, problem biz.Problem, _ [
 func (r *serviceFakeRepository) FindByID(context.Context, int64) (biz.Problem, error) {
 	return r.found, r.err
 }
+
+func (r *serviceFakeRepository) List(context.Context, int32, int32, bool) ([]biz.Problem, int64, error) {
+	return nil, 0, r.err
+}

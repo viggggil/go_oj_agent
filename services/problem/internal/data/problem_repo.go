@@ -137,3 +137,44 @@ func (s *StoreSet) FindByID(ctx context.Context, problemID int64) (biz.Problem, 
 	}
 	return problem, rows.Err()
 }
+
+func (s *StoreSet) List(ctx context.Context, page, pageSize int32, includeArchived bool) ([]biz.Problem, int64, error) {
+	if s == nil || s.db == nil {
+		return nil, 0, biz.ErrorInternal("problem database is not configured")
+	}
+	where := " WHERE status = ?"
+	countArgs := []interface{}{problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String()}
+	if includeArchived {
+		where = ""
+		countArgs = nil
+	}
+	var total int64
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM problems"+where, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	args := append(countArgs, pageSize, (page-1)*pageSize)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, title, slug, difficulty, status
+		FROM problems`+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := make([]biz.Problem, 0, pageSize)
+	for rows.Next() {
+		var problem biz.Problem
+		var difficulty, status string
+		if err := rows.Scan(&problem.ID, &problem.Title, &problem.Slug, &difficulty, &status); err != nil {
+			return nil, 0, err
+		}
+		difficultyValue, difficultyOK := problemv1.ProblemDifficulty_value[difficulty]
+		statusValue, statusOK := problemv1.ProblemStatus_value[status]
+		if !difficultyOK || !statusOK {
+			return nil, 0, biz.ErrorInternal("invalid problem enum in database")
+		}
+		problem.Difficulty = problemv1.ProblemDifficulty(difficultyValue)
+		problem.Status = problemv1.ProblemStatus(statusValue)
+		items = append(items, problem)
+	}
+	return items, total, rows.Err()
+}

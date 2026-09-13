@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/wire"
 
+	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/biz"
 )
@@ -62,4 +63,22 @@ func (s *ProblemService) GetProblem(ctx context.Context, req *problemv1.GetProbl
 		return nil, err
 	}
 	return &problemv1.GetProblemResponse{Problem: toProtoProblem(problem)}, nil
+}
+
+func (s *ProblemService) ListProblems(ctx context.Context, req *problemv1.ListProblemsRequest) (*problemv1.ListProblemsResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid list problems request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	page, err := s.uc.List(ctx, req.GetContext(), req.GetPage().GetPage(), req.GetPage().GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*problemv1.ProblemSummary, 0, len(page.Items))
+	for _, problem := range page.Items {
+		items = append(items, &problemv1.ProblemSummary{Id: problem.ID, Title: problem.Title, Slug: problem.Slug, Difficulty: problem.Difficulty, Status: problem.Status})
+	}
+	return &problemv1.ListProblemsResponse{Items: items, Page: &commonv1.PageResponse{Page: page.Page, PageSize: page.PageSize, Total: page.Total}}, nil
 }
