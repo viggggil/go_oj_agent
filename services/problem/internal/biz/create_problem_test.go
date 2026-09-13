@@ -84,3 +84,7 @@ func (r *fakeProblemRepository) Create(_ context.Context, problem Problem, tags 
 func (r *fakeProblemRepository) FindByID(context.Context, int64) (Problem, error) {
 	return r.created, r.err
 }
+
+func (r *fakeProblemRepository) List(context.Context, int32, int32, bool) ([]Problem, int64, error) {
+	return nil, 0, r.err
+}

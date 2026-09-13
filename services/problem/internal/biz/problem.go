@@ -41,6 +41,38 @@ type CreateProblemInput struct {
 type ProblemRepository interface {
 	Create(context.Context, Problem, []string) (Problem, error)
 	FindByID(context.Context, int64) (Problem, error)
+	List(context.Context, int32, int32, bool) ([]Problem, int64, error)
+}
+
+type ProblemPage struct {
+	Items    []Problem
+	Page     int32
+	PageSize int32
+	Total    int64
+}
+
+func (uc *ProblemUsecase) List(ctx context.Context, requestContext *commonv1.RequestContext, page, pageSize int32) (ProblemPage, error) {
+	if uc == nil || uc.repo == nil {
+		return ProblemPage{}, ErrorInternal("problem repository is not configured")
+	}
+	if requestContext == nil || requestContext.GetUserId() <= 0 {
+		return ProblemPage{}, ErrorInvalidArgument("invalid list problems request")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	includeArchived := requireAdmin(requestContext) == nil
+	items, total, err := uc.repo.List(ctx, page, pageSize, includeArchived)
+	if err != nil {
+		return ProblemPage{}, err
+	}
+	return ProblemPage{Items: items, Page: page, PageSize: pageSize, Total: total}, nil
 }
 
 func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64) (Problem, error) {
