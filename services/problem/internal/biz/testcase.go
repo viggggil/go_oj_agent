@@ -24,13 +24,21 @@ type Testcase struct {
 type TestcaseRepository interface {
 	AddTestcase(context.Context, Testcase) (Testcase, error)
 }
+type ProblemCreationCompensator interface {
+	DeleteCreatedProblem(context.Context, int64) error
+}
+type TestcaseContent struct {
+	CaseNo int32
+	Input  []byte
+	Output []byte
+}
 type ObjectStore interface {
 	Put(context.Context, string, []byte) error
 	Delete(context.Context, string) error
 }
 
-func NewProblemUsecaseWithStore(problems ProblemRepository, testcases TestcaseRepository, objects ObjectStore) *ProblemUsecase {
-	return &ProblemUsecase{repo: problems, testcases: testcases, objects: objects}
+func NewProblemUsecaseWithStore(problems ProblemRepository, testcases TestcaseRepository, objects ObjectStore, compensator ProblemCreationCompensator) *ProblemUsecase {
+	return &ProblemUsecase{repo: problems, testcases: testcases, objects: objects, compensator: compensator}
 }
 
 func (uc *ProblemUsecase) AddTestcase(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64, caseNo int32, input, output []byte) (Testcase, error) {
@@ -46,6 +54,10 @@ func (uc *ProblemUsecase) AddTestcase(ctx context.Context, requestContext *commo
 	if _, err := uc.repo.FindByID(ctx, problemID); err != nil {
 		return Testcase{}, err
 	}
+	return uc.addTestcaseToProblem(ctx, problemID, caseNo, input, output)
+}
+
+func (uc *ProblemUsecase) addTestcaseToProblem(ctx context.Context, problemID int64, caseNo int32, input, output []byte) (Testcase, error) {
 	inputKey := fmt.Sprintf("problem-%d/input/%d.in", problemID, caseNo)
 	outputKey := fmt.Sprintf("problem-%d/output/%d.out", problemID, caseNo)
 	if err := uc.objects.Put(ctx, inputKey, input); err != nil {

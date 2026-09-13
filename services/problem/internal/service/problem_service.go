@@ -42,8 +42,8 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 			TimeLimitMs:   in.GetTimeLimitMs(),
 			MemoryLimitKb: in.GetMemoryLimitKb(),
 		},
-		Tags:         in.GetTags(),
-		HasTestcases: len(req.GetTestcases()) > 0,
+		Tags:      in.GetTags(),
+		Testcases: toBizTestcaseContents(req.GetTestcases()),
 	})
 	if err != nil {
 		return nil, err

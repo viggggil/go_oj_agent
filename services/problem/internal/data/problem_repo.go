@@ -90,6 +90,14 @@ func translateMySQLError(err error) error {
 	return err
 }
 
+func (s *StoreSet) DeleteCreatedProblem(ctx context.Context, problemID int64) error {
+	if s == nil || s.db == nil {
+		return biz.ErrorInternal("problem database is not configured")
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM problems WHERE id = ?`, problemID)
+	return err
+}
+
 func (s *StoreSet) FindByID(ctx context.Context, problemID int64) (biz.Problem, error) {
 	if s == nil || s.db == nil {
 		return biz.Problem{}, biz.ErrorInternal("problem database is not configured")

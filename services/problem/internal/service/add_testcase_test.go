@@ -11,7 +11,7 @@ import (
 func TestAddTestcaseHandler(t *testing.T) {
 	repo := &serviceTestcaseRepo{serviceFakeRepository: serviceFakeRepository{found: biz.Problem{ID: 2}}}
 	objects := &serviceObjectStore{}
-	server := NewProblemService(biz.NewProblemUsecaseWithStore(repo, repo, objects))
+	server := NewProblemService(biz.NewProblemUsecaseWithStore(repo, repo, objects, repo))
 	response, err := server.AddTestcase(context.Background(), &problemv1.AddTestcaseRequest{Context: adminContextProto(), ProblemId: 2, CaseNo: 1, InputFilename: "1.in", InputContent: []byte("in"), OutputFilename: "1.out", OutputContent: []byte("out")})
 	if err != nil || response.GetTestcase().GetId() != 7 {
 		t.Fatalf("response=%+v err=%v", response, err)

@@ -98,3 +98,18 @@ func repositoryProblem() biz.Problem {
 		Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536,
 		Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL, CreatedBy: 7}
 }
+
+func TestDeleteCreatedProblem(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectExec("DELETE FROM problems").WithArgs(int64(12)).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := NewStoreSet(db).DeleteCreatedProblem(context.Background(), 12); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

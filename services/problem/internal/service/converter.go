@@ -42,3 +42,11 @@ func toProtoTestcase(testcase biz.Testcase) *problemv1.TestcaseMetadata {
 	}
 	return result
 }
+
+func toBizTestcaseContents(inputs []*problemv1.TestcaseInput) []biz.TestcaseContent {
+	result := make([]biz.TestcaseContent, 0, len(inputs))
+	for _, input := range inputs {
+		result = append(result, biz.TestcaseContent{CaseNo: input.GetCaseNo(), Input: input.GetInputContent(), Output: input.GetOutputContent()})
+	}
+	return result
+}
