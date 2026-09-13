@@ -80,24 +80,21 @@ type ProblemStatus int32
 
 const (
 	ProblemStatus_PROBLEM_STATUS_UNSPECIFIED ProblemStatus = 0
-	ProblemStatus_PROBLEM_STATUS_DRAFT       ProblemStatus = 1
-	ProblemStatus_PROBLEM_STATUS_PUBLISHED   ProblemStatus = 2
-	ProblemStatus_PROBLEM_STATUS_ARCHIVED    ProblemStatus = 3
+	ProblemStatus_PROBLEM_STATUS_NORMAL      ProblemStatus = 1
+	ProblemStatus_PROBLEM_STATUS_ARCHIVED    ProblemStatus = 2
 )
 
 // Enum value maps for ProblemStatus.
 var (
 	ProblemStatus_name = map[int32]string{
 		0: "PROBLEM_STATUS_UNSPECIFIED",
-		1: "PROBLEM_STATUS_DRAFT",
-		2: "PROBLEM_STATUS_PUBLISHED",
-		3: "PROBLEM_STATUS_ARCHIVED",
+		1: "PROBLEM_STATUS_NORMAL",
+		2: "PROBLEM_STATUS_ARCHIVED",
 	}
 	ProblemStatus_value = map[string]int32{
 		"PROBLEM_STATUS_UNSPECIFIED": 0,
-		"PROBLEM_STATUS_DRAFT":       1,
-		"PROBLEM_STATUS_PUBLISHED":   2,
-		"PROBLEM_STATUS_ARCHIVED":    3,
+		"PROBLEM_STATUS_NORMAL":      1,
+		"PROBLEM_STATUS_ARCHIVED":    2,
 	}
 )
 
@@ -672,9 +669,11 @@ func (x *ProblemInput) GetTags() []string {
 }
 
 type CreateProblemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Context       *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
-	Problem       *ProblemInput          `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Context *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
+	Problem *ProblemInput          `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
+	// Optional paired testcases submitted together by the admin create page.
+	Testcases     []*TestcaseInput `protobuf:"bytes,3,rep,name=testcases,proto3" json:"testcases,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -719,6 +718,13 @@ func (x *CreateProblemRequest) GetContext() *v1.RequestContext {
 func (x *CreateProblemRequest) GetProblem() *ProblemInput {
 	if x != nil {
 		return x.Problem
+	}
+	return nil
+}
+
+func (x *CreateProblemRequest) GetTestcases() []*TestcaseInput {
+	if x != nil {
+		return x.Testcases
 	}
 	return nil
 }
@@ -871,102 +877,6 @@ func (x *UpdateProblemResponse) GetProblem() *Problem {
 	return nil
 }
 
-type PublishProblemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Context       *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
-	ProblemId     int64                  `protobuf:"varint,2,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PublishProblemRequest) Reset() {
-	*x = PublishProblemRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PublishProblemRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PublishProblemRequest) ProtoMessage() {}
-
-func (x *PublishProblemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PublishProblemRequest.ProtoReflect.Descriptor instead.
-func (*PublishProblemRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *PublishProblemRequest) GetContext() *v1.RequestContext {
-	if x != nil {
-		return x.Context
-	}
-	return nil
-}
-
-func (x *PublishProblemRequest) GetProblemId() int64 {
-	if x != nil {
-		return x.ProblemId
-	}
-	return 0
-}
-
-type PublishProblemResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Problem       *Problem               `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PublishProblemResponse) Reset() {
-	*x = PublishProblemResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PublishProblemResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PublishProblemResponse) ProtoMessage() {}
-
-func (x *PublishProblemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PublishProblemResponse.ProtoReflect.Descriptor instead.
-func (*PublishProblemResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *PublishProblemResponse) GetProblem() *Problem {
-	if x != nil {
-		return x.Problem
-	}
-	return nil
-}
-
 type ArchiveProblemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Context       *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
@@ -977,7 +887,7 @@ type ArchiveProblemRequest struct {
 
 func (x *ArchiveProblemRequest) Reset() {
 	*x = ArchiveProblemRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[11]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -989,7 +899,7 @@ func (x *ArchiveProblemRequest) String() string {
 func (*ArchiveProblemRequest) ProtoMessage() {}
 
 func (x *ArchiveProblemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[11]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1002,7 +912,7 @@ func (x *ArchiveProblemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveProblemRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveProblemRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{11}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ArchiveProblemRequest) GetContext() *v1.RequestContext {
@@ -1028,7 +938,7 @@ type ArchiveProblemResponse struct {
 
 func (x *ArchiveProblemResponse) Reset() {
 	*x = ArchiveProblemResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[12]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1040,7 +950,7 @@ func (x *ArchiveProblemResponse) String() string {
 func (*ArchiveProblemResponse) ProtoMessage() {}
 
 func (x *ArchiveProblemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[12]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1053,7 +963,7 @@ func (x *ArchiveProblemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveProblemResponse.ProtoReflect.Descriptor instead.
 func (*ArchiveProblemResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{12}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ArchiveProblemResponse) GetProblem() *Problem {
@@ -1073,7 +983,7 @@ type GetProblemRequest struct {
 
 func (x *GetProblemRequest) Reset() {
 	*x = GetProblemRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[13]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1085,7 +995,7 @@ func (x *GetProblemRequest) String() string {
 func (*GetProblemRequest) ProtoMessage() {}
 
 func (x *GetProblemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[13]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1098,7 +1008,7 @@ func (x *GetProblemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProblemRequest.ProtoReflect.Descriptor instead.
 func (*GetProblemRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{13}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetProblemRequest) GetContext() *v1.RequestContext {
@@ -1124,7 +1034,7 @@ type GetProblemResponse struct {
 
 func (x *GetProblemResponse) Reset() {
 	*x = GetProblemResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[14]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1136,7 +1046,7 @@ func (x *GetProblemResponse) String() string {
 func (*GetProblemResponse) ProtoMessage() {}
 
 func (x *GetProblemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[14]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1149,7 +1059,7 @@ func (x *GetProblemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProblemResponse.ProtoReflect.Descriptor instead.
 func (*GetProblemResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{14}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetProblemResponse) GetProblem() *Problem {
@@ -1169,7 +1079,7 @@ type ListProblemsRequest struct {
 
 func (x *ListProblemsRequest) Reset() {
 	*x = ListProblemsRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[15]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1091,7 @@ func (x *ListProblemsRequest) String() string {
 func (*ListProblemsRequest) ProtoMessage() {}
 
 func (x *ListProblemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[15]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1104,7 @@ func (x *ListProblemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProblemsRequest.ProtoReflect.Descriptor instead.
 func (*ListProblemsRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{15}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListProblemsRequest) GetContext() *v1.RequestContext {
@@ -1221,7 +1131,7 @@ type ListProblemsResponse struct {
 
 func (x *ListProblemsResponse) Reset() {
 	*x = ListProblemsResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[16]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1233,7 +1143,7 @@ func (x *ListProblemsResponse) String() string {
 func (*ListProblemsResponse) ProtoMessage() {}
 
 func (x *ListProblemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[16]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1246,7 +1156,7 @@ func (x *ListProblemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProblemsResponse.ProtoReflect.Descriptor instead.
 func (*ListProblemsResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{16}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListProblemsResponse) GetItems() []*ProblemSummary {
@@ -1267,19 +1177,18 @@ type AddTestcaseRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Context        *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
 	ProblemId      int64                  `protobuf:"varint,2,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
-	Version        int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	CaseNo         int32                  `protobuf:"varint,4,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
-	InputFilename  string                 `protobuf:"bytes,5,opt,name=input_filename,json=inputFilename,proto3" json:"input_filename,omitempty"`
-	InputContent   []byte                 `protobuf:"bytes,6,opt,name=input_content,json=inputContent,proto3" json:"input_content,omitempty"`
-	OutputFilename string                 `protobuf:"bytes,7,opt,name=output_filename,json=outputFilename,proto3" json:"output_filename,omitempty"`
-	OutputContent  []byte                 `protobuf:"bytes,8,opt,name=output_content,json=outputContent,proto3" json:"output_content,omitempty"`
+	CaseNo         int32                  `protobuf:"varint,3,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
+	InputFilename  string                 `protobuf:"bytes,4,opt,name=input_filename,json=inputFilename,proto3" json:"input_filename,omitempty"`
+	InputContent   []byte                 `protobuf:"bytes,5,opt,name=input_content,json=inputContent,proto3" json:"input_content,omitempty"`
+	OutputFilename string                 `protobuf:"bytes,6,opt,name=output_filename,json=outputFilename,proto3" json:"output_filename,omitempty"`
+	OutputContent  []byte                 `protobuf:"bytes,7,opt,name=output_content,json=outputContent,proto3" json:"output_content,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AddTestcaseRequest) Reset() {
 	*x = AddTestcaseRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[17]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1291,7 +1200,7 @@ func (x *AddTestcaseRequest) String() string {
 func (*AddTestcaseRequest) ProtoMessage() {}
 
 func (x *AddTestcaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[17]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1304,7 +1213,7 @@ func (x *AddTestcaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTestcaseRequest.ProtoReflect.Descriptor instead.
 func (*AddTestcaseRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{17}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AddTestcaseRequest) GetContext() *v1.RequestContext {
@@ -1317,13 +1226,6 @@ func (x *AddTestcaseRequest) GetContext() *v1.RequestContext {
 func (x *AddTestcaseRequest) GetProblemId() int64 {
 	if x != nil {
 		return x.ProblemId
-	}
-	return 0
-}
-
-func (x *AddTestcaseRequest) GetVersion() int32 {
-	if x != nil {
-		return x.Version
 	}
 	return 0
 }
@@ -1363,6 +1265,82 @@ func (x *AddTestcaseRequest) GetOutputContent() []byte {
 	return nil
 }
 
+type TestcaseInput struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CaseNo         int32                  `protobuf:"varint,1,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
+	InputFilename  string                 `protobuf:"bytes,2,opt,name=input_filename,json=inputFilename,proto3" json:"input_filename,omitempty"`
+	InputContent   []byte                 `protobuf:"bytes,3,opt,name=input_content,json=inputContent,proto3" json:"input_content,omitempty"`
+	OutputFilename string                 `protobuf:"bytes,4,opt,name=output_filename,json=outputFilename,proto3" json:"output_filename,omitempty"`
+	OutputContent  []byte                 `protobuf:"bytes,5,opt,name=output_content,json=outputContent,proto3" json:"output_content,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TestcaseInput) Reset() {
+	*x = TestcaseInput{}
+	mi := &file_api_problem_v1_problem_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestcaseInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestcaseInput) ProtoMessage() {}
+
+func (x *TestcaseInput) ProtoReflect() protoreflect.Message {
+	mi := &file_api_problem_v1_problem_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestcaseInput.ProtoReflect.Descriptor instead.
+func (*TestcaseInput) Descriptor() ([]byte, []int) {
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *TestcaseInput) GetCaseNo() int32 {
+	if x != nil {
+		return x.CaseNo
+	}
+	return 0
+}
+
+func (x *TestcaseInput) GetInputFilename() string {
+	if x != nil {
+		return x.InputFilename
+	}
+	return ""
+}
+
+func (x *TestcaseInput) GetInputContent() []byte {
+	if x != nil {
+		return x.InputContent
+	}
+	return nil
+}
+
+func (x *TestcaseInput) GetOutputFilename() string {
+	if x != nil {
+		return x.OutputFilename
+	}
+	return ""
+}
+
+func (x *TestcaseInput) GetOutputContent() []byte {
+	if x != nil {
+		return x.OutputContent
+	}
+	return nil
+}
+
 type AddTestcaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Testcase      *TestcaseMetadata      `protobuf:"bytes,1,opt,name=testcase,proto3" json:"testcase,omitempty"`
@@ -1372,7 +1350,7 @@ type AddTestcaseResponse struct {
 
 func (x *AddTestcaseResponse) Reset() {
 	*x = AddTestcaseResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[18]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1384,7 +1362,7 @@ func (x *AddTestcaseResponse) String() string {
 func (*AddTestcaseResponse) ProtoMessage() {}
 
 func (x *AddTestcaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[18]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1397,7 +1375,7 @@ func (x *AddTestcaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTestcaseResponse.ProtoReflect.Descriptor instead.
 func (*AddTestcaseResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{18}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AddTestcaseResponse) GetTestcase() *TestcaseMetadata {
@@ -1418,7 +1396,7 @@ type ArchiveTestcaseRequest struct {
 
 func (x *ArchiveTestcaseRequest) Reset() {
 	*x = ArchiveTestcaseRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[19]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1430,7 +1408,7 @@ func (x *ArchiveTestcaseRequest) String() string {
 func (*ArchiveTestcaseRequest) ProtoMessage() {}
 
 func (x *ArchiveTestcaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[19]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1443,7 +1421,7 @@ func (x *ArchiveTestcaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveTestcaseRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveTestcaseRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{19}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ArchiveTestcaseRequest) GetContext() *v1.RequestContext {
@@ -1476,7 +1454,7 @@ type ArchiveTestcaseResponse struct {
 
 func (x *ArchiveTestcaseResponse) Reset() {
 	*x = ArchiveTestcaseResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[20]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1488,7 +1466,7 @@ func (x *ArchiveTestcaseResponse) String() string {
 func (*ArchiveTestcaseResponse) ProtoMessage() {}
 
 func (x *ArchiveTestcaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[20]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1501,7 +1479,7 @@ func (x *ArchiveTestcaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveTestcaseResponse.ProtoReflect.Descriptor instead.
 func (*ArchiveTestcaseResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{20}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ArchiveTestcaseResponse) GetTestcase() *TestcaseMetadata {
@@ -1515,15 +1493,14 @@ type ListProblemTestcasesRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Context         *v1.RequestContext     `protobuf:"bytes,1,opt,name=context,proto3" json:"context,omitempty"`
 	ProblemId       int64                  `protobuf:"varint,2,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
-	Version         int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	IncludeArchived bool                   `protobuf:"varint,4,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
+	IncludeArchived bool                   `protobuf:"varint,3,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ListProblemTestcasesRequest) Reset() {
 	*x = ListProblemTestcasesRequest{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[21]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1535,7 +1512,7 @@ func (x *ListProblemTestcasesRequest) String() string {
 func (*ListProblemTestcasesRequest) ProtoMessage() {}
 
 func (x *ListProblemTestcasesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[21]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1548,7 +1525,7 @@ func (x *ListProblemTestcasesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProblemTestcasesRequest.ProtoReflect.Descriptor instead.
 func (*ListProblemTestcasesRequest) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{21}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListProblemTestcasesRequest) GetContext() *v1.RequestContext {
@@ -1561,13 +1538,6 @@ func (x *ListProblemTestcasesRequest) GetContext() *v1.RequestContext {
 func (x *ListProblemTestcasesRequest) GetProblemId() int64 {
 	if x != nil {
 		return x.ProblemId
-	}
-	return 0
-}
-
-func (x *ListProblemTestcasesRequest) GetVersion() int32 {
-	if x != nil {
-		return x.Version
 	}
 	return 0
 }
@@ -1588,7 +1558,7 @@ type ListProblemTestcasesResponse struct {
 
 func (x *ListProblemTestcasesResponse) Reset() {
 	*x = ListProblemTestcasesResponse{}
-	mi := &file_api_problem_v1_problem_proto_msgTypes[22]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1600,7 +1570,7 @@ func (x *ListProblemTestcasesResponse) String() string {
 func (*ListProblemTestcasesResponse) ProtoMessage() {}
 
 func (x *ListProblemTestcasesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_problem_v1_problem_proto_msgTypes[22]
+	mi := &file_api_problem_v1_problem_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1613,7 +1583,7 @@ func (x *ListProblemTestcasesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProblemTestcasesResponse.ProtoReflect.Descriptor instead.
 func (*ListProblemTestcasesResponse) Descriptor() ([]byte, []int) {
-	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{22}
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListProblemTestcasesResponse) GetItems() []*TestcaseMetadata {
@@ -1688,10 +1658,11 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"difficulty\x12/\n" +
 	"\rtime_limit_ms\x18\x05 \x01(\x05B\v\xfaB\b\x1a\x06\x18\xc0\xcf$ \x00R\vtimeLimitMs\x123\n" +
 	"\x0fmemory_limit_kb\x18\x06 \x01(\x05B\v\xfaB\b\x1a\x06\x18\x80\x80@ \x00R\rmemoryLimitKb\x12&\n" +
-	"\x04tags\x18\a \x03(\tB\x12\xfaB\x0f\x92\x01\f\x10\x14\x18\x01\"\x06r\x04\x10\x01\x18@R\x04tags\"\x93\x01\n" +
+	"\x04tags\x18\a \x03(\tB\x12\xfaB\x0f\x92\x01\f\x10\x14\x18\x01\"\x06r\x04\x10\x01\x18@R\x04tags\"\xd6\x01\n" +
 	"\x14CreateProblemRequest\x12=\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.common.v1.RequestContextB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontext\x12<\n" +
-	"\aproblem\x18\x02 \x01(\v2\x18.problem.v1.ProblemInputB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aproblem\"F\n" +
+	"\aproblem\x18\x02 \x01(\v2\x18.problem.v1.ProblemInputB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aproblem\x12A\n" +
+	"\ttestcases\x18\x03 \x03(\v2\x19.problem.v1.TestcaseInputB\b\xfaB\x05\x92\x01\x02\x10dR\ttestcases\"F\n" +
 	"\x15CreateProblemResponse\x12-\n" +
 	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"\xbb\x01\n" +
 	"\x14UpdateProblemRequest\x12=\n" +
@@ -1700,12 +1671,6 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12<\n" +
 	"\aproblem\x18\x03 \x01(\v2\x18.problem.v1.ProblemInputB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aproblem\"F\n" +
 	"\x15UpdateProblemResponse\x12-\n" +
-	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"~\n" +
-	"\x15PublishProblemRequest\x12=\n" +
-	"\acontext\x18\x01 \x01(\v2\x19.common.v1.RequestContextB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontext\x12&\n" +
-	"\n" +
-	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\"G\n" +
-	"\x16PublishProblemResponse\x12-\n" +
 	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"~\n" +
 	"\x15ArchiveProblemRequest\x12=\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.common.v1.RequestContextB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontext\x12&\n" +
@@ -1724,17 +1689,22 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"\x04page\x18\x02 \x01(\v2\x16.common.v1.PageRequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04page\"u\n" +
 	"\x14ListProblemsResponse\x120\n" +
 	"\x05items\x18\x01 \x03(\v2\x1a.problem.v1.ProblemSummaryR\x05items\x12+\n" +
-	"\x04page\x18\x02 \x01(\v2\x17.common.v1.PageResponseR\x04page\"\xaf\x03\n" +
+	"\x04page\x18\x02 \x01(\v2\x17.common.v1.PageResponseR\x04page\"\x8c\x03\n" +
 	"\x12AddTestcaseRequest\x12=\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.common.v1.RequestContextB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontext\x12&\n" +
 	"\n" +
-	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12!\n" +
-	"\aversion\x18\x03 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\aversion\x12 \n" +
-	"\acase_no\x18\x04 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x06caseNo\x12@\n" +
-	"\x0einput_filename\x18\x05 \x01(\tB\x19\xfaB\x16r\x14\x10\x04\x18\xff\x012\r^[^/\\\\]+\\.in$R\rinputFilename\x121\n" +
-	"\rinput_content\x18\x06 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\finputContent\x12C\n" +
-	"\x0foutput_filename\x18\a \x01(\tB\x1a\xfaB\x17r\x15\x10\x05\x18\xff\x012\x0e^[^/\\\\]+\\.out$R\x0eoutputFilename\x123\n" +
-	"\x0eoutput_content\x18\b \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\routputContent\"O\n" +
+	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12 \n" +
+	"\acase_no\x18\x03 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x06caseNo\x12@\n" +
+	"\x0einput_filename\x18\x04 \x01(\tB\x19\xfaB\x16r\x14\x10\x04\x18\xff\x012\r^[^/\\\\]+\\.in$R\rinputFilename\x121\n" +
+	"\rinput_content\x18\x05 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\finputContent\x12C\n" +
+	"\x0foutput_filename\x18\x06 \x01(\tB\x1a\xfaB\x17r\x15\x10\x05\x18\xff\x012\x0e^[^/\\\\]+\\.out$R\x0eoutputFilename\x123\n" +
+	"\x0eoutput_content\x18\a \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\routputContent\"\xa0\x02\n" +
+	"\rTestcaseInput\x12 \n" +
+	"\acase_no\x18\x01 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x06caseNo\x12@\n" +
+	"\x0einput_filename\x18\x02 \x01(\tB\x19\xfaB\x16r\x14\x10\x04\x18\xff\x012\r^[^/\\\\]+\\.in$R\rinputFilename\x121\n" +
+	"\rinput_content\x18\x03 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\finputContent\x12C\n" +
+	"\x0foutput_filename\x18\x04 \x01(\tB\x1a\xfaB\x17r\x15\x10\x05\x18\xff\x012\x0e^[^/\\\\]+\\.out$R\x0eoutputFilename\x123\n" +
+	"\x0eoutput_content\x18\x05 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\routputContent\"O\n" +
 	"\x13AddTestcaseResponse\x128\n" +
 	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase\"\xa9\x01\n" +
 	"\x16ArchiveTestcaseRequest\x12=\n" +
@@ -1744,33 +1714,30 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"\vtestcase_id\x18\x03 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\n" +
 	"testcaseId\"S\n" +
 	"\x17ArchiveTestcaseResponse\x128\n" +
-	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase\"\xd2\x01\n" +
+	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase\"\xaf\x01\n" +
 	"\x1bListProblemTestcasesRequest\x12=\n" +
 	"\acontext\x18\x01 \x01(\v2\x19.common.v1.RequestContextB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontext\x12&\n" +
 	"\n" +
-	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12!\n" +
-	"\aversion\x18\x03 \x01(\x05B\a\xfaB\x04\x1a\x02(\x00R\aversion\x12)\n" +
-	"\x10include_archived\x18\x04 \x01(\bR\x0fincludeArchived\"R\n" +
+	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12)\n" +
+	"\x10include_archived\x18\x03 \x01(\bR\x0fincludeArchived\"R\n" +
 	"\x1cListProblemTestcasesResponse\x122\n" +
 	"\x05items\x18\x01 \x03(\v2\x1c.problem.v1.TestcaseMetadataR\x05items*\x90\x01\n" +
 	"\x11ProblemDifficulty\x12\"\n" +
 	"\x1ePROBLEM_DIFFICULTY_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17PROBLEM_DIFFICULTY_EASY\x10\x01\x12\x1d\n" +
 	"\x19PROBLEM_DIFFICULTY_MEDIUM\x10\x02\x12\x1b\n" +
-	"\x17PROBLEM_DIFFICULTY_HARD\x10\x03*\x84\x01\n" +
+	"\x17PROBLEM_DIFFICULTY_HARD\x10\x03*g\n" +
 	"\rProblemStatus\x12\x1e\n" +
-	"\x1aPROBLEM_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14PROBLEM_STATUS_DRAFT\x10\x01\x12\x1c\n" +
-	"\x18PROBLEM_STATUS_PUBLISHED\x10\x02\x12\x1b\n" +
-	"\x17PROBLEM_STATUS_ARCHIVED\x10\x03*k\n" +
+	"\x1aPROBLEM_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15PROBLEM_STATUS_NORMAL\x10\x01\x12\x1b\n" +
+	"\x17PROBLEM_STATUS_ARCHIVED\x10\x02*k\n" +
 	"\x0eTestcaseStatus\x12\x1f\n" +
 	"\x1bTESTCASE_STATUS_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16TESTCASE_STATUS_ACTIVE\x10\x01\x12\x1c\n" +
-	"\x18TESTCASE_STATUS_ARCHIVED\x10\x022\xa5\x06\n" +
+	"\x18TESTCASE_STATUS_ARCHIVED\x10\x022\xcc\x05\n" +
 	"\x0eProblemService\x12T\n" +
 	"\rCreateProblem\x12 .problem.v1.CreateProblemRequest\x1a!.problem.v1.CreateProblemResponse\x12T\n" +
 	"\rUpdateProblem\x12 .problem.v1.UpdateProblemRequest\x1a!.problem.v1.UpdateProblemResponse\x12W\n" +
-	"\x0ePublishProblem\x12!.problem.v1.PublishProblemRequest\x1a\".problem.v1.PublishProblemResponse\x12W\n" +
 	"\x0eArchiveProblem\x12!.problem.v1.ArchiveProblemRequest\x1a\".problem.v1.ArchiveProblemResponse\x12K\n" +
 	"\n" +
 	"GetProblem\x12\x1d.problem.v1.GetProblemRequest\x1a\x1e.problem.v1.GetProblemResponse\x12Q\n" +
@@ -1792,7 +1759,7 @@ func file_api_problem_v1_problem_proto_rawDescGZIP() []byte {
 }
 
 var file_api_problem_v1_problem_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_api_problem_v1_problem_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_api_problem_v1_problem_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_api_problem_v1_problem_proto_goTypes = []any{
 	(ProblemDifficulty)(0),               // 0: problem.v1.ProblemDifficulty
 	(ProblemStatus)(0),                   // 1: problem.v1.ProblemStatus
@@ -1806,24 +1773,23 @@ var file_api_problem_v1_problem_proto_goTypes = []any{
 	(*CreateProblemResponse)(nil),        // 9: problem.v1.CreateProblemResponse
 	(*UpdateProblemRequest)(nil),         // 10: problem.v1.UpdateProblemRequest
 	(*UpdateProblemResponse)(nil),        // 11: problem.v1.UpdateProblemResponse
-	(*PublishProblemRequest)(nil),        // 12: problem.v1.PublishProblemRequest
-	(*PublishProblemResponse)(nil),       // 13: problem.v1.PublishProblemResponse
-	(*ArchiveProblemRequest)(nil),        // 14: problem.v1.ArchiveProblemRequest
-	(*ArchiveProblemResponse)(nil),       // 15: problem.v1.ArchiveProblemResponse
-	(*GetProblemRequest)(nil),            // 16: problem.v1.GetProblemRequest
-	(*GetProblemResponse)(nil),           // 17: problem.v1.GetProblemResponse
-	(*ListProblemsRequest)(nil),          // 18: problem.v1.ListProblemsRequest
-	(*ListProblemsResponse)(nil),         // 19: problem.v1.ListProblemsResponse
-	(*AddTestcaseRequest)(nil),           // 20: problem.v1.AddTestcaseRequest
-	(*AddTestcaseResponse)(nil),          // 21: problem.v1.AddTestcaseResponse
-	(*ArchiveTestcaseRequest)(nil),       // 22: problem.v1.ArchiveTestcaseRequest
-	(*ArchiveTestcaseResponse)(nil),      // 23: problem.v1.ArchiveTestcaseResponse
-	(*ListProblemTestcasesRequest)(nil),  // 24: problem.v1.ListProblemTestcasesRequest
-	(*ListProblemTestcasesResponse)(nil), // 25: problem.v1.ListProblemTestcasesResponse
-	(*timestamppb.Timestamp)(nil),        // 26: google.protobuf.Timestamp
-	(*v1.RequestContext)(nil),            // 27: common.v1.RequestContext
-	(*v1.PageRequest)(nil),               // 28: common.v1.PageRequest
-	(*v1.PageResponse)(nil),              // 29: common.v1.PageResponse
+	(*ArchiveProblemRequest)(nil),        // 12: problem.v1.ArchiveProblemRequest
+	(*ArchiveProblemResponse)(nil),       // 13: problem.v1.ArchiveProblemResponse
+	(*GetProblemRequest)(nil),            // 14: problem.v1.GetProblemRequest
+	(*GetProblemResponse)(nil),           // 15: problem.v1.GetProblemResponse
+	(*ListProblemsRequest)(nil),          // 16: problem.v1.ListProblemsRequest
+	(*ListProblemsResponse)(nil),         // 17: problem.v1.ListProblemsResponse
+	(*AddTestcaseRequest)(nil),           // 18: problem.v1.AddTestcaseRequest
+	(*TestcaseInput)(nil),                // 19: problem.v1.TestcaseInput
+	(*AddTestcaseResponse)(nil),          // 20: problem.v1.AddTestcaseResponse
+	(*ArchiveTestcaseRequest)(nil),       // 21: problem.v1.ArchiveTestcaseRequest
+	(*ArchiveTestcaseResponse)(nil),      // 22: problem.v1.ArchiveTestcaseResponse
+	(*ListProblemTestcasesRequest)(nil),  // 23: problem.v1.ListProblemTestcasesRequest
+	(*ListProblemTestcasesResponse)(nil), // 24: problem.v1.ListProblemTestcasesResponse
+	(*timestamppb.Timestamp)(nil),        // 25: google.protobuf.Timestamp
+	(*v1.RequestContext)(nil),            // 26: common.v1.RequestContext
+	(*v1.PageRequest)(nil),               // 27: common.v1.PageRequest
+	(*v1.PageResponse)(nil),              // 28: common.v1.PageResponse
 }
 var file_api_problem_v1_problem_proto_depIdxs = []int32{
 	0,  // 0: problem.v1.ProblemSummary.difficulty:type_name -> problem.v1.ProblemDifficulty
@@ -1831,57 +1797,54 @@ var file_api_problem_v1_problem_proto_depIdxs = []int32{
 	0,  // 2: problem.v1.Problem.difficulty:type_name -> problem.v1.ProblemDifficulty
 	1,  // 3: problem.v1.Problem.status:type_name -> problem.v1.ProblemStatus
 	5,  // 4: problem.v1.Problem.tags:type_name -> problem.v1.Tag
-	26, // 5: problem.v1.Problem.created_at:type_name -> google.protobuf.Timestamp
-	26, // 6: problem.v1.Problem.updated_at:type_name -> google.protobuf.Timestamp
+	25, // 5: problem.v1.Problem.created_at:type_name -> google.protobuf.Timestamp
+	25, // 6: problem.v1.Problem.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 7: problem.v1.TestcaseMetadata.status:type_name -> problem.v1.TestcaseStatus
-	26, // 8: problem.v1.TestcaseMetadata.created_at:type_name -> google.protobuf.Timestamp
-	26, // 9: problem.v1.TestcaseMetadata.archived_at:type_name -> google.protobuf.Timestamp
+	25, // 8: problem.v1.TestcaseMetadata.created_at:type_name -> google.protobuf.Timestamp
+	25, // 9: problem.v1.TestcaseMetadata.archived_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: problem.v1.ProblemInput.difficulty:type_name -> problem.v1.ProblemDifficulty
-	27, // 11: problem.v1.CreateProblemRequest.context:type_name -> common.v1.RequestContext
+	26, // 11: problem.v1.CreateProblemRequest.context:type_name -> common.v1.RequestContext
 	7,  // 12: problem.v1.CreateProblemRequest.problem:type_name -> problem.v1.ProblemInput
-	4,  // 13: problem.v1.CreateProblemResponse.problem:type_name -> problem.v1.Problem
-	27, // 14: problem.v1.UpdateProblemRequest.context:type_name -> common.v1.RequestContext
-	7,  // 15: problem.v1.UpdateProblemRequest.problem:type_name -> problem.v1.ProblemInput
-	4,  // 16: problem.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
-	27, // 17: problem.v1.PublishProblemRequest.context:type_name -> common.v1.RequestContext
-	4,  // 18: problem.v1.PublishProblemResponse.problem:type_name -> problem.v1.Problem
-	27, // 19: problem.v1.ArchiveProblemRequest.context:type_name -> common.v1.RequestContext
-	4,  // 20: problem.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
-	27, // 21: problem.v1.GetProblemRequest.context:type_name -> common.v1.RequestContext
-	4,  // 22: problem.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
-	27, // 23: problem.v1.ListProblemsRequest.context:type_name -> common.v1.RequestContext
-	28, // 24: problem.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
-	3,  // 25: problem.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
-	29, // 26: problem.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
-	27, // 27: problem.v1.AddTestcaseRequest.context:type_name -> common.v1.RequestContext
-	6,  // 28: problem.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
-	27, // 29: problem.v1.ArchiveTestcaseRequest.context:type_name -> common.v1.RequestContext
-	6,  // 30: problem.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
-	27, // 31: problem.v1.ListProblemTestcasesRequest.context:type_name -> common.v1.RequestContext
-	6,  // 32: problem.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
-	8,  // 33: problem.v1.ProblemService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
-	10, // 34: problem.v1.ProblemService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
-	12, // 35: problem.v1.ProblemService.PublishProblem:input_type -> problem.v1.PublishProblemRequest
-	14, // 36: problem.v1.ProblemService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
-	16, // 37: problem.v1.ProblemService.GetProblem:input_type -> problem.v1.GetProblemRequest
-	18, // 38: problem.v1.ProblemService.ListProblems:input_type -> problem.v1.ListProblemsRequest
-	20, // 39: problem.v1.ProblemService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
-	22, // 40: problem.v1.ProblemService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
-	24, // 41: problem.v1.ProblemService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
-	9,  // 42: problem.v1.ProblemService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
-	11, // 43: problem.v1.ProblemService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
-	13, // 44: problem.v1.ProblemService.PublishProblem:output_type -> problem.v1.PublishProblemResponse
-	15, // 45: problem.v1.ProblemService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
-	17, // 46: problem.v1.ProblemService.GetProblem:output_type -> problem.v1.GetProblemResponse
-	19, // 47: problem.v1.ProblemService.ListProblems:output_type -> problem.v1.ListProblemsResponse
-	21, // 48: problem.v1.ProblemService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
-	23, // 49: problem.v1.ProblemService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
-	25, // 50: problem.v1.ProblemService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
-	42, // [42:51] is the sub-list for method output_type
-	33, // [33:42] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	19, // 13: problem.v1.CreateProblemRequest.testcases:type_name -> problem.v1.TestcaseInput
+	4,  // 14: problem.v1.CreateProblemResponse.problem:type_name -> problem.v1.Problem
+	26, // 15: problem.v1.UpdateProblemRequest.context:type_name -> common.v1.RequestContext
+	7,  // 16: problem.v1.UpdateProblemRequest.problem:type_name -> problem.v1.ProblemInput
+	4,  // 17: problem.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
+	26, // 18: problem.v1.ArchiveProblemRequest.context:type_name -> common.v1.RequestContext
+	4,  // 19: problem.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
+	26, // 20: problem.v1.GetProblemRequest.context:type_name -> common.v1.RequestContext
+	4,  // 21: problem.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
+	26, // 22: problem.v1.ListProblemsRequest.context:type_name -> common.v1.RequestContext
+	27, // 23: problem.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
+	3,  // 24: problem.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
+	28, // 25: problem.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
+	26, // 26: problem.v1.AddTestcaseRequest.context:type_name -> common.v1.RequestContext
+	6,  // 27: problem.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	26, // 28: problem.v1.ArchiveTestcaseRequest.context:type_name -> common.v1.RequestContext
+	6,  // 29: problem.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	26, // 30: problem.v1.ListProblemTestcasesRequest.context:type_name -> common.v1.RequestContext
+	6,  // 31: problem.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
+	8,  // 32: problem.v1.ProblemService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
+	10, // 33: problem.v1.ProblemService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
+	12, // 34: problem.v1.ProblemService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
+	14, // 35: problem.v1.ProblemService.GetProblem:input_type -> problem.v1.GetProblemRequest
+	16, // 36: problem.v1.ProblemService.ListProblems:input_type -> problem.v1.ListProblemsRequest
+	18, // 37: problem.v1.ProblemService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
+	21, // 38: problem.v1.ProblemService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
+	23, // 39: problem.v1.ProblemService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
+	9,  // 40: problem.v1.ProblemService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
+	11, // 41: problem.v1.ProblemService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
+	13, // 42: problem.v1.ProblemService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
+	15, // 43: problem.v1.ProblemService.GetProblem:output_type -> problem.v1.GetProblemResponse
+	17, // 44: problem.v1.ProblemService.ListProblems:output_type -> problem.v1.ListProblemsResponse
+	20, // 45: problem.v1.ProblemService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
+	22, // 46: problem.v1.ProblemService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
+	24, // 47: problem.v1.ProblemService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
+	40, // [40:48] is the sub-list for method output_type
+	32, // [32:40] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_api_problem_v1_problem_proto_init() }
@@ -1895,7 +1858,7 @@ func file_api_problem_v1_problem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_problem_v1_problem_proto_rawDesc), len(file_api_problem_v1_problem_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   23,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

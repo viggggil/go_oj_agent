@@ -11,7 +11,6 @@ import "validate/validate.proto";
 service ProblemService {
   rpc CreateProblem(CreateProblemRequest) returns (CreateProblemResponse);
   rpc UpdateProblem(UpdateProblemRequest) returns (UpdateProblemResponse);
-  rpc PublishProblem(PublishProblemRequest) returns (PublishProblemResponse);
   rpc ArchiveProblem(ArchiveProblemRequest) returns (ArchiveProblemResponse);
   rpc GetProblem(GetProblemRequest) returns (GetProblemResponse);
   rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
@@ -33,9 +32,8 @@ enum ProblemDifficulty {
 
 enum ProblemStatus {
   PROBLEM_STATUS_UNSPECIFIED = 0;
-  PROBLEM_STATUS_DRAFT = 1;
-  PROBLEM_STATUS_PUBLISHED = 2;
-  PROBLEM_STATUS_ARCHIVED = 3;
+  PROBLEM_STATUS_NORMAL = 1;
+  PROBLEM_STATUS_ARCHIVED = 2;
 }
 
 enum TestcaseStatus {
@@ -111,6 +109,8 @@ message ProblemInput {
 message CreateProblemRequest {
   common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
   ProblemInput problem = 2 [(validate.rules).message.required = true];
+  // Optional paired testcases submitted together by the admin create page.
+  repeated TestcaseInput testcases = 3 [(validate.rules).repeated = {max_items: 100}];
 }
 
 message CreateProblemResponse {
@@ -124,15 +124,6 @@ message UpdateProblemRequest {
 }
 
 message UpdateProblemResponse {
-  Problem problem = 1;
-}
-
-message PublishProblemRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
-  int64 problem_id = 2 [(validate.rules).int64.gt = 0];
-}
-
-message PublishProblemResponse {
   Problem problem = 1;
 }
 
@@ -167,20 +158,31 @@ message ListProblemsResponse {
 message AddTestcaseRequest {
   common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
-  int32 version = 3 [(validate.rules).int32.gt = 0];
-  int32 case_no = 4 [(validate.rules).int32.gt = 0];
-  string input_filename = 5 [(validate.rules).string = {
+  int32 case_no = 3 [(validate.rules).int32.gt = 0];
+  string input_filename = 4 [(validate.rules).string = {
     min_len: 4,
     max_len: 255,
     pattern: "^[^/\\\\]+\\.in$"
   }];
-  bytes input_content = 6 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
-  string output_filename = 7 [(validate.rules).string = {
+  bytes input_content = 5 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
+  string output_filename = 6 [(validate.rules).string = {
     min_len: 5,
     max_len: 255,
     pattern: "^[^/\\\\]+\\.out$"
   }];
-  bytes output_content = 8 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
+  bytes output_content = 7 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
+}
+
+message TestcaseInput {
+  int32 case_no = 1 [(validate.rules).int32.gt = 0];
+  string input_filename = 2 [(validate.rules).string = {
+    min_len: 4, max_len: 255, pattern: "^[^/\\\\]+\\.in$"
+  }];
+  bytes input_content = 3 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
+  string output_filename = 4 [(validate.rules).string = {
+    min_len: 5, max_len: 255, pattern: "^[^/\\\\]+\\.out$"
+  }];
+  bytes output_content = 5 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
 }
 
 message AddTestcaseResponse {
@@ -200,8 +202,7 @@ message ArchiveTestcaseResponse {
 message ListProblemTestcasesRequest {
   common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
-  int32 version = 3 [(validate.rules).int32.gte = 0];
-  bool include_archived = 4;
+  bool include_archived = 3;
 }
 
 message ListProblemTestcasesResponse {

@@ -314,7 +314,7 @@ Response：
       "title": "Two Sum",
       "slug": "two-sum",
       "difficulty": "PROBLEM_DIFFICULTY_EASY",
-      "status": "PROBLEM_STATUS_PUBLISHED"
+      "status": "PROBLEM_STATUS_NORMAL"
     }
   ],
   "page": {
@@ -341,10 +341,6 @@ Response：
 
 管理员更新题目。
 
-### POST `/api/v1/problems/{problem_id}/publish`
-
-管理员发布草稿题目。
-
 ### DELETE `/api/v1/problems/{problem_id}`
 
 管理员归档题目。该操作将状态改为 `ARCHIVED`，不物理删除题目。
@@ -352,7 +348,7 @@ Response：
 ### POST `/api/v1/problems/{problem_id}/testcases`
 
 管理员以 `multipart/form-data` 一次提交配对的 `.in` 和 `.out` 文件及
-`version`、`case_no`。Gateway 读取文件后调用内部 `AddTestcase` RPC；
+`case_no`。Gateway 读取文件后调用内部 `AddTestcase` RPC；
 Problem Service 在同一次业务操作中完成 MinIO 上传、SHA-256 计算和 MySQL
 元信息落库，不提供单独的上传完成确认 API。每个文件当前最大 16 MiB。
 
@@ -360,7 +356,7 @@ Problem Service 在同一次业务操作中完成 MinIO 上传、SHA-256 计算�
 
 管理员展示某题测试用例元信息时使用。内部对应的
 `ListProblemTestcases` RPC 同时供可信 Judge 调用方复用。默认只返回
-`ACTIVE` 测试用例，可以按 `version` 查询；管理员可以显式包含归档项。
+`ACTIVE` 测试用例，按 `case_no` 查询；管理员可以显式包含归档项。
 
 ### DELETE `/api/v1/problems/{problem_id}/testcases/{testcase_id}`
 
@@ -644,7 +640,6 @@ package problem.v1;
 service ProblemService {
   rpc CreateProblem(CreateProblemRequest) returns (CreateProblemResponse);
   rpc UpdateProblem(UpdateProblemRequest) returns (UpdateProblemResponse);
-  rpc PublishProblem(PublishProblemRequest) returns (PublishProblemResponse);
   rpc ArchiveProblem(ArchiveProblemRequest) returns (ArchiveProblemResponse);
   rpc GetProblem(GetProblemRequest) returns (GetProblemResponse);
   rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
