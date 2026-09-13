@@ -9,6 +9,7 @@ package main
 import (
 	"github.com/viggggil/go_oj_agent/services/problem/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/problem/internal/data"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/server"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/service"
 )
@@ -17,11 +18,17 @@ import (
 
 func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	v := server.NewMiddlewares()
-	problemUsecase := biz.NewProblemUsecase()
+	db, cleanup, err := data.NewMySQLDB(bc)
+	if err != nil {
+		return nil, nil, err
+	}
+	storeSet := data.NewStoreSet(db)
+	problemUsecase := biz.NewProblemUsecase(storeSet)
 	problemService := service.NewProblemService(problemUsecase)
 	grpcServer := server.NewGRPCServer(bc, v, problemService)
 	registrar := server.NewRegistrar(bc)
 	v2 := newApp(bc, grpcServer, registrar)
 	return v2, func() {
+		cleanup()
 	}, nil
 }
