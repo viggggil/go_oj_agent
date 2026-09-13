@@ -60,7 +60,11 @@ func (uc *ProblemUsecase) Archive(ctx context.Context, requestContext *commonv1.
 	if problem.Status == problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED {
 		return problem, nil
 	}
-	return uc.repo.Archive(ctx, problemID)
+	archived, err := uc.repo.Archive(ctx, problemID)
+	if err == nil && uc.cache != nil {
+		_ = uc.cache.Delete(ctx, problemID)
+	}
+	return archived, err
 }
 
 func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64, input Problem, tags []string) (Problem, error) {
@@ -84,7 +88,11 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	input.Status = current.Status
 	input.CreatedBy = current.CreatedBy
 	input.CreatedAt = current.CreatedAt
-	return uc.repo.Update(ctx, input, normalizeTags(tags))
+	updated, err := uc.repo.Update(ctx, input, normalizeTags(tags))
+	if err == nil && uc.cache != nil {
+		_ = uc.cache.Delete(ctx, problemID)
+	}
+	return updated, err
 }
 
 type ProblemPage struct {
@@ -125,7 +133,20 @@ func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.Requ
 	if requestContext == nil || requestContext.GetUserId() <= 0 || problemID <= 0 {
 		return Problem{}, ErrorInvalidArgument("invalid get problem request")
 	}
-	problem, err := uc.repo.FindByID(ctx, problemID)
+	var problem Problem
+	var err error
+	if uc.cache != nil {
+		var found bool
+		problem, found, _ = uc.cache.Get(ctx, problemID)
+		if !found {
+			problem, err = uc.repo.FindByID(ctx, problemID)
+			if err == nil {
+				_ = uc.cache.Set(ctx, problem)
+			}
+		}
+	} else {
+		problem, err = uc.repo.FindByID(ctx, problemID)
+	}
 	if err != nil {
 		return Problem{}, err
 	}
@@ -142,10 +163,21 @@ type ProblemUsecase struct {
 	testcases   TestcaseRepository
 	objects     ObjectStore
 	compensator ProblemCreationCompensator
+	cache       ProblemCache
 }
 
 func NewProblemUsecase(repo ProblemRepository) *ProblemUsecase {
 	return &ProblemUsecase{repo: repo}
+}
+
+type ProblemCache interface {
+	Get(context.Context, int64) (Problem, bool, error)
+	Set(context.Context, Problem) error
+	Delete(context.Context, int64) error
+}
+
+func NewProblemUsecaseWithDependencies(problems ProblemRepository, testcases TestcaseRepository, objects ObjectStore, compensator ProblemCreationCompensator, cache ProblemCache) *ProblemUsecase {
+	return &ProblemUsecase{repo: problems, testcases: testcases, objects: objects, compensator: compensator, cache: cache}
 }
 
 func requireAdmin(ctx *commonv1.RequestContext) error {
@@ -191,6 +223,9 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	problem.Status = problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL
 	problem.CreatedBy = input.Context.GetUserId()
 	created, err := uc.repo.Create(ctx, problem, normalizeTags(input.Tags))
+	if err == nil && uc.cache != nil {
+		_ = uc.cache.Set(ctx, created)
+	}
 	if err != nil || len(input.Testcases) == 0 {
 		return created, err
 	}

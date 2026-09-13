@@ -28,12 +28,19 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	problemUsecase := biz.NewProblemUsecaseWithStore(storeSet, storeSet, minIOStore, storeSet)
+	client, cleanup2, err := data.NewRedisClient(bc)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	redisProblemCache := data.NewProblemCache(client, bc)
+	problemUsecase := biz.NewProblemUsecaseWithDependencies(storeSet, storeSet, minIOStore, storeSet, redisProblemCache)
 	problemService := service.NewProblemService(problemUsecase)
 	grpcServer := server.NewGRPCServer(bc, v, problemService)
 	registrar := server.NewRegistrar(bc)
 	v2 := newApp(bc, grpcServer, registrar)
 	return v2, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }
