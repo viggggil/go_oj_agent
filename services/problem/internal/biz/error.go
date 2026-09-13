@@ -38,3 +38,7 @@ func ErrorStorageUnavailable(format string, args ...interface{}) *kerrors.Error 
 func ErrorTestcaseAlreadyExists(format string, args ...interface{}) *kerrors.Error {
 	return problemv1.ErrorProblemErrorReasonTestcaseAlreadyExists(format, args...)
 }
+
+func ErrorTestcaseNotFound(format string, args ...interface{}) *kerrors.Error {
+	return problemv1.ErrorProblemErrorReasonTestcaseNotFound(format, args...)
+}

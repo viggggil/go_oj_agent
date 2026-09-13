@@ -70,3 +70,27 @@ func (s *StoreSet) ListTestcases(ctx context.Context, problemID int64, includeAr
 	}
 	return items, rows.Err()
 }
+
+func (s *StoreSet) ArchiveTestcase(ctx context.Context, problemID, testcaseID int64) (biz.Testcase, error) {
+	result, err := s.db.ExecContext(ctx, `UPDATE testcases SET status = ?, archived_at = COALESCE(archived_at, UTC_TIMESTAMP(3)), updated_at = UTC_TIMESTAMP(3) WHERE id = ? AND problem_id = ?`, problemv1.TestcaseStatus_TESTCASE_STATUS_ARCHIVED.String(), testcaseID, problemID)
+	if err != nil {
+		return biz.Testcase{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return biz.Testcase{}, err
+	}
+	if affected == 0 {
+		return biz.Testcase{}, biz.ErrorTestcaseNotFound("testcase not found")
+	}
+	rows, err := s.ListTestcases(ctx, problemID, true)
+	if err != nil {
+		return biz.Testcase{}, err
+	}
+	for _, item := range rows {
+		if item.ID == testcaseID {
+			return item, nil
+		}
+	}
+	return biz.Testcase{}, biz.ErrorTestcaseNotFound("testcase not found")
+}

@@ -24,6 +24,20 @@ type Testcase struct {
 type TestcaseRepository interface {
 	AddTestcase(context.Context, Testcase) (Testcase, error)
 	ListTestcases(context.Context, int64, bool) ([]Testcase, error)
+	ArchiveTestcase(context.Context, int64, int64) (Testcase, error)
+}
+
+func (uc *ProblemUsecase) ArchiveTestcase(ctx context.Context, requestContext *commonv1.RequestContext, problemID, testcaseID int64) (Testcase, error) {
+	if err := requireAdmin(requestContext); err != nil {
+		return Testcase{}, err
+	}
+	if uc == nil || uc.repo == nil || uc.testcases == nil {
+		return Testcase{}, ErrorInternal("testcase dependencies are not configured")
+	}
+	if _, err := uc.repo.FindByID(ctx, problemID); err != nil {
+		return Testcase{}, err
+	}
+	return uc.testcases.ArchiveTestcase(ctx, problemID, testcaseID)
 }
 
 func requireTestcaseReader(ctx *commonv1.RequestContext) error {

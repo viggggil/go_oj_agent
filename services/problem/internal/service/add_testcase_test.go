@@ -30,6 +30,9 @@ func (*serviceTestcaseRepo) AddTestcase(_ context.Context, t biz.Testcase) (biz.
 func (*serviceTestcaseRepo) ListTestcases(context.Context, int64, bool) ([]biz.Testcase, error) {
 	return []biz.Testcase{{ID: 7}}, nil
 }
+func (*serviceTestcaseRepo) ArchiveTestcase(_ context.Context, problemID, testcaseID int64) (biz.Testcase, error) {
+	return biz.Testcase{ID: testcaseID, ProblemID: problemID, Status: problemv1.TestcaseStatus_TESTCASE_STATUS_ARCHIVED}, nil
+}
 
 type serviceObjectStore struct{}
 
