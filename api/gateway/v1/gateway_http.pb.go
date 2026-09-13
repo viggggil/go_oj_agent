@@ -9,6 +9,7 @@ package gatewayv1
 import (
 	context "context"
 	http "github.com/go-kratos/kratos/v3/transport/http"
+	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -17,22 +18,38 @@ var _ = new(context.Context)
 
 const _ = http.SupportPackageIsVersion3
 
+const OperationGatewayServiceAddTestcase = "/gateway.v1.GatewayService/AddTestcase"
+const OperationGatewayServiceArchiveProblem = "/gateway.v1.GatewayService/ArchiveProblem"
+const OperationGatewayServiceArchiveTestcase = "/gateway.v1.GatewayService/ArchiveTestcase"
+const OperationGatewayServiceCreateProblem = "/gateway.v1.GatewayService/CreateProblem"
 const OperationGatewayServiceGetCurrentUser = "/gateway.v1.GatewayService/GetCurrentUser"
+const OperationGatewayServiceGetProblem = "/gateway.v1.GatewayService/GetProblem"
 const OperationGatewayServiceGetUser = "/gateway.v1.GatewayService/GetUser"
 const OperationGatewayServiceHealth = "/gateway.v1.GatewayService/Health"
+const OperationGatewayServiceListProblemTestcases = "/gateway.v1.GatewayService/ListProblemTestcases"
+const OperationGatewayServiceListProblems = "/gateway.v1.GatewayService/ListProblems"
 const OperationGatewayServiceLogin = "/gateway.v1.GatewayService/Login"
 const OperationGatewayServiceLogout = "/gateway.v1.GatewayService/Logout"
 const OperationGatewayServiceRefreshToken = "/gateway.v1.GatewayService/RefreshToken"
 const OperationGatewayServiceRegister = "/gateway.v1.GatewayService/Register"
+const OperationGatewayServiceUpdateProblem = "/gateway.v1.GatewayService/UpdateProblem"
 
 type GatewayServiceHTTPServer interface {
+	AddTestcase(context.Context, *v1.AddTestcaseRequest) (*v1.AddTestcaseResponse, error)
+	ArchiveProblem(context.Context, *v1.ArchiveProblemRequest) (*v1.ArchiveProblemResponse, error)
+	ArchiveTestcase(context.Context, *v1.ArchiveTestcaseRequest) (*v1.ArchiveTestcaseResponse, error)
+	CreateProblem(context.Context, *v1.CreateProblemRequest) (*v1.CreateProblemResponse, error)
 	GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error)
+	GetProblem(context.Context, *v1.GetProblemRequest) (*v1.GetProblemResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
+	ListProblemTestcases(context.Context, *v1.ListProblemTestcasesRequest) (*v1.ListProblemTestcasesResponse, error)
+	ListProblems(context.Context, *v1.ListProblemsRequest) (*v1.ListProblemsResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
+	UpdateProblem(context.Context, *v1.UpdateProblemRequest) (*v1.UpdateProblemResponse, error)
 }
 
 func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServer) {
@@ -44,6 +61,14 @@ func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServ
 	r.Handle("POST", "/api/v1/auth/logout", _GatewayService_Logout0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/users/me", _GatewayService_GetCurrentUser0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/users/{id}", _GatewayService_GetUser0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/problems", _GatewayService_CreateProblem0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/problems/{problem_id}", _GatewayService_GetProblem0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/problems", _GatewayService_ListProblems0_HTTP_Handler(srv))
+	r.Handle("PUT", "/api/v1/problems/{problem_id}", _GatewayService_UpdateProblem0_HTTP_Handler(srv))
+	r.Handle("DELETE", "/api/v1/problems/{problem_id}", _GatewayService_ArchiveProblem0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/problems/{problem_id}/testcases", _GatewayService_AddTestcase0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/problems/{problem_id}/testcases", _GatewayService_ListProblemTestcases0_HTTP_Handler(srv))
+	r.Handle("DELETE", "/api/v1/problems/{problem_id}/testcases/{testcase_id}", _GatewayService_ArchiveTestcase0_HTTP_Handler(srv))
 }
 
 func _GatewayService_Health0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
@@ -182,14 +207,195 @@ func _GatewayService_GetUser0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ct
 	}
 }
 
+func _GatewayService_CreateProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.CreateProblemRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceCreateProblem)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateProblem(ctx, req.(*v1.CreateProblemRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.CreateProblemResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_GetProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.GetProblemRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceGetProblem)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetProblem(ctx, req.(*v1.GetProblemRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.GetProblemResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_ListProblems0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.ListProblemsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceListProblems)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListProblems(ctx, req.(*v1.ListProblemsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.ListProblemsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_UpdateProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.UpdateProblemRequest
+		if err := ctx.Bind(&in.Problem); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceUpdateProblem)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateProblem(ctx, req.(*v1.UpdateProblemRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.UpdateProblemResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_ArchiveProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.ArchiveProblemRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceArchiveProblem)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ArchiveProblem(ctx, req.(*v1.ArchiveProblemRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.ArchiveProblemResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_AddTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.AddTestcaseRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceAddTestcase)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AddTestcase(ctx, req.(*v1.AddTestcaseRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.AddTestcaseResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_ListProblemTestcases0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.ListProblemTestcasesRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceListProblemTestcases)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListProblemTestcases(ctx, req.(*v1.ListProblemTestcasesRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.ListProblemTestcasesResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_ArchiveTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in v1.ArchiveTestcaseRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceArchiveTestcase)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ArchiveTestcase(ctx, req.(*v1.ArchiveTestcaseRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*v1.ArchiveTestcaseResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type GatewayServiceHTTPClient interface {
+	AddTestcase(ctx context.Context, req *v1.AddTestcaseRequest, opts ...http.CallOption) (rsp *v1.AddTestcaseResponse, err error)
+	ArchiveProblem(ctx context.Context, req *v1.ArchiveProblemRequest, opts ...http.CallOption) (rsp *v1.ArchiveProblemResponse, err error)
+	ArchiveTestcase(ctx context.Context, req *v1.ArchiveTestcaseRequest, opts ...http.CallOption) (rsp *v1.ArchiveTestcaseResponse, err error)
+	CreateProblem(ctx context.Context, req *v1.CreateProblemRequest, opts ...http.CallOption) (rsp *v1.CreateProblemResponse, err error)
 	GetCurrentUser(ctx context.Context, req *GetCurrentUserRequest, opts ...http.CallOption) (rsp *GetCurrentUserResponse, err error)
+	GetProblem(ctx context.Context, req *v1.GetProblemRequest, opts ...http.CallOption) (rsp *v1.GetProblemResponse, err error)
 	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *GetUserResponse, err error)
 	Health(ctx context.Context, req *HealthRequest, opts ...http.CallOption) (rsp *HealthResponse, err error)
+	ListProblemTestcases(ctx context.Context, req *v1.ListProblemTestcasesRequest, opts ...http.CallOption) (rsp *v1.ListProblemTestcasesResponse, err error)
+	ListProblems(ctx context.Context, req *v1.ListProblemsRequest, opts ...http.CallOption) (rsp *v1.ListProblemsResponse, err error)
 	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
 	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
 	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenResponse, err error)
 	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterResponse, err error)
+	UpdateProblem(ctx context.Context, req *v1.UpdateProblemRequest, opts ...http.CallOption) (rsp *v1.UpdateProblemResponse, err error)
 }
 
 type GatewayServiceHTTPClientImpl struct {
@@ -200,6 +406,72 @@ func NewGatewayServiceHTTPClient(client *http.Client) GatewayServiceHTTPClient {
 	return &GatewayServiceHTTPClientImpl{client}
 }
 
+func (c *GatewayServiceHTTPClientImpl) AddTestcase(ctx context.Context, in *v1.AddTestcaseRequest, opts ...http.CallOption) (*v1.AddTestcaseResponse, error) {
+	var out v1.AddTestcaseResponse
+	pattern := "/api/v1/problems/{problem_id}/testcases"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceAddTestcase),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) ArchiveProblem(ctx context.Context, in *v1.ArchiveProblemRequest, opts ...http.CallOption) (*v1.ArchiveProblemResponse, error) {
+	var out v1.ArchiveProblemResponse
+	pattern := "/api/v1/problems/{problem_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceArchiveProblem),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) ArchiveTestcase(ctx context.Context, in *v1.ArchiveTestcaseRequest, opts ...http.CallOption) (*v1.ArchiveTestcaseResponse, error) {
+	var out v1.ArchiveTestcaseResponse
+	pattern := "/api/v1/problems/{problem_id}/testcases/{testcase_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceArchiveTestcase),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) CreateProblem(ctx context.Context, in *v1.CreateProblemRequest, opts ...http.CallOption) (*v1.CreateProblemResponse, error) {
+	var out v1.CreateProblemResponse
+	pattern := "/api/v1/problems"
+	path := http.BuildPath(pattern, in)
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceCreateProblem),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *GatewayServiceHTTPClientImpl) GetCurrentUser(ctx context.Context, in *GetCurrentUserRequest, opts ...http.CallOption) (*GetCurrentUserResponse, error) {
 	var out GetCurrentUserResponse
 	pattern := "/api/v1/users/me"
@@ -207,6 +479,22 @@ func (c *GatewayServiceHTTPClientImpl) GetCurrentUser(ctx context.Context, in *G
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationGatewayServiceGetCurrentUser),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) GetProblem(ctx context.Context, in *v1.GetProblemRequest, opts ...http.CallOption) (*v1.GetProblemResponse, error) {
+	var out v1.GetProblemResponse
+	pattern := "/api/v1/problems/{problem_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceGetProblem),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
@@ -239,6 +527,38 @@ func (c *GatewayServiceHTTPClientImpl) Health(ctx context.Context, in *HealthReq
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationGatewayServiceHealth),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) ListProblemTestcases(ctx context.Context, in *v1.ListProblemTestcasesRequest, opts ...http.CallOption) (*v1.ListProblemTestcasesResponse, error) {
+	var out v1.ListProblemTestcasesResponse
+	pattern := "/api/v1/problems/{problem_id}/testcases"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceListProblemTestcases),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) ListProblems(ctx context.Context, in *v1.ListProblemsRequest, opts ...http.CallOption) (*v1.ListProblemsResponse, error) {
+	var out v1.ListProblemsResponse
+	pattern := "/api/v1/problems"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceListProblems),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
@@ -310,6 +630,23 @@ func (c *GatewayServiceHTTPClientImpl) Register(ctx context.Context, in *Registe
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) UpdateProblem(ctx context.Context, in *v1.UpdateProblemRequest, opts ...http.CallOption) (*v1.UpdateProblemResponse, error) {
+	var out v1.UpdateProblemResponse
+	pattern := "/api/v1/problems/{problem_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("problem"))
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceUpdateProblem),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in.Problem, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

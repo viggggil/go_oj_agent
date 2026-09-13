@@ -4,19 +4,30 @@ import (
 	"context"
 
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
+	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 )
 
 // GatewayService 实现由 gateway.proto 生成的 HTTP 服务接口。
 type GatewayService struct {
-	auth *AuthService
-	user *UserService
+	auth    *AuthService
+	user    *UserService
+	problem problemv1.ProblemServiceClient
 }
 
-func NewGatewayService(auth *AuthService, user *UserService) *GatewayService {
-	return &GatewayService{
-		auth: auth,
-		user: user,
+func NewGatewayService(auth *AuthService, user *UserService, problems ...problemv1.ProblemServiceClient) *GatewayService {
+	var problem problemv1.ProblemServiceClient
+	if len(problems) > 0 {
+		problem = problems[0]
 	}
+	return &GatewayService{
+		auth:    auth,
+		user:    user,
+		problem: problem,
+	}
+}
+
+func NewGatewayServiceWithProblem(auth *AuthService, user *UserService, problem problemv1.ProblemServiceClient) *GatewayService {
+	return NewGatewayService(auth, user, problem)
 }
 
 func (s *GatewayService) Health(context.Context, *gatewayv1.HealthRequest) (*gatewayv1.HealthResponse, error) {

@@ -8,6 +8,7 @@ package gatewayv1
 
 import (
 	context "context"
+	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,13 +20,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GatewayService_Health_FullMethodName         = "/gateway.v1.GatewayService/Health"
-	GatewayService_Register_FullMethodName       = "/gateway.v1.GatewayService/Register"
-	GatewayService_Login_FullMethodName          = "/gateway.v1.GatewayService/Login"
-	GatewayService_RefreshToken_FullMethodName   = "/gateway.v1.GatewayService/RefreshToken"
-	GatewayService_Logout_FullMethodName         = "/gateway.v1.GatewayService/Logout"
-	GatewayService_GetCurrentUser_FullMethodName = "/gateway.v1.GatewayService/GetCurrentUser"
-	GatewayService_GetUser_FullMethodName        = "/gateway.v1.GatewayService/GetUser"
+	GatewayService_Health_FullMethodName               = "/gateway.v1.GatewayService/Health"
+	GatewayService_Register_FullMethodName             = "/gateway.v1.GatewayService/Register"
+	GatewayService_Login_FullMethodName                = "/gateway.v1.GatewayService/Login"
+	GatewayService_RefreshToken_FullMethodName         = "/gateway.v1.GatewayService/RefreshToken"
+	GatewayService_Logout_FullMethodName               = "/gateway.v1.GatewayService/Logout"
+	GatewayService_GetCurrentUser_FullMethodName       = "/gateway.v1.GatewayService/GetCurrentUser"
+	GatewayService_GetUser_FullMethodName              = "/gateway.v1.GatewayService/GetUser"
+	GatewayService_CreateProblem_FullMethodName        = "/gateway.v1.GatewayService/CreateProblem"
+	GatewayService_GetProblem_FullMethodName           = "/gateway.v1.GatewayService/GetProblem"
+	GatewayService_ListProblems_FullMethodName         = "/gateway.v1.GatewayService/ListProblems"
+	GatewayService_UpdateProblem_FullMethodName        = "/gateway.v1.GatewayService/UpdateProblem"
+	GatewayService_ArchiveProblem_FullMethodName       = "/gateway.v1.GatewayService/ArchiveProblem"
+	GatewayService_AddTestcase_FullMethodName          = "/gateway.v1.GatewayService/AddTestcase"
+	GatewayService_ListProblemTestcases_FullMethodName = "/gateway.v1.GatewayService/ListProblemTestcases"
+	GatewayService_ArchiveTestcase_FullMethodName      = "/gateway.v1.GatewayService/ArchiveTestcase"
 )
 
 // GatewayServiceClient is the client API for GatewayService service.
@@ -39,6 +48,14 @@ type GatewayServiceClient interface {
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
 	GetCurrentUser(ctx context.Context, in *GetCurrentUserRequest, opts ...grpc.CallOption) (*GetCurrentUserResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
+	CreateProblem(ctx context.Context, in *v1.CreateProblemRequest, opts ...grpc.CallOption) (*v1.CreateProblemResponse, error)
+	GetProblem(ctx context.Context, in *v1.GetProblemRequest, opts ...grpc.CallOption) (*v1.GetProblemResponse, error)
+	ListProblems(ctx context.Context, in *v1.ListProblemsRequest, opts ...grpc.CallOption) (*v1.ListProblemsResponse, error)
+	UpdateProblem(ctx context.Context, in *v1.UpdateProblemRequest, opts ...grpc.CallOption) (*v1.UpdateProblemResponse, error)
+	ArchiveProblem(ctx context.Context, in *v1.ArchiveProblemRequest, opts ...grpc.CallOption) (*v1.ArchiveProblemResponse, error)
+	AddTestcase(ctx context.Context, in *v1.AddTestcaseRequest, opts ...grpc.CallOption) (*v1.AddTestcaseResponse, error)
+	ListProblemTestcases(ctx context.Context, in *v1.ListProblemTestcasesRequest, opts ...grpc.CallOption) (*v1.ListProblemTestcasesResponse, error)
+	ArchiveTestcase(ctx context.Context, in *v1.ArchiveTestcaseRequest, opts ...grpc.CallOption) (*v1.ArchiveTestcaseResponse, error)
 }
 
 type gatewayServiceClient struct {
@@ -119,6 +136,86 @@ func (c *gatewayServiceClient) GetUser(ctx context.Context, in *GetUserRequest, 
 	return out, nil
 }
 
+func (c *gatewayServiceClient) CreateProblem(ctx context.Context, in *v1.CreateProblemRequest, opts ...grpc.CallOption) (*v1.CreateProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.CreateProblemResponse)
+	err := c.cc.Invoke(ctx, GatewayService_CreateProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) GetProblem(ctx context.Context, in *v1.GetProblemRequest, opts ...grpc.CallOption) (*v1.GetProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.GetProblemResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ListProblems(ctx context.Context, in *v1.ListProblemsRequest, opts ...grpc.CallOption) (*v1.ListProblemsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ListProblemsResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ListProblems_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) UpdateProblem(ctx context.Context, in *v1.UpdateProblemRequest, opts ...grpc.CallOption) (*v1.UpdateProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.UpdateProblemResponse)
+	err := c.cc.Invoke(ctx, GatewayService_UpdateProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ArchiveProblem(ctx context.Context, in *v1.ArchiveProblemRequest, opts ...grpc.CallOption) (*v1.ArchiveProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ArchiveProblemResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ArchiveProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) AddTestcase(ctx context.Context, in *v1.AddTestcaseRequest, opts ...grpc.CallOption) (*v1.AddTestcaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.AddTestcaseResponse)
+	err := c.cc.Invoke(ctx, GatewayService_AddTestcase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ListProblemTestcases(ctx context.Context, in *v1.ListProblemTestcasesRequest, opts ...grpc.CallOption) (*v1.ListProblemTestcasesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ListProblemTestcasesResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ListProblemTestcases_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ArchiveTestcase(ctx context.Context, in *v1.ArchiveTestcaseRequest, opts ...grpc.CallOption) (*v1.ArchiveTestcaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ArchiveTestcaseResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ArchiveTestcase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayServiceServer is the server API for GatewayService service.
 // All implementations must embed UnimplementedGatewayServiceServer
 // for forward compatibility.
@@ -130,6 +227,14 @@ type GatewayServiceServer interface {
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
+	CreateProblem(context.Context, *v1.CreateProblemRequest) (*v1.CreateProblemResponse, error)
+	GetProblem(context.Context, *v1.GetProblemRequest) (*v1.GetProblemResponse, error)
+	ListProblems(context.Context, *v1.ListProblemsRequest) (*v1.ListProblemsResponse, error)
+	UpdateProblem(context.Context, *v1.UpdateProblemRequest) (*v1.UpdateProblemResponse, error)
+	ArchiveProblem(context.Context, *v1.ArchiveProblemRequest) (*v1.ArchiveProblemResponse, error)
+	AddTestcase(context.Context, *v1.AddTestcaseRequest) (*v1.AddTestcaseResponse, error)
+	ListProblemTestcases(context.Context, *v1.ListProblemTestcasesRequest) (*v1.ListProblemTestcasesResponse, error)
+	ArchiveTestcase(context.Context, *v1.ArchiveTestcaseRequest) (*v1.ArchiveTestcaseResponse, error)
 	mustEmbedUnimplementedGatewayServiceServer()
 }
 
@@ -160,6 +265,30 @@ func (UnimplementedGatewayServiceServer) GetCurrentUser(context.Context, *GetCur
 }
 func (UnimplementedGatewayServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
+}
+func (UnimplementedGatewayServiceServer) CreateProblem(context.Context, *v1.CreateProblemRequest) (*v1.CreateProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateProblem not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetProblem(context.Context, *v1.GetProblemRequest) (*v1.GetProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProblem not implemented")
+}
+func (UnimplementedGatewayServiceServer) ListProblems(context.Context, *v1.ListProblemsRequest) (*v1.ListProblemsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProblems not implemented")
+}
+func (UnimplementedGatewayServiceServer) UpdateProblem(context.Context, *v1.UpdateProblemRequest) (*v1.UpdateProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProblem not implemented")
+}
+func (UnimplementedGatewayServiceServer) ArchiveProblem(context.Context, *v1.ArchiveProblemRequest) (*v1.ArchiveProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveProblem not implemented")
+}
+func (UnimplementedGatewayServiceServer) AddTestcase(context.Context, *v1.AddTestcaseRequest) (*v1.AddTestcaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddTestcase not implemented")
+}
+func (UnimplementedGatewayServiceServer) ListProblemTestcases(context.Context, *v1.ListProblemTestcasesRequest) (*v1.ListProblemTestcasesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProblemTestcases not implemented")
+}
+func (UnimplementedGatewayServiceServer) ArchiveTestcase(context.Context, *v1.ArchiveTestcaseRequest) (*v1.ArchiveTestcaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveTestcase not implemented")
 }
 func (UnimplementedGatewayServiceServer) mustEmbedUnimplementedGatewayServiceServer() {}
 func (UnimplementedGatewayServiceServer) testEmbeddedByValue()                        {}
@@ -308,6 +437,150 @@ func _GatewayService_GetUser_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_CreateProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.CreateProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).CreateProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_CreateProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).CreateProblem(ctx, req.(*v1.CreateProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_GetProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.GetProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetProblem(ctx, req.(*v1.GetProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ListProblems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ListProblemsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ListProblems(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ListProblems_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ListProblems(ctx, req.(*v1.ListProblemsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_UpdateProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.UpdateProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).UpdateProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_UpdateProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).UpdateProblem(ctx, req.(*v1.UpdateProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ArchiveProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ArchiveProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ArchiveProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ArchiveProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ArchiveProblem(ctx, req.(*v1.ArchiveProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_AddTestcase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.AddTestcaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).AddTestcase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_AddTestcase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).AddTestcase(ctx, req.(*v1.AddTestcaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ListProblemTestcases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ListProblemTestcasesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ListProblemTestcases(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ListProblemTestcases_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ListProblemTestcases(ctx, req.(*v1.ListProblemTestcasesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ArchiveTestcase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ArchiveTestcaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ArchiveTestcase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ArchiveTestcase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ArchiveTestcase(ctx, req.(*v1.ArchiveTestcaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GatewayService_ServiceDesc is the grpc.ServiceDesc for GatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -342,6 +615,38 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUser",
 			Handler:    _GatewayService_GetUser_Handler,
+		},
+		{
+			MethodName: "CreateProblem",
+			Handler:    _GatewayService_CreateProblem_Handler,
+		},
+		{
+			MethodName: "GetProblem",
+			Handler:    _GatewayService_GetProblem_Handler,
+		},
+		{
+			MethodName: "ListProblems",
+			Handler:    _GatewayService_ListProblems_Handler,
+		},
+		{
+			MethodName: "UpdateProblem",
+			Handler:    _GatewayService_UpdateProblem_Handler,
+		},
+		{
+			MethodName: "ArchiveProblem",
+			Handler:    _GatewayService_ArchiveProblem_Handler,
+		},
+		{
+			MethodName: "AddTestcase",
+			Handler:    _GatewayService_AddTestcase_Handler,
+		},
+		{
+			MethodName: "ListProblemTestcases",
+			Handler:    _GatewayService_ListProblemTestcases_Handler,
+		},
+		{
+			MethodName: "ArchiveTestcase",
+			Handler:    _GatewayService_ArchiveTestcase_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -29,11 +29,18 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	userServiceClient := client.ProvideUserServiceClient(userClient)
 	authService := service.NewAuthService(userServiceClient)
 	userService := service.NewUserService(userServiceClient)
-	gatewayService := service.NewGatewayService(authService, userService)
+	problemClient, cleanup2, err := client.NewProblemClient(context, bc)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	problemServiceClient := client.ProvideProblemServiceClient(problemClient)
+	gatewayService := service.NewGatewayServiceWithProblem(authService, userService, problemServiceClient)
 	httpServer := server.NewHTTPServer(bc, authMiddleware, gatewayService)
 	registrar := server.NewRegistrar(bc)
 	v := newApp(bc, httpServer, registrar)
 	return v, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }

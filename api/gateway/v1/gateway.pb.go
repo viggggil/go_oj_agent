@@ -8,6 +8,8 @@ package gatewayv1
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
+	_ "github.com/viggggil/go_oj_agent/api/common/v1"
+	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -760,7 +762,7 @@ var File_api_gateway_v1_gateway_proto protoreflect.FileDescriptor
 const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"\x1capi/gateway/v1/gateway.proto\x12\n" +
-	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17validate/validate.proto\"}\n" +
+	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17validate/validate.proto\x1a\x1aapi/common/v1/common.proto\x1a\x1capi/problem/v1/problem.proto\"}\n" +
 	"\vUserSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
@@ -805,7 +807,7 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x16GetCurrentUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\">\n" +
 	"\x0fGetUserResponse\x12+\n" +
-	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user2\xd1\x05\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user2\xea\r\n" +
 	"\x0eGatewayService\x12Q\n" +
 	"\x06Health\x12\x19.gateway.v1.HealthRequest\x1a\x1a.gateway.v1.HealthResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
 	"\x12\b/healthz\x12g\n" +
@@ -814,7 +816,16 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\fRefreshToken\x12\x1f.gateway.v1.RefreshTokenRequest\x1a .gateway.v1.RefreshTokenResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/auth/refresh\x12_\n" +
 	"\x06Logout\x12\x19.gateway.v1.LogoutRequest\x1a\x1a.gateway.v1.LogoutResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/api/v1/auth/logout\x12q\n" +
 	"\x0eGetCurrentUser\x12!.gateway.v1.GetCurrentUserRequest\x1a\".gateway.v1.GetCurrentUserResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/users/me\x12^\n" +
-	"\aGetUser\x12\x1a.gateway.v1.GetUserRequest\x1a\x1b.gateway.v1.GetUserResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/users/{id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
+	"\aGetUser\x12\x1a.gateway.v1.GetUserRequest\x1a\x1b.gateway.v1.GetUserResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/users/{id}\x12q\n" +
+	"\rCreateProblem\x12 .problem.v1.CreateProblemRequest\x1a!.problem.v1.CreateProblemResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/problems\x12r\n" +
+	"\n" +
+	"GetProblem\x12\x1d.problem.v1.GetProblemRequest\x1a\x1e.problem.v1.GetProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/problems/{problem_id}\x12k\n" +
+	"\fListProblems\x12\x1f.problem.v1.ListProblemsRequest\x1a .problem.v1.ListProblemsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/problems\x12\x84\x01\n" +
+	"\rUpdateProblem\x12 .problem.v1.UpdateProblemRequest\x1a!.problem.v1.UpdateProblemResponse\".\x82\xd3\xe4\x93\x02(:\aproblem\x1a\x1d/api/v1/problems/{problem_id}\x12~\n" +
+	"\x0eArchiveProblem\x12!.problem.v1.ArchiveProblemRequest\x1a\".problem.v1.ArchiveProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/problems/{problem_id}\x12\x82\x01\n" +
+	"\vAddTestcase\x12\x1e.problem.v1.AddTestcaseRequest\x1a\x1f.problem.v1.AddTestcaseResponse\"2\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/problems/{problem_id}/testcases\x12\x9a\x01\n" +
+	"\x14ListProblemTestcases\x12'.problem.v1.ListProblemTestcasesRequest\x1a(.problem.v1.ListProblemTestcasesResponse\"/\x82\xd3\xe4\x93\x02)\x12'/api/v1/problems/{problem_id}/testcases\x12\x99\x01\n" +
+	"\x0fArchiveTestcase\x12\".problem.v1.ArchiveTestcaseRequest\x1a#.problem.v1.ArchiveTestcaseResponse\"=\x82\xd3\xe4\x93\x027*5/api/v1/problems/{problem_id}/testcases/{testcase_id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
 
 var (
 	file_api_gateway_v1_gateway_proto_rawDescOnce sync.Once
@@ -830,21 +841,37 @@ func file_api_gateway_v1_gateway_proto_rawDescGZIP() []byte {
 
 var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_api_gateway_v1_gateway_proto_goTypes = []any{
-	(*UserSummary)(nil),            // 0: gateway.v1.UserSummary
-	(*HealthRequest)(nil),          // 1: gateway.v1.HealthRequest
-	(*HealthResponse)(nil),         // 2: gateway.v1.HealthResponse
-	(*RegisterRequest)(nil),        // 3: gateway.v1.RegisterRequest
-	(*RegisterResponse)(nil),       // 4: gateway.v1.RegisterResponse
-	(*LoginRequest)(nil),           // 5: gateway.v1.LoginRequest
-	(*LoginResponse)(nil),          // 6: gateway.v1.LoginResponse
-	(*RefreshTokenRequest)(nil),    // 7: gateway.v1.RefreshTokenRequest
-	(*RefreshTokenResponse)(nil),   // 8: gateway.v1.RefreshTokenResponse
-	(*LogoutRequest)(nil),          // 9: gateway.v1.LogoutRequest
-	(*LogoutResponse)(nil),         // 10: gateway.v1.LogoutResponse
-	(*GetCurrentUserRequest)(nil),  // 11: gateway.v1.GetCurrentUserRequest
-	(*GetUserRequest)(nil),         // 12: gateway.v1.GetUserRequest
-	(*GetCurrentUserResponse)(nil), // 13: gateway.v1.GetCurrentUserResponse
-	(*GetUserResponse)(nil),        // 14: gateway.v1.GetUserResponse
+	(*UserSummary)(nil),                     // 0: gateway.v1.UserSummary
+	(*HealthRequest)(nil),                   // 1: gateway.v1.HealthRequest
+	(*HealthResponse)(nil),                  // 2: gateway.v1.HealthResponse
+	(*RegisterRequest)(nil),                 // 3: gateway.v1.RegisterRequest
+	(*RegisterResponse)(nil),                // 4: gateway.v1.RegisterResponse
+	(*LoginRequest)(nil),                    // 5: gateway.v1.LoginRequest
+	(*LoginResponse)(nil),                   // 6: gateway.v1.LoginResponse
+	(*RefreshTokenRequest)(nil),             // 7: gateway.v1.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),            // 8: gateway.v1.RefreshTokenResponse
+	(*LogoutRequest)(nil),                   // 9: gateway.v1.LogoutRequest
+	(*LogoutResponse)(nil),                  // 10: gateway.v1.LogoutResponse
+	(*GetCurrentUserRequest)(nil),           // 11: gateway.v1.GetCurrentUserRequest
+	(*GetUserRequest)(nil),                  // 12: gateway.v1.GetUserRequest
+	(*GetCurrentUserResponse)(nil),          // 13: gateway.v1.GetCurrentUserResponse
+	(*GetUserResponse)(nil),                 // 14: gateway.v1.GetUserResponse
+	(*v1.CreateProblemRequest)(nil),         // 15: problem.v1.CreateProblemRequest
+	(*v1.GetProblemRequest)(nil),            // 16: problem.v1.GetProblemRequest
+	(*v1.ListProblemsRequest)(nil),          // 17: problem.v1.ListProblemsRequest
+	(*v1.UpdateProblemRequest)(nil),         // 18: problem.v1.UpdateProblemRequest
+	(*v1.ArchiveProblemRequest)(nil),        // 19: problem.v1.ArchiveProblemRequest
+	(*v1.AddTestcaseRequest)(nil),           // 20: problem.v1.AddTestcaseRequest
+	(*v1.ListProblemTestcasesRequest)(nil),  // 21: problem.v1.ListProblemTestcasesRequest
+	(*v1.ArchiveTestcaseRequest)(nil),       // 22: problem.v1.ArchiveTestcaseRequest
+	(*v1.CreateProblemResponse)(nil),        // 23: problem.v1.CreateProblemResponse
+	(*v1.GetProblemResponse)(nil),           // 24: problem.v1.GetProblemResponse
+	(*v1.ListProblemsResponse)(nil),         // 25: problem.v1.ListProblemsResponse
+	(*v1.UpdateProblemResponse)(nil),        // 26: problem.v1.UpdateProblemResponse
+	(*v1.ArchiveProblemResponse)(nil),       // 27: problem.v1.ArchiveProblemResponse
+	(*v1.AddTestcaseResponse)(nil),          // 28: problem.v1.AddTestcaseResponse
+	(*v1.ListProblemTestcasesResponse)(nil), // 29: problem.v1.ListProblemTestcasesResponse
+	(*v1.ArchiveTestcaseResponse)(nil),      // 30: problem.v1.ArchiveTestcaseResponse
 }
 var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
 	0,  // 0: gateway.v1.RegisterResponse.user:type_name -> gateway.v1.UserSummary
@@ -857,15 +884,31 @@ var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
 	9,  // 7: gateway.v1.GatewayService.Logout:input_type -> gateway.v1.LogoutRequest
 	11, // 8: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
 	12, // 9: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
-	2,  // 10: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
-	4,  // 11: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
-	6,  // 12: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
-	8,  // 13: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
-	10, // 14: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
-	13, // 15: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
-	14, // 16: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
-	10, // [10:17] is the sub-list for method output_type
-	3,  // [3:10] is the sub-list for method input_type
+	15, // 10: gateway.v1.GatewayService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
+	16, // 11: gateway.v1.GatewayService.GetProblem:input_type -> problem.v1.GetProblemRequest
+	17, // 12: gateway.v1.GatewayService.ListProblems:input_type -> problem.v1.ListProblemsRequest
+	18, // 13: gateway.v1.GatewayService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
+	19, // 14: gateway.v1.GatewayService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
+	20, // 15: gateway.v1.GatewayService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
+	21, // 16: gateway.v1.GatewayService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
+	22, // 17: gateway.v1.GatewayService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
+	2,  // 18: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
+	4,  // 19: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
+	6,  // 20: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
+	8,  // 21: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
+	10, // 22: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
+	13, // 23: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
+	14, // 24: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
+	23, // 25: gateway.v1.GatewayService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
+	24, // 26: gateway.v1.GatewayService.GetProblem:output_type -> problem.v1.GetProblemResponse
+	25, // 27: gateway.v1.GatewayService.ListProblems:output_type -> problem.v1.ListProblemsResponse
+	26, // 28: gateway.v1.GatewayService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
+	27, // 29: gateway.v1.GatewayService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
+	28, // 30: gateway.v1.GatewayService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
+	29, // 31: gateway.v1.GatewayService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
+	30, // 32: gateway.v1.GatewayService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
+	18, // [18:33] is the sub-list for method output_type
+	3,  // [3:18] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name

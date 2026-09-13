@@ -6,6 +6,8 @@ option go_package = "github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1";
 
 import "google/api/annotations.proto";
 import "validate/validate.proto";
+import "api/common/v1/common.proto";
+import "api/problem/v1/problem.proto";
 
 service GatewayService {
   rpc Health(HealthRequest) returns (HealthResponse) {
@@ -53,6 +55,15 @@ service GatewayService {
       get: "/api/v1/users/{id}"
     };
   }
+
+  rpc CreateProblem(problem.v1.CreateProblemRequest) returns (problem.v1.CreateProblemResponse) { option (google.api.http) = { post: "/api/v1/problems" body: "*" }; }
+  rpc GetProblem(problem.v1.GetProblemRequest) returns (problem.v1.GetProblemResponse) { option (google.api.http) = { get: "/api/v1/problems/{problem_id}" }; }
+  rpc ListProblems(problem.v1.ListProblemsRequest) returns (problem.v1.ListProblemsResponse) { option (google.api.http) = { get: "/api/v1/problems" }; }
+  rpc UpdateProblem(problem.v1.UpdateProblemRequest) returns (problem.v1.UpdateProblemResponse) { option (google.api.http) = { put: "/api/v1/problems/{problem_id}" body: "problem" }; }
+  rpc ArchiveProblem(problem.v1.ArchiveProblemRequest) returns (problem.v1.ArchiveProblemResponse) { option (google.api.http) = { delete: "/api/v1/problems/{problem_id}" }; }
+  rpc AddTestcase(problem.v1.AddTestcaseRequest) returns (problem.v1.AddTestcaseResponse) { option (google.api.http) = { post: "/api/v1/problems/{problem_id}/testcases" body: "*" }; }
+  rpc ListProblemTestcases(problem.v1.ListProblemTestcasesRequest) returns (problem.v1.ListProblemTestcasesResponse) { option (google.api.http) = { get: "/api/v1/problems/{problem_id}/testcases" }; }
+  rpc ArchiveTestcase(problem.v1.ArchiveTestcaseRequest) returns (problem.v1.ArchiveTestcaseResponse) { option (google.api.http) = { delete: "/api/v1/problems/{problem_id}/testcases/{testcase_id}" }; }
 }
 
 message UserSummary {
