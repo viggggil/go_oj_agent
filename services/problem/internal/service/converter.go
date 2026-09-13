@@ -31,3 +31,14 @@ func toProtoProblem(problem biz.Problem) *problemv1.Problem {
 	}
 	return result
 }
+
+func toProtoTestcase(testcase biz.Testcase) *problemv1.TestcaseMetadata {
+	result := &problemv1.TestcaseMetadata{Id: testcase.ID, ProblemId: testcase.ProblemID, CaseNo: testcase.CaseNo, InputObjectKey: testcase.InputObjectKey, OutputObjectKey: testcase.OutputObjectKey, InputSha256: testcase.InputSHA256, OutputSha256: testcase.OutputSHA256, InputSizeBytes: testcase.InputSizeBytes, OutputSizeBytes: testcase.OutputSizeBytes, Status: testcase.Status}
+	if !testcase.CreatedAt.IsZero() {
+		result.CreatedAt = timestamppb.New(testcase.CreatedAt)
+	}
+	if testcase.ArchivedAt != nil {
+		result.ArchivedAt = timestamppb.New(*testcase.ArchivedAt)
+	}
+	return result
+}
