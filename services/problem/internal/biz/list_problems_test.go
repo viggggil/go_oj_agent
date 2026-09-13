@@ -33,3 +33,6 @@ func (r *listRepository) List(_ context.Context, _, _ int32, includeArchived boo
 	r.includeArchived = includeArchived
 	return []Problem{{ID: 1}}, 1, nil
 }
+func (*listRepository) Update(context.Context, Problem, []string) (Problem, error) {
+	return Problem{}, nil
+}

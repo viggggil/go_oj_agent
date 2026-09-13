@@ -34,3 +34,6 @@ func (*listServiceRepository) FindByID(context.Context, int64) (biz.Problem, err
 func (*listServiceRepository) List(context.Context, int32, int32, bool) ([]biz.Problem, int64, error) {
 	return []biz.Problem{{ID: 1, Title: "A+B", Slug: "a-plus-b", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL}}, 1, nil
 }
+func (*listServiceRepository) Update(context.Context, biz.Problem, []string) (biz.Problem, error) {
+	return biz.Problem{}, nil
+}
