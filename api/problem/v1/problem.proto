@@ -75,7 +75,8 @@ message Tag {
 message TestcaseMetadata {
   int64 id = 1;
   int64 problem_id = 2;
-  int32 version = 3;
+  reserved 3;
+  reserved "version";
   int32 case_no = 4;
   string input_object_key = 5;
   string output_object_key = 6;

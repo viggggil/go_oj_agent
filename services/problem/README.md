@@ -4,7 +4,7 @@
 
 ## Current contract
 
-- Problem create, full update, publish, archive, detail, and paginated summaries.
+- Problem create, full update, archive, detail, and paginated summaries.
 - One-call testcase upload for paired `.in` and `.out` files.
 - Testcase archive instead of physical deletion.
 - One testcase metadata listing RPC shared by admin and trusted judge callers.

@@ -2,59 +2,99 @@ package biz
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
-	"strings"
 )
 
+const RoleAdmin = "admin"
+
 type Problem struct {
-	ID                         int64
-	Title, Slug, Description   string
-	Difficulty                 problemv1.ProblemDifficulty
-	TimeLimitMs, MemoryLimitKb int32
-	Status                     problemv1.ProblemStatus
-	CreatedBy                  int64
-	Tags                       []Tag
+	ID            int64
+	Title         string
+	Slug          string
+	Description   string
+	Difficulty    problemv1.ProblemDifficulty
+	TimeLimitMs   int32
+	MemoryLimitKb int32
+	Status        problemv1.ProblemStatus
+	CreatedBy     int64
+	Tags          []Tag
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
+
 type Tag struct {
 	ID   int64
 	Name string
 }
+
 type CreateProblemInput struct {
-	Context                    *commonv1.RequestContext
-	Title, Slug, Description   string
-	Difficulty                 problemv1.ProblemDifficulty
-	TimeLimitMs, MemoryLimitKb int32
-	Tags                       []string
+	Context      *commonv1.RequestContext
+	Problem      Problem
+	Tags         []string
+	HasTestcases bool
 }
+
 type ProblemRepository interface {
 	Create(context.Context, Problem, []string) (Problem, error)
 }
-type ProblemUsecase struct{ repo ProblemRepository }
 
-func NewProblemUsecase(r ProblemRepository) *ProblemUsecase { return &ProblemUsecase{repo: r} }
-func (u *ProblemUsecase) Create(ctx context.Context, in CreateProblemInput) (Problem, error) {
-	if u == nil || u.repo == nil || in.Context == nil || in.Context.GetUserId() <= 0 {
-		return Problem{}, ErrorInvalidArgument("invalid context")
+type ProblemUsecase struct {
+	repo ProblemRepository
+}
+
+func NewProblemUsecase(repo ProblemRepository) *ProblemUsecase {
+	return &ProblemUsecase{repo: repo}
+}
+
+func requireAdmin(ctx *commonv1.RequestContext) error {
+	if ctx == nil || ctx.GetUserId() <= 0 {
+		return ErrorInvalidArgument("invalid request context")
 	}
-	admin := false
-	for _, r := range in.Context.GetRoles() {
-		admin = admin || strings.EqualFold(r, "admin")
-	}
-	if !admin {
-		return Problem{}, ErrorPermissionDenied("admin role required")
-	}
-	if strings.TrimSpace(in.Title) == "" || strings.TrimSpace(in.Slug) == "" || strings.TrimSpace(in.Description) == "" || in.Difficulty == 0 || in.TimeLimitMs <= 0 || in.MemoryLimitKb <= 0 {
-		return Problem{}, ErrorInvalidArgument("invalid problem input")
-	}
-	seen := map[string]bool{}
-	tags := []string{}
-	for _, t := range in.Tags {
-		t = strings.ToLower(strings.TrimSpace(t))
-		if t != "" && !seen[t] {
-			seen[t] = true
-			tags = append(tags, t)
+	for _, role := range ctx.GetRoles() {
+		if strings.EqualFold(strings.TrimSpace(role), RoleAdmin) {
+			return nil
 		}
 	}
-	return u.repo.Create(ctx, Problem{Title: strings.TrimSpace(in.Title), Slug: strings.TrimSpace(in.Slug), Description: strings.TrimSpace(in.Description), Difficulty: in.Difficulty, TimeLimitMs: in.TimeLimitMs, MemoryLimitKb: in.MemoryLimitKb, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL, CreatedBy: in.Context.GetUserId()}, tags)
+	return ErrorPermissionDenied("admin role required")
+}
+
+func normalizeTags(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	tags := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		tags = append(tags, value)
+	}
+	return tags
+}
+
+func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) (Problem, error) {
+	if uc == nil || uc.repo == nil {
+		return Problem{}, ErrorInternal("problem repository is not configured")
+	}
+	if err := requireAdmin(input.Context); err != nil {
+		return Problem{}, err
+	}
+	if input.HasTestcases {
+		return Problem{}, ErrorInvalidStatus("testcase storage is not available yet")
+	}
+
+	problem := input.Problem
+	problem.Title = strings.TrimSpace(problem.Title)
+	problem.Slug = strings.TrimSpace(problem.Slug)
+	problem.Description = strings.TrimSpace(problem.Description)
+	problem.Status = problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL
+	problem.CreatedBy = input.Context.GetUserId()
+	return uc.repo.Create(ctx, problem, normalizeTags(input.Tags))
 }
