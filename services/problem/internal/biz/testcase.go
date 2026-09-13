@@ -23,7 +23,34 @@ type Testcase struct {
 
 type TestcaseRepository interface {
 	AddTestcase(context.Context, Testcase) (Testcase, error)
+	ListTestcases(context.Context, int64, bool) ([]Testcase, error)
 }
+
+func requireTestcaseReader(ctx *commonv1.RequestContext) error {
+	if ctx == nil || ctx.GetUserId() <= 0 {
+		return ErrorInvalidArgument("invalid request context")
+	}
+	for _, role := range ctx.GetRoles() {
+		if role == RoleAdmin || role == "judge" {
+			return nil
+		}
+	}
+	return ErrorPermissionDenied("testcase reader role required")
+}
+
+func (uc *ProblemUsecase) ListTestcases(ctx context.Context, requestContext *commonv1.RequestContext, problemID int64, includeArchived bool) ([]Testcase, error) {
+	if err := requireTestcaseReader(requestContext); err != nil {
+		return nil, err
+	}
+	if uc == nil || uc.repo == nil || uc.testcases == nil {
+		return nil, ErrorInternal("testcase dependencies are not configured")
+	}
+	if _, err := uc.repo.FindByID(ctx, problemID); err != nil {
+		return nil, err
+	}
+	return uc.testcases.ListTestcases(ctx, problemID, includeArchived)
+}
+
 type ProblemCreationCompensator interface {
 	DeleteCreatedProblem(context.Context, int64) error
 }

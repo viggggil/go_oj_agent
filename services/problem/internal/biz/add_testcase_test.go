@@ -59,6 +59,9 @@ func (r *fakeTestcaseRepository) AddTestcase(_ context.Context, t Testcase) (Tes
 	r.created = t
 	return t, nil
 }
+func (r *fakeTestcaseRepository) ListTestcases(context.Context, int64, bool) ([]Testcase, error) {
+	return []Testcase{r.created}, r.err
+}
 
 type fakeObjectStore struct {
 	puts, deletes []string

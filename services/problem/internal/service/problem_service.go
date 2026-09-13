@@ -128,3 +128,21 @@ func (s *ProblemService) AddTestcase(ctx context.Context, req *problemv1.AddTest
 	}
 	return &problemv1.AddTestcaseResponse{Testcase: toProtoTestcase(testcase)}, nil
 }
+
+func (s *ProblemService) ListProblemTestcases(ctx context.Context, req *problemv1.ListProblemTestcasesRequest) (*problemv1.ListProblemTestcasesResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid list testcases request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	items, err := s.uc.ListTestcases(ctx, req.GetContext(), req.GetProblemId(), req.GetIncludeArchived())
+	if err != nil {
+		return nil, err
+	}
+	response := make([]*problemv1.TestcaseMetadata, 0, len(items))
+	for _, item := range items {
+		response = append(response, toProtoTestcase(item))
+	}
+	return &problemv1.ListProblemTestcasesResponse{Items: response}, nil
+}
