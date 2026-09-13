@@ -15,7 +15,10 @@ import (
 var ProviderSet = wire.NewSet(
 	NewMySQLDB,
 	NewStoreSet,
+	NewMinIOStore,
 	wire.Bind(new(biz.ProblemRepository), new(*StoreSet)),
+	wire.Bind(new(biz.TestcaseRepository), new(*StoreSet)),
+	wire.Bind(new(biz.ObjectStore), new(*MinIOStore)),
 )
 
 func NewMySQLDB(config *conf.Bootstrap) (*sql.DB, func(), error) {

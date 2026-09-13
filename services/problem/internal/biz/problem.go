@@ -138,7 +138,9 @@ func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.Requ
 }
 
 type ProblemUsecase struct {
-	repo ProblemRepository
+	repo      ProblemRepository
+	testcases TestcaseRepository
+	objects   ObjectStore
 }
 
 func NewProblemUsecase(repo ProblemRepository) *ProblemUsecase {

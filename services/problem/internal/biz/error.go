@@ -30,3 +30,11 @@ func ErrorInvalidStatus(format string, args ...interface{}) *kerrors.Error {
 func ErrorInternal(format string, args ...interface{}) *kerrors.Error {
 	return kerrors.InternalServer("PROBLEM_INTERNAL", fmt.Sprintf(format, args...))
 }
+
+func ErrorStorageUnavailable(format string, args ...interface{}) *kerrors.Error {
+	return problemv1.ErrorProblemErrorReasonStorageUnavailable(format, args...)
+}
+
+func ErrorTestcaseAlreadyExists(format string, args ...interface{}) *kerrors.Error {
+	return problemv1.ErrorProblemErrorReasonTestcaseAlreadyExists(format, args...)
+}

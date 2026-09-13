@@ -114,3 +114,17 @@ func (s *ProblemService) ArchiveProblem(ctx context.Context, req *problemv1.Arch
 	}
 	return &problemv1.ArchiveProblemResponse{Problem: toProtoProblem(problem)}, nil
 }
+
+func (s *ProblemService) AddTestcase(ctx context.Context, req *problemv1.AddTestcaseRequest) (*problemv1.AddTestcaseResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid add testcase request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	testcase, err := s.uc.AddTestcase(ctx, req.GetContext(), req.GetProblemId(), req.GetCaseNo(), req.GetInputContent(), req.GetOutputContent())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.AddTestcaseResponse{Testcase: toProtoTestcase(testcase)}, nil
+}

@@ -2,4 +2,4 @@ package biz
 
 import "github.com/google/wire"
 
-var ProviderSet = wire.NewSet(NewProblemUsecase)
+var ProviderSet = wire.NewSet(NewProblemUsecaseWithStore)
