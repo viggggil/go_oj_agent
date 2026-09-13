@@ -37,12 +37,15 @@ func TestCreateProblemRejectsNonAdmin(t *testing.T) {
 	}
 }
 
-func TestCreateProblemRejectsTestcasesUntilStorageIsAvailable(t *testing.T) {
+func TestCreateProblemStoresTestcases(t *testing.T) {
 	input := validCreateInput()
-	input.HasTestcases = true
-	_, err := NewProblemUsecase(&fakeProblemRepository{}).Create(context.Background(), input)
-	if !problemv1.IsProblemErrorReasonInvalidStatus(err) {
-		t.Fatalf("expected invalid status, got %v", err)
+	input.Testcases = []TestcaseContent{{CaseNo: 1, Input: []byte("in"), Output: []byte("out")}}
+	problems := &fakeProblemRepository{created: Problem{ID: 5}}
+	testcases := &fakeTestcaseRepository{}
+	objects := &fakeObjectStore{}
+	_, err := NewProblemUsecaseWithStore(problems, testcases, objects, problems).Create(context.Background(), input)
+	if err != nil || testcases.created.ProblemID != 5 || len(objects.puts) != 2 {
+		t.Fatalf("error=%v testcase=%+v puts=%v", err, testcases.created, objects.puts)
 	}
 }
 
@@ -98,3 +101,4 @@ func (r *fakeProblemRepository) Archive(context.Context, int64) (Problem, error)
 	r.created.Status = problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED
 	return r.created, r.err
 }
+func (r *fakeProblemRepository) DeleteCreatedProblem(context.Context, int64) error { return r.err }

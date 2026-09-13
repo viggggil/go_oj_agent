@@ -28,7 +28,7 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	problemUsecase := biz.NewProblemUsecaseWithStore(storeSet, storeSet, minIOStore)
+	problemUsecase := biz.NewProblemUsecaseWithStore(storeSet, storeSet, minIOStore, storeSet)
 	problemService := service.NewProblemService(problemUsecase)
 	grpcServer := server.NewGRPCServer(bc, v, problemService)
 	registrar := server.NewRegistrar(bc)

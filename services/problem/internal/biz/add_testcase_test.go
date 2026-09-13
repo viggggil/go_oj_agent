@@ -13,7 +13,7 @@ func TestAddTestcaseUploadsAndPersistsMetadata(t *testing.T) {
 	problems := &fakeProblemRepository{created: Problem{ID: 2, Status: problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED}}
 	testcases := &fakeTestcaseRepository{}
 	objects := &fakeObjectStore{}
-	got, err := NewProblemUsecaseWithStore(problems, testcases, objects).AddTestcase(context.Background(), adminContext(), 2, 1, []byte("1 2\n"), []byte("3\n"))
+	got, err := NewProblemUsecaseWithStore(problems, testcases, objects, problems).AddTestcase(context.Background(), adminContext(), 2, 1, []byte("1 2\n"), []byte("3\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,8 @@ func TestAddTestcaseUploadsAndPersistsMetadata(t *testing.T) {
 func TestAddTestcaseCompensatesObjectsWhenMetadataFails(t *testing.T) {
 	testcases := &fakeTestcaseRepository{err: errors.New("db failed")}
 	objects := &fakeObjectStore{}
-	_, err := NewProblemUsecaseWithStore(&fakeProblemRepository{created: Problem{ID: 2}}, testcases, objects).AddTestcase(context.Background(), adminContext(), 2, 1, []byte("in"), []byte("out"))
+	problems := &fakeProblemRepository{created: Problem{ID: 2}}
+	_, err := NewProblemUsecaseWithStore(problems, testcases, objects, problems).AddTestcase(context.Background(), adminContext(), 2, 1, []byte("in"), []byte("out"))
 	if err == nil || len(objects.deletes) != 2 {
 		t.Fatalf("err=%v deletes=%v", err, objects.deletes)
 	}
@@ -33,7 +34,8 @@ func TestAddTestcaseCompensatesObjectsWhenMetadataFails(t *testing.T) {
 
 func TestAddTestcaseCompensatesInputWhenOutputUploadFails(t *testing.T) {
 	objects := &fakeObjectStore{putErrAt: 2}
-	_, err := NewProblemUsecaseWithStore(&fakeProblemRepository{created: Problem{ID: 2}}, &fakeTestcaseRepository{}, objects).
+	problems := &fakeProblemRepository{created: Problem{ID: 2}}
+	_, err := NewProblemUsecaseWithStore(problems, &fakeTestcaseRepository{}, objects, problems).
 		AddTestcase(context.Background(), adminContext(), 2, 1, []byte("in"), []byte("out"))
 	if !problemv1.IsProblemErrorReasonStorageUnavailable(err) || len(objects.deletes) != 1 {
 		t.Fatalf("err=%v deletes=%v", err, objects.deletes)

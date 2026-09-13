@@ -33,6 +33,20 @@ func TestCreateProblemHandlerValidatesRequest(t *testing.T) {
 	}
 }
 
+func TestCreateProblemHandlerForwardsTestcases(t *testing.T) {
+	repo := &serviceTestcaseRepo{serviceFakeRepository: serviceFakeRepository{}}
+	objects := &serviceObjectStore{}
+	server := NewProblemService(biz.NewProblemUsecaseWithStore(repo, repo, objects, repo))
+	response, err := server.CreateProblem(context.Background(), &problemv1.CreateProblemRequest{
+		Context:   adminContextProto(),
+		Problem:   &problemv1.ProblemInput{Title: "A+B", Slug: "a-plus-b", Description: "Statement", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536},
+		Testcases: []*problemv1.TestcaseInput{{CaseNo: 1, InputFilename: "1.in", InputContent: []byte("in"), OutputFilename: "1.out", OutputContent: []byte("out")}},
+	})
+	if err != nil || response.GetProblem().GetId() != 101 {
+		t.Fatalf("response=%+v err=%v", response, err)
+	}
+}
+
 type serviceFakeRepository struct {
 	found biz.Problem
 	err   error
@@ -57,3 +71,4 @@ func (r *serviceFakeRepository) Archive(context.Context, int64) (biz.Problem, er
 	r.found.Status = problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED
 	return r.found, r.err
 }
+func (r *serviceFakeRepository) DeleteCreatedProblem(context.Context, int64) error { return r.err }

@@ -32,10 +32,10 @@ type Tag struct {
 }
 
 type CreateProblemInput struct {
-	Context      *commonv1.RequestContext
-	Problem      Problem
-	Tags         []string
-	HasTestcases bool
+	Context   *commonv1.RequestContext
+	Problem   Problem
+	Tags      []string
+	Testcases []TestcaseContent
 }
 
 type ProblemRepository interface {
@@ -138,9 +138,10 @@ func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.Requ
 }
 
 type ProblemUsecase struct {
-	repo      ProblemRepository
-	testcases TestcaseRepository
-	objects   ObjectStore
+	repo        ProblemRepository
+	testcases   TestcaseRepository
+	objects     ObjectStore
+	compensator ProblemCreationCompensator
 }
 
 func NewProblemUsecase(repo ProblemRepository) *ProblemUsecase {
@@ -183,15 +184,33 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	if err := requireAdmin(input.Context); err != nil {
 		return Problem{}, err
 	}
-	if input.HasTestcases {
-		return Problem{}, ErrorInvalidStatus("testcase storage is not available yet")
-	}
-
 	problem := input.Problem
 	problem.Title = strings.TrimSpace(problem.Title)
 	problem.Slug = strings.TrimSpace(problem.Slug)
 	problem.Description = strings.TrimSpace(problem.Description)
 	problem.Status = problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL
 	problem.CreatedBy = input.Context.GetUserId()
-	return uc.repo.Create(ctx, problem, normalizeTags(input.Tags))
+	created, err := uc.repo.Create(ctx, problem, normalizeTags(input.Tags))
+	if err != nil || len(input.Testcases) == 0 {
+		return created, err
+	}
+	if uc.testcases == nil || uc.objects == nil || uc.compensator == nil {
+		return Problem{}, ErrorInternal("testcase dependencies are not configured")
+	}
+	stored := make([]Testcase, 0, len(input.Testcases))
+	for _, testcase := range input.Testcases {
+		item, addErr := uc.addTestcaseToProblem(ctx, created.ID, testcase.CaseNo, testcase.Input, testcase.Output)
+		if addErr != nil {
+			for _, previous := range stored {
+				_ = uc.objects.Delete(ctx, previous.InputObjectKey)
+				_ = uc.objects.Delete(ctx, previous.OutputObjectKey)
+			}
+			if cleanupErr := uc.compensator.DeleteCreatedProblem(ctx, created.ID); cleanupErr != nil {
+				return Problem{}, ErrorInternal("create problem cleanup failed: %v", cleanupErr)
+			}
+			return Problem{}, addErr
+		}
+		stored = append(stored, item)
+	}
+	return created, nil
 }
