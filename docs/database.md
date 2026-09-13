@@ -204,17 +204,22 @@ PRIMARY KEY(problem_id, tag_id)
 | `output_object_key` | VARCHAR(512) | MinIO key |
 | `input_sha256` | CHAR(64) | NOT NULL |
 | `output_sha256` | CHAR(64) | NOT NULL |
-| `size_bytes` | BIGINT | Optional |
+| `input_size_bytes` | BIGINT | Input object size |
+| `output_size_bytes` | BIGINT | Output object size |
+| `status` | VARCHAR(32) | active / archived |
 | `created_at` | DATETIME(3) | NOT NULL |
+| `archived_at` | DATETIME(3) | Nullable archive time |
+| `updated_at` | DATETIME(3) | NOT NULL |
 
 约束：
 
 ```text
 UNIQUE(problem_id, version, case_no)
-INDEX(problem_id, version)
+INDEX(problem_id, status, version, case_no)
 ```
 
-保留 `version + sha256` 以支持历史判题复现。
+保留 `version + sha256` 以支持历史判题复现。测试用例删除使用
+`status=archived` 标记，不物理删除 MySQL 元信息或 MinIO 对象。
 
 ---
 

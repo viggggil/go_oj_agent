@@ -19,11 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProblemService_CreateProblem_FullMethodName  = "/problem.v1.ProblemService/CreateProblem"
-	ProblemService_UpdateProblem_FullMethodName  = "/problem.v1.ProblemService/UpdateProblem"
-	ProblemService_GetProblem_FullMethodName     = "/problem.v1.ProblemService/GetProblem"
-	ProblemService_ListProblems_FullMethodName   = "/problem.v1.ProblemService/ListProblems"
-	ProblemService_SearchProblems_FullMethodName = "/problem.v1.ProblemService/SearchProblems"
+	ProblemService_CreateProblem_FullMethodName        = "/problem.v1.ProblemService/CreateProblem"
+	ProblemService_UpdateProblem_FullMethodName        = "/problem.v1.ProblemService/UpdateProblem"
+	ProblemService_PublishProblem_FullMethodName       = "/problem.v1.ProblemService/PublishProblem"
+	ProblemService_ArchiveProblem_FullMethodName       = "/problem.v1.ProblemService/ArchiveProblem"
+	ProblemService_GetProblem_FullMethodName           = "/problem.v1.ProblemService/GetProblem"
+	ProblemService_ListProblems_FullMethodName         = "/problem.v1.ProblemService/ListProblems"
+	ProblemService_AddTestcase_FullMethodName          = "/problem.v1.ProblemService/AddTestcase"
+	ProblemService_ArchiveTestcase_FullMethodName      = "/problem.v1.ProblemService/ArchiveTestcase"
+	ProblemService_ListProblemTestcases_FullMethodName = "/problem.v1.ProblemService/ListProblemTestcases"
 )
 
 // ProblemServiceClient is the client API for ProblemService service.
@@ -32,9 +36,16 @@ const (
 type ProblemServiceClient interface {
 	CreateProblem(ctx context.Context, in *CreateProblemRequest, opts ...grpc.CallOption) (*CreateProblemResponse, error)
 	UpdateProblem(ctx context.Context, in *UpdateProblemRequest, opts ...grpc.CallOption) (*UpdateProblemResponse, error)
+	PublishProblem(ctx context.Context, in *PublishProblemRequest, opts ...grpc.CallOption) (*PublishProblemResponse, error)
+	ArchiveProblem(ctx context.Context, in *ArchiveProblemRequest, opts ...grpc.CallOption) (*ArchiveProblemResponse, error)
 	GetProblem(ctx context.Context, in *GetProblemRequest, opts ...grpc.CallOption) (*GetProblemResponse, error)
 	ListProblems(ctx context.Context, in *ListProblemsRequest, opts ...grpc.CallOption) (*ListProblemsResponse, error)
-	SearchProblems(ctx context.Context, in *SearchProblemsRequest, opts ...grpc.CallOption) (*SearchProblemsResponse, error)
+	// AddTestcase stores one paired .in/.out testcase and its metadata atomically
+	// from the caller's perspective.
+	AddTestcase(ctx context.Context, in *AddTestcaseRequest, opts ...grpc.CallOption) (*AddTestcaseResponse, error)
+	ArchiveTestcase(ctx context.Context, in *ArchiveTestcaseRequest, opts ...grpc.CallOption) (*ArchiveTestcaseResponse, error)
+	// Shared by the admin UI and trusted judge callers.
+	ListProblemTestcases(ctx context.Context, in *ListProblemTestcasesRequest, opts ...grpc.CallOption) (*ListProblemTestcasesResponse, error)
 }
 
 type problemServiceClient struct {
@@ -65,6 +76,26 @@ func (c *problemServiceClient) UpdateProblem(ctx context.Context, in *UpdateProb
 	return out, nil
 }
 
+func (c *problemServiceClient) PublishProblem(ctx context.Context, in *PublishProblemRequest, opts ...grpc.CallOption) (*PublishProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishProblemResponse)
+	err := c.cc.Invoke(ctx, ProblemService_PublishProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *problemServiceClient) ArchiveProblem(ctx context.Context, in *ArchiveProblemRequest, opts ...grpc.CallOption) (*ArchiveProblemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveProblemResponse)
+	err := c.cc.Invoke(ctx, ProblemService_ArchiveProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *problemServiceClient) GetProblem(ctx context.Context, in *GetProblemRequest, opts ...grpc.CallOption) (*GetProblemResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetProblemResponse)
@@ -85,10 +116,30 @@ func (c *problemServiceClient) ListProblems(ctx context.Context, in *ListProblem
 	return out, nil
 }
 
-func (c *problemServiceClient) SearchProblems(ctx context.Context, in *SearchProblemsRequest, opts ...grpc.CallOption) (*SearchProblemsResponse, error) {
+func (c *problemServiceClient) AddTestcase(ctx context.Context, in *AddTestcaseRequest, opts ...grpc.CallOption) (*AddTestcaseResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SearchProblemsResponse)
-	err := c.cc.Invoke(ctx, ProblemService_SearchProblems_FullMethodName, in, out, cOpts...)
+	out := new(AddTestcaseResponse)
+	err := c.cc.Invoke(ctx, ProblemService_AddTestcase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *problemServiceClient) ArchiveTestcase(ctx context.Context, in *ArchiveTestcaseRequest, opts ...grpc.CallOption) (*ArchiveTestcaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveTestcaseResponse)
+	err := c.cc.Invoke(ctx, ProblemService_ArchiveTestcase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *problemServiceClient) ListProblemTestcases(ctx context.Context, in *ListProblemTestcasesRequest, opts ...grpc.CallOption) (*ListProblemTestcasesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProblemTestcasesResponse)
+	err := c.cc.Invoke(ctx, ProblemService_ListProblemTestcases_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +152,16 @@ func (c *problemServiceClient) SearchProblems(ctx context.Context, in *SearchPro
 type ProblemServiceServer interface {
 	CreateProblem(context.Context, *CreateProblemRequest) (*CreateProblemResponse, error)
 	UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error)
+	PublishProblem(context.Context, *PublishProblemRequest) (*PublishProblemResponse, error)
+	ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error)
 	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
 	ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error)
-	SearchProblems(context.Context, *SearchProblemsRequest) (*SearchProblemsResponse, error)
+	// AddTestcase stores one paired .in/.out testcase and its metadata atomically
+	// from the caller's perspective.
+	AddTestcase(context.Context, *AddTestcaseRequest) (*AddTestcaseResponse, error)
+	ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error)
+	// Shared by the admin UI and trusted judge callers.
+	ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error)
 	mustEmbedUnimplementedProblemServiceServer()
 }
 
@@ -120,14 +178,26 @@ func (UnimplementedProblemServiceServer) CreateProblem(context.Context, *CreateP
 func (UnimplementedProblemServiceServer) UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateProblem not implemented")
 }
+func (UnimplementedProblemServiceServer) PublishProblem(context.Context, *PublishProblemRequest) (*PublishProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishProblem not implemented")
+}
+func (UnimplementedProblemServiceServer) ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveProblem not implemented")
+}
 func (UnimplementedProblemServiceServer) GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProblem not implemented")
 }
 func (UnimplementedProblemServiceServer) ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListProblems not implemented")
 }
-func (UnimplementedProblemServiceServer) SearchProblems(context.Context, *SearchProblemsRequest) (*SearchProblemsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SearchProblems not implemented")
+func (UnimplementedProblemServiceServer) AddTestcase(context.Context, *AddTestcaseRequest) (*AddTestcaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddTestcase not implemented")
+}
+func (UnimplementedProblemServiceServer) ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveTestcase not implemented")
+}
+func (UnimplementedProblemServiceServer) ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProblemTestcases not implemented")
 }
 func (UnimplementedProblemServiceServer) mustEmbedUnimplementedProblemServiceServer() {}
 func (UnimplementedProblemServiceServer) testEmbeddedByValue()                        {}
@@ -186,6 +256,42 @@ func _ProblemService_UpdateProblem_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProblemService_PublishProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProblemServiceServer).PublishProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProblemService_PublishProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProblemServiceServer).PublishProblem(ctx, req.(*PublishProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProblemService_ArchiveProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveProblemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProblemServiceServer).ArchiveProblem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProblemService_ArchiveProblem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProblemServiceServer).ArchiveProblem(ctx, req.(*ArchiveProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProblemService_GetProblem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetProblemRequest)
 	if err := dec(in); err != nil {
@@ -222,20 +328,56 @@ func _ProblemService_ListProblems_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ProblemService_SearchProblems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SearchProblemsRequest)
+func _ProblemService_AddTestcase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddTestcaseRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ProblemServiceServer).SearchProblems(ctx, in)
+		return srv.(ProblemServiceServer).AddTestcase(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ProblemService_SearchProblems_FullMethodName,
+		FullMethod: ProblemService_AddTestcase_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProblemServiceServer).SearchProblems(ctx, req.(*SearchProblemsRequest))
+		return srv.(ProblemServiceServer).AddTestcase(ctx, req.(*AddTestcaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProblemService_ArchiveTestcase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveTestcaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProblemServiceServer).ArchiveTestcase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProblemService_ArchiveTestcase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProblemServiceServer).ArchiveTestcase(ctx, req.(*ArchiveTestcaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProblemService_ListProblemTestcases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProblemTestcasesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProblemServiceServer).ListProblemTestcases(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProblemService_ListProblemTestcases_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProblemServiceServer).ListProblemTestcases(ctx, req.(*ListProblemTestcasesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -256,6 +398,14 @@ var ProblemService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProblemService_UpdateProblem_Handler,
 		},
 		{
+			MethodName: "PublishProblem",
+			Handler:    _ProblemService_PublishProblem_Handler,
+		},
+		{
+			MethodName: "ArchiveProblem",
+			Handler:    _ProblemService_ArchiveProblem_Handler,
+		},
+		{
 			MethodName: "GetProblem",
 			Handler:    _ProblemService_GetProblem_Handler,
 		},
@@ -264,8 +414,16 @@ var ProblemService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProblemService_ListProblems_Handler,
 		},
 		{
-			MethodName: "SearchProblems",
-			Handler:    _ProblemService_SearchProblems_Handler,
+			MethodName: "AddTestcase",
+			Handler:    _ProblemService_AddTestcase_Handler,
+		},
+		{
+			MethodName: "ArchiveTestcase",
+			Handler:    _ProblemService_ArchiveTestcase_Handler,
+		},
+		{
+			MethodName: "ListProblemTestcases",
+			Handler:    _ProblemService_ListProblemTestcases_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
