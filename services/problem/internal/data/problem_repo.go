@@ -7,6 +7,7 @@ import (
 
 	mysql "github.com/go-sql-driver/mysql"
 
+	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/biz"
 )
 
@@ -87,4 +88,52 @@ func translateMySQLError(err error) error {
 		return biz.ErrorAlreadyExists("problem or tag already exists")
 	}
 	return err
+}
+
+func (s *StoreSet) FindByID(ctx context.Context, problemID int64) (biz.Problem, error) {
+	if s == nil || s.db == nil {
+		return biz.Problem{}, biz.ErrorInternal("problem database is not configured")
+	}
+	var problem biz.Problem
+	var difficulty, problemStatus string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, title, slug, description, difficulty, time_limit_ms, memory_limit_kb,
+		       status, created_by, created_at, updated_at
+		FROM problems WHERE id = ?
+	`, problemID).Scan(&problem.ID, &problem.Title, &problem.Slug, &problem.Description,
+		&difficulty, &problem.TimeLimitMs, &problem.MemoryLimitKb, &problemStatus,
+		&problem.CreatedBy, &problem.CreatedAt, &problem.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return biz.Problem{}, biz.ErrorNotFound("problem not found")
+	}
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	difficultyValue, ok := problemv1.ProblemDifficulty_value[difficulty]
+	if !ok {
+		return biz.Problem{}, biz.ErrorInternal("invalid problem difficulty in database")
+	}
+	statusValue, ok := problemv1.ProblemStatus_value[problemStatus]
+	if !ok {
+		return biz.Problem{}, biz.ErrorInternal("invalid problem status in database")
+	}
+	problem.Difficulty = problemv1.ProblemDifficulty(difficultyValue)
+	problem.Status = problemv1.ProblemStatus(statusValue)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.id, t.name
+		FROM tags t JOIN problem_tags pt ON pt.tag_id = t.id
+		WHERE pt.problem_id = ? ORDER BY t.id
+	`, problemID)
+	if err != nil {
+		return biz.Problem{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tag biz.Tag
+		if err := rows.Scan(&tag.ID, &tag.Name); err != nil {
+			return biz.Problem{}, err
+		}
+		problem.Tags = append(problem.Tags, tag)
+	}
+	return problem, rows.Err()
 }
