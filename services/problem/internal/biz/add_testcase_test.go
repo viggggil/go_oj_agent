@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
@@ -17,8 +18,12 @@ func TestAddTestcaseUploadsAndPersistsMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.InputObjectKey != "problem-2/input/1.in" || got.InputSHA256 == "" || len(objects.puts) != 2 {
+	if !strings.HasPrefix(got.InputObjectKey, "problem-2/testcases/1/") || !strings.HasSuffix(got.InputObjectKey, ".in") || got.InputSHA256 == "" || len(objects.puts) != 2 {
 		t.Fatalf("got=%+v puts=%v", got, objects.puts)
+	}
+	inputID := strings.TrimSuffix(strings.TrimPrefix(got.InputObjectKey, "problem-2/testcases/1/"), ".in")
+	if got.OutputObjectKey != "problem-2/testcases/1/"+inputID+".out" {
+		t.Fatalf("object keys do not share an upload id: %+v", got)
 	}
 }
 

@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 
+	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/conf"
@@ -65,6 +67,35 @@ func TestProblemInfrastructureIntegration(t *testing.T) {
 		t.Fatalf("StatObject() size=%d err=%v", info.Size, err)
 	}
 
+	admin := &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}}
+	usecase := biz.NewProblemUsecaseWithStore(store, store, objects, store)
+	testcase, err := usecase.AddTestcase(ctx, admin, created.ID, 1, []byte("1 2\n"), []byte("3\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = objects.Delete(context.Background(), testcase.InputObjectKey)
+		_ = objects.Delete(context.Background(), testcase.OutputObjectKey)
+	})
+	if _, err = store.ArchiveTestcase(ctx, created.ID, testcase.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = objects.client.StatObject(ctx, objects.bucket, testcase.InputObjectKey, minio.StatObjectOptions{}); err != nil {
+		t.Fatalf("archive deleted object: %v", err)
+	}
+
+	failing := failingTestcaseRepository{StoreSet: store}
+	failingUsecase := biz.NewProblemUsecaseWithStore(store, failing, objects, store)
+	if _, err = failingUsecase.AddTestcase(ctx, admin, created.ID, 2, []byte("in"), []byte("out")); err == nil {
+		t.Fatal("expected metadata failure")
+	}
+	for object := range objects.client.ListObjects(ctx, objects.bucket, minio.ListObjectsOptions{Prefix: fmt.Sprintf("problem-%d/testcases/2/", created.ID), Recursive: true}) {
+		if object.Err != nil {
+			t.Fatal(object.Err)
+		}
+		t.Fatalf("compensation left object %s", object.Key)
+	}
+
 	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
 	defer redisClient.Close()
 	cache := NewProblemCache(redisClient, &conf.Bootstrap{Data: &conf.DataProto{RedisNamespace: "integration"}})
@@ -88,4 +119,10 @@ func envOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+type failingTestcaseRepository struct{ *StoreSet }
+
+func (failingTestcaseRepository) AddTestcase(context.Context, biz.Testcase) (biz.Testcase, error) {
+	return biz.Testcase{}, errors.New("forced metadata failure")
 }

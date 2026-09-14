@@ -2,7 +2,9 @@ package biz
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -99,8 +101,12 @@ func (uc *ProblemUsecase) AddTestcase(ctx context.Context, requestContext *commo
 }
 
 func (uc *ProblemUsecase) addTestcaseToProblem(ctx context.Context, problemID int64, caseNo int32, input, output []byte) (Testcase, error) {
-	inputKey := fmt.Sprintf("problem-%d/input/%d.in", problemID, caseNo)
-	outputKey := fmt.Sprintf("problem-%d/output/%d.out", problemID, caseNo)
+	uploadID, err := newUploadID()
+	if err != nil {
+		return Testcase{}, ErrorInternal("generate testcase object key: %v", err)
+	}
+	inputKey := fmt.Sprintf("problem-%d/testcases/%d/%s.in", problemID, caseNo, uploadID)
+	outputKey := fmt.Sprintf("problem-%d/testcases/%d/%s.out", problemID, caseNo, uploadID)
 	if err := uc.objects.Put(ctx, inputKey, input); err != nil {
 		return Testcase{}, ErrorStorageUnavailable("upload testcase input: %v", err)
 	}
@@ -116,4 +122,12 @@ func (uc *ProblemUsecase) addTestcaseToProblem(ctx context.Context, problemID in
 		return Testcase{}, err
 	}
 	return testcase, nil
+}
+
+func newUploadID() (string, error) {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(value), nil
 }

@@ -219,10 +219,10 @@ INDEX(problem_id, status, case_no)
 
 保留 hash 以支持对象完整性校验和历史判题复现。测试用例删除使用
 `status=archived` 标记，不物理删除 MySQL 元信息或 MinIO 对象。
-正文位于 MinIO 的 `problem-data` bucket，对象 key 分别为
-`problem-{problem_id}/input/{case_no}.in` 和
-`problem-{problem_id}/output/{case_no}.out`。状态只有 `ACTIVE` 和
-`ARCHIVED`。
+正文位于 MinIO 的 `problem-data` bucket，对象 key 使用
+`problem-{problem_id}/testcases/{case_no}/{upload_id}.in|out`。同一对文件
+共享随机 `upload_id`，避免并发重复上传覆盖已有测试点对象。状态只有
+`ACTIVE` 和 `ARCHIVED`。
 
 ---
 
