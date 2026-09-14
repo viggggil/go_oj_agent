@@ -216,6 +216,9 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	if err := requireAdmin(input.Context); err != nil {
 		return Problem{}, err
 	}
+	if len(input.Testcases) > 0 && (uc.testcases == nil || uc.objects == nil || uc.compensator == nil) {
+		return Problem{}, ErrorInternal("testcase dependencies are not configured")
+	}
 	problem := input.Problem
 	problem.Title = strings.TrimSpace(problem.Title)
 	problem.Slug = strings.TrimSpace(problem.Slug)
@@ -229,13 +232,13 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	if err != nil || len(input.Testcases) == 0 {
 		return created, err
 	}
-	if uc.testcases == nil || uc.objects == nil || uc.compensator == nil {
-		return Problem{}, ErrorInternal("testcase dependencies are not configured")
-	}
 	stored := make([]Testcase, 0, len(input.Testcases))
 	for _, testcase := range input.Testcases {
 		item, addErr := uc.addTestcaseToProblem(ctx, created.ID, testcase.CaseNo, testcase.Input, testcase.Output)
 		if addErr != nil {
+			if uc.cache != nil {
+				_ = uc.cache.Delete(ctx, created.ID)
+			}
 			for _, previous := range stored {
 				_ = uc.objects.Delete(ctx, previous.InputObjectKey)
 				_ = uc.objects.Delete(ctx, previous.OutputObjectKey)

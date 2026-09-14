@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"errors"
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"testing"
@@ -36,5 +37,17 @@ func TestUpdateProblemInvalidatesCache(t *testing.T) {
 	_, err := NewProblemUsecaseWithDependencies(repo, nil, nil, nil, cache).Update(context.Background(), adminContext(), 2, Problem{Title: "A", Slug: "a", Description: "S", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1, MemoryLimitKb: 1}, nil)
 	if err != nil || cache.deletes != 1 {
 		t.Fatalf("err=%v deletes=%d", err, cache.deletes)
+	}
+}
+
+func TestCreateProblemFailureInvalidatesPopulatedCache(t *testing.T) {
+	cache := &fakeProblemCache{}
+	problems := &fakeProblemRepository{created: Problem{ID: 5}}
+	testcases := &fakeTestcaseRepository{err: errors.New("db failed")}
+	input := validCreateInput()
+	input.Testcases = []TestcaseContent{{CaseNo: 1, Input: []byte("in"), Output: []byte("out")}}
+	_, err := NewProblemUsecaseWithDependencies(problems, testcases, &fakeObjectStore{}, problems, cache).Create(context.Background(), input)
+	if err == nil || cache.sets != 1 || cache.deletes != 1 {
+		t.Fatalf("err=%v sets=%d deletes=%d", err, cache.sets, cache.deletes)
 	}
 }
