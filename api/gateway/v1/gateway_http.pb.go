@@ -9,7 +9,6 @@ package gatewayv1
 import (
 	context "context"
 	http "github.com/go-kratos/kratos/v3/transport/http"
-	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -35,21 +34,21 @@ const OperationGatewayServiceRegister = "/gateway.v1.GatewayService/Register"
 const OperationGatewayServiceUpdateProblem = "/gateway.v1.GatewayService/UpdateProblem"
 
 type GatewayServiceHTTPServer interface {
-	AddTestcase(context.Context, *v1.AddTestcaseRequest) (*v1.AddTestcaseResponse, error)
-	ArchiveProblem(context.Context, *v1.ArchiveProblemRequest) (*v1.ArchiveProblemResponse, error)
-	ArchiveTestcase(context.Context, *v1.ArchiveTestcaseRequest) (*v1.ArchiveTestcaseResponse, error)
-	CreateProblem(context.Context, *v1.CreateProblemRequest) (*v1.CreateProblemResponse, error)
+	AddTestcase(context.Context, *AddTestcaseRequest) (*AddTestcaseResponse, error)
+	ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error)
+	ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error)
+	CreateProblem(context.Context, *CreateProblemRequest) (*CreateProblemResponse, error)
 	GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error)
-	GetProblem(context.Context, *v1.GetProblemRequest) (*v1.GetProblemResponse, error)
+	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
-	ListProblemTestcases(context.Context, *v1.ListProblemTestcasesRequest) (*v1.ListProblemTestcasesResponse, error)
-	ListProblems(context.Context, *v1.ListProblemsRequest) (*v1.ListProblemsResponse, error)
+	ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error)
+	ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
-	UpdateProblem(context.Context, *v1.UpdateProblemRequest) (*v1.UpdateProblemResponse, error)
+	UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error)
 }
 
 func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServer) {
@@ -209,26 +208,26 @@ func _GatewayService_GetUser0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ct
 
 func _GatewayService_CreateProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.CreateProblemRequest
+		var in CreateProblemRequest
 		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		http.SetOperation(ctx, OperationGatewayServiceCreateProblem)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.CreateProblem(ctx, req.(*v1.CreateProblemRequest))
+			return srv.CreateProblem(ctx, req.(*CreateProblemRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.CreateProblemResponse)
+		reply := out.(*CreateProblemResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_GetProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.GetProblemRequest
+		var in GetProblemRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -237,39 +236,39 @@ func _GatewayService_GetProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func
 		}
 		http.SetOperation(ctx, OperationGatewayServiceGetProblem)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.GetProblem(ctx, req.(*v1.GetProblemRequest))
+			return srv.GetProblem(ctx, req.(*GetProblemRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.GetProblemResponse)
+		reply := out.(*GetProblemResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_ListProblems0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.ListProblemsRequest
+		var in ListProblemsRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
 		http.SetOperation(ctx, OperationGatewayServiceListProblems)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.ListProblems(ctx, req.(*v1.ListProblemsRequest))
+			return srv.ListProblems(ctx, req.(*ListProblemsRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.ListProblemsResponse)
+		reply := out.(*ListProblemsResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_UpdateProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.UpdateProblemRequest
+		var in UpdateProblemRequest
 		if err := ctx.Bind(&in.Problem); err != nil {
 			return err
 		}
@@ -281,20 +280,20 @@ func _GatewayService_UpdateProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) f
 		}
 		http.SetOperation(ctx, OperationGatewayServiceUpdateProblem)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.UpdateProblem(ctx, req.(*v1.UpdateProblemRequest))
+			return srv.UpdateProblem(ctx, req.(*UpdateProblemRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.UpdateProblemResponse)
+		reply := out.(*UpdateProblemResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_ArchiveProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.ArchiveProblemRequest
+		var in ArchiveProblemRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -303,20 +302,20 @@ func _GatewayService_ArchiveProblem0_HTTP_Handler(srv GatewayServiceHTTPServer) 
 		}
 		http.SetOperation(ctx, OperationGatewayServiceArchiveProblem)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.ArchiveProblem(ctx, req.(*v1.ArchiveProblemRequest))
+			return srv.ArchiveProblem(ctx, req.(*ArchiveProblemRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.ArchiveProblemResponse)
+		reply := out.(*ArchiveProblemResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_AddTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.AddTestcaseRequest
+		var in AddTestcaseRequest
 		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
@@ -325,20 +324,20 @@ func _GatewayService_AddTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer) fun
 		}
 		http.SetOperation(ctx, OperationGatewayServiceAddTestcase)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.AddTestcase(ctx, req.(*v1.AddTestcaseRequest))
+			return srv.AddTestcase(ctx, req.(*AddTestcaseRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.AddTestcaseResponse)
+		reply := out.(*AddTestcaseResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_ListProblemTestcases0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.ListProblemTestcasesRequest
+		var in ListProblemTestcasesRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -347,20 +346,20 @@ func _GatewayService_ListProblemTestcases0_HTTP_Handler(srv GatewayServiceHTTPSe
 		}
 		http.SetOperation(ctx, OperationGatewayServiceListProblemTestcases)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.ListProblemTestcases(ctx, req.(*v1.ListProblemTestcasesRequest))
+			return srv.ListProblemTestcases(ctx, req.(*ListProblemTestcasesRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.ListProblemTestcasesResponse)
+		reply := out.(*ListProblemTestcasesResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 func _GatewayService_ArchiveTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in v1.ArchiveTestcaseRequest
+		var in ArchiveTestcaseRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -369,33 +368,33 @@ func _GatewayService_ArchiveTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer)
 		}
 		http.SetOperation(ctx, OperationGatewayServiceArchiveTestcase)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.ArchiveTestcase(ctx, req.(*v1.ArchiveTestcaseRequest))
+			return srv.ArchiveTestcase(ctx, req.(*ArchiveTestcaseRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*v1.ArchiveTestcaseResponse)
+		reply := out.(*ArchiveTestcaseResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 type GatewayServiceHTTPClient interface {
-	AddTestcase(ctx context.Context, req *v1.AddTestcaseRequest, opts ...http.CallOption) (rsp *v1.AddTestcaseResponse, err error)
-	ArchiveProblem(ctx context.Context, req *v1.ArchiveProblemRequest, opts ...http.CallOption) (rsp *v1.ArchiveProblemResponse, err error)
-	ArchiveTestcase(ctx context.Context, req *v1.ArchiveTestcaseRequest, opts ...http.CallOption) (rsp *v1.ArchiveTestcaseResponse, err error)
-	CreateProblem(ctx context.Context, req *v1.CreateProblemRequest, opts ...http.CallOption) (rsp *v1.CreateProblemResponse, err error)
+	AddTestcase(ctx context.Context, req *AddTestcaseRequest, opts ...http.CallOption) (rsp *AddTestcaseResponse, err error)
+	ArchiveProblem(ctx context.Context, req *ArchiveProblemRequest, opts ...http.CallOption) (rsp *ArchiveProblemResponse, err error)
+	ArchiveTestcase(ctx context.Context, req *ArchiveTestcaseRequest, opts ...http.CallOption) (rsp *ArchiveTestcaseResponse, err error)
+	CreateProblem(ctx context.Context, req *CreateProblemRequest, opts ...http.CallOption) (rsp *CreateProblemResponse, err error)
 	GetCurrentUser(ctx context.Context, req *GetCurrentUserRequest, opts ...http.CallOption) (rsp *GetCurrentUserResponse, err error)
-	GetProblem(ctx context.Context, req *v1.GetProblemRequest, opts ...http.CallOption) (rsp *v1.GetProblemResponse, err error)
+	GetProblem(ctx context.Context, req *GetProblemRequest, opts ...http.CallOption) (rsp *GetProblemResponse, err error)
 	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *GetUserResponse, err error)
 	Health(ctx context.Context, req *HealthRequest, opts ...http.CallOption) (rsp *HealthResponse, err error)
-	ListProblemTestcases(ctx context.Context, req *v1.ListProblemTestcasesRequest, opts ...http.CallOption) (rsp *v1.ListProblemTestcasesResponse, err error)
-	ListProblems(ctx context.Context, req *v1.ListProblemsRequest, opts ...http.CallOption) (rsp *v1.ListProblemsResponse, err error)
+	ListProblemTestcases(ctx context.Context, req *ListProblemTestcasesRequest, opts ...http.CallOption) (rsp *ListProblemTestcasesResponse, err error)
+	ListProblems(ctx context.Context, req *ListProblemsRequest, opts ...http.CallOption) (rsp *ListProblemsResponse, err error)
 	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
 	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
 	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenResponse, err error)
 	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterResponse, err error)
-	UpdateProblem(ctx context.Context, req *v1.UpdateProblemRequest, opts ...http.CallOption) (rsp *v1.UpdateProblemResponse, err error)
+	UpdateProblem(ctx context.Context, req *UpdateProblemRequest, opts ...http.CallOption) (rsp *UpdateProblemResponse, err error)
 }
 
 type GatewayServiceHTTPClientImpl struct {
@@ -406,8 +405,8 @@ func NewGatewayServiceHTTPClient(client *http.Client) GatewayServiceHTTPClient {
 	return &GatewayServiceHTTPClientImpl{client}
 }
 
-func (c *GatewayServiceHTTPClientImpl) AddTestcase(ctx context.Context, in *v1.AddTestcaseRequest, opts ...http.CallOption) (*v1.AddTestcaseResponse, error) {
-	var out v1.AddTestcaseResponse
+func (c *GatewayServiceHTTPClientImpl) AddTestcase(ctx context.Context, in *AddTestcaseRequest, opts ...http.CallOption) (*AddTestcaseResponse, error) {
+	var out AddTestcaseResponse
 	pattern := "/api/v1/problems/{problem_id}/testcases"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -423,8 +422,8 @@ func (c *GatewayServiceHTTPClientImpl) AddTestcase(ctx context.Context, in *v1.A
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) ArchiveProblem(ctx context.Context, in *v1.ArchiveProblemRequest, opts ...http.CallOption) (*v1.ArchiveProblemResponse, error) {
-	var out v1.ArchiveProblemResponse
+func (c *GatewayServiceHTTPClientImpl) ArchiveProblem(ctx context.Context, in *ArchiveProblemRequest, opts ...http.CallOption) (*ArchiveProblemResponse, error) {
+	var out ArchiveProblemResponse
 	pattern := "/api/v1/problems/{problem_id}"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
@@ -439,8 +438,8 @@ func (c *GatewayServiceHTTPClientImpl) ArchiveProblem(ctx context.Context, in *v
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) ArchiveTestcase(ctx context.Context, in *v1.ArchiveTestcaseRequest, opts ...http.CallOption) (*v1.ArchiveTestcaseResponse, error) {
-	var out v1.ArchiveTestcaseResponse
+func (c *GatewayServiceHTTPClientImpl) ArchiveTestcase(ctx context.Context, in *ArchiveTestcaseRequest, opts ...http.CallOption) (*ArchiveTestcaseResponse, error) {
+	var out ArchiveTestcaseResponse
 	pattern := "/api/v1/problems/{problem_id}/testcases/{testcase_id}"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
@@ -455,8 +454,8 @@ func (c *GatewayServiceHTTPClientImpl) ArchiveTestcase(ctx context.Context, in *
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) CreateProblem(ctx context.Context, in *v1.CreateProblemRequest, opts ...http.CallOption) (*v1.CreateProblemResponse, error) {
-	var out v1.CreateProblemResponse
+func (c *GatewayServiceHTTPClientImpl) CreateProblem(ctx context.Context, in *CreateProblemRequest, opts ...http.CallOption) (*CreateProblemResponse, error) {
+	var out CreateProblemResponse
 	pattern := "/api/v1/problems"
 	path := http.BuildPath(pattern, in)
 	opts = append([]http.CallOption{
@@ -488,8 +487,8 @@ func (c *GatewayServiceHTTPClientImpl) GetCurrentUser(ctx context.Context, in *G
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) GetProblem(ctx context.Context, in *v1.GetProblemRequest, opts ...http.CallOption) (*v1.GetProblemResponse, error) {
-	var out v1.GetProblemResponse
+func (c *GatewayServiceHTTPClientImpl) GetProblem(ctx context.Context, in *GetProblemRequest, opts ...http.CallOption) (*GetProblemResponse, error) {
+	var out GetProblemResponse
 	pattern := "/api/v1/problems/{problem_id}"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
@@ -536,8 +535,8 @@ func (c *GatewayServiceHTTPClientImpl) Health(ctx context.Context, in *HealthReq
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) ListProblemTestcases(ctx context.Context, in *v1.ListProblemTestcasesRequest, opts ...http.CallOption) (*v1.ListProblemTestcasesResponse, error) {
-	var out v1.ListProblemTestcasesResponse
+func (c *GatewayServiceHTTPClientImpl) ListProblemTestcases(ctx context.Context, in *ListProblemTestcasesRequest, opts ...http.CallOption) (*ListProblemTestcasesResponse, error) {
+	var out ListProblemTestcasesResponse
 	pattern := "/api/v1/problems/{problem_id}/testcases"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
@@ -552,8 +551,8 @@ func (c *GatewayServiceHTTPClientImpl) ListProblemTestcases(ctx context.Context,
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) ListProblems(ctx context.Context, in *v1.ListProblemsRequest, opts ...http.CallOption) (*v1.ListProblemsResponse, error) {
-	var out v1.ListProblemsResponse
+func (c *GatewayServiceHTTPClientImpl) ListProblems(ctx context.Context, in *ListProblemsRequest, opts ...http.CallOption) (*ListProblemsResponse, error) {
+	var out ListProblemsResponse
 	pattern := "/api/v1/problems"
 	path := http.BuildPath(pattern, in, http.WithQueryParams())
 	opts = append([]http.CallOption{
@@ -636,8 +635,8 @@ func (c *GatewayServiceHTTPClientImpl) Register(ctx context.Context, in *Registe
 	return &out, nil
 }
 
-func (c *GatewayServiceHTTPClientImpl) UpdateProblem(ctx context.Context, in *v1.UpdateProblemRequest, opts ...http.CallOption) (*v1.UpdateProblemResponse, error) {
-	var out v1.UpdateProblemResponse
+func (c *GatewayServiceHTTPClientImpl) UpdateProblem(ctx context.Context, in *UpdateProblemRequest, opts ...http.CallOption) (*UpdateProblemResponse, error) {
+	var out UpdateProblemResponse
 	pattern := "/api/v1/problems/{problem_id}"
 	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("problem"))
 	opts = append([]http.CallOption{

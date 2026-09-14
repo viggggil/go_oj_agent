@@ -4,7 +4,7 @@ Integration, contract, and e2e test suites live here.
 
 ## 认证集成测试
 
-认证集成测试通过独立 Docker Compose project 启动 MySQL、Redis、user-service 和 gateway-service：
+集成测试通过独立 Docker Compose project 启动 MySQL、Redis、MinIO、user-service、problem-service 和 gateway-service：
 
 ```bash
 make test-integration
@@ -17,6 +17,9 @@ AUTH_TEST_GATEWAY_HTTP_PORT
 AUTH_TEST_USER_GRPC_PORT
 AUTH_TEST_MYSQL_PORT
 AUTH_TEST_REDIS_PORT
+PROBLEM_TEST_GRPC_PORT
+PROBLEM_TEST_MINIO_PORT
+PROBLEM_TEST_MINIO_CONSOLE_PORT
 ```
 
 覆盖范围：
@@ -27,5 +30,9 @@ AUTH_TEST_REDIS_PORT
 - 登录和获取当前用户。
 - Access Token 真实过期。
 - Refresh Token 轮换、新 Access Token 访问和旧 Refresh Token 拒绝。
+- Problem Repository 对真实 MySQL 的创建、读取、更新和归档。
+- MinIO 对象上传、读取元信息和清理。
+- Redis Problem 详情缓存命中与失效。
+- Gateway 创建题目、multipart 测试点上传、查询和归档链路。
 
 直接运行 `go test ./...` 时，如果没有设置 `AUTH_INTEGRATION_BASE_URL`，该测试会跳过，以保持单元测试不依赖 Docker。

@@ -29,6 +29,7 @@ func TestAddTestcaseRequestValidate(t *testing.T) {
 		{name: "missing context", mutate: func(req *AddTestcaseRequest) { req.Context = nil }},
 		{name: "invalid problem", mutate: func(req *AddTestcaseRequest) { req.ProblemId = 0 }},
 		{name: "wrong input suffix", mutate: func(req *AddTestcaseRequest) { req.InputFilename = "001.txt" }},
+		{name: "non-canonical input number", mutate: func(req *AddTestcaseRequest) { req.InputFilename = "001.in" }},
 		{name: "path input filename", mutate: func(req *AddTestcaseRequest) { req.InputFilename = "dir/001.in" }},
 		{name: "wrong output suffix", mutate: func(req *AddTestcaseRequest) { req.OutputFilename = "001.ans" }},
 		{name: "empty input", mutate: func(req *AddTestcaseRequest) { req.InputContent = nil }},

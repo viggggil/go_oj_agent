@@ -65,6 +65,12 @@ make errors    # 使用 Kratos errors 插件生成错误代码
 application/json
 ```
 
+测试用例文件上传：
+
+```text
+multipart/form-data
+```
+
 Streaming：
 
 ```text
@@ -185,6 +191,34 @@ Response：
 ```
 
 当前 Gateway 已接入该接口，内部转发到 `user.v1.UserService/Register`。
+
+## 3.2 Problem
+
+所有 Problem HTTP 接口都要求 Bearer Token，Gateway 将认证结果转换为
+`common.v1.RequestContext`，最终资源权限仍由 problem-service 校验。
+
+```text
+POST   /api/v1/problems
+GET    /api/v1/problems
+GET    /api/v1/problems/{problem_id}
+PUT    /api/v1/problems/{problem_id}
+DELETE /api/v1/problems/{problem_id}
+GET    /api/v1/problems/{problem_id}/testcases
+DELETE /api/v1/problems/{problem_id}/testcases/{testcase_id}
+```
+
+测试点文件通过以下接口上传：
+
+```http
+POST /api/v1/problems/{problem_id}/testcases/upload
+Authorization: Bearer <access_token>
+Content-Type: multipart/form-data
+```
+
+表单字段为 `case_no`、`input` 和 `output`。当 `case_no=7` 时，两个文件名
+必须严格为 `7.in` 和 `7.out`。每个文件最大 16 MiB，整个 HTTP 请求最大
+34 MiB。Gateway 只解析并转发文件，MinIO 和 MySQL 写入由 ProblemService
+完成。
 
 ### POST `/api/v1/auth/login`
 

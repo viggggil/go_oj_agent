@@ -3,7 +3,7 @@ service:
 server:
   http:
     address: ":8080"
-    timeout: "3s"
+    timeout: "30s"
 auth:
   access_token_key: "replace-with-the-same-secret-as-user-service"
   issuer: "go-oj-agent"
@@ -15,8 +15,8 @@ clients:
     timeout: "3s"
   problem:
     name: "problem-service"
-    endpoint: ""
-    timeout: "3s"
+    endpoint: "127.0.0.1:9002"
+    timeout: "30s"
   submission:
     name: "submission-service"
     endpoint: ""

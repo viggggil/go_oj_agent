@@ -1,4 +1,4 @@
-name: go-oj-auth
+name: go-oj-agent
 
 services:
   mysql:
@@ -17,6 +17,10 @@ services:
       - ../../migrations/user/000002_create_roles.up.sql:/docker-entrypoint-initdb.d/102_create_roles.sql:ro
       - ../../migrations/user/000003_create_user_roles.up.sql:/docker-entrypoint-initdb.d/103_create_user_roles.sql:ro
       - ../../migrations/user/000004_seed_default_roles.up.sql:/docker-entrypoint-initdb.d/104_seed_default_roles.sql:ro
+      - ../../migrations/problem/000001_create_problems.up.sql:/docker-entrypoint-initdb.d/201_create_problems.sql:ro
+      - ../../migrations/problem/000002_create_tags.up.sql:/docker-entrypoint-initdb.d/202_create_tags.sql:ro
+      - ../../migrations/problem/000003_create_problem_tags.up.sql:/docker-entrypoint-initdb.d/203_create_problem_tags.sql:ro
+      - ../../migrations/problem/000004_create_testcases.up.sql:/docker-entrypoint-initdb.d/204_create_testcases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
@@ -38,6 +42,40 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing local/problem-data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
 
   user-service:
     build:
@@ -73,6 +111,43 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  problem-service:
+    build:
+      context: ../..
+      dockerfile: services/problem/Dockerfile
+    environment:
+      KRATOS_SERVER_GRPC_ADDRESS: ":9002"
+      KRATOS_SERVER_GRPC_MAX_RECEIVE_MESSAGE_BYTES: "35651584"
+      KRATOS_DATA_MYSQL_DSN: "root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(mysql:3306)/oj_problem?parseTime=true"
+      KRATOS_DATA_REDIS_ADDR: "redis:6379"
+      KRATOS_DATA_REDIS_PASSWORD: ""
+      KRATOS_DATA_REDIS_DB: "0"
+      KRATOS_DATA_REDIS_NAMESPACE: "go_oj_agent:problem"
+      KRATOS_STORAGE_MINIO_ENDPOINT: "minio:9000"
+      KRATOS_STORAGE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      KRATOS_STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      KRATOS_STORAGE_MINIO_BUCKET: "problem-data"
+      KRATOS_STORAGE_MINIO_USE_SSL: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${PROBLEM_GRPC_PORT:-9002}:9002"
+    volumes:
+      - ./configs/problem.yaml:/app/config.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9002"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
   gateway-service:
     build:
       context: ../..
@@ -83,6 +158,7 @@ services:
       KRATOS_AUTH_ISSUER: "go-oj-agent"
       KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
       KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
+      KRATOS_CLIENTS_PROBLEM_ENDPOINT: "problem-service:9002"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
     ports:
       - "127.0.0.1:${GATEWAY_HTTP_PORT:-8080}:8080"
@@ -90,6 +166,8 @@ services:
       - ./configs/gateway.yaml:/app/config.yaml:ro
     depends_on:
       user-service:
+        condition: service_healthy
+      problem-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
@@ -115,3 +193,4 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  minio-data:

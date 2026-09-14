@@ -3,7 +3,7 @@ service:
 server:
   http:
     address: "${SERVER_HTTP_ADDRESS}"
-    timeout: "3s"
+    timeout: "30s"
 auth:
   access_token_key: "${AUTH_ACCESS_TOKEN_KEY}"
   issuer: "${AUTH_ISSUER}"
@@ -15,8 +15,8 @@ clients:
     timeout: "3s"
   problem:
     name: problem-service
-    endpoint: ""
-    timeout: "3s"
+    endpoint: "${CLIENTS_PROBLEM_ENDPOINT}"
+    timeout: "30s"
   submission:
     name: submission-service
     endpoint: ""

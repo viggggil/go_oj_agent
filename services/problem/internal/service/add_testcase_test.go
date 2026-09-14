@@ -17,6 +17,19 @@ func TestAddTestcaseHandler(t *testing.T) {
 		t.Fatalf("response=%+v err=%v", response, err)
 	}
 }
+
+func TestAddTestcaseHandlerRejectsFilenameNotMatchingCaseNumber(t *testing.T) {
+	repo := &serviceTestcaseRepo{serviceFakeRepository: serviceFakeRepository{found: biz.Problem{ID: 2}}}
+	server := NewProblemService(biz.NewProblemUsecaseWithStore(repo, repo, &serviceObjectStore{}, repo))
+	_, err := server.AddTestcase(context.Background(), &problemv1.AddTestcaseRequest{
+		Context: adminContextProto(), ProblemId: 2, CaseNo: 2,
+		InputFilename: "1.in", InputContent: []byte("in"),
+		OutputFilename: "2.out", OutputContent: []byte("out"),
+	})
+	if !problemv1.IsProblemErrorReasonInvalidArgument(err) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
 func adminContextProto() *commonv1.RequestContext {
 	return &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}}
 }

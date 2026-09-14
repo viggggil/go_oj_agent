@@ -1,12 +1,16 @@
-# 认证链路 Docker Compose
+# 本地开发 Docker Compose
 
 本目录提供当前认证后端链路所需的最小本地环境：
 
 ```text
 HTTP Client -> gateway-service -> gRPC -> user-service -> MySQL / Redis
+                              -> gRPC -> problem-service -> MySQL / Redis / MinIO
 ```
 
-MySQL 保存用户和角色，Redis 保存 Refresh Token 元数据。当前环境不启动 RabbitMQ、MinIO、Consul 或尚未实现的业务服务。
+MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保存 Refresh Token
+及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
+启动 user-service、problem-service、gateway-service 和 Web，尚不启动
+RabbitMQ、Consul 或未实现的业务服务。
 
 ## 启动
 
@@ -23,8 +27,11 @@ make infra-up
 | Gateway | `http://127.0.0.1:8080` | 外部 REST API |
 | Web | `http://127.0.0.1:5173` | Vue 3 认证前端 |
 | user-service | `127.0.0.1:9001` | 内部 gRPC，仅用于本地调试 |
-| MySQL | `127.0.0.1:3306` | `oj_user` 数据库 |
-| Redis | `127.0.0.1:6379` | Refresh Token 元数据 |
+| problem-service | `127.0.0.1:9002` | 内部 gRPC，仅用于本地调试 |
+| MySQL | `127.0.0.1:3306` | `oj_user`、`oj_problem` 数据库 |
+| Redis | `127.0.0.1:6379` | Refresh Token 和题目详情缓存 |
+| MinIO | `http://127.0.0.1:9000` | 测试点对象存储 API |
+| MinIO Console | `http://127.0.0.1:9003` | 本地对象存储管理界面 |
 
 检查状态：
 
@@ -35,7 +42,7 @@ curl http://127.0.0.1:8080/healthz
 
 浏览器访问 `http://127.0.0.1:5173` 可使用注册、登录和个人资料页面。Compose 构建时通过 `WEB_API_BASE_URL` 注入 Gateway 地址；如果修改了 `GATEWAY_HTTP_PORT`，应同步设置 `WEB_API_BASE_URL`，例如 `WEB_API_BASE_URL=http://127.0.0.1:18080 GATEWAY_HTTP_PORT=18080 make infra-up`。
 
-停止服务但保留 MySQL 和 Redis 数据：
+停止服务但保留 MySQL、Redis 和 MinIO 数据：
 
 ```bash
 make infra-down
@@ -47,7 +54,7 @@ make infra-down
 docker compose -f deploy/compose/compose.yaml down --volumes
 ```
 
-该命令会永久删除此 Compose 项目的本地 MySQL 和 Redis 数据。
+该命令会永久删除此 Compose 项目的本地 MySQL、Redis 和 MinIO 数据。
 
 ## 配置
 
@@ -75,6 +82,9 @@ MySQL 官方镜像仅在数据目录为空时执行 `/docker-entrypoint-initdb.d
 3. 创建 `oj_user.roles`。
 4. 创建 `oj_user.user_roles`。
 5. 写入 `user` 和 `admin` 默认角色。
+6. 创建 `oj_problem.problems`、`tags`、`problem_tags` 和 `testcases`。
+
+`minio-init` 在 MinIO 健康后幂等创建 `problem-data` bucket。
 
 Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrations/`。
 
