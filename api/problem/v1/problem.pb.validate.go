@@ -2563,7 +2563,7 @@ func (m *AddTestcaseRequest) validate(all bool) error {
 	if !_AddTestcaseRequest_InputFilename_Pattern.MatchString(m.GetInputFilename()) {
 		err := AddTestcaseRequestValidationError{
 			field:  "InputFilename",
-			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.in$\"",
+			reason: "value does not match regex pattern \"^[1-9][0-9]*\\\\.in$\"",
 		}
 		if !all {
 			return err
@@ -2596,7 +2596,7 @@ func (m *AddTestcaseRequest) validate(all bool) error {
 	if !_AddTestcaseRequest_OutputFilename_Pattern.MatchString(m.GetOutputFilename()) {
 		err := AddTestcaseRequestValidationError{
 			field:  "OutputFilename",
-			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.out$\"",
+			reason: "value does not match regex pattern \"^[1-9][0-9]*\\\\.out$\"",
 		}
 		if !all {
 			return err
@@ -2695,9 +2695,9 @@ var _ interface {
 	ErrorName() string
 } = AddTestcaseRequestValidationError{}
 
-var _AddTestcaseRequest_InputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.in$")
+var _AddTestcaseRequest_InputFilename_Pattern = regexp.MustCompile("^[1-9][0-9]*\\.in$")
 
-var _AddTestcaseRequest_OutputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.out$")
+var _AddTestcaseRequest_OutputFilename_Pattern = regexp.MustCompile("^[1-9][0-9]*\\.out$")
 
 // Validate checks the field values on TestcaseInput with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -2746,7 +2746,7 @@ func (m *TestcaseInput) validate(all bool) error {
 	if !_TestcaseInput_InputFilename_Pattern.MatchString(m.GetInputFilename()) {
 		err := TestcaseInputValidationError{
 			field:  "InputFilename",
-			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.in$\"",
+			reason: "value does not match regex pattern \"^[1-9][0-9]*\\\\.in$\"",
 		}
 		if !all {
 			return err
@@ -2779,7 +2779,7 @@ func (m *TestcaseInput) validate(all bool) error {
 	if !_TestcaseInput_OutputFilename_Pattern.MatchString(m.GetOutputFilename()) {
 		err := TestcaseInputValidationError{
 			field:  "OutputFilename",
-			reason: "value does not match regex pattern \"^[^/\\\\\\\\]+\\\\.out$\"",
+			reason: "value does not match regex pattern \"^[1-9][0-9]*\\\\.out$\"",
 		}
 		if !all {
 			return err
@@ -2876,9 +2876,9 @@ var _ interface {
 	ErrorName() string
 } = TestcaseInputValidationError{}
 
-var _TestcaseInput_InputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.in$")
+var _TestcaseInput_InputFilename_Pattern = regexp.MustCompile("^[1-9][0-9]*\\.in$")
 
-var _TestcaseInput_OutputFilename_Pattern = regexp.MustCompile("^[^/\\\\]+\\.out$")
+var _TestcaseInput_OutputFilename_Pattern = regexp.MustCompile("^[1-9][0-9]*\\.out$")
 
 // Validate checks the field values on AddTestcaseResponse with the rules
 // defined in the proto definition for this message. If any rules are

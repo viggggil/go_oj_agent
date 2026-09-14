@@ -39,6 +39,7 @@ func NewHTTPServer(
 		),
 	)
 	gatewayv1.RegisterGatewayServiceHTTPServer(server, gatewayService)
+	registerProblemUploadRoute(server, gatewayService)
 	server.Use(
 		gatewayv1.OperationGatewayServiceGetCurrentUser,
 		authMiddleware.Middleware(),
@@ -47,5 +48,17 @@ func NewHTTPServer(
 		gatewayv1.OperationGatewayServiceGetUser,
 		authMiddleware.Middleware(),
 	)
+	for _, operation := range []string{
+		gatewayv1.OperationGatewayServiceCreateProblem,
+		gatewayv1.OperationGatewayServiceGetProblem,
+		gatewayv1.OperationGatewayServiceListProblems,
+		gatewayv1.OperationGatewayServiceUpdateProblem,
+		gatewayv1.OperationGatewayServiceArchiveProblem,
+		gatewayv1.OperationGatewayServiceAddTestcase,
+		gatewayv1.OperationGatewayServiceListProblemTestcases,
+		gatewayv1.OperationGatewayServiceArchiveTestcase,
+	} {
+		server.Use(operation, authMiddleware.Middleware())
+	}
 	return server
 }

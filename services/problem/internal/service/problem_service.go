@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/wire"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
@@ -30,6 +31,11 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 	}
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	for _, testcase := range req.GetTestcases() {
+		if err := validateTestcasePair(testcase.GetCaseNo(), testcase.GetInputFilename(), testcase.GetOutputFilename()); err != nil {
+			return nil, err
+		}
 	}
 	in := req.GetProblem()
 	p, err := s.uc.Create(ctx, biz.CreateProblemInput{
@@ -122,11 +128,23 @@ func (s *ProblemService) AddTestcase(ctx context.Context, req *problemv1.AddTest
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
+	if err := validateTestcasePair(req.GetCaseNo(), req.GetInputFilename(), req.GetOutputFilename()); err != nil {
+		return nil, err
+	}
 	testcase, err := s.uc.AddTestcase(ctx, req.GetContext(), req.GetProblemId(), req.GetCaseNo(), req.GetInputContent(), req.GetOutputContent())
 	if err != nil {
 		return nil, err
 	}
 	return &problemv1.AddTestcaseResponse{Testcase: toProtoTestcase(testcase)}, nil
+}
+
+func validateTestcasePair(caseNo int32, inputFilename, outputFilename string) error {
+	wantInput := fmt.Sprintf("%d.in", caseNo)
+	wantOutput := fmt.Sprintf("%d.out", caseNo)
+	if inputFilename != wantInput || outputFilename != wantOutput {
+		return biz.ErrorInvalidArgument("testcase files must be named %s and %s", wantInput, wantOutput)
+	}
+	return nil
 }
 
 func (s *ProblemService) ListProblemTestcases(ctx context.Context, req *problemv1.ListProblemTestcasesRequest) (*problemv1.ListProblemTestcasesResponse, error) {

@@ -13,9 +13,9 @@ func TestAddTestcaseRequestValidate(t *testing.T) {
 		Context:        &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}},
 		ProblemId:      10,
 		CaseNo:         1,
-		InputFilename:  "001.in",
+		InputFilename:  "1.in",
 		InputContent:   []byte("1 2\n"),
-		OutputFilename: "001.out",
+		OutputFilename: "1.out",
 		OutputContent:  []byte("3\n"),
 	}
 	if err := valid.Validate(); err != nil {
