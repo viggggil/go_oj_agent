@@ -14,7 +14,7 @@ body {
   margin: 0;
 }
 .shell {
-  max-width: 960px;
+  max-width: 1120px;
   margin: auto;
   padding: 24px;
 }
@@ -23,6 +23,249 @@ header {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 72px;
+}
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+.page-head h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+.page-head p {
+  margin: 0;
+  color: #687188;
+}
+.button {
+  display: inline-block;
+  background: #3157d5;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+.secondary {
+  background: #e8edfb;
+  color: #2445af;
+}
+.problem-table {
+  background: #fff;
+  border: 1px solid #e1e5ee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.table-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 100px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #edf0f5;
+  color: #172033;
+  align-items: center;
+}
+.table-row.admin {
+  grid-template-columns: 72px 1fr 100px 100px;
+}
+.table-row:last-child {
+  border-bottom: 0;
+}
+.table-row:not(.table-head):hover {
+  background: #f8f9fc;
+}
+.table-head {
+  color: #687188;
+  font-size: 13px;
+  background: #f8f9fc;
+}
+.difficulty {
+  font-weight: 600;
+}
+.d-1 {
+  color: #15805b;
+}
+.d-2 {
+  color: #a76200;
+}
+.d-3 {
+  color: #c53b45;
+}
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin: 24px;
+}
+.pager button {
+  padding: 8px 14px;
+}
+.empty {
+  text-align: center;
+  color: #687188;
+  padding: 30px;
+}
+.eyebrow {
+  font-size: 13px;
+  text-transform: uppercase;
+}
+.meta,
+.tags {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.meta span:not(.difficulty),
+.tags span {
+  color: #596277;
+  background: #eef1f6;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.problem-detail .page-head {
+  border-bottom: 1px solid #dde2ec;
+  padding-bottom: 24px;
+}
+.statement {
+  max-width: 800px;
+  margin-top: 42px;
+}
+.statement h2,
+.testcases h2 {
+  font-size: 19px;
+}
+.statement p {
+  white-space: pre-wrap;
+  line-height: 1.75;
+}
+.workspace {
+  max-width: 900px;
+  margin: auto;
+}
+.editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 22px;
+  background: #fff;
+  border: 1px solid #e1e5ee;
+  border-radius: 8px;
+  padding: 24px;
+}
+.wide {
+  grid-column: 1/-1;
+}
+textarea,
+select {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 11px;
+  border: 1px solid #d7dcea;
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+textarea {
+  min-height: 260px;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.actions button {
+  width: auto;
+}
+.danger {
+  background: #b8323e;
+}
+.notice {
+  color: #147454;
+}
+.testcases {
+  margin-top: 36px;
+  border-top: 1px solid #dfe4ed;
+  padding-top: 24px;
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.toggle input {
+  width: auto;
+  margin: 0;
+}
+.upload {
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+  background: #eef1f6;
+  padding: 16px;
+  border-radius: 8px;
+}
+.upload label {
+  margin: 0;
+}
+.upload button {
+  margin: 0 0 1px;
+  width: auto;
+}
+.testcase-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 70px;
+  align-items: center;
+  padding: 14px 8px;
+  border-bottom: 1px solid #e4e8f0;
+}
+.danger-text {
+  background: none;
+  color: #b8323e;
+  padding: 4px;
+}
+@media (max-width: 700px) {
+  .shell {
+    padding: 16px;
+  }
+  header {
+    margin-bottom: 40px;
+    align-items: flex-start;
+  }
+  nav {
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .table-row,
+  .table-row.admin {
+    grid-template-columns: 48px 1fr 70px;
+  }
+  .table-row.admin span:last-child {
+    display: none;
+  }
+  .editor {
+    grid-template-columns: 1fr;
+  }
+  .wide {
+    grid-column: auto;
+  }
+  .upload {
+    grid-template-columns: 1fr;
+  }
+  .testcase-row {
+    grid-template-columns: 60px 1fr 70px;
+  }
+  .page-head h1 {
+    font-size: 26px;
+  }
 }
 nav {
   display: flex;

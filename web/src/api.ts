@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { TokenPair, User } from './types'
+import type { Problem, ProblemInput, ProblemSummary, Testcase, TokenPair, User } from './types'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/',
@@ -73,4 +73,32 @@ export const authApi = {
     api.post<TokenPair>('/api/v1/auth/login', payload),
   profile: () => api.get<{ user: User }>('/api/v1/users/me'),
   logout: () => api.post('/api/v1/auth/logout', { refresh_token: refreshToken }),
+}
+export const problemApi = {
+  list: (page = 1, pageSize = 20) =>
+    api.get<{ items: ProblemSummary[]; page: { page: number; page_size: number; total: number } }>(
+      '/api/v1/problems',
+      { params: { 'page.page': page, 'page.page_size': pageSize } },
+    ),
+  get: (id: number) => api.get<{ problem: Problem }>(`/api/v1/problems/${id}`),
+  create: (problem: ProblemInput) =>
+    api.post<{ problem: Problem }>('/api/v1/problems', { problem }),
+  update: (id: number, problem: ProblemInput) =>
+    api.put<{ problem: Problem }>(`/api/v1/problems/${id}`, problem),
+  archive: (id: number) => api.delete(`/api/v1/problems/${id}`),
+  testcases: (id: number, includeArchived = false) =>
+    api.get<{ items: Testcase[] }>(`/api/v1/problems/${id}/testcases`, {
+      params: { include_archived: includeArchived },
+    }),
+  uploadTestcase: (id: number, caseNo: number, input: File, output: File) => {
+    const form = new FormData()
+    form.append('case_no', String(caseNo))
+    form.append('input', input)
+    form.append('output', output)
+    return api.post<{ testcase: Testcase }>(`/api/v1/problems/${id}/testcases/upload`, form, {
+      headers: { 'Content-Type': undefined },
+    })
+  },
+  archiveTestcase: (problemId: number, testcaseId: number) =>
+    api.delete(`/api/v1/problems/${problemId}/testcases/${testcaseId}`),
 }
