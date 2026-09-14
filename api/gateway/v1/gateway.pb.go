@@ -8,7 +8,7 @@ package gatewayv1
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	_ "github.com/viggggil/go_oj_agent/api/common/v1"
+	v11 "github.com/viggggil/go_oj_agent/api/common/v1"
 	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -757,6 +757,790 @@ func (x *GetUserResponse) GetUser() *UserSummary {
 	return nil
 }
 
+type CreateProblemRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *v1.ProblemInput       `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	Testcases     []*v1.TestcaseInput    `protobuf:"bytes,2,rep,name=testcases,proto3" json:"testcases,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateProblemRequest) Reset() {
+	*x = CreateProblemRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateProblemRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateProblemRequest) ProtoMessage() {}
+
+func (x *CreateProblemRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateProblemRequest.ProtoReflect.Descriptor instead.
+func (*CreateProblemRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CreateProblemRequest) GetProblem() *v1.ProblemInput {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+func (x *CreateProblemRequest) GetTestcases() []*v1.TestcaseInput {
+	if x != nil {
+		return x.Testcases
+	}
+	return nil
+}
+
+type CreateProblemResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *v1.Problem            `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateProblemResponse) Reset() {
+	*x = CreateProblemResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateProblemResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateProblemResponse) ProtoMessage() {}
+
+func (x *CreateProblemResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateProblemResponse.ProtoReflect.Descriptor instead.
+func (*CreateProblemResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *CreateProblemResponse) GetProblem() *v1.Problem {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type GetProblemRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId     int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProblemRequest) Reset() {
+	*x = GetProblemRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProblemRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProblemRequest) ProtoMessage() {}
+
+func (x *GetProblemRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProblemRequest.ProtoReflect.Descriptor instead.
+func (*GetProblemRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetProblemRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+type GetProblemResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *v1.Problem            `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProblemResponse) Reset() {
+	*x = GetProblemResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProblemResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProblemResponse) ProtoMessage() {}
+
+func (x *GetProblemResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProblemResponse.ProtoReflect.Descriptor instead.
+func (*GetProblemResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetProblemResponse) GetProblem() *v1.Problem {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type ListProblemsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          *v11.PageRequest       `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProblemsRequest) Reset() {
+	*x = ListProblemsRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProblemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProblemsRequest) ProtoMessage() {}
+
+func (x *ListProblemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProblemsRequest.ProtoReflect.Descriptor instead.
+func (*ListProblemsRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListProblemsRequest) GetPage() *v11.PageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListProblemsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*v1.ProblemSummary   `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Page          *v11.PageResponse      `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProblemsResponse) Reset() {
+	*x = ListProblemsResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProblemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProblemsResponse) ProtoMessage() {}
+
+func (x *ListProblemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProblemsResponse.ProtoReflect.Descriptor instead.
+func (*ListProblemsResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListProblemsResponse) GetItems() []*v1.ProblemSummary {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListProblemsResponse) GetPage() *v11.PageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type UpdateProblemRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId     int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	Problem       *v1.ProblemInput       `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProblemRequest) Reset() {
+	*x = UpdateProblemRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProblemRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProblemRequest) ProtoMessage() {}
+
+func (x *UpdateProblemRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProblemRequest.ProtoReflect.Descriptor instead.
+func (*UpdateProblemRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *UpdateProblemRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *UpdateProblemRequest) GetProblem() *v1.ProblemInput {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type UpdateProblemResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *v1.Problem            `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProblemResponse) Reset() {
+	*x = UpdateProblemResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProblemResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProblemResponse) ProtoMessage() {}
+
+func (x *UpdateProblemResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProblemResponse.ProtoReflect.Descriptor instead.
+func (*UpdateProblemResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UpdateProblemResponse) GetProblem() *v1.Problem {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type ArchiveProblemRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId     int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArchiveProblemRequest) Reset() {
+	*x = ArchiveProblemRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveProblemRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveProblemRequest) ProtoMessage() {}
+
+func (x *ArchiveProblemRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveProblemRequest.ProtoReflect.Descriptor instead.
+func (*ArchiveProblemRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ArchiveProblemRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+type ArchiveProblemResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *v1.Problem            `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArchiveProblemResponse) Reset() {
+	*x = ArchiveProblemResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveProblemResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveProblemResponse) ProtoMessage() {}
+
+func (x *ArchiveProblemResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveProblemResponse.ProtoReflect.Descriptor instead.
+func (*ArchiveProblemResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ArchiveProblemResponse) GetProblem() *v1.Problem {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type AddTestcaseRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId      int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	CaseNo         int32                  `protobuf:"varint,2,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
+	InputFilename  string                 `protobuf:"bytes,3,opt,name=input_filename,json=inputFilename,proto3" json:"input_filename,omitempty"`
+	InputContent   []byte                 `protobuf:"bytes,4,opt,name=input_content,json=inputContent,proto3" json:"input_content,omitempty"`
+	OutputFilename string                 `protobuf:"bytes,5,opt,name=output_filename,json=outputFilename,proto3" json:"output_filename,omitempty"`
+	OutputContent  []byte                 `protobuf:"bytes,6,opt,name=output_content,json=outputContent,proto3" json:"output_content,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AddTestcaseRequest) Reset() {
+	*x = AddTestcaseRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTestcaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTestcaseRequest) ProtoMessage() {}
+
+func (x *AddTestcaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTestcaseRequest.ProtoReflect.Descriptor instead.
+func (*AddTestcaseRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AddTestcaseRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *AddTestcaseRequest) GetCaseNo() int32 {
+	if x != nil {
+		return x.CaseNo
+	}
+	return 0
+}
+
+func (x *AddTestcaseRequest) GetInputFilename() string {
+	if x != nil {
+		return x.InputFilename
+	}
+	return ""
+}
+
+func (x *AddTestcaseRequest) GetInputContent() []byte {
+	if x != nil {
+		return x.InputContent
+	}
+	return nil
+}
+
+func (x *AddTestcaseRequest) GetOutputFilename() string {
+	if x != nil {
+		return x.OutputFilename
+	}
+	return ""
+}
+
+func (x *AddTestcaseRequest) GetOutputContent() []byte {
+	if x != nil {
+		return x.OutputContent
+	}
+	return nil
+}
+
+type AddTestcaseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Testcase      *v1.TestcaseMetadata   `protobuf:"bytes,1,opt,name=testcase,proto3" json:"testcase,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTestcaseResponse) Reset() {
+	*x = AddTestcaseResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTestcaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTestcaseResponse) ProtoMessage() {}
+
+func (x *AddTestcaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTestcaseResponse.ProtoReflect.Descriptor instead.
+func (*AddTestcaseResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AddTestcaseResponse) GetTestcase() *v1.TestcaseMetadata {
+	if x != nil {
+		return x.Testcase
+	}
+	return nil
+}
+
+type ListProblemTestcasesRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId       int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	IncludeArchived bool                   `protobuf:"varint,2,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ListProblemTestcasesRequest) Reset() {
+	*x = ListProblemTestcasesRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProblemTestcasesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProblemTestcasesRequest) ProtoMessage() {}
+
+func (x *ListProblemTestcasesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProblemTestcasesRequest.ProtoReflect.Descriptor instead.
+func (*ListProblemTestcasesRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListProblemTestcasesRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *ListProblemTestcasesRequest) GetIncludeArchived() bool {
+	if x != nil {
+		return x.IncludeArchived
+	}
+	return false
+}
+
+type ListProblemTestcasesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*v1.TestcaseMetadata `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProblemTestcasesResponse) Reset() {
+	*x = ListProblemTestcasesResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProblemTestcasesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProblemTestcasesResponse) ProtoMessage() {}
+
+func (x *ListProblemTestcasesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProblemTestcasesResponse.ProtoReflect.Descriptor instead.
+func (*ListProblemTestcasesResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ListProblemTestcasesResponse) GetItems() []*v1.TestcaseMetadata {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type ArchiveTestcaseRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId     int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	TestcaseId    int64                  `protobuf:"varint,2,opt,name=testcase_id,json=testcaseId,proto3" json:"testcase_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArchiveTestcaseRequest) Reset() {
+	*x = ArchiveTestcaseRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveTestcaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveTestcaseRequest) ProtoMessage() {}
+
+func (x *ArchiveTestcaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveTestcaseRequest.ProtoReflect.Descriptor instead.
+func (*ArchiveTestcaseRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ArchiveTestcaseRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *ArchiveTestcaseRequest) GetTestcaseId() int64 {
+	if x != nil {
+		return x.TestcaseId
+	}
+	return 0
+}
+
+type ArchiveTestcaseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Testcase      *v1.TestcaseMetadata   `protobuf:"bytes,1,opt,name=testcase,proto3" json:"testcase,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArchiveTestcaseResponse) Reset() {
+	*x = ArchiveTestcaseResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveTestcaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveTestcaseResponse) ProtoMessage() {}
+
+func (x *ArchiveTestcaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveTestcaseResponse.ProtoReflect.Descriptor instead.
+func (*ArchiveTestcaseResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ArchiveTestcaseResponse) GetTestcase() *v1.TestcaseMetadata {
+	if x != nil {
+		return x.Testcase
+	}
+	return nil
+}
+
 var File_api_gateway_v1_gateway_proto protoreflect.FileDescriptor
 
 const file_api_gateway_v1_gateway_proto_rawDesc = "" +
@@ -807,7 +1591,56 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x16GetCurrentUserResponse\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\">\n" +
 	"\x0fGetUserResponse\x12+\n" +
-	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user2\xea\r\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.gateway.v1.UserSummaryR\x04user\"\x97\x01\n" +
+	"\x14CreateProblemRequest\x12<\n" +
+	"\aproblem\x18\x01 \x01(\v2\x18.problem.v1.ProblemInputB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aproblem\x12A\n" +
+	"\ttestcases\x18\x02 \x03(\v2\x19.problem.v1.TestcaseInputB\b\xfaB\x05\x92\x01\x02\x10dR\ttestcases\"F\n" +
+	"\x15CreateProblemResponse\x12-\n" +
+	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\";\n" +
+	"\x11GetProblemRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\"C\n" +
+	"\x12GetProblemResponse\x12-\n" +
+	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"K\n" +
+	"\x13ListProblemsRequest\x124\n" +
+	"\x04page\x18\x01 \x01(\v2\x16.common.v1.PageRequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04page\"u\n" +
+	"\x14ListProblemsResponse\x120\n" +
+	"\x05items\x18\x01 \x03(\v2\x1a.problem.v1.ProblemSummaryR\x05items\x12+\n" +
+	"\x04page\x18\x02 \x01(\v2\x17.common.v1.PageResponseR\x04page\"|\n" +
+	"\x14UpdateProblemRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12<\n" +
+	"\aproblem\x18\x02 \x01(\v2\x18.problem.v1.ProblemInputB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aproblem\"F\n" +
+	"\x15UpdateProblemResponse\x12-\n" +
+	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"?\n" +
+	"\x15ArchiveProblemRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\"G\n" +
+	"\x16ArchiveProblemResponse\x12-\n" +
+	"\aproblem\x18\x01 \x01(\v2\x13.problem.v1.ProblemR\aproblem\"\xd5\x02\n" +
+	"\x12AddTestcaseRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12 \n" +
+	"\acase_no\x18\x02 \x01(\x05B\a\xfaB\x04\x1a\x02 \x00R\x06caseNo\x12D\n" +
+	"\x0einput_filename\x18\x03 \x01(\tB\x1d\xfaB\x1ar\x18\x10\x04\x18\xff\x012\x11^[1-9][0-9]*\\.in$R\rinputFilename\x121\n" +
+	"\rinput_content\x18\x04 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\finputContent\x12G\n" +
+	"\x0foutput_filename\x18\x05 \x01(\tB\x1e\xfaB\x1br\x19\x10\x05\x18\xff\x012\x12^[1-9][0-9]*\\.out$R\x0eoutputFilename\x123\n" +
+	"\x0eoutput_content\x18\x06 \x01(\fB\f\xfaB\tz\a\x10\x01\x18\x80\x80\x80\bR\routputContent\"O\n" +
+	"\x13AddTestcaseResponse\x128\n" +
+	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase\"p\n" +
+	"\x1bListProblemTestcasesRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12)\n" +
+	"\x10include_archived\x18\x02 \x01(\bR\x0fincludeArchived\"R\n" +
+	"\x1cListProblemTestcasesResponse\x122\n" +
+	"\x05items\x18\x01 \x03(\v2\x1c.problem.v1.TestcaseMetadataR\x05items\"j\n" +
+	"\x16ArchiveTestcaseRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12(\n" +
+	"\vtestcase_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\n" +
+	"testcaseId\"S\n" +
+	"\x17ArchiveTestcaseResponse\x128\n" +
+	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase2\xea\r\n" +
 	"\x0eGatewayService\x12Q\n" +
 	"\x06Health\x12\x19.gateway.v1.HealthRequest\x1a\x1a.gateway.v1.HealthResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
 	"\x12\b/healthz\x12g\n" +
@@ -817,15 +1650,15 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x06Logout\x12\x19.gateway.v1.LogoutRequest\x1a\x1a.gateway.v1.LogoutResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/api/v1/auth/logout\x12q\n" +
 	"\x0eGetCurrentUser\x12!.gateway.v1.GetCurrentUserRequest\x1a\".gateway.v1.GetCurrentUserResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/users/me\x12^\n" +
 	"\aGetUser\x12\x1a.gateway.v1.GetUserRequest\x1a\x1b.gateway.v1.GetUserResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/users/{id}\x12q\n" +
-	"\rCreateProblem\x12 .problem.v1.CreateProblemRequest\x1a!.problem.v1.CreateProblemResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/problems\x12r\n" +
+	"\rCreateProblem\x12 .gateway.v1.CreateProblemRequest\x1a!.gateway.v1.CreateProblemResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/problems\x12r\n" +
 	"\n" +
-	"GetProblem\x12\x1d.problem.v1.GetProblemRequest\x1a\x1e.problem.v1.GetProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/problems/{problem_id}\x12k\n" +
-	"\fListProblems\x12\x1f.problem.v1.ListProblemsRequest\x1a .problem.v1.ListProblemsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/problems\x12\x84\x01\n" +
-	"\rUpdateProblem\x12 .problem.v1.UpdateProblemRequest\x1a!.problem.v1.UpdateProblemResponse\".\x82\xd3\xe4\x93\x02(:\aproblem\x1a\x1d/api/v1/problems/{problem_id}\x12~\n" +
-	"\x0eArchiveProblem\x12!.problem.v1.ArchiveProblemRequest\x1a\".problem.v1.ArchiveProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/problems/{problem_id}\x12\x82\x01\n" +
-	"\vAddTestcase\x12\x1e.problem.v1.AddTestcaseRequest\x1a\x1f.problem.v1.AddTestcaseResponse\"2\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/problems/{problem_id}/testcases\x12\x9a\x01\n" +
-	"\x14ListProblemTestcases\x12'.problem.v1.ListProblemTestcasesRequest\x1a(.problem.v1.ListProblemTestcasesResponse\"/\x82\xd3\xe4\x93\x02)\x12'/api/v1/problems/{problem_id}/testcases\x12\x99\x01\n" +
-	"\x0fArchiveTestcase\x12\".problem.v1.ArchiveTestcaseRequest\x1a#.problem.v1.ArchiveTestcaseResponse\"=\x82\xd3\xe4\x93\x027*5/api/v1/problems/{problem_id}/testcases/{testcase_id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
+	"GetProblem\x12\x1d.gateway.v1.GetProblemRequest\x1a\x1e.gateway.v1.GetProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/problems/{problem_id}\x12k\n" +
+	"\fListProblems\x12\x1f.gateway.v1.ListProblemsRequest\x1a .gateway.v1.ListProblemsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/problems\x12\x84\x01\n" +
+	"\rUpdateProblem\x12 .gateway.v1.UpdateProblemRequest\x1a!.gateway.v1.UpdateProblemResponse\".\x82\xd3\xe4\x93\x02(:\aproblem\x1a\x1d/api/v1/problems/{problem_id}\x12~\n" +
+	"\x0eArchiveProblem\x12!.gateway.v1.ArchiveProblemRequest\x1a\".gateway.v1.ArchiveProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/problems/{problem_id}\x12\x82\x01\n" +
+	"\vAddTestcase\x12\x1e.gateway.v1.AddTestcaseRequest\x1a\x1f.gateway.v1.AddTestcaseResponse\"2\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/problems/{problem_id}/testcases\x12\x9a\x01\n" +
+	"\x14ListProblemTestcases\x12'.gateway.v1.ListProblemTestcasesRequest\x1a(.gateway.v1.ListProblemTestcasesResponse\"/\x82\xd3\xe4\x93\x02)\x12'/api/v1/problems/{problem_id}/testcases\x12\x99\x01\n" +
+	"\x0fArchiveTestcase\x12\".gateway.v1.ArchiveTestcaseRequest\x1a#.gateway.v1.ArchiveTestcaseResponse\"=\x82\xd3\xe4\x93\x027*5/api/v1/problems/{problem_id}/testcases/{testcase_id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
 
 var (
 	file_api_gateway_v1_gateway_proto_rawDescOnce sync.Once
@@ -839,79 +1672,99 @@ func file_api_gateway_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_api_gateway_v1_gateway_proto_rawDescData
 }
 
-var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_api_gateway_v1_gateway_proto_goTypes = []any{
-	(*UserSummary)(nil),                     // 0: gateway.v1.UserSummary
-	(*HealthRequest)(nil),                   // 1: gateway.v1.HealthRequest
-	(*HealthResponse)(nil),                  // 2: gateway.v1.HealthResponse
-	(*RegisterRequest)(nil),                 // 3: gateway.v1.RegisterRequest
-	(*RegisterResponse)(nil),                // 4: gateway.v1.RegisterResponse
-	(*LoginRequest)(nil),                    // 5: gateway.v1.LoginRequest
-	(*LoginResponse)(nil),                   // 6: gateway.v1.LoginResponse
-	(*RefreshTokenRequest)(nil),             // 7: gateway.v1.RefreshTokenRequest
-	(*RefreshTokenResponse)(nil),            // 8: gateway.v1.RefreshTokenResponse
-	(*LogoutRequest)(nil),                   // 9: gateway.v1.LogoutRequest
-	(*LogoutResponse)(nil),                  // 10: gateway.v1.LogoutResponse
-	(*GetCurrentUserRequest)(nil),           // 11: gateway.v1.GetCurrentUserRequest
-	(*GetUserRequest)(nil),                  // 12: gateway.v1.GetUserRequest
-	(*GetCurrentUserResponse)(nil),          // 13: gateway.v1.GetCurrentUserResponse
-	(*GetUserResponse)(nil),                 // 14: gateway.v1.GetUserResponse
-	(*v1.CreateProblemRequest)(nil),         // 15: problem.v1.CreateProblemRequest
-	(*v1.GetProblemRequest)(nil),            // 16: problem.v1.GetProblemRequest
-	(*v1.ListProblemsRequest)(nil),          // 17: problem.v1.ListProblemsRequest
-	(*v1.UpdateProblemRequest)(nil),         // 18: problem.v1.UpdateProblemRequest
-	(*v1.ArchiveProblemRequest)(nil),        // 19: problem.v1.ArchiveProblemRequest
-	(*v1.AddTestcaseRequest)(nil),           // 20: problem.v1.AddTestcaseRequest
-	(*v1.ListProblemTestcasesRequest)(nil),  // 21: problem.v1.ListProblemTestcasesRequest
-	(*v1.ArchiveTestcaseRequest)(nil),       // 22: problem.v1.ArchiveTestcaseRequest
-	(*v1.CreateProblemResponse)(nil),        // 23: problem.v1.CreateProblemResponse
-	(*v1.GetProblemResponse)(nil),           // 24: problem.v1.GetProblemResponse
-	(*v1.ListProblemsResponse)(nil),         // 25: problem.v1.ListProblemsResponse
-	(*v1.UpdateProblemResponse)(nil),        // 26: problem.v1.UpdateProblemResponse
-	(*v1.ArchiveProblemResponse)(nil),       // 27: problem.v1.ArchiveProblemResponse
-	(*v1.AddTestcaseResponse)(nil),          // 28: problem.v1.AddTestcaseResponse
-	(*v1.ListProblemTestcasesResponse)(nil), // 29: problem.v1.ListProblemTestcasesResponse
-	(*v1.ArchiveTestcaseResponse)(nil),      // 30: problem.v1.ArchiveTestcaseResponse
+	(*UserSummary)(nil),                  // 0: gateway.v1.UserSummary
+	(*HealthRequest)(nil),                // 1: gateway.v1.HealthRequest
+	(*HealthResponse)(nil),               // 2: gateway.v1.HealthResponse
+	(*RegisterRequest)(nil),              // 3: gateway.v1.RegisterRequest
+	(*RegisterResponse)(nil),             // 4: gateway.v1.RegisterResponse
+	(*LoginRequest)(nil),                 // 5: gateway.v1.LoginRequest
+	(*LoginResponse)(nil),                // 6: gateway.v1.LoginResponse
+	(*RefreshTokenRequest)(nil),          // 7: gateway.v1.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),         // 8: gateway.v1.RefreshTokenResponse
+	(*LogoutRequest)(nil),                // 9: gateway.v1.LogoutRequest
+	(*LogoutResponse)(nil),               // 10: gateway.v1.LogoutResponse
+	(*GetCurrentUserRequest)(nil),        // 11: gateway.v1.GetCurrentUserRequest
+	(*GetUserRequest)(nil),               // 12: gateway.v1.GetUserRequest
+	(*GetCurrentUserResponse)(nil),       // 13: gateway.v1.GetCurrentUserResponse
+	(*GetUserResponse)(nil),              // 14: gateway.v1.GetUserResponse
+	(*CreateProblemRequest)(nil),         // 15: gateway.v1.CreateProblemRequest
+	(*CreateProblemResponse)(nil),        // 16: gateway.v1.CreateProblemResponse
+	(*GetProblemRequest)(nil),            // 17: gateway.v1.GetProblemRequest
+	(*GetProblemResponse)(nil),           // 18: gateway.v1.GetProblemResponse
+	(*ListProblemsRequest)(nil),          // 19: gateway.v1.ListProblemsRequest
+	(*ListProblemsResponse)(nil),         // 20: gateway.v1.ListProblemsResponse
+	(*UpdateProblemRequest)(nil),         // 21: gateway.v1.UpdateProblemRequest
+	(*UpdateProblemResponse)(nil),        // 22: gateway.v1.UpdateProblemResponse
+	(*ArchiveProblemRequest)(nil),        // 23: gateway.v1.ArchiveProblemRequest
+	(*ArchiveProblemResponse)(nil),       // 24: gateway.v1.ArchiveProblemResponse
+	(*AddTestcaseRequest)(nil),           // 25: gateway.v1.AddTestcaseRequest
+	(*AddTestcaseResponse)(nil),          // 26: gateway.v1.AddTestcaseResponse
+	(*ListProblemTestcasesRequest)(nil),  // 27: gateway.v1.ListProblemTestcasesRequest
+	(*ListProblemTestcasesResponse)(nil), // 28: gateway.v1.ListProblemTestcasesResponse
+	(*ArchiveTestcaseRequest)(nil),       // 29: gateway.v1.ArchiveTestcaseRequest
+	(*ArchiveTestcaseResponse)(nil),      // 30: gateway.v1.ArchiveTestcaseResponse
+	(*v1.ProblemInput)(nil),              // 31: problem.v1.ProblemInput
+	(*v1.TestcaseInput)(nil),             // 32: problem.v1.TestcaseInput
+	(*v1.Problem)(nil),                   // 33: problem.v1.Problem
+	(*v11.PageRequest)(nil),              // 34: common.v1.PageRequest
+	(*v1.ProblemSummary)(nil),            // 35: problem.v1.ProblemSummary
+	(*v11.PageResponse)(nil),             // 36: common.v1.PageResponse
+	(*v1.TestcaseMetadata)(nil),          // 37: problem.v1.TestcaseMetadata
 }
 var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
 	0,  // 0: gateway.v1.RegisterResponse.user:type_name -> gateway.v1.UserSummary
 	0,  // 1: gateway.v1.GetCurrentUserResponse.user:type_name -> gateway.v1.UserSummary
 	0,  // 2: gateway.v1.GetUserResponse.user:type_name -> gateway.v1.UserSummary
-	1,  // 3: gateway.v1.GatewayService.Health:input_type -> gateway.v1.HealthRequest
-	3,  // 4: gateway.v1.GatewayService.Register:input_type -> gateway.v1.RegisterRequest
-	5,  // 5: gateway.v1.GatewayService.Login:input_type -> gateway.v1.LoginRequest
-	7,  // 6: gateway.v1.GatewayService.RefreshToken:input_type -> gateway.v1.RefreshTokenRequest
-	9,  // 7: gateway.v1.GatewayService.Logout:input_type -> gateway.v1.LogoutRequest
-	11, // 8: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
-	12, // 9: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
-	15, // 10: gateway.v1.GatewayService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
-	16, // 11: gateway.v1.GatewayService.GetProblem:input_type -> problem.v1.GetProblemRequest
-	17, // 12: gateway.v1.GatewayService.ListProblems:input_type -> problem.v1.ListProblemsRequest
-	18, // 13: gateway.v1.GatewayService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
-	19, // 14: gateway.v1.GatewayService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
-	20, // 15: gateway.v1.GatewayService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
-	21, // 16: gateway.v1.GatewayService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
-	22, // 17: gateway.v1.GatewayService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
-	2,  // 18: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
-	4,  // 19: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
-	6,  // 20: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
-	8,  // 21: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
-	10, // 22: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
-	13, // 23: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
-	14, // 24: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
-	23, // 25: gateway.v1.GatewayService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
-	24, // 26: gateway.v1.GatewayService.GetProblem:output_type -> problem.v1.GetProblemResponse
-	25, // 27: gateway.v1.GatewayService.ListProblems:output_type -> problem.v1.ListProblemsResponse
-	26, // 28: gateway.v1.GatewayService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
-	27, // 29: gateway.v1.GatewayService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
-	28, // 30: gateway.v1.GatewayService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
-	29, // 31: gateway.v1.GatewayService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
-	30, // 32: gateway.v1.GatewayService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
-	18, // [18:33] is the sub-list for method output_type
-	3,  // [3:18] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	31, // 3: gateway.v1.CreateProblemRequest.problem:type_name -> problem.v1.ProblemInput
+	32, // 4: gateway.v1.CreateProblemRequest.testcases:type_name -> problem.v1.TestcaseInput
+	33, // 5: gateway.v1.CreateProblemResponse.problem:type_name -> problem.v1.Problem
+	33, // 6: gateway.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
+	34, // 7: gateway.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
+	35, // 8: gateway.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
+	36, // 9: gateway.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
+	31, // 10: gateway.v1.UpdateProblemRequest.problem:type_name -> problem.v1.ProblemInput
+	33, // 11: gateway.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
+	33, // 12: gateway.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
+	37, // 13: gateway.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	37, // 14: gateway.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
+	37, // 15: gateway.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	1,  // 16: gateway.v1.GatewayService.Health:input_type -> gateway.v1.HealthRequest
+	3,  // 17: gateway.v1.GatewayService.Register:input_type -> gateway.v1.RegisterRequest
+	5,  // 18: gateway.v1.GatewayService.Login:input_type -> gateway.v1.LoginRequest
+	7,  // 19: gateway.v1.GatewayService.RefreshToken:input_type -> gateway.v1.RefreshTokenRequest
+	9,  // 20: gateway.v1.GatewayService.Logout:input_type -> gateway.v1.LogoutRequest
+	11, // 21: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
+	12, // 22: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
+	15, // 23: gateway.v1.GatewayService.CreateProblem:input_type -> gateway.v1.CreateProblemRequest
+	17, // 24: gateway.v1.GatewayService.GetProblem:input_type -> gateway.v1.GetProblemRequest
+	19, // 25: gateway.v1.GatewayService.ListProblems:input_type -> gateway.v1.ListProblemsRequest
+	21, // 26: gateway.v1.GatewayService.UpdateProblem:input_type -> gateway.v1.UpdateProblemRequest
+	23, // 27: gateway.v1.GatewayService.ArchiveProblem:input_type -> gateway.v1.ArchiveProblemRequest
+	25, // 28: gateway.v1.GatewayService.AddTestcase:input_type -> gateway.v1.AddTestcaseRequest
+	27, // 29: gateway.v1.GatewayService.ListProblemTestcases:input_type -> gateway.v1.ListProblemTestcasesRequest
+	29, // 30: gateway.v1.GatewayService.ArchiveTestcase:input_type -> gateway.v1.ArchiveTestcaseRequest
+	2,  // 31: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
+	4,  // 32: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
+	6,  // 33: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
+	8,  // 34: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
+	10, // 35: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
+	13, // 36: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
+	14, // 37: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
+	16, // 38: gateway.v1.GatewayService.CreateProblem:output_type -> gateway.v1.CreateProblemResponse
+	18, // 39: gateway.v1.GatewayService.GetProblem:output_type -> gateway.v1.GetProblemResponse
+	20, // 40: gateway.v1.GatewayService.ListProblems:output_type -> gateway.v1.ListProblemsResponse
+	22, // 41: gateway.v1.GatewayService.UpdateProblem:output_type -> gateway.v1.UpdateProblemResponse
+	24, // 42: gateway.v1.GatewayService.ArchiveProblem:output_type -> gateway.v1.ArchiveProblemResponse
+	26, // 43: gateway.v1.GatewayService.AddTestcase:output_type -> gateway.v1.AddTestcaseResponse
+	28, // 44: gateway.v1.GatewayService.ListProblemTestcases:output_type -> gateway.v1.ListProblemTestcasesResponse
+	30, // 45: gateway.v1.GatewayService.ArchiveTestcase:output_type -> gateway.v1.ArchiveTestcaseResponse
+	31, // [31:46] is the sub-list for method output_type
+	16, // [16:31] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_api_gateway_v1_gateway_proto_init() }
@@ -925,7 +1778,7 @@ func file_api_gateway_v1_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_gateway_v1_gateway_proto_rawDesc), len(file_api_gateway_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

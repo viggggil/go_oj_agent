@@ -35,6 +35,24 @@ func TestProblemUploadForwardsPairedFiles(t *testing.T) {
 	}
 }
 
+func TestCreateProblemHTTPInjectsAuthenticatedContext(t *testing.T) {
+	client := &fakeProblemClient{}
+	server := newProblemTestHTTPServer(t, client)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/problems", bytes.NewBufferString(`{"problem":{"title":"A+B","slug":"a-plus-b","description":"Add.","difficulty":1,"time_limit_ms":1000,"memory_limit_kb":65536}}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+testAccessToken(t))
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if client.createRequest == nil || client.createRequest.GetContext().GetUserId() != 1001 {
+		t.Fatalf("forwarded request = %+v", client.createRequest)
+	}
+}
+
 func TestProblemUploadRejectsMismatchedFilenames(t *testing.T) {
 	client := &fakeProblemClient{}
 	server := newProblemTestHTTPServer(t, client)
@@ -97,13 +115,17 @@ func multipartRequest(t *testing.T, caseNo, inputName string, input []byte, outp
 	return request
 }
 
-type fakeProblemClient struct{ addRequest *problemv1.AddTestcaseRequest }
+type fakeProblemClient struct {
+	addRequest    *problemv1.AddTestcaseRequest
+	createRequest *problemv1.CreateProblemRequest
+}
 
 func (c *fakeProblemClient) AddTestcase(_ context.Context, req *problemv1.AddTestcaseRequest, _ ...grpc.CallOption) (*problemv1.AddTestcaseResponse, error) {
 	c.addRequest = req
 	return &problemv1.AddTestcaseResponse{Testcase: &problemv1.TestcaseMetadata{ProblemId: req.GetProblemId(), CaseNo: req.GetCaseNo()}}, nil
 }
-func (*fakeProblemClient) CreateProblem(context.Context, *problemv1.CreateProblemRequest, ...grpc.CallOption) (*problemv1.CreateProblemResponse, error) {
+func (c *fakeProblemClient) CreateProblem(_ context.Context, request *problemv1.CreateProblemRequest, _ ...grpc.CallOption) (*problemv1.CreateProblemResponse, error) {
+	c.createRequest = request
 	return &problemv1.CreateProblemResponse{}, nil
 }
 func (*fakeProblemClient) UpdateProblem(context.Context, *problemv1.UpdateProblemRequest, ...grpc.CallOption) (*problemv1.UpdateProblemResponse, error) {

@@ -1,0 +1,22 @@
+service:
+  name: problem-service
+server:
+  grpc:
+    address: "${SERVER_GRPC_ADDRESS}"
+    max_receive_message_bytes: 35651584
+data:
+  mysql_dsn: "${DATA_MYSQL_DSN}"
+  redis_addr: "${DATA_REDIS_ADDR}"
+  redis_password: "${DATA_REDIS_PASSWORD}"
+  redis_db: 0
+  redis_namespace: "${DATA_REDIS_NAMESPACE}"
+storage:
+  minio:
+    endpoint: "${STORAGE_MINIO_ENDPOINT}"
+    access_key: "${STORAGE_MINIO_ACCESS_KEY}"
+    secret_key: "${STORAGE_MINIO_SECRET_KEY}"
+    bucket: "${STORAGE_MINIO_BUCKET}"
+    use_ssl: false
+registry:
+  consul:
+    enabled: false

@@ -11,7 +11,6 @@ import (
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
-	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/service"
 )
 
@@ -43,7 +42,7 @@ func problemUploadHandler(gateway *service.GatewayService) khttp.HandlerFunc {
 	}
 }
 
-func decodeTestcaseUpload(ctx khttp.Context) (*problemv1.AddTestcaseRequest, error) {
+func decodeTestcaseUpload(ctx khttp.Context) (*gatewayv1.AddTestcaseRequest, error) {
 	request := ctx.Request()
 	request.Body = http.MaxBytesReader(ctx.Response(), request.Body, maxTestcaseUploadBody)
 	if err := request.ParseMultipartForm(multipartMemoryBytes); err != nil {
@@ -73,7 +72,7 @@ func decodeTestcaseUpload(ctx khttp.Context) (*problemv1.AddTestcaseRequest, err
 	if err != nil {
 		return nil, err
 	}
-	return &problemv1.AddTestcaseRequest{
+	return &gatewayv1.AddTestcaseRequest{
 		ProblemId:      problemID,
 		CaseNo:         int32(caseNumber),
 		InputFilename:  inputName,
