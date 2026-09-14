@@ -163,13 +163,13 @@ message AddTestcaseRequest {
   string input_filename = 4 [(validate.rules).string = {
     min_len: 4,
     max_len: 255,
-    pattern: "^[^/\\\\]+\\.in$"
+    pattern: "^[1-9][0-9]*\\.in$"
   }];
   bytes input_content = 5 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
   string output_filename = 6 [(validate.rules).string = {
     min_len: 5,
     max_len: 255,
-    pattern: "^[^/\\\\]+\\.out$"
+    pattern: "^[1-9][0-9]*\\.out$"
   }];
   bytes output_content = 7 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
 }
@@ -177,11 +177,11 @@ message AddTestcaseRequest {
 message TestcaseInput {
   int32 case_no = 1 [(validate.rules).int32.gt = 0];
   string input_filename = 2 [(validate.rules).string = {
-    min_len: 4, max_len: 255, pattern: "^[^/\\\\]+\\.in$"
+    min_len: 4, max_len: 255, pattern: "^[1-9][0-9]*\\.in$"
   }];
   bytes input_content = 3 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
   string output_filename = 4 [(validate.rules).string = {
-    min_len: 5, max_len: 255, pattern: "^[^/\\\\]+\\.out$"
+    min_len: 5, max_len: 255, pattern: "^[1-9][0-9]*\\.out$"
   }];
   bytes output_content = 5 [(validate.rules).bytes = {min_len: 1, max_len: 16777216}];
 }
