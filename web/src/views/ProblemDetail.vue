@@ -27,7 +27,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { RouterLink, useRoute } from 'vue-router'
-  import { problemApi } from '../api'
+  import { apiErrorMessage, problemApi } from '../api'
   import { useAuthStore } from '../stores/auth'
   import type { Problem } from '../types'
   const route = useRoute(),
@@ -42,8 +42,8 @@
     if (!auth.user) await auth.fetchProfile().catch(() => undefined)
     try {
       problem.value = (await problemApi.get(Number(route.params.id))).data.problem
-    } catch {
-      error.value = '题目不存在或已归档'
+    } catch (cause) {
+      error.value = apiErrorMessage(cause, '加载题目')
     }
   })
 </script>
