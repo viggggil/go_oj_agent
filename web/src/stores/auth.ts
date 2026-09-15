@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { authApi, tokens } from '../api'
+import { authApi, tokens, tokenState } from '../api'
 import type { User } from '../types'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({ user: null as User | null, loading: false }),
-  getters: { isAuthenticated: () => Boolean(tokens.access) },
+  getters: { isAuthenticated: () => Boolean(tokenState.access) },
   actions: {
     async login(account: string, password: string) {
       this.loading = true

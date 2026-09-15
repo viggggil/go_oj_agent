@@ -7,7 +7,7 @@
     <RouterLink v-if="isAdmin" class="button" to="/problems/new">新建题目</RouterLink>
   </section>
   <div class="problem-table">
-    <div class="table-row table-head">
+    <div class="table-row table-head" :class="{ admin: isAdmin }">
       <span>编号</span><span>题目</span><span>难度</span><span v-if="isAdmin">状态</span>
     </div>
     <RouterLink
@@ -36,7 +36,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { RouterLink } from 'vue-router'
-  import { problemApi } from '../api'
+  import { apiErrorMessage, problemApi } from '../api'
   import { useAuthStore } from '../stores/auth'
   import type { ProblemSummary } from '../types'
   const auth = useAuthStore(),
@@ -56,8 +56,8 @@
       items.value = data.items || []
       page.value = data.page.page
       total.value = data.page.total
-    } catch (e) {
-      error.value = '题目列表加载失败'
+    } catch (error) {
+      error.value = apiErrorMessage(error, '加载题目列表')
     } finally {
       loading.value = false
     }
