@@ -57,7 +57,11 @@ func TestRS256RejectsTamperAlgorithmAndAudience(t *testing.T) {
 	signer, _ := NewRS256Signer(RS256SignerConfig{PrivateKeyPEM: priv, KeyID: "k", Issuer: "issuer", Audience: "aud", TTL: time.Minute, Now: func() time.Time { return now }})
 	token, _ := signer.Sign(AccessTokenClaims{Subject: 1})
 	verifier, _ := NewRS256Verifier(RS256VerifierConfig{PublicKeys: map[string][]byte{"k": pub}, Issuer: "issuer", Audience: "aud", Now: func() time.Time { return now }})
-	if _, err := verifier.Verify(token[:len(token)-1] + "x"); !errors.Is(err, ErrInvalidToken) {
+	tampered := token[:len(token)-1] + "A"
+	if tampered == token {
+		tampered = token[:len(token)-1] + "B"
+	}
+	if _, err := verifier.Verify(tampered); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("tamper err=%v", err)
 	}
 	bad := token[:len(token)-len("RS256")] + "HS256" // header mutation invalidates signature and algorithm

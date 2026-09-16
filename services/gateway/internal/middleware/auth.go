@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	kerrors "github.com/go-kratos/kratos/v3/errors"
@@ -14,17 +15,30 @@ import (
 )
 
 type AuthMiddleware struct {
-	verifier *pkgauth.HMACVerifier
+	verifier       *pkgauth.RS256Verifier
+	legacyVerifier *pkgauth.HMACVerifier
 }
 
 func NewAuthMiddleware(config *conf.Bootstrap) (*AuthMiddleware, error) {
 	if config == nil || config.GetAuth() == nil {
 		return nil, fmt.Errorf("gateway auth config is required")
 	}
-	verifier, err := pkgauth.NewHMACVerifier(pkgauth.HMACVerifierConfig{
-		Secret:   config.GetAuth().GetAccessTokenKey(),
-		Issuer:   config.GetAuth().GetIssuer(),
-		Audience: config.GetAuth().GetAudience(),
+	keyPath := config.GetAuth().GetAccessTokenPublicKeyFile()
+	if keyPath == "" {
+		legacy, legacyErr := pkgauth.NewHMACVerifier(pkgauth.HMACVerifierConfig{Secret: config.GetAuth().GetAccessTokenKey(), Issuer: config.GetAuth().GetIssuer(), Audience: config.GetAuth().GetAudience()})
+		if legacyErr != nil {
+			return nil, fmt.Errorf("gateway auth public key file is required")
+		}
+		return &AuthMiddleware{legacyVerifier: legacy}, nil
+	}
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read gateway auth public key: %w", err)
+	}
+	verifier, err := pkgauth.NewRS256Verifier(pkgauth.RS256VerifierConfig{
+		PublicKeys: map[string][]byte{config.GetAuth().GetAccessTokenKeyId(): key},
+		Issuer:     config.GetAuth().GetIssuer(),
+		Audience:   config.GetAuth().GetAudience(),
 	})
 	if err != nil {
 		return nil, err
@@ -44,7 +58,7 @@ func BearerToken(authorization string) (string, bool) {
 func (m *AuthMiddleware) Middleware() middleware.Middleware {
 	return func(next middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
-			if m == nil || m.verifier == nil {
+			if m == nil || (m.verifier == nil && m.legacyVerifier == nil) {
 				return nil, ErrUnauthenticated("gateway auth middleware is not configured")
 			}
 			request, ok := khttp.RequestFromServerContext(ctx)
@@ -55,7 +69,13 @@ func (m *AuthMiddleware) Middleware() middleware.Middleware {
 			if !ok {
 				return nil, ErrUnauthenticated("bearer token is required")
 			}
-			claims, err := m.verifier.Verify(token)
+			var claims pkgauth.AccessTokenClaims
+			var err error
+			if m.verifier != nil {
+				claims, err = m.verifier.Verify(token)
+			} else {
+				claims, err = m.legacyVerifier.Verify(token)
+			}
 			if err != nil {
 				return nil, ErrUnauthenticated("bearer token is invalid")
 			}

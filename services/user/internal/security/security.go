@@ -1,8 +1,10 @@
 package security
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/wire"
@@ -14,9 +16,15 @@ var (
 	ErrInvalidCredential = errors.New("invalid credential")
 )
 
-var ProviderSet = wire.NewSet(NewHMACTokenManagerFromConfig)
+var ProviderSet = wire.NewSet(NewRS256TokenManagerFromConfig)
 
-func NewHMACTokenManagerFromConfig(config *conf.Bootstrap) (*HMACTokenManager, error) {
+type TokenManager interface {
+	IssueAccessToken(context.Context, TokenSubject) (string, time.Duration, error)
+	Generate(int64, string, string) (string, RefreshTokenRecord, error)
+	Hash(string) string
+}
+
+func NewRS256TokenManagerFromConfig(config *conf.Bootstrap) (TokenManager, error) {
 	if config == nil || config.GetAuth() == nil {
 		return nil, ErrInvalidArgument
 	}
@@ -28,11 +36,15 @@ func NewHMACTokenManagerFromConfig(config *conf.Bootstrap) (*HMACTokenManager, e
 	if err != nil {
 		return nil, fmt.Errorf("auth.refresh_token_ttl is invalid: %w", err)
 	}
-	return NewHMACTokenManager(TokenConfig{
-		Secret:          config.GetAuth().GetAccessTokenKey(),
-		Issuer:          config.GetAuth().GetIssuer(),
-		Audience:        config.GetAuth().GetAudience(),
-		AccessTokenTTL:  accessTTL,
-		RefreshTokenTTL: refreshTTL,
-	})
+	keyPath := config.GetAuth().GetAccessTokenPrivateKeyFile()
+	if keyPath == "" {
+		// Deprecated compatibility for existing local deployments. New deployments
+		// must provide an RSA private key file and key id.
+		return NewHMACTokenManager(TokenConfig{Secret: config.GetAuth().GetAccessTokenKey(), Issuer: config.GetAuth().GetIssuer(), Audience: config.GetAuth().GetAudience(), AccessTokenTTL: accessTTL, RefreshTokenTTL: refreshTTL})
+	}
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read access token private key: %w", err)
+	}
+	return NewRS256TokenManager(key, config.GetAuth().GetAccessTokenKeyId(), config.GetAuth().GetIssuer(), config.GetAuth().GetAudience(), accessTTL, refreshTTL, nil)
 }

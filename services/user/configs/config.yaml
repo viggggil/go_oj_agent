@@ -13,6 +13,8 @@ auth:
   access_token_ttl: "15m"
   refresh_token_ttl: "168h"
   access_token_key: "replace-with-a-long-random-secret"
+  access_token_private_key_file: ""
+  access_token_key_id: "user-access-2026-09"
   issuer: "go-oj-agent"
   audience: "go-oj-gateway"
   password:

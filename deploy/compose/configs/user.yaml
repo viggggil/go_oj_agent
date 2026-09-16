@@ -13,6 +13,8 @@ auth:
   access_token_ttl: "${AUTH_ACCESS_TOKEN_TTL}"
   refresh_token_ttl: "${AUTH_REFRESH_TOKEN_TTL}"
   access_token_key: "${AUTH_ACCESS_TOKEN_KEY}"
+  access_token_private_key_file: "${AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE}"
+  access_token_key_id: "${AUTH_ACCESS_TOKEN_KEY_ID}"
   issuer: "${AUTH_ISSUER}"
   audience: "${AUTH_AUDIENCE}"
   password:
