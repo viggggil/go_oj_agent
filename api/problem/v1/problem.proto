@@ -108,7 +108,8 @@ message ProblemInput {
 }
 
 message CreateProblemRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   ProblemInput problem = 2 [(validate.rules).message.required = true];
   // Optional paired testcases submitted together by the admin create page.
   repeated TestcaseInput testcases = 3 [(validate.rules).repeated = {max_items: 100}];
@@ -119,7 +120,8 @@ message CreateProblemResponse {
 }
 
 message UpdateProblemRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
   ProblemInput problem = 3 [(validate.rules).message.required = true];
 }
@@ -129,7 +131,8 @@ message UpdateProblemResponse {
 }
 
 message ArchiveProblemRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
 }
 
@@ -138,7 +141,8 @@ message ArchiveProblemResponse {
 }
 
 message GetProblemRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
 }
 
@@ -147,7 +151,8 @@ message GetProblemResponse {
 }
 
 message ListProblemsRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   common.v1.PageRequest page = 2 [(validate.rules).message.required = true];
 }
 
@@ -157,7 +162,8 @@ message ListProblemsResponse {
 }
 
 message AddTestcaseRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
   int32 case_no = 3 [(validate.rules).int32.gt = 0];
   string input_filename = 4 [(validate.rules).string = {
@@ -191,7 +197,8 @@ message AddTestcaseResponse {
 }
 
 message ArchiveTestcaseRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
   int64 testcase_id = 3 [(validate.rules).int64.gt = 0];
 }
@@ -201,7 +208,8 @@ message ArchiveTestcaseResponse {
 }
 
 message ListProblemTestcasesRequest {
-  common.v1.RequestContext context = 1 [(validate.rules).message.required = true];
+  reserved 1;
+  reserved "context";
   int64 problem_id = 2 [(validate.rules).int64.gt = 0];
   bool include_archived = 3;
 }

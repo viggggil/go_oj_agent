@@ -8,6 +8,14 @@ import (
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 )
 
+func requestContextFromPrincipal(ctx context.Context) (*commonv1.RequestContext, error) {
+	p, ok := internalauth.PrincipalFromContext(ctx)
+	if !ok || p.ActorID <= 0 {
+		return nil, fmt.Errorf("trusted principal is missing")
+	}
+	return &commonv1.RequestContext{UserId: p.ActorID, Roles: append([]string(nil), p.ActorRoles...), RequestId: p.RequestID, TraceId: p.TraceID}, nil
+}
+
 // verifyRequestContext is a compatibility guard until RequestContext is
 // removed from the Problem protobuf. When the internal middleware is active,
 // the signed JWT is the authority and a mismatching body context is rejected.

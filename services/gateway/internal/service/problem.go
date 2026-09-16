@@ -22,11 +22,11 @@ func (s *GatewayService) problemClient(ctx context.Context) (problemv1.ProblemSe
 }
 
 func (s *GatewayService) CreateProblem(ctx context.Context, req *gatewayv1.CreateProblemRequest) (*gatewayv1.CreateProblemResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.CreateProblem(ctx, &problemv1.CreateProblemRequest{Context: requestContext, Problem: req.GetProblem(), Testcases: req.GetTestcases()})
+	response, err := client.CreateProblem(ctx, &problemv1.CreateProblemRequest{Problem: req.GetProblem(), Testcases: req.GetTestcases()})
 	if err != nil {
 		return nil, err
 	}
@@ -34,11 +34,11 @@ func (s *GatewayService) CreateProblem(ctx context.Context, req *gatewayv1.Creat
 }
 
 func (s *GatewayService) GetProblem(ctx context.Context, req *gatewayv1.GetProblemRequest) (*gatewayv1.GetProblemResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.GetProblem(ctx, &problemv1.GetProblemRequest{Context: requestContext, ProblemId: req.GetProblemId()})
+	response, err := client.GetProblem(ctx, &problemv1.GetProblemRequest{ProblemId: req.GetProblemId()})
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +46,11 @@ func (s *GatewayService) GetProblem(ctx context.Context, req *gatewayv1.GetProbl
 }
 
 func (s *GatewayService) ListProblems(ctx context.Context, req *gatewayv1.ListProblemsRequest) (*gatewayv1.ListProblemsResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.ListProblems(ctx, &problemv1.ListProblemsRequest{Context: requestContext, Page: req.GetPage()})
+	response, err := client.ListProblems(ctx, &problemv1.ListProblemsRequest{Page: req.GetPage()})
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +58,11 @@ func (s *GatewayService) ListProblems(ctx context.Context, req *gatewayv1.ListPr
 }
 
 func (s *GatewayService) UpdateProblem(ctx context.Context, req *gatewayv1.UpdateProblemRequest) (*gatewayv1.UpdateProblemResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.UpdateProblem(ctx, &problemv1.UpdateProblemRequest{Context: requestContext, ProblemId: req.GetProblemId(), Problem: req.GetProblem()})
+	response, err := client.UpdateProblem(ctx, &problemv1.UpdateProblemRequest{ProblemId: req.GetProblemId(), Problem: req.GetProblem()})
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +70,11 @@ func (s *GatewayService) UpdateProblem(ctx context.Context, req *gatewayv1.Updat
 }
 
 func (s *GatewayService) ArchiveProblem(ctx context.Context, req *gatewayv1.ArchiveProblemRequest) (*gatewayv1.ArchiveProblemResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.ArchiveProblem(ctx, &problemv1.ArchiveProblemRequest{Context: requestContext, ProblemId: req.GetProblemId()})
+	response, err := client.ArchiveProblem(ctx, &problemv1.ArchiveProblemRequest{ProblemId: req.GetProblemId()})
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +82,11 @@ func (s *GatewayService) ArchiveProblem(ctx context.Context, req *gatewayv1.Arch
 }
 
 func (s *GatewayService) AddTestcase(ctx context.Context, req *gatewayv1.AddTestcaseRequest) (*gatewayv1.AddTestcaseResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.AddTestcase(ctx, &problemv1.AddTestcaseRequest{Context: requestContext, ProblemId: req.GetProblemId(), CaseNo: req.GetCaseNo(), InputFilename: req.GetInputFilename(), InputContent: req.GetInputContent(), OutputFilename: req.GetOutputFilename(), OutputContent: req.GetOutputContent()})
+	response, err := client.AddTestcase(ctx, &problemv1.AddTestcaseRequest{ProblemId: req.GetProblemId(), CaseNo: req.GetCaseNo(), InputFilename: req.GetInputFilename(), InputContent: req.GetInputContent(), OutputFilename: req.GetOutputFilename(), OutputContent: req.GetOutputContent()})
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +94,11 @@ func (s *GatewayService) AddTestcase(ctx context.Context, req *gatewayv1.AddTest
 }
 
 func (s *GatewayService) ListProblemTestcases(ctx context.Context, req *gatewayv1.ListProblemTestcasesRequest) (*gatewayv1.ListProblemTestcasesResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.ListProblemTestcases(ctx, &problemv1.ListProblemTestcasesRequest{Context: requestContext, ProblemId: req.GetProblemId(), IncludeArchived: req.GetIncludeArchived()})
+	response, err := client.ListProblemTestcases(ctx, &problemv1.ListProblemTestcasesRequest{ProblemId: req.GetProblemId(), IncludeArchived: req.GetIncludeArchived()})
 	if err != nil {
 		return nil, err
 	}
@@ -106,11 +106,11 @@ func (s *GatewayService) ListProblemTestcases(ctx context.Context, req *gatewayv
 }
 
 func (s *GatewayService) ArchiveTestcase(ctx context.Context, req *gatewayv1.ArchiveTestcaseRequest) (*gatewayv1.ArchiveTestcaseResponse, error) {
-	client, requestContext, err := s.problemClient(ctx)
+	client, _, err := s.problemClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.ArchiveTestcase(ctx, &problemv1.ArchiveTestcaseRequest{Context: requestContext, ProblemId: req.GetProblemId(), TestcaseId: req.GetTestcaseId()})
+	response, err := client.ArchiveTestcase(ctx, &problemv1.ArchiveTestcaseRequest{ProblemId: req.GetProblemId(), TestcaseId: req.GetTestcaseId()})
 	if err != nil {
 		return nil, err
 	}

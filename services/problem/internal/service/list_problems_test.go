@@ -11,9 +11,8 @@ import (
 
 func TestListProblemsHandler(t *testing.T) {
 	repo := &listServiceRepository{}
-	response, err := NewProblemService(biz.NewProblemUsecase(repo)).ListProblems(context.Background(), &problemv1.ListProblemsRequest{
-		Context: &commonv1.RequestContext{UserId: 1, Roles: []string{"user"}},
-		Page:    &commonv1.PageRequest{Page: 1, PageSize: 20},
+	response, err := NewProblemService(biz.NewProblemUsecase(repo)).ListProblems(userContext(), &problemv1.ListProblemsRequest{
+		Page: &commonv1.PageRequest{Page: 1, PageSize: 20},
 	})
 	if err != nil {
 		t.Fatal(err)

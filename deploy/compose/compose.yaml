@@ -77,6 +77,21 @@ services:
         condition: service_healthy
     restart: "no"
 
+  auth-key-init:
+    image: alpine:3.23
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        apk add --no-cache openssl >/dev/null &&
+        test -f /keys/user-private.pem || openssl genrsa -out /keys/user-private.pem 2048 >/dev/null 2>&1 &&
+        test -f /keys/user-public.pem || openssl rsa -in /keys/user-private.pem -pubout -out /keys/user-public.pem >/dev/null 2>&1 &&
+        test -f /keys/gateway-private.pem || openssl genrsa -out /keys/gateway-private.pem 2048 >/dev/null 2>&1 &&
+        test -f /keys/gateway-public.pem || openssl rsa -in /keys/gateway-private.pem -pubout -out /keys/gateway-public.pem >/dev/null 2>&1 &&
+        chmod 644 /keys/*.pem
+    volumes:
+      - auth-keys:/keys
+    restart: "no"
+
   user-service:
     build:
       context: ../..
@@ -91,6 +106,8 @@ services:
       KRATOS_AUTH_ACCESS_TOKEN_TTL: "${ACCESS_TOKEN_TTL:-15m}"
       KRATOS_AUTH_REFRESH_TOKEN_TTL: "${REFRESH_TOKEN_TTL:-168h}"
       KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
+      KRATOS_AUTH_ACCESS_TOKEN_PRIVATE_KEY_FILE: "/run/auth-keys/user-private.pem"
+      KRATOS_AUTH_ACCESS_TOKEN_KEY_ID: "user-access-2026-09"
       KRATOS_AUTH_ISSUER: "go-oj-agent"
       KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
@@ -98,11 +115,14 @@ services:
       - "127.0.0.1:${USER_GRPC_PORT:-9001}:9001"
     volumes:
       - ./configs/user.yaml:/app/config.yaml:ro
+      - auth-keys:/run/auth-keys:ro
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+      auth-key-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9001"]
       interval: 3s
@@ -133,12 +153,15 @@ services:
       - "127.0.0.1:${PROBLEM_GRPC_PORT:-9002}:9002"
     volumes:
       - ./configs/problem.yaml:/app/config.yaml:ro
+      - auth-keys:/run/auth-keys:ro
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio-init:
+        condition: service_completed_successfully
+      auth-key-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9002"]
@@ -157,6 +180,13 @@ services:
       KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
       KRATOS_AUTH_ISSUER: "go-oj-agent"
       KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
+      KRATOS_AUTH_ACCESS_TOKEN_PUBLIC_KEY_FILE: "/run/auth-keys/user-public.pem"
+      KRATOS_AUTH_ACCESS_TOKEN_KEY_ID: "user-access-2026-09"
+      KRATOS_AUTH_INTERNAL_PRIVATE_KEY_FILE: "/run/auth-keys/gateway-private.pem"
+      KRATOS_AUTH_INTERNAL_KEY_ID: "gateway-internal-2026-09"
+      KRATOS_AUTH_INTERNAL_ISSUER: "go-oj-gateway"
+      KRATOS_AUTH_INTERNAL_AUDIENCE: "problem-service"
+      KRATOS_AUTH_INTERNAL_TOKEN_TTL: "30s"
       KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
       KRATOS_CLIENTS_PROBLEM_ENDPOINT: "problem-service:9002"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
@@ -164,6 +194,7 @@ services:
       - "127.0.0.1:${GATEWAY_HTTP_PORT:-8080}:8080"
     volumes:
       - ./configs/gateway.yaml:/app/config.yaml:ro
+      - auth-keys:/run/auth-keys:ro
     depends_on:
       user-service:
         condition: service_healthy
@@ -194,3 +225,4 @@ volumes:
   mysql-data:
   redis-data:
   minio-data:
+  auth-keys:
