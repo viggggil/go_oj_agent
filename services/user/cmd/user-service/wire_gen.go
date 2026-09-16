@@ -25,7 +25,7 @@ func initApp(bc *conf.Bootstrap) (*kratos.App, func(), error) {
 		return nil, nil, err
 	}
 	storeSet := data.NewStoreSet(db)
-	hmacTokenManager, err := security.NewHMACTokenManagerFromConfig(bc)
+	hmacTokenManager, err := security.NewRS256TokenManagerFromConfig(bc)
 	if err != nil {
 		cleanup()
 		return nil, nil, err

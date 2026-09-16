@@ -6,6 +6,8 @@ server:
     timeout: "30s"
 auth:
   access_token_key: "${AUTH_ACCESS_TOKEN_KEY}"
+  access_token_public_key_file: "${AUTH_ACCESS_TOKEN_PUBLIC_KEY_FILE}"
+  access_token_key_id: "${AUTH_ACCESS_TOKEN_KEY_ID}"
   issuer: "${AUTH_ISSUER}"
   audience: "${AUTH_AUDIENCE}"
 clients:

@@ -6,6 +6,8 @@ server:
     timeout: "30s"
 auth:
   access_token_key: "replace-with-the-same-secret-as-user-service"
+  access_token_public_key_file: ""
+  access_token_key_id: "user-access-2026-09"
   issuer: "go-oj-agent"
   audience: "go-oj-gateway"
 clients:

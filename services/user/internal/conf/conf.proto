@@ -35,7 +35,9 @@ message DataProto {
 message AuthProto {
   string access_token_ttl = 1;
   string refresh_token_ttl = 2;
-  string access_token_key = 3;
+  string access_token_key = 3 [deprecated = true];
+  string access_token_private_key_file = 7;
+  string access_token_key_id = 8;
   string issuer = 4;
   string audience = 5;
   PasswordProto password = 6;
