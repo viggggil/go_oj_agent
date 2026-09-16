@@ -68,3 +68,16 @@ func TestInternalTokenRejectsWrongAudienceAndTamper(t *testing.T) {
 		t.Fatalf("tamper err=%v", e)
 	}
 }
+
+func TestPrincipalMatchesRequestContext(t *testing.T) {
+	p := Principal{ActorID: 7, ActorRoles: []string{"admin", "user"}}
+	if !p.MatchesRequestContext(7, []string{"user", "admin"}) {
+		t.Fatal("equivalent roles should match")
+	}
+	if p.MatchesRequestContext(8, []string{"admin", "user"}) {
+		t.Fatal("different user must not match")
+	}
+	if p.MatchesRequestContext(7, []string{"admin"}) {
+		t.Fatal("different roles must not match")
+	}
+}

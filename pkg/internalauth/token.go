@@ -37,6 +37,26 @@ type Principal struct {
 	ActorRoles                  []string
 	RequestID, TraceID, TokenID string
 }
+
+// MatchesRequestContext is a migration guard while protobuf RequestContext
+// fields are being removed. It rejects a body identity that differs from the
+// signed Gateway assertion.
+func (p Principal) MatchesRequestContext(userID int64, roles []string) bool {
+	if p.ActorID != userID || len(p.ActorRoles) != len(roles) {
+		return false
+	}
+	set := make(map[string]struct{}, len(p.ActorRoles))
+	for _, role := range p.ActorRoles {
+		set[role] = struct{}{}
+	}
+	for _, role := range roles {
+		if _, ok := set[role]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 type principalKey struct{}
 
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
