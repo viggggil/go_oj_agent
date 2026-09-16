@@ -60,6 +60,69 @@ type HMACTokenManager struct {
 	now             func() time.Time
 }
 
+// RS256TokenManager signs access tokens with a user-service-only RSA key. Refresh
+// tokens remain random opaque values and use the same storage semantics.
+type RS256TokenManager struct {
+	signer          *pkgauth.RS256Signer
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+	now             func() time.Time
+}
+
+func NewRS256TokenManager(privateKeyPEM []byte, keyID, issuer, audience string, accessTTL, refreshTTL time.Duration, now func() time.Time) (*RS256TokenManager, error) {
+	if refreshTTL <= 0 {
+		return nil, ErrInvalidArgument
+	}
+	signer, err := pkgauth.NewRS256Signer(pkgauth.RS256SignerConfig{PrivateKeyPEM: privateKeyPEM, KeyID: keyID, Issuer: issuer, Audience: audience, TTL: accessTTL, Now: now})
+	if err != nil {
+		return nil, err
+	}
+	if now == nil {
+		now = time.Now
+	}
+	return &RS256TokenManager{signer: signer, accessTokenTTL: accessTTL, refreshTokenTTL: refreshTTL, now: now}, nil
+}
+
+func (m *RS256TokenManager) IssueAccessToken(_ context.Context, subject TokenSubject) (string, time.Duration, error) {
+	if m == nil || m.signer == nil || subject.ID <= 0 {
+		return "", 0, ErrInvalidArgument
+	}
+	token, err := m.signer.Sign(AccessTokenClaims{Subject: subject.ID, Username: subject.Username, Roles: subject.Roles})
+	if err != nil {
+		return "", 0, err
+	}
+	return token, m.signerTTL(), nil
+}
+
+func (m *RS256TokenManager) signerTTL() time.Duration { return m.accessTokenTTL }
+
+func (m *RS256TokenManager) Generate(userID int64, sessionID, rotatedFrom string) (string, RefreshTokenRecord, error) {
+	if m == nil || userID <= 0 {
+		return "", RefreshTokenRecord{}, ErrInvalidArgument
+	}
+	raw, err := randomURLToken(32)
+	if err != nil {
+		return "", RefreshTokenRecord{}, err
+	}
+	if sessionID == "" {
+		sessionID, err = randomHex(16)
+		if err != nil {
+			return "", RefreshTokenRecord{}, err
+		}
+	}
+	id, err := randomHex(16)
+	if err != nil {
+		return "", RefreshTokenRecord{}, err
+	}
+	now := m.now().UTC()
+	sum := sha256.Sum256([]byte(raw))
+	return raw, RefreshTokenRecord{UserID: userID, SessionID: sessionID, TokenID: id, TokenHash: hex.EncodeToString(sum[:]), CreatedAt: now, ExpiresAt: now.Add(m.refreshTokenTTL), LastUsedAt: now, RotatedFrom: rotatedFrom}, nil
+}
+func (m *RS256TokenManager) Hash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
 func NewHMACTokenManager(config TokenConfig) (*HMACTokenManager, error) {
 	if strings.TrimSpace(config.Secret) == "" {
 		return nil, ErrInvalidArgument

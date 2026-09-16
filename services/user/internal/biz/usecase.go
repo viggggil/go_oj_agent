@@ -206,7 +206,10 @@ func NewUserUsecaseFromConfig(
 	config *conf.Bootstrap,
 	users UserRepository,
 	roles RoleRepository,
-	tokens *security.HMACTokenManager,
+	tokens interface {
+		TokenIssuer
+		RefreshTokenGenerator
+	},
 	refreshTokens RefreshTokenStore,
 ) *UserUsecase {
 	if config == nil || config.GetAuth() == nil {
