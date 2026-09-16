@@ -243,6 +243,11 @@ type AuthProto struct {
 	AccessTokenKey           string `protobuf:"bytes,1,opt,name=access_token_key,json=accessTokenKey,proto3" json:"access_token_key,omitempty"`
 	AccessTokenPublicKeyFile string `protobuf:"bytes,4,opt,name=access_token_public_key_file,json=accessTokenPublicKeyFile,proto3" json:"access_token_public_key_file,omitempty"`
 	AccessTokenKeyId         string `protobuf:"bytes,5,opt,name=access_token_key_id,json=accessTokenKeyId,proto3" json:"access_token_key_id,omitempty"`
+	InternalPrivateKeyFile   string `protobuf:"bytes,6,opt,name=internal_private_key_file,json=internalPrivateKeyFile,proto3" json:"internal_private_key_file,omitempty"`
+	InternalKeyId            string `protobuf:"bytes,7,opt,name=internal_key_id,json=internalKeyId,proto3" json:"internal_key_id,omitempty"`
+	InternalIssuer           string `protobuf:"bytes,8,opt,name=internal_issuer,json=internalIssuer,proto3" json:"internal_issuer,omitempty"`
+	InternalAudience         string `protobuf:"bytes,9,opt,name=internal_audience,json=internalAudience,proto3" json:"internal_audience,omitempty"`
+	InternalTokenTtl         string `protobuf:"bytes,10,opt,name=internal_token_ttl,json=internalTokenTtl,proto3" json:"internal_token_ttl,omitempty"`
 	Issuer                   string `protobuf:"bytes,2,opt,name=issuer,proto3" json:"issuer,omitempty"`
 	Audience                 string `protobuf:"bytes,3,opt,name=audience,proto3" json:"audience,omitempty"`
 	unknownFields            protoimpl.UnknownFields
@@ -297,6 +302,41 @@ func (x *AuthProto) GetAccessTokenPublicKeyFile() string {
 func (x *AuthProto) GetAccessTokenKeyId() string {
 	if x != nil {
 		return x.AccessTokenKeyId
+	}
+	return ""
+}
+
+func (x *AuthProto) GetInternalPrivateKeyFile() string {
+	if x != nil {
+		return x.InternalPrivateKeyFile
+	}
+	return ""
+}
+
+func (x *AuthProto) GetInternalKeyId() string {
+	if x != nil {
+		return x.InternalKeyId
+	}
+	return ""
+}
+
+func (x *AuthProto) GetInternalIssuer() string {
+	if x != nil {
+		return x.InternalIssuer
+	}
+	return ""
+}
+
+func (x *AuthProto) GetInternalAudience() string {
+	if x != nil {
+		return x.InternalAudience
+	}
+	return ""
+}
+
+func (x *AuthProto) GetInternalTokenTtl() string {
+	if x != nil {
+		return x.InternalTokenTtl
 	}
 	return ""
 }
@@ -580,11 +620,17 @@ const file_services_gateway_internal_conf_conf_proto_rawDesc = "" +
 	"\x04http\x18\x01 \x01(\v2\x17.gateway.conf.HTTPProtoR\x04http\"?\n" +
 	"\tHTTPProto\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x18\n" +
-	"\atimeout\x18\x02 \x01(\tR\atimeout\"\xdc\x01\n" +
+	"\atimeout\x18\x02 \x01(\tR\atimeout\"\xc3\x03\n" +
 	"\tAuthProto\x12,\n" +
 	"\x10access_token_key\x18\x01 \x01(\tB\x02\x18\x01R\x0eaccessTokenKey\x12>\n" +
 	"\x1caccess_token_public_key_file\x18\x04 \x01(\tR\x18accessTokenPublicKeyFile\x12-\n" +
-	"\x13access_token_key_id\x18\x05 \x01(\tR\x10accessTokenKeyId\x12\x16\n" +
+	"\x13access_token_key_id\x18\x05 \x01(\tR\x10accessTokenKeyId\x129\n" +
+	"\x19internal_private_key_file\x18\x06 \x01(\tR\x16internalPrivateKeyFile\x12&\n" +
+	"\x0finternal_key_id\x18\a \x01(\tR\rinternalKeyId\x12'\n" +
+	"\x0finternal_issuer\x18\b \x01(\tR\x0einternalIssuer\x12+\n" +
+	"\x11internal_audience\x18\t \x01(\tR\x10internalAudience\x12,\n" +
+	"\x12internal_token_ttl\x18\n" +
+	" \x01(\tR\x10internalTokenTtl\x12\x16\n" +
 	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x12\x1a\n" +
 	"\baudience\x18\x03 \x01(\tR\baudience\"\xad\x01\n" +
 	"\fClientsProto\x12-\n" +

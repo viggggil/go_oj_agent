@@ -42,7 +42,7 @@ func ProvideUserServiceClient(client *UserClient) userv1.UserServiceClient {
 	return client.UserServiceClient
 }
 
-func newGRPCConn(ctx context.Context, config *conf.ClientProto) (*grpc.ClientConn, func(), error) {
+func newGRPCConn(ctx context.Context, config *conf.ClientProto, interceptors ...grpc.UnaryClientInterceptor) (*grpc.ClientConn, func(), error) {
 	if config == nil || strings.TrimSpace(config.GetEndpoint()) == "" {
 		return nil, nil, fmt.Errorf("gateway client endpoint is required")
 	}
@@ -50,7 +50,11 @@ func newGRPCConn(ctx context.Context, config *conf.ClientProto) (*grpc.ClientCon
 	if parsed, err := time.ParseDuration(config.GetTimeout()); err == nil && parsed > 0 {
 		timeout = parsed
 	}
-	conn, err := kgrpc.NewClient(ctx, kgrpc.WithEndpoint(config.GetEndpoint()), kgrpc.WithTimeout(timeout))
+	options := []kgrpc.ClientOption{kgrpc.WithEndpoint(config.GetEndpoint()), kgrpc.WithTimeout(timeout)}
+	if len(interceptors) > 0 {
+		options = append(options, kgrpc.WithUnaryInterceptor(interceptors...))
+	}
+	conn, err := kgrpc.NewClient(ctx, options...)
 	if err != nil {
 		return nil, nil, err
 	}

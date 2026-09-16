@@ -10,6 +10,17 @@ message Bootstrap {
   DataProto data = 3;
   StorageProto storage = 4;
   RegistryProto registry = 5;
+  InternalAuthProto internal_auth = 6;
+}
+
+message InternalAuthProto {
+  string public_key_file = 1;
+  string key_id = 2;
+  string issuer = 3;
+  string audience = 4;
+  string subject = 5;
+  string max_token_ttl = 6;
+  string clock_skew = 7;
 }
 
 message ServiceProto {
