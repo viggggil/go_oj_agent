@@ -86,7 +86,8 @@ services:
         test -f /keys/user-private.pem || openssl genrsa -out /keys/user-private.pem 2048 >/dev/null 2>&1 &&
         test -f /keys/user-public.pem || openssl rsa -in /keys/user-private.pem -pubout -out /keys/user-public.pem >/dev/null 2>&1 &&
         test -f /keys/gateway-private.pem || openssl genrsa -out /keys/gateway-private.pem 2048 >/dev/null 2>&1 &&
-        test -f /keys/gateway-public.pem || openssl rsa -in /keys/gateway-private.pem -pubout -out /keys/gateway-public.pem >/dev/null 2>&1
+        test -f /keys/gateway-public.pem || openssl rsa -in /keys/gateway-private.pem -pubout -out /keys/gateway-public.pem >/dev/null 2>&1 &&
+        chmod 644 /keys/*.pem
     volumes:
       - auth-keys:/keys
     restart: "no"
