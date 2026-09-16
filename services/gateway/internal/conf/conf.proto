@@ -29,6 +29,11 @@ message AuthProto {
   string access_token_key = 1 [deprecated = true];
   string access_token_public_key_file = 4;
   string access_token_key_id = 5;
+  string internal_private_key_file = 6;
+  string internal_key_id = 7;
+  string internal_issuer = 8;
+  string internal_audience = 9;
+  string internal_token_ttl = 10;
   string issuer = 2;
   string audience = 3;
 }
