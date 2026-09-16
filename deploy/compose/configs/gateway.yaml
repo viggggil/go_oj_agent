@@ -10,6 +10,11 @@ auth:
   access_token_key_id: "${AUTH_ACCESS_TOKEN_KEY_ID}"
   issuer: "${AUTH_ISSUER}"
   audience: "${AUTH_AUDIENCE}"
+  internal_private_key_file: "${AUTH_INTERNAL_PRIVATE_KEY_FILE}"
+  internal_key_id: "${AUTH_INTERNAL_KEY_ID}"
+  internal_issuer: "${AUTH_INTERNAL_ISSUER}"
+  internal_audience: "${AUTH_INTERNAL_AUDIENCE}"
+  internal_token_ttl: "${AUTH_INTERNAL_TOKEN_TTL}"
 clients:
   user:
     name: user-service
