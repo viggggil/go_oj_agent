@@ -7,6 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY api ./api
 COPY errors ./errors
+COPY pkg ./pkg
 COPY services/problem ./services/problem
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/problem-service ./services/problem/cmd/problem-service
