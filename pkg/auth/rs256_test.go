@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -57,10 +58,13 @@ func TestRS256RejectsTamperAlgorithmAndAudience(t *testing.T) {
 	signer, _ := NewRS256Signer(RS256SignerConfig{PrivateKeyPEM: priv, KeyID: "k", Issuer: "issuer", Audience: "aud", TTL: time.Minute, Now: func() time.Time { return now }})
 	token, _ := signer.Sign(AccessTokenClaims{Subject: 1})
 	verifier, _ := NewRS256Verifier(RS256VerifierConfig{PublicKeys: map[string][]byte{"k": pub}, Issuer: "issuer", Audience: "aud", Now: func() time.Time { return now }})
-	tampered := token[:len(token)-1] + "A"
-	if tampered == token {
-		tampered = token[:len(token)-1] + "B"
+	parts := strings.Split(token, ".")
+	first := "A"
+	if string(parts[2][0]) == first {
+		first = "B"
 	}
+	parts[2] = first + parts[2][1:]
+	tampered := strings.Join(parts, ".")
 	if _, err := verifier.Verify(tampered); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("tamper err=%v", err)
 	}
