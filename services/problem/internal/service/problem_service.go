@@ -37,9 +37,13 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 			return nil, err
 		}
 	}
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
 	in := req.GetProblem()
 	p, err := s.uc.Create(ctx, biz.CreateProblemInput{
-		Context: req.GetContext(),
+		Context: requestContext,
 		Problem: biz.Problem{
 			Title:         in.GetTitle(),
 			Slug:          in.GetSlug(),
@@ -64,7 +68,11 @@ func (s *ProblemService) GetProblem(ctx context.Context, req *problemv1.GetProbl
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
-	problem, err := s.uc.Get(ctx, req.GetContext(), req.GetProblemId())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	problem, err := s.uc.Get(ctx, requestContext, req.GetProblemId())
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +86,11 @@ func (s *ProblemService) ListProblems(ctx context.Context, req *problemv1.ListPr
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
-	page, err := s.uc.List(ctx, req.GetContext(), req.GetPage().GetPage(), req.GetPage().GetPageSize())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	page, err := s.uc.List(ctx, requestContext, req.GetPage().GetPage(), req.GetPage().GetPageSize())
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +109,11 @@ func (s *ProblemService) UpdateProblem(ctx context.Context, req *problemv1.Updat
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
 	in := req.GetProblem()
-	problem, err := s.uc.Update(ctx, req.GetContext(), req.GetProblemId(), biz.Problem{
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	problem, err := s.uc.Update(ctx, requestContext, req.GetProblemId(), biz.Problem{
 		Title: in.GetTitle(), Description: in.GetDescription(), Slug: in.GetSlug(), Difficulty: in.GetDifficulty(),
 		TimeLimitMs: in.GetTimeLimitMs(), MemoryLimitKb: in.GetMemoryLimitKb(),
 	}, in.GetTags())
@@ -114,7 +130,11 @@ func (s *ProblemService) ArchiveProblem(ctx context.Context, req *problemv1.Arch
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
-	problem, err := s.uc.Archive(ctx, req.GetContext(), req.GetProblemId())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	problem, err := s.uc.Archive(ctx, requestContext, req.GetProblemId())
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +151,11 @@ func (s *ProblemService) AddTestcase(ctx context.Context, req *problemv1.AddTest
 	if err := validateTestcasePair(req.GetCaseNo(), req.GetInputFilename(), req.GetOutputFilename()); err != nil {
 		return nil, err
 	}
-	testcase, err := s.uc.AddTestcase(ctx, req.GetContext(), req.GetProblemId(), req.GetCaseNo(), req.GetInputContent(), req.GetOutputContent())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	testcase, err := s.uc.AddTestcase(ctx, requestContext, req.GetProblemId(), req.GetCaseNo(), req.GetInputContent(), req.GetOutputContent())
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +178,11 @@ func (s *ProblemService) ListProblemTestcases(ctx context.Context, req *problemv
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
-	items, err := s.uc.ListTestcases(ctx, req.GetContext(), req.GetProblemId(), req.GetIncludeArchived())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	items, err := s.uc.ListTestcases(ctx, requestContext, req.GetProblemId(), req.GetIncludeArchived())
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +200,11 @@ func (s *ProblemService) ArchiveTestcase(ctx context.Context, req *problemv1.Arc
 	if err := req.Validate(); err != nil {
 		return nil, biz.ErrorInvalidArgument("%s", err.Error())
 	}
-	item, err := s.uc.ArchiveTestcase(ctx, req.GetContext(), req.GetProblemId(), req.GetTestcaseId())
+	requestContext, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
+	}
+	item, err := s.uc.ArchiveTestcase(ctx, requestContext, req.GetProblemId(), req.GetTestcaseId())
 	if err != nil {
 		return nil, err
 	}

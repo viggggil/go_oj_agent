@@ -20,3 +20,11 @@ storage:
 registry:
   consul:
     enabled: false
+internal_auth:
+  public_key_file: "/run/auth-keys/gateway-public.pem"
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
+  audience: "problem-service"
+  subject: "gateway-service"
+  max_token_ttl: "60s"
+  clock_skew: "5s"

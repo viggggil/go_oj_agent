@@ -4,16 +4,15 @@ import (
 	"context"
 	"testing"
 
-	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
+	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	"github.com/viggggil/go_oj_agent/services/problem/internal/biz"
 )
 
 func TestCreateProblemHandler(t *testing.T) {
 	repo := &serviceFakeRepository{}
 	server := NewProblemService(biz.NewProblemUsecase(repo))
-	response, err := server.CreateProblem(context.Background(), &problemv1.CreateProblemRequest{
-		Context: &commonv1.RequestContext{UserId: 9, Roles: []string{"admin"}},
+	response, err := server.CreateProblem(internalauth.WithPrincipal(context.Background(), internalauth.Principal{ActorID: 9, ActorRoles: []string{"admin"}}), &problemv1.CreateProblemRequest{
 		Problem: &problemv1.ProblemInput{Title: "Two Sum", Slug: "two-sum", Description: "Statement",
 			Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536},
 	})
@@ -37,8 +36,7 @@ func TestCreateProblemHandlerForwardsTestcases(t *testing.T) {
 	repo := &serviceTestcaseRepo{serviceFakeRepository: serviceFakeRepository{}}
 	objects := &serviceObjectStore{}
 	server := NewProblemService(biz.NewProblemUsecaseWithStore(repo, repo, objects, repo))
-	response, err := server.CreateProblem(context.Background(), &problemv1.CreateProblemRequest{
-		Context:   adminContextProto(),
+	response, err := server.CreateProblem(adminContext(), &problemv1.CreateProblemRequest{
 		Problem:   &problemv1.ProblemInput{Title: "A+B", Slug: "a-plus-b", Description: "Statement", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536},
 		Testcases: []*problemv1.TestcaseInput{{CaseNo: 1, InputFilename: "1.in", InputContent: []byte("in"), OutputFilename: "1.out", OutputContent: []byte("out")}},
 	})

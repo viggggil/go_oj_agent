@@ -10,7 +10,6 @@ import (
 
 func TestAddTestcaseRequestValidate(t *testing.T) {
 	valid := &AddTestcaseRequest{
-		Context:        &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}},
 		ProblemId:      10,
 		CaseNo:         1,
 		InputFilename:  "1.in",
@@ -26,7 +25,7 @@ func TestAddTestcaseRequestValidate(t *testing.T) {
 		name   string
 		mutate func(*AddTestcaseRequest)
 	}{
-		{name: "missing context", mutate: func(req *AddTestcaseRequest) { req.Context = nil }},
+		{name: "missing problem", mutate: func(req *AddTestcaseRequest) { req.ProblemId = 0 }},
 		{name: "invalid problem", mutate: func(req *AddTestcaseRequest) { req.ProblemId = 0 }},
 		{name: "wrong input suffix", mutate: func(req *AddTestcaseRequest) { req.InputFilename = "001.txt" }},
 		{name: "non-canonical input number", mutate: func(req *AddTestcaseRequest) { req.InputFilename = "001.in" }},
@@ -59,21 +58,18 @@ func TestProblemRequestsValidate(t *testing.T) {
 		MemoryLimitKb: 65536,
 		Tags:          []string{"array"},
 	}
-	context := &commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}}
-
-	if err := (&CreateProblemRequest{Context: context, Problem: input}).Validate(); err != nil {
+	if err := (&CreateProblemRequest{Problem: input}).Validate(); err != nil {
 		t.Fatalf("valid create request rejected: %v", err)
 	}
 	if err := (&ListProblemsRequest{
-		Context: context,
-		Page:    &commonv1.PageRequest{Page: 1, PageSize: 20},
+		Page: &commonv1.PageRequest{Page: 1, PageSize: 20},
 	}).Validate(); err != nil {
 		t.Fatalf("valid list request rejected: %v", err)
 	}
 
 	invalid := proto.Clone(input).(*ProblemInput)
 	invalid.Difficulty = ProblemDifficulty_PROBLEM_DIFFICULTY_UNSPECIFIED
-	if err := (&CreateProblemRequest{Context: context, Problem: invalid}).Validate(); err == nil {
+	if err := (&CreateProblemRequest{Problem: invalid}).Validate(); err == nil {
 		t.Fatal("expected unspecified difficulty to fail validation")
 	}
 }
