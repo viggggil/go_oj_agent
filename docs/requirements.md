@@ -301,7 +301,7 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 - Judge Worker
 - Agent Service
 
-Judge Worker 的扩容模型独立于 Judge Service；提交 API、Outbox Relay 和结果消费者可以按运行角色独立部署，但共享同一服务代码与数据所有权。
+Judge Worker 的扩容模型独立于 Judge Service。首版只启动一个 `judge-service` 实例，并在同一进程运行提交 API、Outbox Relay 和结果消费者；后续有容量依据时才拆分运行角色，数据所有权保持不变。
 
 ### 6.4 可观测性
 
@@ -433,7 +433,7 @@ Pull Request 至少验证：
 
 - RabbitMQ
 - Transactional Outbox
-- Judge Service 内置任务规范化、语言/优先级路由和有界重试策略
+- Judge Service 内置任务规范化、语言路由和有界重试策略；首版仅普通优先级
 - Judge Worker
 - MinIO
 - Sandbox

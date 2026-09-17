@@ -1,6 +1,6 @@
 # ADR-0001：合并 Submission 与 Judge Scheduler
 
-- 状态：Accepted（总体服务边界）；部分实现细节待决策
+- 状态：Accepted
 - 日期：2026-09-17
 
 ## 背景
@@ -13,7 +13,7 @@
 2. 将 `submission-service` 重命名为 `judge-service`。
 3. `judge-service` 拥有 `oj_submission` Schema，以及 Submission、Case Result、Outbox 和消费幂等数据。
 4. 创建提交时，在同一个 MySQL 事务中写入 Submission 与 `judge.requested` Outbox 意图。
-5. `judge-service` 的 Outbox Relay 读取意图，完成任务规范化、语言/优先级路由，直接发布到 `judge.task.<language>`。
+5. `judge-service` 的 Outbox Relay 读取意图，完成任务规范化和语言路由，直接发布到 `judge.task.<language>`。
 6. 收到 RabbitMQ Publisher Confirm 后，Relay 才把 Outbox 标记为已发布。
 7. `judge-worker` 保持独立部署，只消费任务、执行不可信代码并发布 `judge.completed` 或 `judge.failed`。
 8. `judge-service` 幂等消费结果并更新 Submission，仍是提交状态和结果的唯一事实来源。
@@ -33,7 +33,7 @@ Client
   -> MySQL submission + case results
 ```
 
-Outbox Relay 可以与 API Server 使用同一二进制的不同启动参数，也可以先以内嵌后台组件运行。无论部署方式如何，它都属于 `judge-service`，共享同一数据所有权与发布语义，不形成新的业务服务。
+首版只启动一个 `judge-service` 实例，在同一进程内运行 API Server、Outbox Relay 和 Result Consumer。三者仍保持独立模块、独立生命周期和有界并发，便于后续按运行角色拆分；当前不增加额外部署单元。
 
 ## 不变量
 
@@ -60,17 +60,15 @@ Outbox Relay 可以与 API Server 使用同一二进制的不同启动参数，�
 - 调度策略扩展会增加 Judge Service 内部复杂度。
 - 如果未来需要跨集群、全局公平调度或独立容量规划，可以重新提取 Scheduler，但必须以实际需求和监控数据为依据。
 
-## 待决策
+## 首版实现决策
 
-以下问题不阻塞本次架构文档更新，但必须在 Judge 链路编码前或对应功能 PR 中敲定：
-
-1. **Proto 包和外部路径是否同步改名。** 推荐服务实现与部署名使用 `judge-service`；现有 `submission.v1` 业务 API 可以保留，避免把 Submission 资源错误改名为 Judge。`api/judge/v1` 继续用于 Worker 管理接口和内部判题模型。是否合并两个 Proto 包需要单独做兼容性评审。
-2. **Relay 的首版运行形态。** 推荐同一仓库和二进制提供 `api`、`relay`、`result-consumer` 三种 role，Compose 可以分别启动；不建议 API 进程内无条件启动 Relay，否则 API 横向扩容会隐式增加 Relay 并发。
-3. **Outbox 并发领取策略。** 推荐 MySQL 8 使用短事务 `SELECT ... FOR UPDATE SKIP LOCKED` 领取批次，并设置 lease/attempt；需要确定是否允许同一事件被多个 Relay 重复发布。即使使用 lease，也必须按至少一次语义设计。
-4. **优先级模型。** 尚未确定普通提交、比赛提交、重判和管理员任务的优先级来源及防饥饿规则。首版可以只有普通优先级，但字段和 routing policy 不应依赖客户端自报。
-5. **重判模型。** 需要确定重判复用 `submission_id` 还是创建 `judge_attempt`。推荐引入 attempt/version，使迟到的旧结果不能覆盖新一轮结果。
-6. **测试用例快照。** 当前 Problem Testcase 已取消 version 字段，需要确定任务创建后测试点变化时的可重复判题策略。推荐 Judge Task 固化一组不可变 testcase object keys 或 manifest ID，而不是 Worker 在执行时读取“当前所有测试点”。
-7. **源码存储。** 需要确定源代码正文直接存 MySQL、存 MinIO 仅留 object key，或按大小分层。MQ 中不应携带大段源码。
-8. **结果消费事务。** 推荐 `processed_events` 去重、Submission 状态迁移、Case Result 写入和 `submission.judged` Outbox 事件在同一个事务内完成。
-9. **取消与超时。** 需要定义用户取消、系统超时、Worker 心跳丢失后由谁产生终态，以及迟到结果如何处理。
-10. **SSE 更新来源。** 推荐 MySQL 为事实来源，Redis 只做实时视图；结果事务提交后再更新/失效 Redis，SSE 断线重连必须能回查 MySQL。
+1. **Proto 边界。** 服务实现与部署名使用 `judge-service`；Submission 资源 API 保留 `submission.v1`，Worker、内部判题和管理契约使用 `judge.v1`，暂不合并 Proto 包。
+2. **运行形态。** 首版仅运行一个 `judge-service` 实例，并在同一进程中启动 API、Relay 和 Result Consumer。每个后台组件必须支持优雅停止，启动失败必须使服务启动失败，不能静默降级。
+3. **Outbox 领取。** 使用 MySQL 8 `SELECT ... FOR UPDATE SKIP LOCKED` 在短事务中领取批次，并记录 lease、attempt、next retry time。Publisher Confirm 前不得标记 published；整体仍按至少一次语义设计。
+4. **优先级。** 首版所有任务都是普通优先级，不接受客户端提供的 priority，也不创建多级优先队列。未来引入比赛或管理员优先级时另行版本化契约。
+5. **判题轮次。** 首次判题和每次重判都创建新的 `judge_attempt`。每个 attempt 有单调递增的 `attempt_no`，并在 `judge_revision` 中固定本轮使用的不可变测试集 revision。结果消息携带 `attempt_id` 和 `judge_revision`；旧 attempt 的迟到结果只能完成自身记录，不能覆盖 Submission 的当前结果。
+6. **测试集快照。** Problem Service 发布 revision 时，把完整测试集写入 MinIO 不可变前缀 `problem-{problem_id}/judge-revisions/{judge_revision}/`，包含 `manifest.json` 及成对的 `testcases/{case_no}.in|out`。所有对象和 hash 完整后才能原子切换题目的 active revision。首版所有已发布 revision 均不覆盖、不物理删除，避免 Problem Service 跨库判断 Judge 引用关系。
+7. **源码存储。** 源码正文存入 MinIO 不可变对象，Judge 数据库只保存 `source_object_key`、SHA-256 和大小。RabbitMQ 只传对象引用和 hash，不传源码正文。
+8. **结果事务。** `processed_events` 去重、attempt 状态与 Case Result、Submission 当前结果以及 `submission.judged` Outbox 必须在同一事务内更新。
+9. **取消与超时。** Judge Service 是终态所有者。取消或系统超时通过 attempt 条件更新产生终态；Worker 的迟到消息保留审计信息但不能改写已终止 attempt 或更新 Submission 当前结果。
+10. **SSE 来源。** MySQL 是事实来源，Redis 只作为实时状态视图。结果事务提交后再更新或失效 Redis；SSE 断线重连必须从 MySQL 恢复状态。

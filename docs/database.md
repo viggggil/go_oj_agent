@@ -156,6 +156,7 @@ Refresh Token 元数据优先放 Redis；如果后续需要长期审计，再新
 | `difficulty` | VARCHAR(32) | NOT NULL |
 | `time_limit_ms` | INT | NOT NULL |
 | `memory_limit_kb` | INT | NOT NULL |
+| `active_judge_revision` | CHAR(26) | Nullable, published immutable testcase revision |
 | `status` | VARCHAR(32) | normal / archived |
 | `created_by` | BIGINT | User ID reference only; no cross-DB FK |
 | `created_at` | DATETIME(3) | NOT NULL |
@@ -217,12 +218,43 @@ UNIQUE(problem_id, case_no)
 INDEX(problem_id, status, case_no)
 ```
 
-保留 hash 以支持对象完整性校验和历史判题复现。测试用例删除使用
-`status=archived` 标记，不物理删除 MySQL 元信息或 MinIO 对象。
-正文位于 MinIO 的 `problem-data` bucket，对象 key 使用
-`problem-{problem_id}/testcases/{case_no}/{upload_id}.in|out`。同一对文件
-共享随机 `upload_id`，避免并发重复上传覆盖已有测试点对象。状态只有
-`ACTIVE` 和 `ARCHIVED`。
+保留 hash 以支持对象完整性校验。测试用例删除使用 `status=archived`
+标记。`testcases` 只表示管理员当前编辑视图，不增加 `version` 字段。
+
+每次发布测试集时生成新的 ULID `judge_revision`，把全部有效测试点写入
+MinIO `problem-data` bucket 的不可变前缀：
+
+```text
+problem-{problem_id}/judge-revisions/{judge_revision}/manifest.json
+problem-{problem_id}/judge-revisions/{judge_revision}/testcases/{case_no}.in
+problem-{problem_id}/judge-revisions/{judge_revision}/testcases/{case_no}.out
+```
+
+`manifest.json` 固化 case 顺序、对象 key、大小和 SHA-256。所有对象上传并
+校验成功后，Problem Service 才在一个 MySQL 事务中登记已发布 revision，
+并切换 `problems.active_judge_revision`。失败的未发布前缀由后台 GC 清理；
+首版所有已发布 revision 均不可覆盖、不可物理删除。未来若需要回收，必须
+通过显式事件或内部 API 建立引用与保留期，禁止 Problem Service 跨库查询
+`judge_attempt`。
+
+## 5.5 `problem_judge_revisions`
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `judge_revision` | CHAR(26) | PK, ULID |
+| `problem_id` | BIGINT | FK within `oj_problem` |
+| `manifest_object_key` | VARCHAR(512) | Immutable MinIO key |
+| `manifest_sha256` | CHAR(64) | NOT NULL |
+| `case_count` | INT | NOT NULL |
+| `status` | VARCHAR(32) | published / retired |
+| `created_at` | DATETIME(3) | NOT NULL |
+
+约束：
+
+```text
+UNIQUE(problem_id, judge_revision)
+INDEX(problem_id, status, created_at)
+```
 
 ---
 
@@ -236,7 +268,10 @@ INDEX(problem_id, status, case_no)
 | `user_id` | BIGINT | User ID reference, no cross-DB FK |
 | `problem_id` | BIGINT | Problem ID reference, no cross-DB FK |
 | `language` | VARCHAR(32) | cpp / go / python / java |
-| `source_code` | MEDIUMTEXT | v0 可存 DB；后续可迁移 MinIO |
+| `source_object_key` | VARCHAR(512) | Immutable MinIO key |
+| `source_sha256` | CHAR(64) | NOT NULL |
+| `source_size_bytes` | BIGINT | NOT NULL |
+| `current_attempt_id` | BIGINT | Nullable, current judge attempt |
 | `status` | VARCHAR(32) | QUEUED / COMPILING / RUNNING / DONE |
 | `verdict` | VARCHAR(32) | AC / WA / TLE / MLE / RE / CE |
 | `time_ms` | INT | Nullable |
@@ -256,12 +291,45 @@ INDEX(verdict, created_at)
 
 状态更新需要防止重复 Event 造成非法回退。
 
-## 6.2 `submission_case_results`
+源码正文存入 MinIO `submission-source` bucket，使用随机 ULID 生成不可变 key，
+例如 `sources/{source_id}/source.cpp`。上传成功后再在 Submission + Attempt +
+Outbox 事务中记录 key、hash 和大小；事务失败产生的未引用对象由后台 GC
+按安全保留期清理。源码对象不覆盖，重判复用同一源码对象。
+
+## 6.2 `judge_attempts`
 
 | Column | Type | Note |
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `submission_id` | BIGINT | FK within `oj_submission` |
+| `attempt_no` | INT | Monotonic within submission |
+| `judge_revision` | CHAR(26) | Immutable testcase revision |
+| `status` | VARCHAR(32) | QUEUED / COMPILING / RUNNING / DONE / CANCELLED / SYSTEM_ERROR |
+| `verdict` | VARCHAR(32) | Nullable |
+| `time_ms` | INT | Nullable |
+| `memory_kb` | INT | Nullable |
+| `created_at` | DATETIME(3) | NOT NULL |
+| `started_at` | DATETIME(3) | Nullable |
+| `finished_at` | DATETIME(3) | Nullable |
+
+约束：
+
+```text
+UNIQUE(submission_id, attempt_no)
+INDEX(submission_id, created_at)
+INDEX(status, created_at)
+```
+
+首次判题与每次重判都创建新 attempt。`submissions.current_attempt_id` 只指向
+当前 attempt；旧 attempt 的迟到结果可以记录审计信息，但不得更新
+Submission 的当前状态、Verdict 或资源用量。
+
+## 6.3 `submission_case_results`
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `id` | BIGINT | PK |
+| `attempt_id` | BIGINT | FK to judge_attempts |
 | `case_no` | INT | NOT NULL |
 | `verdict` | VARCHAR(32) | NOT NULL |
 | `time_ms` | INT | Nullable |
@@ -272,11 +340,11 @@ INDEX(verdict, created_at)
 约束：
 
 ```text
-UNIQUE(submission_id, case_no)
-INDEX(submission_id)
+UNIQUE(attempt_id, case_no)
+INDEX(attempt_id)
 ```
 
-## 6.3 `outbox_events`
+## 6.4 `outbox_events`
 
 用于 Transactional Outbox。
 
@@ -284,14 +352,16 @@ INDEX(submission_id)
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `event_id` | CHAR(36) | UNIQUE |
-| `aggregate_type` | VARCHAR(64) | submission |
-| `aggregate_id` | BIGINT | submission_id |
+| `aggregate_type` | VARCHAR(64) | judge_attempt / submission |
+| `aggregate_id` | BIGINT | attempt_id or submission_id |
 | `event_type` | VARCHAR(128) | Internal intent, e.g. judge.requested |
 | `event_version` | INT | NOT NULL |
 | `payload` | JSON | Event Payload |
 | `status` | VARCHAR(32) | pending / published / failed |
 | `retry_count` | INT | default 0 |
 | `next_retry_at` | DATETIME(3) | Nullable |
+| `lease_owner` | VARCHAR(128) | Nullable relay instance |
+| `lease_until` | DATETIME(3) | Nullable |
 | `created_at` | DATETIME(3) | NOT NULL |
 | `published_at` | DATETIME(3) | Nullable |
 
@@ -303,9 +373,11 @@ INDEX(status, next_retry_at, id)
 INDEX(aggregate_type, aggregate_id)
 ```
 
-Relay 读取未发布事件，发布成功并收到 Publisher Confirm 后标记 `published`。
+Relay 使用短事务和 `SELECT ... FOR UPDATE SKIP LOCKED` 领取未发布事件并设置
+lease；发布成功并收到 Publisher Confirm 后标记 `published`。lease 只能降低
+并发碰撞，不能替代 Consumer 幂等。
 
-## 6.4 `processed_events`
+## 6.5 `processed_events`
 
 用于 Consumer 幂等去重的一种实现。
 

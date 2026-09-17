@@ -573,8 +573,13 @@ submission.judged
 ```json
 {
   "submission_id": 10001,
+  "attempt_id": 1,
   "problem_id": 1001,
-  "language": "cpp"
+  "language": "cpp",
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+  "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
+  "source_sha256": "...",
+  "source_size_bytes": 1234
 }
 ```
 
@@ -713,7 +718,7 @@ List Submissions
 Submission State Machine
 ```
 
-`judge-service` 替代原 `submission-service`，并在 Phase 3 内继续加入 Outbox Relay、任务规范化、语言/优先级路由和判题结果消费。Worker 执行逻辑不进入该服务。
+`judge-service` 替代原 `submission-service`，并在 Phase 3 内继续加入 Outbox Relay、任务规范化、语言路由和判题结果消费。首版只启动一个实例，由同一进程运行 API、Relay 和 Result Consumer；首版不区分任务优先级。Worker 执行逻辑不进入该服务。
 
 状态建议：
 
@@ -732,12 +737,29 @@ SYSTEM_ERROR
 
 Phase 2 可以暂时接 Fake Judge，以便先打通业务层。
 
+创建 Submission 的持久化顺序：
+
+```text
+Problem Service: resolve active judge_revision
+        ↓
+MinIO: upload immutable source object
+        ↓
+MySQL TX: submission + judge_attempt + judge.requested outbox
+```
+
+`judge_attempt.judge_revision` 固定单次判题使用的完整测试集。首次判题和重判
+都创建新 attempt；旧 attempt 的迟到结果不得覆盖当前 Submission。源码正文
+只存 MinIO，数据库与 RabbitMQ 只保存 object key、SHA-256 和大小。
+
 ## Required Tests
 
 - [ ] Create submission
 - [ ] Ownership / permission
 - [ ] State transition
 - [ ] Invalid state transition
+- [ ] Attempt revision remains immutable after testcase changes
+- [ ] Late result cannot overwrite current attempt
+- [ ] Orphan source object cleanup after transaction failure
 - [ ] Pagination
 - [ ] Repository integration
 - [ ] Cache behavior
@@ -863,7 +885,7 @@ Publisher Confirm
 mark published
 ```
 
-Relay 属于 `judge-service`，可以作为独立进程/运行角色水平扩展，但不是新的业务服务。它读取 `judge.requested` Outbox 意图，完成任务规范化与语言/优先级选择，直接发布 `judge.task.<language>`。
+Relay 属于 `judge-service`。首版作为单个 Judge Service 进程内的后台模块运行，读取 `judge.requested` Outbox 意图，完成任务规范化与语言选择，直接发布 `judge.task.<language>`。首版只有普通优先级；后续有容量依据时可以拆分运行角色，但不新增业务服务。
 
 重点保证：
 
@@ -935,7 +957,7 @@ idempotent consumer
 
 ```text
 language routing
-priority
+single normal priority in v1
 retry routing
 worker queue dispatch
 task metadata normalization

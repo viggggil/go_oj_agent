@@ -395,7 +395,9 @@ Problem Service 在同一次业务操作中完成 MinIO 上传、SHA-256 计算�
 ### DELETE `/api/v1/problems/{problem_id}/testcases/{testcase_id}`
 
 管理员归档测试用例。该操作不物理删除 MySQL 元信息或 MinIO 对象，保证
-历史判题仍可按照测试用例版本复现。
+历史判题仍可按照 `judge_revision` 复现。新增或归档测试点成功时，Problem
+Service 必须先发布包含全部有效测试点的新 immutable revision，再切换题目的
+active revision；发布失败时保留旧 revision，并使本次变更失败。
 
 ---
 
@@ -432,6 +434,11 @@ Response：
 ```http
 202 Accepted
 ```
+
+Judge Service 接收 `source_code` 后获取题目的 active `judge_revision`，把源码
+上传为 MinIO 不可变对象，再在一个事务中创建 Submission、首个
+`judge_attempt` 和 `judge.requested` Outbox。数据库与 MQ 不保存源码正文。
+如果事务失败，已上传但未被引用的源码对象由 GC 在安全保留期后清理。
 
 ### GET `/api/v1/submissions/{submission_id}`
 
@@ -817,13 +824,17 @@ Payload：
 ```json
 {
   "submission_id": 90001,
+  "attempt_id": 1,
   "problem_id": 1001,
   "language": "cpp",
-  "testcase_snapshot_ref": "pending-contract"
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+  "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
+  "source_sha256": "...",
+  "source_size_bytes": 1234
 }
 ```
 
-`testcase_snapshot_ref` 的最终类型需要在 Judge Task 契约落地前确定；它必须引用不可变测试数据快照，不能隐式表示“执行时读取当前测试点”。
+`judge_revision` 引用 Problem Service 已完整发布的不可变测试集 revision。首版没有 priority 字段，所有任务都使用普通优先级。源码正文存 MinIO，消息只携带不可变对象 key 与 hash。
 
 ---
 
@@ -855,13 +866,17 @@ Payload 至少包括：
 ```json
 {
   "submission_id": 90001,
+  "attempt_id": 1,
   "problem_id": 1001,
   "language": "cpp",
-  "testcase_snapshot_ref": "pending-contract"
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+  "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
+  "source_sha256": "...",
+  "source_size_bytes": 1234
 }
 ```
 
-源码和测试数据不必全部塞入 MQ；Worker 可以按安全约束从对象存储或受控数据源获取。
+Worker 使用受限的服务凭据按对象引用读取源码，并根据 `judge_revision` 读取该 revision 的 `manifest.json` 和全部测试点。不得在同一 attempt 中读取其他 revision，也不得把源码或测试数据正文塞入 MQ。
 
 ---
 
@@ -884,6 +899,8 @@ Payload：
 ```json
 {
   "submission_id": 90001,
+  "attempt_id": 1,
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "verdict": "AC",
   "time_ms": 32,
   "memory_kb": 4096,
@@ -904,6 +921,8 @@ Payload：
 ```json
 {
   "submission_id": 90001,
+  "attempt_id": 1,
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "reason": "SANDBOX_UNAVAILABLE",
   "retryable": true
 }
@@ -999,6 +1018,11 @@ v0 阶段保持简单。
 - Agent 中产生写操作的未来 Tool。
 
 MQ Consumer 以 `event_id` 或业务唯一约束实现去重。
+
+Judge Result Consumer 必须在同一个事务内完成 `processed_events` 去重、
+attempt 状态与 Case Result 写入、当前 Submission 投影更新，以及
+`submission.judged` Outbox 写入。结果中的 `attempt_id` 和 `judge_revision`
+必须同时匹配；迟到或重复结果不得覆盖当前 attempt。
 
 ---
 

@@ -87,6 +87,7 @@ flowchart TB
     Contest --> Redis
 
     Problem --> MinIO
+    Judge --> MinIO
     Worker --> MinIO
     Agent --> MinIO
 
@@ -117,7 +118,7 @@ flowchart TB
 | `gateway-service` | Go + Kratos | REST、SSE、认证入口、限流、路由、Trace | Redis、Consul |
 | `user-service` | Go + Kratos | 用户、认证、RBAC | MySQL、Redis、Consul |
 | `problem-service` | Go + Kratos | 题目、标签、测试点 Metadata | MySQL、Redis、MinIO、Consul |
-| `judge-service` | Go + Kratos | 提交、状态、结果、调度策略、Outbox Relay、结果消费 | MySQL、Redis、RabbitMQ、Consul |
+| `judge-service` | Go + Kratos | 提交、源码对象、状态、结果、调度策略、Outbox Relay、结果消费 | MySQL、Redis、RabbitMQ、MinIO、Consul |
 | `contest-service` | Go + Kratos | 比赛、作业、排行榜 | MySQL、Redis、Consul |
 | `judge-worker` | Go | 编译、Sandbox 执行、结果聚合 | RabbitMQ、MinIO |
 | `agent-service` | Python + FastAPI | Agent、RAG、Tool Calling、Streaming | gRPC、Vector DB、Redis |
@@ -287,6 +288,7 @@ sequenceDiagram
     participant C as Client
     participant G as Gateway
     participant J as Judge Service
+    participant P as Problem Service
     participant DB as MySQL
     participant O as Outbox Relay
     participant MQ as RabbitMQ
@@ -295,17 +297,20 @@ sequenceDiagram
 
     C->>G: POST /api/v1/submissions
     G->>J: CreateSubmission
+    J->>P: Get active judge_revision + limits
+    J->>M: Upload immutable source object
 
     J->>DB: BEGIN
     J->>DB: INSERT submission
-    J->>DB: INSERT outbox_event(judge.requested)
+    J->>DB: INSERT judge_attempt(judge_revision)
+    J->>DB: INSERT outbox_event(judge.requested, attempt_id)
     J->>DB: COMMIT
 
     J-->>G: submission_id + QUEUED
     G-->>C: 202 Accepted
 
     O->>DB: Read unpublished outbox
-    O->>O: Normalize task + select language/priority route
+    O->>O: Normalize task + select language route
     O->>MQ: Publish judge.task.<language>
     MQ-->>O: Publisher Confirm
     O->>DB: Mark published
@@ -321,7 +326,7 @@ sequenceDiagram
     JW->>MQ: ACK task
 
     MQ->>J: Consume judge.completed
-    J->>DB: Idempotently update submission/result
+    J->>DB: TX dedup + attempt/cases + submission + outbox
     J->>MQ: ACK result
 ```
 
@@ -351,7 +356,7 @@ BEGIN
 COMMIT
 ```
 
-之后由 `judge-service` 内部的 Outbox Relay 读取事件，完成任务规范化和语言/优先级路由，直接发布到 `judge.task.<language>` 并等待 Publisher Confirm。Relay 是同一服务的独立运行角色或进程，不是新的业务服务。
+之后由 `judge-service` 内部的 Outbox Relay 读取事件，完成任务规范化和语言路由，直接发布到 `judge.task.<language>` 并等待 Publisher Confirm。首版只启动一个 `judge-service` 实例，API、Relay 和 Result Consumer 在同一进程中作为独立模块运行；后续可以拆成运行角色，但不会形成新的业务服务。
 
 ### 6.2 Delivery Model
 
@@ -371,6 +376,11 @@ At-least-once Delivery
 - DLQ
 - bounded Prefetch
 - Backoff
+
+结果消息必须携带 `attempt_id` 与 `judge_revision`。Judge Service 在同一事务
+完成消费去重、attempt/Case Result、当前 Submission 投影及
+`submission.judged` Outbox；已取消、已超时或非当前 attempt 的迟到结果不得
+覆盖当前 Submission。MySQL 是 SSE 可恢复的事实来源，Redis 只保存实时视图。
 
 ---
 
