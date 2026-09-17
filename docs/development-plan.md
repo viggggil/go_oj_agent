@@ -126,7 +126,7 @@ MySQL
 ```text
 Create Submission
   ↓
-Submission Service
+Judge Service
   ↓
 Outbox
   ↓
@@ -164,7 +164,7 @@ Judge Result
 ```text
 user-service       → user domain
 problem-service    → problem domain
-submission-service → submission domain
+judge-service      → submission + dispatch domain
 contest-service    → contest domain
 agent-service      → agent domain
 ```
@@ -246,9 +246,8 @@ oj-next/
 │   ├── gateway/
 │   ├── user/
 │   ├── problem/
-│   ├── submission/
+│   ├── judge/
 │   ├── contest/
-│   ├── judge-scheduler/
 │   └── judge-worker/
 ├── agent/
 ├── pkg/
@@ -462,7 +461,7 @@ GetProblem
 ListProblems
 ```
 
-### Submission Service
+### Judge Service
 
 ```text
 CreateSubmission
@@ -513,7 +512,7 @@ contest-service
       ↓
 gRPC / Event
       ↓
-submission-service
+judge-service
 ```
 
 ---
@@ -535,14 +534,20 @@ submission-service
 
 ---
 
-## 6.5 MQ Event Contract
+## 6.5 Judge Async Contract
 
-Judge 尚未实现时，也先确定消息模型。
+Judge 尚未实现时，也先区分内部 Outbox 意图和 RabbitMQ 消息模型。
 
-基础事件：
+内部 Outbox 意图：
 
 ```text
 judge.requested
+```
+
+RabbitMQ Task / Event：
+
+```text
+judge.task.<language>
 judge.started
 judge.completed
 judge.failed
@@ -556,14 +561,14 @@ submission.judged
 ```json
 {
   "event_id": "0193...",
-  "event_type": "judge.requested",
+  "event_type": "judge.completed",
   "occurred_at": "2026-08-30T10:00:00Z",
   "trace_id": "...",
   "payload": {}
 }
 ```
 
-`judge.requested` 业务字段至少包含：
+`judge.requested` 只持久化在 `judge-service` 的 Outbox 中，由 Relay 转换并发布为 `judge.task.<language>`，不建立对应的 RabbitMQ Consumer。其业务字段至少包含：
 
 ```json
 {
@@ -695,7 +700,7 @@ version
 
 ---
 
-# 7.4 Submission Service
+# 7.4 Judge Service（Submission Domain）
 
 ## Initial Scope
 
@@ -707,6 +712,8 @@ Get Submission
 List Submissions
 Submission State Machine
 ```
+
+`judge-service` 替代原 `submission-service`，并在 Phase 3 内继续加入 Outbox Relay、任务规范化、语言/优先级路由和判题结果消费。Worker 执行逻辑不进入该服务。
 
 状态建议：
 
@@ -815,7 +822,7 @@ Transactional Outbox
         ↓
 RabbitMQ
         ↓
-Judge Scheduler
+Judge Service Outbox Relay / Dispatch
         ↓
 Judge Worker
         ↓
@@ -856,6 +863,8 @@ Publisher Confirm
 mark published
 ```
 
+Relay 属于 `judge-service`，可以作为独立进程/运行角色水平扩展，但不是新的业务服务。它读取 `judge.requested` Outbox 意图，完成任务规范化与语言/优先级选择，直接发布 `judge.task.<language>`。
+
 重点保证：
 
 ```text
@@ -888,7 +897,6 @@ oj.events
 Routing Keys：
 
 ```text
-judge.requested
 judge.started
 judge.completed
 judge.failed
@@ -921,7 +929,7 @@ idempotent consumer
 
 ---
 
-# 8.4 Judge Scheduler
+# 8.4 Judge Service Dispatch
 
 职责：
 
@@ -933,7 +941,7 @@ worker queue dispatch
 task metadata normalization
 ```
 
-Scheduler 不执行用户代码。
+这些职责合并进 `judge-service` 的 Outbox Relay/Dispatcher，不再存在独立 `judge-scheduler`。Judge Service 不执行用户代码。
 
 ---
 
@@ -1108,13 +1116,11 @@ state/version
 ```text
 POST /submissions
       ↓
-Submission Service
+Judge Service
       ↓
 MySQL + Outbox
       ↓
 RabbitMQ
-      ↓
-Scheduler
       ↓
 Worker
       ↓
@@ -1122,7 +1128,7 @@ Sandbox
       ↓
 Judge Result
       ↓
-Submission Service
+Judge Service
       ↓
 GET /submissions/{id}
 ```
@@ -1279,7 +1285,7 @@ service identity
 ```text
 Agent calls GetSubmission(123)
           ↓
-submission-service checks:
+judge-service checks:
 submission.user_id == current_user_id
 ```
 
@@ -1452,11 +1458,9 @@ OpenTelemetry
 ```text
 Gateway
  ↓
-Submission Service
+Judge Service
  ↓
 RabbitMQ
- ↓
-Scheduler
  ↓
 Judge Worker
 ```
@@ -1931,13 +1935,13 @@ build
 示例：
 
 ```text
-feat(submission): add outbox event model
+feat(judge): add outbox event model
 
-feat(submission): persist outbox event transactionally
+feat(judge): persist submission and outbox event transactionally
 
-feat(submission): implement outbox relay
+feat(judge): implement outbox relay and task dispatch
 
-test(submission): add outbox integration tests
+test(judge): add outbox integration tests
 
 fix(judge): prevent duplicate result update
 

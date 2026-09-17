@@ -10,7 +10,7 @@
 2. 外部使用 REST / SSE，内部同步通信使用 gRPC + Protobuf。
 3. 异步领域事件与 Judge Task 使用 RabbitMQ。
 4. 每个服务拥有自己的数据，禁止跨服务直接访问数据库。
-5. Submission 与 Judge 解耦，使用 Transactional Outbox 保证可靠投递。
+5. `judge-service` 统一拥有 Submission、调度策略和结果状态，使用 Transactional Outbox 保证 Judge Task 可靠投递。
 6. Judge Worker 与业务服务使用不同扩容模型。
 7. Agent 只能通过受控 Tool / gRPC 访问业务数据。
 8. 安全、测试和可观测性属于架构的一部分，而不是后补功能。
@@ -30,12 +30,11 @@ flowchart TB
     subgraph Domain["Go Business Services"]
         User["User Service"]
         Problem["Problem Service"]
-        Submission["Submission Service"]
+        Judge["Judge Service<br/>Submission + Dispatch"]
         Contest["Contest Service"]
     end
 
-    subgraph JudgeDomain["Judge Domain"]
-        Scheduler["Judge Scheduler<br/>Go"]
+    subgraph JudgeDomain["Judge Execution Domain"]
         Worker["Judge Worker × N<br/>Go + Sandbox"]
     end
 
@@ -63,30 +62,28 @@ flowchart TB
 
     Gateway -->|"gRPC"| User
     Gateway -->|"gRPC"| Problem
-    Gateway -->|"gRPC"| Submission
+    Gateway -->|"gRPC"| Judge
     Gateway -->|"gRPC"| Contest
     Gateway -->|"HTTP / SSE"| Agent
 
-    Submission -->|"judge.requested"| RabbitMQ
-    RabbitMQ --> Scheduler
-    Scheduler -->|"judge.task.*"| RabbitMQ
+    Judge -->|"Outbox Relay: judge.task.*"| RabbitMQ
     RabbitMQ --> Worker
     Worker -->|"judge.completed"| RabbitMQ
-    RabbitMQ --> Submission
+    RabbitMQ --> Judge
 
     Agent -->|"gRPC Tools"| User
     Agent -->|"gRPC Tools"| Problem
-    Agent -->|"gRPC Tools"| Submission
+    Agent -->|"gRPC Tools"| Judge
     Agent --> Vector
 
     User --> MySQL
     Problem --> MySQL
-    Submission --> MySQL
+    Judge --> MySQL
     Contest --> MySQL
 
     User --> Redis
     Problem --> Redis
-    Submission --> Redis
+    Judge --> Redis
     Contest --> Redis
 
     Problem --> MinIO
@@ -96,14 +93,13 @@ flowchart TB
     Gateway -.-> Consul
     User -.-> Consul
     Problem -.-> Consul
-    Submission -.-> Consul
+    Judge -.-> Consul
     Contest -.-> Consul
 
     Gateway -. telemetry .-> OTel
     User -. telemetry .-> OTel
     Problem -. telemetry .-> OTel
-    Submission -. telemetry .-> OTel
-    Scheduler -. telemetry .-> OTel
+    Judge -. telemetry .-> OTel
     Worker -. telemetry .-> OTel
     Agent -. telemetry .-> OTel
 
@@ -121,9 +117,8 @@ flowchart TB
 | `gateway-service` | Go + Kratos | REST、SSE、认证入口、限流、路由、Trace | Redis、Consul |
 | `user-service` | Go + Kratos | 用户、认证、RBAC | MySQL、Redis、Consul |
 | `problem-service` | Go + Kratos | 题目、标签、测试点 Metadata | MySQL、Redis、MinIO、Consul |
-| `submission-service` | Go + Kratos | 提交、状态、结果、Outbox | MySQL、Redis、RabbitMQ、Consul |
+| `judge-service` | Go + Kratos | 提交、状态、结果、调度策略、Outbox Relay、结果消费 | MySQL、Redis、RabbitMQ、Consul |
 | `contest-service` | Go + Kratos | 比赛、作业、排行榜 | MySQL、Redis、Consul |
-| `judge-scheduler` | Go | Task 路由、优先级、Retry | RabbitMQ |
 | `judge-worker` | Go | 编译、Sandbox 执行、结果聚合 | RabbitMQ、MinIO |
 | `agent-service` | Python + FastAPI | Agent、RAG、Tool Calling、Streaming | gRPC、Vector DB、Redis |
 
@@ -142,13 +137,13 @@ submission tables
 ```text
 contest-service
     ↓ gRPC
-submission-service
+judge-service
 ```
 
 或者：
 
 ```text
-submission-service
+judge-service
     ↓ Domain Event
 RabbitMQ
     ↓
@@ -175,9 +170,8 @@ distributed-oj/
 │   ├── gateway/
 │   ├── user/
 │   ├── problem/
-│   ├── submission/
+│   ├── judge/
 │   ├── contest/
-│   ├── judge-scheduler/
 │   └── judge-worker/
 │
 ├── pkg/
@@ -292,33 +286,29 @@ sequenceDiagram
 
     participant C as Client
     participant G as Gateway
-    participant S as Submission Service
+    participant J as Judge Service
     participant DB as MySQL
     participant O as Outbox Relay
     participant MQ as RabbitMQ
-    participant JS as Judge Scheduler
     participant JW as Judge Worker
     participant M as MinIO
 
     C->>G: POST /api/v1/submissions
-    G->>S: CreateSubmission
+    G->>J: CreateSubmission
 
-    S->>DB: BEGIN
-    S->>DB: INSERT submission
-    S->>DB: INSERT outbox_event
-    S->>DB: COMMIT
+    J->>DB: BEGIN
+    J->>DB: INSERT submission
+    J->>DB: INSERT outbox_event(judge.requested)
+    J->>DB: COMMIT
 
-    S-->>G: submission_id + QUEUED
+    J-->>G: submission_id + QUEUED
     G-->>C: 202 Accepted
 
     O->>DB: Read unpublished outbox
-    O->>MQ: Publish judge.requested
+    O->>O: Normalize task + select language/priority route
+    O->>MQ: Publish judge.task.<language>
     MQ-->>O: Publisher Confirm
     O->>DB: Mark published
-
-    MQ->>JS: Consume judge.requested
-    JS->>MQ: Publish judge.task.<language>
-    JS->>MQ: ACK
 
     MQ->>JW: Consume judge task
     JW->>M: Download testcase
@@ -330,9 +320,9 @@ sequenceDiagram
     MQ-->>JW: Publisher Confirm
     JW->>MQ: ACK task
 
-    MQ->>S: Consume judge.completed
-    S->>DB: Update submission
-    S->>MQ: ACK result
+    MQ->>J: Consume judge.completed
+    J->>DB: Idempotently update submission/result
+    J->>MQ: ACK result
 ```
 
 ### 6.1 Transactional Outbox
@@ -361,7 +351,7 @@ BEGIN
 COMMIT
 ```
 
-之后由 Outbox Relay 发布消息并等待 Publisher Confirm。
+之后由 `judge-service` 内部的 Outbox Relay 读取事件，完成任务规范化和语言/优先级路由，直接发布到 `judge.task.<language>` 并等待 Publisher Confirm。Relay 是同一服务的独立运行角色或进程，不是新的业务服务。
 
 ### 6.2 Delivery Model
 
@@ -398,7 +388,6 @@ Routing Keys：
 submission.created
 submission.judged
 
-judge.requested
 judge.started
 judge.completed
 judge.failed
@@ -428,7 +417,7 @@ Event Envelope：
 ```json
 {
   "event_id": "uuid",
-  "event_type": "judge.requested",
+  "event_type": "judge.completed",
   "event_version": 1,
   "occurred_at": "RFC3339 timestamp",
   "trace_id": "trace id",
@@ -532,8 +521,8 @@ flowchart TB
     ToolAgent --> Recommend["RecommendProblem"]
 
     Problem -->|"gRPC"| PS["Problem Service"]
-    Submission -->|"gRPC"| SS["Submission Service"]
-    Judge -->|"gRPC"| SS
+    Submission -->|"gRPC"| JS["Judge Service"]
+    Judge -->|"gRPC"| JS
     Recommend -->|"gRPC"| PS
     RAG --> Vector[("Chroma / Qdrant")]
 
@@ -652,14 +641,12 @@ Kubernetes
 ```mermaid
 flowchart LR
     HTTP["HTTP Request"] --> Gateway["Gateway"]
-    Gateway --> Submission["Submission"]
-    Submission --> MQ["RabbitMQ"]
-    MQ --> Scheduler["Scheduler"]
-    Scheduler --> Worker["Worker"]
+    Gateway --> Judge["Judge Service"]
+    Judge --> MQ["RabbitMQ"]
+    MQ --> Worker["Worker"]
 
     Gateway -. telemetry .-> OTel["OpenTelemetry"]
-    Submission -. telemetry .-> OTel
-    Scheduler -. telemetry .-> OTel
+    Judge -. telemetry .-> OTel
     Worker -. telemetry .-> OTel
 
     OTel --> Metrics["Prometheus"]

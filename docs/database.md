@@ -34,7 +34,7 @@ oj_agent
 | --- | --- | --- |
 | `oj_user` | user-service | User、Role |
 | `oj_problem` | problem-service | Problem、Tag、Testcase Metadata |
-| `oj_submission` | submission-service | Submission、Case Result、Outbox、Dedup |
+| `oj_submission` | judge-service | Submission、Case Result、Outbox、Dedup |
 | `oj_contest` | contest-service | Contest、Participant、Leaderboard Snapshot |
 | `oj_agent` | agent-service | Conversation、Message |
 
@@ -51,7 +51,7 @@ oj_submission.submissions
 ```text
 contest-service
   ↓ gRPC / RabbitMQ Event
-submission-service
+judge-service
 ```
 
 Agent 也不允许读取其他业务 Schema。
@@ -286,7 +286,7 @@ INDEX(submission_id)
 | `event_id` | CHAR(36) | UNIQUE |
 | `aggregate_type` | VARCHAR(64) | submission |
 | `aggregate_id` | BIGINT | submission_id |
-| `event_type` | VARCHAR(128) | judge.requested etc. |
+| `event_type` | VARCHAR(128) | Internal intent, e.g. judge.requested |
 | `event_version` | INT | NOT NULL |
 | `payload` | JSON | Event Payload |
 | `status` | VARCHAR(32) | pending / published / failed |

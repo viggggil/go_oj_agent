@@ -727,7 +727,7 @@ get_judge_result         -> GetJudgeResult
 list_recent_submissions  -> ListRecentSubmissions
 ```
 
-Authorization 必须由 Submission Service 执行，而不是 Agent 判断。
+Authorization 必须由 Judge Service 执行，而不是 Agent 判断。
 
 ---
 
@@ -768,14 +768,14 @@ service JudgeAdminService {
 不要将判题主链路重新耦合成：
 
 ```text
-Submission Service
+Judge Service
   ↓ synchronous RPC
 Judge Worker
 ```
 
 ---
 
-## 5. RabbitMQ Event API
+## 5. Judge Async Contract
 
 ## 5.1 Event Envelope
 
@@ -784,7 +784,7 @@ Judge Worker
 ```json
 {
   "event_id": "uuid",
-  "event_type": "judge.requested",
+  "event_type": "judge.completed",
   "event_version": 1,
   "occurred_at": "2026-08-27T00:00:00Z",
   "trace_id": "...",
@@ -802,19 +802,15 @@ Judge Worker
 
 ---
 
-## 5.2 `judge.requested`
+## 5.2 Outbox Intent：`judge.requested`
 
-Producer：
-
-```text
-submission-service / outbox-relay
-```
-
-Consumer：
+Writer：
 
 ```text
-judge-scheduler
+judge-service / CreateSubmission transaction
 ```
+
+该记录是 `judge-service` 内部持久化的调度意图，不是 RabbitMQ 公共事件。Outbox Relay 读取后完成任务规范化与路由，并直接发布 `judge.task.<language>`；它不作为需要独立消费的 RabbitMQ 事件暴露给另一个服务。
 
 Payload：
 
@@ -823,9 +819,11 @@ Payload：
   "submission_id": 90001,
   "problem_id": 1001,
   "language": "cpp",
-  "testcase_version": 3
+  "testcase_snapshot_ref": "pending-contract"
 }
 ```
+
+`testcase_snapshot_ref` 的最终类型需要在 Judge Task 契约落地前确定；它必须引用不可变测试数据快照，不能隐式表示“执行时读取当前测试点”。
 
 ---
 
@@ -834,7 +832,7 @@ Payload：
 Producer：
 
 ```text
-judge-scheduler
+judge-service / outbox-relay
 ```
 
 Consumer：
@@ -859,7 +857,7 @@ Payload 至少包括：
   "submission_id": 90001,
   "problem_id": 1001,
   "language": "cpp",
-  "testcase_version": 3
+  "testcase_snapshot_ref": "pending-contract"
 }
 ```
 
@@ -878,7 +876,7 @@ judge-worker
 Consumer：
 
 ```text
-submission-service
+judge-service
 ```
 
 Payload：
@@ -918,7 +916,7 @@ Payload：
 Producer：
 
 ```text
-submission-service
+judge-service
 ```
 
 Potential Consumers：

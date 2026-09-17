@@ -9,7 +9,7 @@
 - 使用 Go-Kratos 构建领域化微服务。
 - 使用 gRPC + Protobuf 统一内部服务契约。
 - 使用 RabbitMQ 构建可靠异步判题链路。
-- 使用 Go 实现 Judge Scheduler / Worker。
+- 使用 Go 实现整合提交调度的 Judge Service 与独立 Judge Worker。
 - 使用 Sandbox 隔离用户提交的不可信代码。
 - 使用 FastAPI + LangChain/LangGraph 构建 AI Coding Agent。
 - Agent 通过受控 Tool / gRPC 获取题目、提交与判题上下文。
@@ -123,7 +123,7 @@ User
   ↓
 Gateway
   ↓
-Submission Service
+Judge Service
   ↓
 MySQL Transaction
   ├── Submission
@@ -276,7 +276,7 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 
 ### 6.1 可靠性
 
-- Submission 创建与 Judge Event Intent 必须通过 Transactional Outbox 保持一致。
+- Judge Service 创建 Submission 与 Judge Event Intent 必须通过 Transactional Outbox 保持一致。
 - MQ 采用 At-least-once 语义，Consumer 必须幂等。
 - Retry 必须有上限并可观测。
 - 不可恢复消息进入 DLQ。
@@ -301,7 +301,7 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 - Judge Worker
 - Agent Service
 
-Judge Worker 的扩容模型独立于 Submission Service。
+Judge Worker 的扩容模型独立于 Judge Service；提交 API、Outbox Relay 和结果消费者可以按运行角色独立部署，但共享同一服务代码与数据所有权。
 
 ### 6.4 可观测性
 
@@ -320,11 +320,9 @@ HTTP
  ↓
 Gateway
  ↓
-Submission
+Judge Service
  ↓
 RabbitMQ
- ↓
-Scheduler
  ↓
 Worker
 ```
@@ -394,8 +392,8 @@ Submission Updated
 
 用户 A 请求 Agent 分析用户 B 的私有提交时：
 
-- Tool 调用到 Submission Service。
-- Submission Service 拒绝访问。
+- Tool 调用到 Judge Service。
+- Judge Service 拒绝访问。
 - Agent 不得绕过权限读取数据库。
 
 ### AC-05 CI
@@ -435,7 +433,7 @@ Pull Request 至少验证：
 
 - RabbitMQ
 - Transactional Outbox
-- Judge Scheduler
+- Judge Service 内置任务规范化、语言/优先级路由和有界重试策略
 - Judge Worker
 - MinIO
 - Sandbox
