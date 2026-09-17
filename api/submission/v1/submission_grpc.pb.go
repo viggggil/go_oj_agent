@@ -19,11 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SubmissionService_CreateSubmission_FullMethodName      = "/submission.v1.SubmissionService/CreateSubmission"
-	SubmissionService_GetSubmission_FullMethodName         = "/submission.v1.SubmissionService/GetSubmission"
-	SubmissionService_ListSubmissions_FullMethodName       = "/submission.v1.SubmissionService/ListSubmissions"
-	SubmissionService_ListRecentSubmissions_FullMethodName = "/submission.v1.SubmissionService/ListRecentSubmissions"
-	SubmissionService_GetJudgeResult_FullMethodName        = "/submission.v1.SubmissionService/GetJudgeResult"
+	SubmissionService_CreateSubmission_FullMethodName  = "/submission.v1.SubmissionService/CreateSubmission"
+	SubmissionService_GetSubmission_FullMethodName     = "/submission.v1.SubmissionService/GetSubmission"
+	SubmissionService_ListSubmissions_FullMethodName   = "/submission.v1.SubmissionService/ListSubmissions"
+	SubmissionService_GetJudgeResult_FullMethodName    = "/submission.v1.SubmissionService/GetJudgeResult"
+	SubmissionService_RejudgeSubmission_FullMethodName = "/submission.v1.SubmissionService/RejudgeSubmission"
 )
 
 // SubmissionServiceClient is the client API for SubmissionService service.
@@ -32,9 +32,13 @@ const (
 type SubmissionServiceClient interface {
 	CreateSubmission(ctx context.Context, in *CreateSubmissionRequest, opts ...grpc.CallOption) (*CreateSubmissionResponse, error)
 	GetSubmission(ctx context.Context, in *GetSubmissionRequest, opts ...grpc.CallOption) (*GetSubmissionResponse, error)
+	// ListSubmissions also covers recent submissions through stable descending
+	// pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
 	ListSubmissions(ctx context.Context, in *ListSubmissionsRequest, opts ...grpc.CallOption) (*ListSubmissionsResponse, error)
-	ListRecentSubmissions(ctx context.Context, in *ListRecentSubmissionsRequest, opts ...grpc.CallOption) (*ListRecentSubmissionsResponse, error)
 	GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error)
+	// RejudgeSubmission invalidates the old result and creates a new submission
+	// for the same user with the problem's current judge revision.
+	RejudgeSubmission(ctx context.Context, in *RejudgeSubmissionRequest, opts ...grpc.CallOption) (*RejudgeSubmissionResponse, error)
 }
 
 type submissionServiceClient struct {
@@ -75,20 +79,20 @@ func (c *submissionServiceClient) ListSubmissions(ctx context.Context, in *ListS
 	return out, nil
 }
 
-func (c *submissionServiceClient) ListRecentSubmissions(ctx context.Context, in *ListRecentSubmissionsRequest, opts ...grpc.CallOption) (*ListRecentSubmissionsResponse, error) {
+func (c *submissionServiceClient) GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListRecentSubmissionsResponse)
-	err := c.cc.Invoke(ctx, SubmissionService_ListRecentSubmissions_FullMethodName, in, out, cOpts...)
+	out := new(GetJudgeResultResponse)
+	err := c.cc.Invoke(ctx, SubmissionService_GetJudgeResult_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *submissionServiceClient) GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error) {
+func (c *submissionServiceClient) RejudgeSubmission(ctx context.Context, in *RejudgeSubmissionRequest, opts ...grpc.CallOption) (*RejudgeSubmissionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetJudgeResultResponse)
-	err := c.cc.Invoke(ctx, SubmissionService_GetJudgeResult_FullMethodName, in, out, cOpts...)
+	out := new(RejudgeSubmissionResponse)
+	err := c.cc.Invoke(ctx, SubmissionService_RejudgeSubmission_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +105,13 @@ func (c *submissionServiceClient) GetJudgeResult(ctx context.Context, in *GetJud
 type SubmissionServiceServer interface {
 	CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error)
 	GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error)
+	// ListSubmissions also covers recent submissions through stable descending
+	// pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
-	ListRecentSubmissions(context.Context, *ListRecentSubmissionsRequest) (*ListRecentSubmissionsResponse, error)
 	GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error)
+	// RejudgeSubmission invalidates the old result and creates a new submission
+	// for the same user with the problem's current judge revision.
+	RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error)
 	mustEmbedUnimplementedSubmissionServiceServer()
 }
 
@@ -123,11 +131,11 @@ func (UnimplementedSubmissionServiceServer) GetSubmission(context.Context, *GetS
 func (UnimplementedSubmissionServiceServer) ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSubmissions not implemented")
 }
-func (UnimplementedSubmissionServiceServer) ListRecentSubmissions(context.Context, *ListRecentSubmissionsRequest) (*ListRecentSubmissionsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListRecentSubmissions not implemented")
-}
 func (UnimplementedSubmissionServiceServer) GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetJudgeResult not implemented")
+}
+func (UnimplementedSubmissionServiceServer) RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RejudgeSubmission not implemented")
 }
 func (UnimplementedSubmissionServiceServer) mustEmbedUnimplementedSubmissionServiceServer() {}
 func (UnimplementedSubmissionServiceServer) testEmbeddedByValue()                           {}
@@ -204,24 +212,6 @@ func _SubmissionService_ListSubmissions_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SubmissionService_ListRecentSubmissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRecentSubmissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SubmissionServiceServer).ListRecentSubmissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SubmissionService_ListRecentSubmissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SubmissionServiceServer).ListRecentSubmissions(ctx, req.(*ListRecentSubmissionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SubmissionService_GetJudgeResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetJudgeResultRequest)
 	if err := dec(in); err != nil {
@@ -236,6 +226,24 @@ func _SubmissionService_GetJudgeResult_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SubmissionServiceServer).GetJudgeResult(ctx, req.(*GetJudgeResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubmissionService_RejudgeSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejudgeSubmissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubmissionServiceServer).RejudgeSubmission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SubmissionService_RejudgeSubmission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubmissionServiceServer).RejudgeSubmission(ctx, req.(*RejudgeSubmissionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -260,12 +268,12 @@ var SubmissionService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SubmissionService_ListSubmissions_Handler,
 		},
 		{
-			MethodName: "ListRecentSubmissions",
-			Handler:    _SubmissionService_ListRecentSubmissions_Handler,
-		},
-		{
 			MethodName: "GetJudgeResult",
 			Handler:    _SubmissionService_GetJudgeResult_Handler,
+		},
+		{
+			MethodName: "RejudgeSubmission",
+			Handler:    _SubmissionService_RejudgeSubmission_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

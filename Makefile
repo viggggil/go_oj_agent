@@ -10,7 +10,7 @@ COMPOSE_FILE ?= deploy/compose/compose.yaml
 GO_PACKAGES := ./...
 GO_FILES := $(shell git ls-files '*.go')
 API_PROTO_FILES := $(shell find api -name '*.proto' -type f | sort)
-BUF_GENERATE_PATHS := --path api --path services/user/internal/conf --path services/problem/internal/conf --path services/gateway/internal/conf
+BUF_GENERATE_PATHS := --path api --path services/user/internal/conf --path services/problem/internal/conf --path services/gateway/internal/conf --path services/judge/internal/conf
 
 .PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-eval infra-up infra-down dev
 

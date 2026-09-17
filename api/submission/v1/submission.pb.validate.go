@@ -35,6 +35,9 @@ var (
 	_ = sort.Sort
 )
 
+// define the regex for a UUID once up-front
+var _submission_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 // Validate checks the field values on Submission with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -65,8 +68,6 @@ func (m *Submission) validate(all bool) error {
 
 	// no validation rules for Language
 
-	// no validation rules for SourceCode
-
 	// no validation rules for Status
 
 	// no validation rules for Verdict
@@ -75,7 +76,127 @@ func (m *Submission) validate(all bool) error {
 
 	// no validation rules for MemoryKb
 
-	// no validation rules for TestcaseVersion
+	// no validation rules for JudgeRevision
+
+	// no validation rules for RetryCount
+
+	// no validation rules for SystemErrorReason
+
+	if all {
+		switch v := interface{}(m.GetCreatedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "CreatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "CreatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCreatedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubmissionValidationError{
+				field:  "CreatedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetUpdatedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "UpdatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "UpdatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUpdatedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubmissionValidationError{
+				field:  "UpdatedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetJudgedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "JudgedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "JudgedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetJudgedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubmissionValidationError{
+				field:  "JudgedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetInvalidatedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "InvalidatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SubmissionValidationError{
+					field:  "InvalidatedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetInvalidatedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SubmissionValidationError{
+				field:  "InvalidatedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	if len(errors) > 0 {
 		return SubmissionMultiError(errors)
@@ -336,6 +457,10 @@ func (m *JudgeResult) validate(all bool) error {
 
 	}
 
+	// no validation rules for JudgeRevision
+
+	// no validation rules for SystemErrorReason
+
 	if len(errors) > 0 {
 		return JudgeResultMultiError(errors)
 	}
@@ -435,43 +560,83 @@ func (m *CreateSubmissionRequest) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CreateSubmissionRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, CreateSubmissionRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if m.GetProblemId() <= 0 {
+		err := CreateSubmissionRequestValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than 0",
 		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CreateSubmissionRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
 	}
 
-	// no validation rules for ProblemId
+	if l := utf8.RuneCountInString(m.GetLanguage()); l < 1 || l > 32 {
+		err := CreateSubmissionRequestValidationError{
+			field:  "Language",
+			reason: "value length must be between 1 and 32 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Language
+	if !_CreateSubmissionRequest_Language_Pattern.MatchString(m.GetLanguage()) {
+		err := CreateSubmissionRequestValidationError{
+			field:  "Language",
+			reason: "value does not match regex pattern \"^[a-z][a-z0-9_+-]*$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for SourceCode
+	if utf8.RuneCountInString(m.GetSourceCode()) < 1 {
+		err := CreateSubmissionRequestValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSourceCode()) > 1048576 {
+		err := CreateSubmissionRequestValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at most 1048576 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if err := m._validateUuid(m.GetIdempotencyKey()); err != nil {
+		err = CreateSubmissionRequestValidationError{
+			field:  "IdempotencyKey",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return CreateSubmissionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *CreateSubmissionRequest) _validateUuid(uuid string) error {
+	if matched := _submission_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil
@@ -549,6 +714,8 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CreateSubmissionRequestValidationError{}
+
+var _CreateSubmissionRequest_Language_Pattern = regexp.MustCompile("^[a-z][a-z0-9_+-]*$")
 
 // Validate checks the field values on CreateSubmissionResponse with the rules
 // defined in the proto definition for this message. If any rules are
@@ -678,36 +845,16 @@ func (m *GetSubmissionRequest) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, GetSubmissionRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, GetSubmissionRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if m.GetSubmissionId() <= 0 {
+		err := GetSubmissionRequestValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
 		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return GetSubmissionRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
 	}
-
-	// no validation rules for SubmissionId
 
 	if len(errors) > 0 {
 		return GetSubmissionRequestMultiError(errors)
@@ -942,33 +1089,15 @@ func (m *ListSubmissionsRequest) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, ListSubmissionsRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, ListSubmissionsRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if m.GetPage() == nil {
+		err := ListSubmissionsRequestValidationError{
+			field:  "Page",
+			reason: "value is required",
 		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return ListSubmissionsRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
 	}
 
 	if all {
@@ -1000,11 +1129,49 @@ func (m *ListSubmissionsRequest) validate(all bool) error {
 		}
 	}
 
-	// no validation rules for ProblemId
+	if m.GetProblemId() < 0 {
+		err := ListSubmissionsRequestValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Status
+	if _, ok := SubmissionStatus_name[int32(m.GetStatus())]; !ok {
+		err := ListSubmissionsRequestValidationError{
+			field:  "Status",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Language
+	if utf8.RuneCountInString(m.GetLanguage()) > 32 {
+		err := ListSubmissionsRequestValidationError{
+			field:  "Language",
+			reason: "value length must be at most 32 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetUserId() < 0 {
+		err := ListSubmissionsRequestValidationError{
+			field:  "UserId",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return ListSubmissionsRequestMultiError(errors)
@@ -1251,279 +1418,6 @@ var _ interface {
 	ErrorName() string
 } = ListSubmissionsResponseValidationError{}
 
-// Validate checks the field values on ListRecentSubmissionsRequest with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *ListRecentSubmissionsRequest) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on ListRecentSubmissionsRequest with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// ListRecentSubmissionsRequestMultiError, or nil if none found.
-func (m *ListRecentSubmissionsRequest) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *ListRecentSubmissionsRequest) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, ListRecentSubmissionsRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, ListRecentSubmissionsRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return ListRecentSubmissionsRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
-	// no validation rules for UserId
-
-	// no validation rules for Limit
-
-	if len(errors) > 0 {
-		return ListRecentSubmissionsRequestMultiError(errors)
-	}
-
-	return nil
-}
-
-// ListRecentSubmissionsRequestMultiError is an error wrapping multiple
-// validation errors returned by ListRecentSubmissionsRequest.ValidateAll() if
-// the designated constraints aren't met.
-type ListRecentSubmissionsRequestMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m ListRecentSubmissionsRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m ListRecentSubmissionsRequestMultiError) AllErrors() []error { return m }
-
-// ListRecentSubmissionsRequestValidationError is the validation error returned
-// by ListRecentSubmissionsRequest.Validate if the designated constraints
-// aren't met.
-type ListRecentSubmissionsRequestValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e ListRecentSubmissionsRequestValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e ListRecentSubmissionsRequestValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e ListRecentSubmissionsRequestValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e ListRecentSubmissionsRequestValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e ListRecentSubmissionsRequestValidationError) ErrorName() string {
-	return "ListRecentSubmissionsRequestValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e ListRecentSubmissionsRequestValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sListRecentSubmissionsRequest.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = ListRecentSubmissionsRequestValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = ListRecentSubmissionsRequestValidationError{}
-
-// Validate checks the field values on ListRecentSubmissionsResponse with the
-// rules defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *ListRecentSubmissionsResponse) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on ListRecentSubmissionsResponse with
-// the rules defined in the proto definition for this message. If any rules
-// are violated, the result is a list of violation errors wrapped in
-// ListRecentSubmissionsResponseMultiError, or nil if none found.
-func (m *ListRecentSubmissionsResponse) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *ListRecentSubmissionsResponse) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	for idx, item := range m.GetItems() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, ListRecentSubmissionsResponseValidationError{
-						field:  fmt.Sprintf("Items[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, ListRecentSubmissionsResponseValidationError{
-						field:  fmt.Sprintf("Items[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return ListRecentSubmissionsResponseValidationError{
-					field:  fmt.Sprintf("Items[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
-		}
-
-	}
-
-	if len(errors) > 0 {
-		return ListRecentSubmissionsResponseMultiError(errors)
-	}
-
-	return nil
-}
-
-// ListRecentSubmissionsResponseMultiError is an error wrapping multiple
-// validation errors returned by ListRecentSubmissionsResponse.ValidateAll()
-// if the designated constraints aren't met.
-type ListRecentSubmissionsResponseMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m ListRecentSubmissionsResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m ListRecentSubmissionsResponseMultiError) AllErrors() []error { return m }
-
-// ListRecentSubmissionsResponseValidationError is the validation error
-// returned by ListRecentSubmissionsResponse.Validate if the designated
-// constraints aren't met.
-type ListRecentSubmissionsResponseValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e ListRecentSubmissionsResponseValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e ListRecentSubmissionsResponseValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e ListRecentSubmissionsResponseValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e ListRecentSubmissionsResponseValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e ListRecentSubmissionsResponseValidationError) ErrorName() string {
-	return "ListRecentSubmissionsResponseValidationError"
-}
-
-// Error satisfies the builtin error interface
-func (e ListRecentSubmissionsResponseValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sListRecentSubmissionsResponse.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = ListRecentSubmissionsResponseValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = ListRecentSubmissionsResponseValidationError{}
-
 // Validate checks the field values on GetJudgeResultRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -1546,36 +1440,16 @@ func (m *GetJudgeResultRequest) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetContext()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, GetJudgeResultRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, GetJudgeResultRequestValidationError{
-					field:  "Context",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if m.GetSubmissionId() <= 0 {
+		err := GetJudgeResultRequestValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
 		}
-	} else if v, ok := interface{}(m.GetContext()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return GetJudgeResultRequestValidationError{
-				field:  "Context",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
 	}
-
-	// no validation rules for SubmissionId
 
 	if len(errors) > 0 {
 		return GetJudgeResultRequestMultiError(errors)
@@ -1787,3 +1661,269 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GetJudgeResultResponseValidationError{}
+
+// Validate checks the field values on RejudgeSubmissionRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RejudgeSubmissionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RejudgeSubmissionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RejudgeSubmissionRequestMultiError, or nil if none found.
+func (m *RejudgeSubmissionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RejudgeSubmissionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetSubmissionId() <= 0 {
+		err := RejudgeSubmissionRequestValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if err := m._validateUuid(m.GetIdempotencyKey()); err != nil {
+		err = RejudgeSubmissionRequestValidationError{
+			field:  "IdempotencyKey",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RejudgeSubmissionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *RejudgeSubmissionRequest) _validateUuid(uuid string) error {
+	if matched := _submission_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// RejudgeSubmissionRequestMultiError is an error wrapping multiple validation
+// errors returned by RejudgeSubmissionRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RejudgeSubmissionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RejudgeSubmissionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RejudgeSubmissionRequestMultiError) AllErrors() []error { return m }
+
+// RejudgeSubmissionRequestValidationError is the validation error returned by
+// RejudgeSubmissionRequest.Validate if the designated constraints aren't met.
+type RejudgeSubmissionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RejudgeSubmissionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RejudgeSubmissionRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RejudgeSubmissionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RejudgeSubmissionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RejudgeSubmissionRequestValidationError) ErrorName() string {
+	return "RejudgeSubmissionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RejudgeSubmissionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRejudgeSubmissionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RejudgeSubmissionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RejudgeSubmissionRequestValidationError{}
+
+// Validate checks the field values on RejudgeSubmissionResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RejudgeSubmissionResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RejudgeSubmissionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RejudgeSubmissionResponseMultiError, or nil if none found.
+func (m *RejudgeSubmissionResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RejudgeSubmissionResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for InvalidatedSubmissionId
+
+	if all {
+		switch v := interface{}(m.GetSubmission()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RejudgeSubmissionResponseValidationError{
+					field:  "Submission",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RejudgeSubmissionResponseValidationError{
+					field:  "Submission",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSubmission()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RejudgeSubmissionResponseValidationError{
+				field:  "Submission",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RejudgeSubmissionResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RejudgeSubmissionResponseMultiError is an error wrapping multiple validation
+// errors returned by RejudgeSubmissionResponse.ValidateAll() if the
+// designated constraints aren't met.
+type RejudgeSubmissionResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RejudgeSubmissionResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RejudgeSubmissionResponseMultiError) AllErrors() []error { return m }
+
+// RejudgeSubmissionResponseValidationError is the validation error returned by
+// RejudgeSubmissionResponse.Validate if the designated constraints aren't met.
+type RejudgeSubmissionResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RejudgeSubmissionResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RejudgeSubmissionResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RejudgeSubmissionResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RejudgeSubmissionResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RejudgeSubmissionResponseValidationError) ErrorName() string {
+	return "RejudgeSubmissionResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RejudgeSubmissionResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRejudgeSubmissionResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RejudgeSubmissionResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RejudgeSubmissionResponseValidationError{}

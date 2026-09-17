@@ -21,12 +21,14 @@ lint:
       - api/user/v1/errors.proto
       - api/user/v1/user.proto
       - services/gateway/internal/conf/conf.proto
+      - services/judge/internal/conf/conf.proto
       - services/problem/internal/conf/conf.proto
       - services/user/internal/conf/conf.proto
     PACKAGE_VERSION_SUFFIX:
       - errors/errors.proto
       - services/user/internal/conf/conf.proto
       - services/gateway/internal/conf/conf.proto
+      - services/judge/internal/conf/conf.proto
       - services/problem/internal/conf/conf.proto
 
 breaking:

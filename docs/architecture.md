@@ -301,9 +301,8 @@ sequenceDiagram
     J->>M: Upload immutable source object
 
     J->>DB: BEGIN
-    J->>DB: INSERT submission
-    J->>DB: INSERT judge_attempt(judge_revision)
-    J->>DB: INSERT outbox_event(judge.requested, attempt_id)
+    J->>DB: INSERT submission(judge_revision)
+    J->>DB: INSERT outbox_event(judge.requested, submission_id)
     J->>DB: COMMIT
 
     J-->>G: submission_id + QUEUED
@@ -326,7 +325,7 @@ sequenceDiagram
     JW->>MQ: ACK task
 
     MQ->>J: Consume judge.completed
-    J->>DB: TX dedup + attempt/cases + submission + outbox
+    J->>DB: TX dedup + submission/cases + judged outbox
     J->>MQ: ACK result
 ```
 
@@ -377,10 +376,10 @@ At-least-once Delivery
 - bounded Prefetch
 - Backoff
 
-结果消息必须携带 `attempt_id` 与 `judge_revision`。Judge Service 在同一事务
-完成消费去重、attempt/Case Result、当前 Submission 投影及
-`submission.judged` Outbox；已取消、已超时或非当前 attempt 的迟到结果不得
-覆盖当前 Submission。MySQL 是 SSE 可恢复的事实来源，Redis 只保存实时视图。
+结果消息必须携带 `submission_id` 与 `judge_revision`。Judge Service 在同一
+事务完成消费去重、Submission/Case Result 及 `submission.judged` Outbox；
+已取消、已作废或已超时 Submission 的迟到结果不得覆盖终态。MySQL 是 SSE
+可恢复的事实来源，Redis 只保存实时视图。
 
 ---
 
@@ -397,6 +396,7 @@ Routing Keys：
 ```text
 submission.created
 submission.judged
+submission.invalidated
 
 judge.started
 judge.completed
@@ -418,9 +418,22 @@ judge.task.java
 失败消息：
 
 ```text
-judge.retry
+judge.retry.cpp
+judge.retry.go
+judge.retry.python
+judge.retry.java
 judge.dlq
 ```
+
+Worker 捕获到可重试系统故障时，把原任务送入对应语言的 Retry Queue；队列
+TTL 到期后通过 DLX 回到 `judge.task.<language>`。Consumer 根据 RabbitMQ
+`x-death` 计数，最多重试 3 次后转入 `judge.dlq`。Worker 进程直接崩溃可能
+只触发未 ACK 消息 redelivery，因此 Submission 还必须有总 deadline，由
+Judge Service Reconciler 将长期无结果任务收敛为 `DONE/SYSTEM_ERROR`。
+
+RabbitMQ 短暂不可用不立即产生 SYSTEM_ERROR。Outbox 保留未发布意图；Worker
+必须在结果发布收到 Publisher Confirm 后才 ACK 原任务。只有 DLQ 耗尽或超过
+总 deadline，Judge Service 才写入 SYSTEM_ERROR。
 
 Event Envelope：
 

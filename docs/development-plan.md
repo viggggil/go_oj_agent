@@ -554,6 +554,7 @@ judge.failed
 
 submission.created
 submission.judged
+submission.invalidated
 ```
 
 消息公共字段：
@@ -573,7 +574,6 @@ submission.judged
 ```json
 {
   "submission_id": 10001,
-  "attempt_id": 1,
   "problem_id": 1001,
   "language": "cpp",
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
@@ -744,12 +744,13 @@ Problem Service: resolve active judge_revision
         ↓
 MinIO: upload immutable source object
         ↓
-MySQL TX: submission + judge_attempt + judge.requested outbox
+MySQL TX: submission(judge_revision) + judge.requested outbox
 ```
 
-`judge_attempt.judge_revision` 固定单次判题使用的完整测试集。首次判题和重判
-都创建新 attempt；旧 attempt 的迟到结果不得覆盖当前 Submission。源码正文
-只存 MinIO，数据库与 RabbitMQ 只保存 object key、SHA-256 和大小。
+`submission.judge_revision` 固定一次逻辑判题使用的完整测试集。基础设施重试
+复用同一个 Submission；管理员重判将旧 Submission 标记为 `INVALIDATED`，并
+为同一用户创建使用当前 revision 的新 Submission。源码正文只存 MinIO，
+数据库与 RabbitMQ 只保存 object key、SHA-256 和大小。
 
 ## Required Tests
 
@@ -757,8 +758,9 @@ MySQL TX: submission + judge_attempt + judge.requested outbox
 - [ ] Ownership / permission
 - [ ] State transition
 - [ ] Invalid state transition
-- [ ] Attempt revision remains immutable after testcase changes
-- [ ] Late result cannot overwrite current attempt
+- [ ] Submission revision remains immutable after testcase changes
+- [ ] Late result cannot overwrite cancelled or invalidated submission
+- [ ] Rejudge invalidates old result and creates a new submission for the same user
 - [ ] Orphan source object cleanup after transaction failure
 - [ ] Pagination
 - [ ] Repository integration
@@ -935,7 +937,10 @@ judge.task.go
 judge.task.python
 judge.task.java
 
-judge.retry
+judge.retry.cpp
+judge.retry.go
+judge.retry.python
+judge.retry.java
 judge.dlq
 ```
 
@@ -948,6 +953,12 @@ retry
 DLQ
 idempotent consumer
 ```
+
+可重试系统故障进入对应语言的延迟 Retry Queue，TTL 到期后经 DLX 返回任务
+队列。按 `x-death` 计数最多重试 3 次，之后进入 DLQ，由 Judge Service 更新为
+`DONE/SYSTEM_ERROR`。进程崩溃造成的普通 redelivery 还必须受 Submission 总
+deadline 约束，避免无限重投。RabbitMQ 短暂不可用由 Outbox、Publisher
+Confirm 和未 ACK 重投恢复，不立即判定 SYSTEM_ERROR。
 
 ---
 
@@ -1225,7 +1236,7 @@ agent/
 ```text
 GetProblem
 GetSubmission
-ListRecentSubmissions
+ListSubmissions
 SearchProblems
 GetJudgeResult
 RetrieveKnowledge

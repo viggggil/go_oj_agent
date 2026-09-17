@@ -413,7 +413,8 @@ Request：
 {
   "problem_id": 1001,
   "language": "cpp",
-  "source_code": "#include <bits/stdc++.h>..."
+  "source_code": "#include <bits/stdc++.h>...",
+  "idempotency_key": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
@@ -436,8 +437,8 @@ Response：
 ```
 
 Judge Service 接收 `source_code` 后获取题目的 active `judge_revision`，把源码
-上传为 MinIO 不可变对象，再在一个事务中创建 Submission、首个
-`judge_attempt` 和 `judge.requested` Outbox。数据库与 MQ 不保存源码正文。
+上传为 MinIO 不可变对象，再在一个事务中创建 Submission 和
+`judge.requested` Outbox。数据库与 MQ 不保存源码正文。
 如果事务失败，已上传但未被引用的源码对象由 GC 在安全保留期后清理。
 
 ### GET `/api/v1/submissions/{submission_id}`
@@ -456,9 +457,27 @@ page_size
 problem_id
 status
 language
+user_id（仅管理员或可信内部调用方可指定其他用户）
 ```
 
-默认只查询当前用户有权访问的提交。
+默认只查询当前用户有权访问的提交，按 `created_at DESC, id DESC` 稳定排序。
+最近提交直接使用该接口的第一页和较小的 `page_size`，不提供单独的
+`ListRecentSubmissions`。
+
+### POST `/api/v1/submissions/{submission_id}/rejudge`
+
+管理员因题目数据变化发起重判。Judge Service 在一个事务中把原 Submission
+标记为 `INVALIDATED`、写入 `submission.invalidated` Outbox，并为原用户创建
+一个使用当前 active `judge_revision` 的新 Submission 和 `judge.requested`
+Outbox。新提交复用原源码对象；不保存 parent/root/origin 关系。
+
+原结果即使是 AC 也立即失效。Contest Service 消费
+`submission.invalidated` 撤销旧结果，之后以新 Submission 的
+`submission.judged` 为准。
+
+Create 和 Rejudge 的 `idempotency_key` 均为必填 UUID。同一调用身份、操作类型
+和 key 的重复请求必须返回首次响应，不得重复创建 Submission；管理员需要
+再次主动重判时使用新的 key。
 
 ### GET `/api/v1/submissions/{submission_id}/events`
 
@@ -720,9 +739,9 @@ service SubmissionService {
   rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionReply);
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionReply);
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsReply);
-  rpc ListRecentSubmissions(ListRecentSubmissionsRequest)
-      returns (ListRecentSubmissionsReply);
   rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultReply);
+  rpc RejudgeSubmission(RejudgeSubmissionRequest)
+      returns (RejudgeSubmissionReply);
 }
 ```
 
@@ -731,7 +750,7 @@ Agent Tool 映射：
 ```text
 get_submission           -> GetSubmission
 get_judge_result         -> GetJudgeResult
-list_recent_submissions  -> ListRecentSubmissions
+list_recent_submissions  -> ListSubmissions(page=1, bounded page_size)
 ```
 
 Authorization 必须由 Judge Service 执行，而不是 Agent 判断。
@@ -824,7 +843,6 @@ Payload：
 ```json
 {
   "submission_id": 90001,
-  "attempt_id": 1,
   "problem_id": 1001,
   "language": "cpp",
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
@@ -866,7 +884,6 @@ Payload 至少包括：
 ```json
 {
   "submission_id": 90001,
-  "attempt_id": 1,
   "problem_id": 1001,
   "language": "cpp",
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
@@ -876,7 +893,7 @@ Payload 至少包括：
 }
 ```
 
-Worker 使用受限的服务凭据按对象引用读取源码，并根据 `judge_revision` 读取该 revision 的 `manifest.json` 和全部测试点。不得在同一 attempt 中读取其他 revision，也不得把源码或测试数据正文塞入 MQ。
+Worker 使用受限的服务凭据按对象引用读取源码，并根据 `judge_revision` 读取该 revision 的 `manifest.json` 和全部测试点。同一 Submission 不得读取其他 revision，也不得把源码或测试数据正文塞入 MQ。
 
 ---
 
@@ -899,7 +916,6 @@ Payload：
 ```json
 {
   "submission_id": 90001,
-  "attempt_id": 1,
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "verdict": "AC",
   "time_ms": 32,
@@ -921,12 +937,16 @@ Payload：
 ```json
 {
   "submission_id": 90001,
-  "attempt_id": 1,
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "reason": "SANDBOX_UNAVAILABLE",
   "retryable": true
 }
 ```
+
+`retryable=true` 时，任务进入对应语言的延迟 Retry Queue；最多重试 3 次，
+耗尽后进入 DLQ。Judge Service 消费 DLQ 并把仍未终止的 Submission 收敛为
+`DONE/SYSTEM_ERROR`。RabbitMQ 暂时不可用时不立即产生 SYSTEM_ERROR，而是由
+Outbox、Publisher Confirm、未 ACK 重投和总 deadline 共同恢复或最终收敛。
 
 ---
 
@@ -957,6 +977,25 @@ Payload：
   "judged_at": "RFC3339 timestamp"
 }
 ```
+
+---
+
+## 5.7 `submission.invalidated`
+
+管理员重判事务产生，供 Contest、排行榜和统计视图撤销旧结果：
+
+```json
+{
+  "submission_id": 90001,
+  "user_id": 1001,
+  "problem_id": 1001,
+  "previous_verdict": "AC",
+  "invalidated_at": "RFC3339 timestamp"
+}
+```
+
+Consumer 必须按 `event_id` 幂等；旧提交一经作废，不得再接受 Worker 的迟到
+结果。新 Submission 之后按正常 `submission.judged` 流程进入 Contest。
 
 ---
 
@@ -1011,7 +1050,7 @@ v0 阶段保持简单。
 
 以下接口/消费者需要重点考虑幂等：
 
-- Create Submission（可选 Idempotency-Key）。
+- Create Submission 和 Rejudge Submission（必填 `idempotency_key`）。
 - Outbox Relay。
 - Judge Result Consumer。
 - Contest Event Consumer。
@@ -1020,9 +1059,9 @@ v0 阶段保持简单。
 MQ Consumer 以 `event_id` 或业务唯一约束实现去重。
 
 Judge Result Consumer 必须在同一个事务内完成 `processed_events` 去重、
-attempt 状态与 Case Result 写入、当前 Submission 投影更新，以及
-`submission.judged` Outbox 写入。结果中的 `attempt_id` 和 `judge_revision`
-必须同时匹配；迟到或重复结果不得覆盖当前 attempt。
+Submission 状态与 Case Result 写入，以及 `submission.judged` Outbox 写入。
+结果中的 `submission_id` 和 `judge_revision` 必须同时匹配；迟到、重复或已
+作废 Submission 的结果不得覆盖终态。
 
 ---
 

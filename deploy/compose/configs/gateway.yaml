@@ -25,7 +25,7 @@ clients:
     endpoint: "${CLIENTS_PROBLEM_ENDPOINT}"
     timeout: "30s"
   submission:
-    name: submission-service
+    name: judge-service
     endpoint: ""
     timeout: "3s"
 registry:
