@@ -5,13 +5,19 @@ package submission.v1;
 option go_package = "github.com/viggggil/go_oj_agent/api/submission/v1;submissionv1";
 
 import "api/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
 
 service SubmissionService {
   rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse);
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
+  // ListSubmissions also covers recent submissions through stable descending
+  // pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
-  rpc ListRecentSubmissions(ListRecentSubmissionsRequest) returns (ListRecentSubmissionsResponse);
   rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse);
+  // RejudgeSubmission invalidates the old result and creates a new submission
+  // for the same user with the problem's current judge revision.
+  rpc RejudgeSubmission(RejudgeSubmissionRequest) returns (RejudgeSubmissionResponse);
 }
 
 enum SubmissionStatus {
@@ -20,6 +26,9 @@ enum SubmissionStatus {
   SUBMISSION_STATUS_COMPILING = 2;
   SUBMISSION_STATUS_RUNNING = 3;
   SUBMISSION_STATUS_DONE = 4;
+  SUBMISSION_STATUS_RETRY_WAIT = 5;
+  SUBMISSION_STATUS_CANCELLED = 6;
+  SUBMISSION_STATUS_INVALIDATED = 7;
 }
 
 enum JudgeVerdict {
@@ -30,6 +39,7 @@ enum JudgeVerdict {
   JUDGE_VERDICT_MLE = 4;
   JUDGE_VERDICT_RE = 5;
   JUDGE_VERDICT_CE = 6;
+  JUDGE_VERDICT_SYSTEM_ERROR = 7;
 }
 
 message Submission {
@@ -37,12 +47,21 @@ message Submission {
   int64 user_id = 2;
   int64 problem_id = 3;
   string language = 4;
-  string source_code = 5;
+  reserved 5;
+  reserved "source_code";
   SubmissionStatus status = 6;
   JudgeVerdict verdict = 7;
   int32 time_ms = 8;
   int32 memory_kb = 9;
-  int32 testcase_version = 10;
+  reserved 10;
+  reserved "testcase_version";
+  string judge_revision = 11;
+  int32 retry_count = 12;
+  string system_error_reason = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  google.protobuf.Timestamp judged_at = 16;
+  google.protobuf.Timestamp invalidated_at = 17;
 }
 
 message SubmissionCaseResult {
@@ -62,13 +81,21 @@ message JudgeResult {
   int32 time_ms = 4;
   int32 memory_kb = 5;
   repeated SubmissionCaseResult case_results = 6;
+  string judge_revision = 7;
+  string system_error_reason = 8;
 }
 
 message CreateSubmissionRequest {
-  common.v1.RequestContext context = 1;
-  int64 problem_id = 2;
-  string language = 3;
-  string source_code = 4;
+  reserved 1;
+  reserved "context";
+  int64 problem_id = 2 [(validate.rules).int64.gt = 0];
+  string language = 3 [(validate.rules).string = {
+    min_len: 1,
+    max_len: 32,
+    pattern: "^[a-z][a-z0-9_+-]*$"
+  }];
+  string source_code = 4 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  string idempotency_key = 5 [(validate.rules).string.uuid = true];
 }
 
 message CreateSubmissionResponse {
@@ -77,8 +104,9 @@ message CreateSubmissionResponse {
 }
 
 message GetSubmissionRequest {
-  common.v1.RequestContext context = 1;
-  int64 submission_id = 2;
+  reserved 1;
+  reserved "context";
+  int64 submission_id = 2 [(validate.rules).int64.gt = 0];
 }
 
 message GetSubmissionResponse {
@@ -86,11 +114,15 @@ message GetSubmissionResponse {
 }
 
 message ListSubmissionsRequest {
-  common.v1.RequestContext context = 1;
-  common.v1.PageRequest page = 2;
-  int64 problem_id = 3;
-  SubmissionStatus status = 4;
-  string language = 5;
+  reserved 1;
+  reserved "context";
+  common.v1.PageRequest page = 2 [(validate.rules).message.required = true];
+  int64 problem_id = 3 [(validate.rules).int64.gte = 0];
+  SubmissionStatus status = 4 [(validate.rules).enum = {defined_only: true}];
+  string language = 5 [(validate.rules).string.max_len = 32];
+  // Ordinary users may only list themselves. The service permits a different
+  // user_id only for an authorized administrator or trusted internal caller.
+  int64 user_id = 6 [(validate.rules).int64.gte = 0];
 }
 
 message ListSubmissionsResponse {
@@ -98,21 +130,24 @@ message ListSubmissionsResponse {
   common.v1.PageResponse page = 2;
 }
 
-message ListRecentSubmissionsRequest {
-  common.v1.RequestContext context = 1;
-  int64 user_id = 2;
-  int32 limit = 3;
-}
-
-message ListRecentSubmissionsResponse {
-  repeated Submission items = 1;
-}
-
 message GetJudgeResultRequest {
-  common.v1.RequestContext context = 1;
-  int64 submission_id = 2;
+  reserved 1;
+  reserved "context";
+  int64 submission_id = 2 [(validate.rules).int64.gt = 0];
 }
 
 message GetJudgeResultResponse {
   JudgeResult result = 1;
+}
+
+message RejudgeSubmissionRequest {
+  reserved 1;
+  reserved "context";
+  int64 submission_id = 2 [(validate.rules).int64.gt = 0];
+  string idempotency_key = 3 [(validate.rules).string.uuid = true];
+}
+
+message RejudgeSubmissionResponse {
+  int64 invalidated_submission_id = 1;
+  Submission submission = 2;
 }

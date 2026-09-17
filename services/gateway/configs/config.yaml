@@ -25,8 +25,8 @@ clients:
     endpoint: "127.0.0.1:9002"
     timeout: "30s"
   submission:
-    name: "submission-service"
-    endpoint: ""
+    name: "judge-service"
+    endpoint: "127.0.0.1:9003"
     timeout: "3s"
 registry:
   consul:

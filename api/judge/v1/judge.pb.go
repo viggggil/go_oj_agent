@@ -7,6 +7,7 @@
 package judgev1
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -220,6 +221,8 @@ type JudgeResult struct {
 	TimeMs        int32                  `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
 	MemoryKb      int32                  `protobuf:"varint,4,opt,name=memory_kb,json=memoryKb,proto3" json:"memory_kb,omitempty"`
 	CaseResults   []*JudgeCaseResult     `protobuf:"bytes,5,rep,name=case_results,json=caseResults,proto3" json:"case_results,omitempty"`
+	JudgeRevision string                 `protobuf:"bytes,6,opt,name=judge_revision,json=judgeRevision,proto3" json:"judge_revision,omitempty"`
+	EventId       string                 `protobuf:"bytes,7,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -289,6 +292,199 @@ func (x *JudgeResult) GetCaseResults() []*JudgeCaseResult {
 	return nil
 }
 
+func (x *JudgeResult) GetJudgeRevision() string {
+	if x != nil {
+		return x.JudgeRevision
+	}
+	return ""
+}
+
+func (x *JudgeResult) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+// JudgeTask is the RabbitMQ payload published to judge.task.<language>.
+type JudgeTask struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	EventId         string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	SubmissionId    int64                  `protobuf:"varint,2,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	ProblemId       int64                  `protobuf:"varint,3,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	Language        string                 `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
+	JudgeRevision   string                 `protobuf:"bytes,5,opt,name=judge_revision,json=judgeRevision,proto3" json:"judge_revision,omitempty"`
+	SourceObjectKey string                 `protobuf:"bytes,6,opt,name=source_object_key,json=sourceObjectKey,proto3" json:"source_object_key,omitempty"`
+	SourceSha256    string                 `protobuf:"bytes,7,opt,name=source_sha256,json=sourceSha256,proto3" json:"source_sha256,omitempty"`
+	SourceSizeBytes int64                  `protobuf:"varint,8,opt,name=source_size_bytes,json=sourceSizeBytes,proto3" json:"source_size_bytes,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *JudgeTask) Reset() {
+	*x = JudgeTask{}
+	mi := &file_api_judge_v1_judge_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JudgeTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JudgeTask) ProtoMessage() {}
+
+func (x *JudgeTask) ProtoReflect() protoreflect.Message {
+	mi := &file_api_judge_v1_judge_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JudgeTask.ProtoReflect.Descriptor instead.
+func (*JudgeTask) Descriptor() ([]byte, []int) {
+	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *JudgeTask) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *JudgeTask) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+func (x *JudgeTask) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *JudgeTask) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *JudgeTask) GetJudgeRevision() string {
+	if x != nil {
+		return x.JudgeRevision
+	}
+	return ""
+}
+
+func (x *JudgeTask) GetSourceObjectKey() string {
+	if x != nil {
+		return x.SourceObjectKey
+	}
+	return ""
+}
+
+func (x *JudgeTask) GetSourceSha256() string {
+	if x != nil {
+		return x.SourceSha256
+	}
+	return ""
+}
+
+func (x *JudgeTask) GetSourceSizeBytes() int64 {
+	if x != nil {
+		return x.SourceSizeBytes
+	}
+	return 0
+}
+
+// JudgeFailure reports an infrastructure failure. User-code verdicts such as
+// RE, CE, TLE and MLE are normal JudgeResult values, not JudgeFailure values.
+type JudgeFailure struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	SubmissionId  int64                  `protobuf:"varint,2,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	JudgeRevision string                 `protobuf:"bytes,3,opt,name=judge_revision,json=judgeRevision,proto3" json:"judge_revision,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Retryable     bool                   `protobuf:"varint,5,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JudgeFailure) Reset() {
+	*x = JudgeFailure{}
+	mi := &file_api_judge_v1_judge_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JudgeFailure) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JudgeFailure) ProtoMessage() {}
+
+func (x *JudgeFailure) ProtoReflect() protoreflect.Message {
+	mi := &file_api_judge_v1_judge_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JudgeFailure.ProtoReflect.Descriptor instead.
+func (*JudgeFailure) Descriptor() ([]byte, []int) {
+	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *JudgeFailure) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *JudgeFailure) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+func (x *JudgeFailure) GetJudgeRevision() string {
+	if x != nil {
+		return x.JudgeRevision
+	}
+	return ""
+}
+
+func (x *JudgeFailure) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *JudgeFailure) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
 type GetWorkerStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
@@ -298,7 +494,7 @@ type GetWorkerStatusRequest struct {
 
 func (x *GetWorkerStatusRequest) Reset() {
 	*x = GetWorkerStatusRequest{}
-	mi := &file_api_judge_v1_judge_proto_msgTypes[2]
+	mi := &file_api_judge_v1_judge_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -310,7 +506,7 @@ func (x *GetWorkerStatusRequest) String() string {
 func (*GetWorkerStatusRequest) ProtoMessage() {}
 
 func (x *GetWorkerStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_judge_v1_judge_proto_msgTypes[2]
+	mi := &file_api_judge_v1_judge_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -323,7 +519,7 @@ func (x *GetWorkerStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkerStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkerStatusRequest) Descriptor() ([]byte, []int) {
-	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{2}
+	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetWorkerStatusRequest) GetWorkerId() string {
@@ -345,7 +541,7 @@ type GetWorkerStatusResponse struct {
 
 func (x *GetWorkerStatusResponse) Reset() {
 	*x = GetWorkerStatusResponse{}
-	mi := &file_api_judge_v1_judge_proto_msgTypes[3]
+	mi := &file_api_judge_v1_judge_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +553,7 @@ func (x *GetWorkerStatusResponse) String() string {
 func (*GetWorkerStatusResponse) ProtoMessage() {}
 
 func (x *GetWorkerStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_judge_v1_judge_proto_msgTypes[3]
+	mi := &file_api_judge_v1_judge_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +566,7 @@ func (x *GetWorkerStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkerStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetWorkerStatusResponse) Descriptor() ([]byte, []int) {
-	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{3}
+	return file_api_judge_v1_judge_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetWorkerStatusResponse) GetWorkerId() string {
@@ -405,19 +601,40 @@ var File_api_judge_v1_judge_proto protoreflect.FileDescriptor
 
 const file_api_judge_v1_judge_proto_rawDesc = "" +
 	"\n" +
-	"\x18api/judge/v1/judge.proto\x12\bjudge.v1\"\xac\x01\n" +
+	"\x18api/judge/v1/judge.proto\x12\bjudge.v1\x1a\x17validate/validate.proto\"\xac\x01\n" +
 	"\x0fJudgeCaseResult\x12\x17\n" +
 	"\acase_no\x18\x01 \x01(\x05R\x06caseNo\x120\n" +
 	"\averdict\x18\x02 \x01(\x0e2\x16.judge.v1.JudgeVerdictR\averdict\x12\x17\n" +
 	"\atime_ms\x18\x03 \x01(\x05R\x06timeMs\x12\x1b\n" +
 	"\tmemory_kb\x18\x04 \x01(\x05R\bmemoryKb\x12\x18\n" +
-	"\amessage\x18\x05 \x01(\tR\amessage\"\xd8\x01\n" +
-	"\vJudgeResult\x12#\n" +
-	"\rsubmission_id\x18\x01 \x01(\x03R\fsubmissionId\x120\n" +
-	"\averdict\x18\x02 \x01(\x0e2\x16.judge.v1.JudgeVerdictR\averdict\x12\x17\n" +
-	"\atime_ms\x18\x03 \x01(\x05R\x06timeMs\x12\x1b\n" +
-	"\tmemory_kb\x18\x04 \x01(\x05R\bmemoryKb\x12<\n" +
-	"\fcase_results\x18\x05 \x03(\v2\x19.judge.v1.JudgeCaseResultR\vcaseResults\"5\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"\xd5\x02\n" +
+	"\vJudgeResult\x12,\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\x12<\n" +
+	"\averdict\x18\x02 \x01(\x0e2\x16.judge.v1.JudgeVerdictB\n" +
+	"\xfaB\a\x82\x01\x04\x10\x01 \x00R\averdict\x12 \n" +
+	"\atime_ms\x18\x03 \x01(\x05B\a\xfaB\x04\x1a\x02(\x00R\x06timeMs\x12$\n" +
+	"\tmemory_kb\x18\x04 \x01(\x05B\a\xfaB\x04\x1a\x02(\x00R\bmemoryKb\x12<\n" +
+	"\fcase_results\x18\x05 \x03(\v2\x19.judge.v1.JudgeCaseResultR\vcaseResults\x12/\n" +
+	"\x0ejudge_revision\x18\x06 \x01(\tB\b\xfaB\x05r\x03\x98\x01\x1aR\rjudgeRevision\x12#\n" +
+	"\bevent_id\x18\a \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\aeventId\"\x87\x03\n" +
+	"\tJudgeTask\x12#\n" +
+	"\bevent_id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\aeventId\x12,\n" +
+	"\rsubmission_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\x12&\n" +
+	"\n" +
+	"problem_id\x18\x03 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12%\n" +
+	"\blanguage\x18\x04 \x01(\tB\t\xfaB\x06r\x04\x10\x01\x18 R\blanguage\x12/\n" +
+	"\x0ejudge_revision\x18\x05 \x01(\tB\b\xfaB\x05r\x03\x98\x01\x1aR\rjudgeRevision\x126\n" +
+	"\x11source_object_key\x18\x06 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\x18\x80\x04R\x0fsourceObjectKey\x12:\n" +
+	"\rsource_sha256\x18\a \x01(\tB\x15\xfaB\x12r\x102\x0e^[a-f0-9]{64}$R\fsourceSha256\x123\n" +
+	"\x11source_size_bytes\x18\b \x01(\x03B\a\xfaB\x04\"\x02 \x00R\x0fsourceSizeBytes\"\xd4\x01\n" +
+	"\fJudgeFailure\x12#\n" +
+	"\bevent_id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\aeventId\x12,\n" +
+	"\rsubmission_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\x12/\n" +
+	"\x0ejudge_revision\x18\x03 \x01(\tB\b\xfaB\x05r\x03\x98\x01\x1aR\rjudgeRevision\x12\"\n" +
+	"\x06reason\x18\x04 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\x18\x80\x01R\x06reason\x12\x1c\n" +
+	"\tretryable\x18\x05 \x01(\bR\tretryable\"5\n" +
 	"\x16GetWorkerStatusRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\"\xbc\x01\n" +
 	"\x17GetWorkerStatusResponse\x12\x1b\n" +
@@ -455,22 +672,24 @@ func file_api_judge_v1_judge_proto_rawDescGZIP() []byte {
 }
 
 var file_api_judge_v1_judge_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_judge_v1_judge_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_api_judge_v1_judge_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_api_judge_v1_judge_proto_goTypes = []any{
 	(WorkerStatus)(0),               // 0: judge.v1.WorkerStatus
 	(JudgeVerdict)(0),               // 1: judge.v1.JudgeVerdict
 	(*JudgeCaseResult)(nil),         // 2: judge.v1.JudgeCaseResult
 	(*JudgeResult)(nil),             // 3: judge.v1.JudgeResult
-	(*GetWorkerStatusRequest)(nil),  // 4: judge.v1.GetWorkerStatusRequest
-	(*GetWorkerStatusResponse)(nil), // 5: judge.v1.GetWorkerStatusResponse
+	(*JudgeTask)(nil),               // 4: judge.v1.JudgeTask
+	(*JudgeFailure)(nil),            // 5: judge.v1.JudgeFailure
+	(*GetWorkerStatusRequest)(nil),  // 6: judge.v1.GetWorkerStatusRequest
+	(*GetWorkerStatusResponse)(nil), // 7: judge.v1.GetWorkerStatusResponse
 }
 var file_api_judge_v1_judge_proto_depIdxs = []int32{
 	1, // 0: judge.v1.JudgeCaseResult.verdict:type_name -> judge.v1.JudgeVerdict
 	1, // 1: judge.v1.JudgeResult.verdict:type_name -> judge.v1.JudgeVerdict
 	2, // 2: judge.v1.JudgeResult.case_results:type_name -> judge.v1.JudgeCaseResult
 	0, // 3: judge.v1.GetWorkerStatusResponse.status:type_name -> judge.v1.WorkerStatus
-	4, // 4: judge.v1.JudgeAdminService.GetWorkerStatus:input_type -> judge.v1.GetWorkerStatusRequest
-	5, // 5: judge.v1.JudgeAdminService.GetWorkerStatus:output_type -> judge.v1.GetWorkerStatusResponse
+	6, // 4: judge.v1.JudgeAdminService.GetWorkerStatus:input_type -> judge.v1.GetWorkerStatusRequest
+	7, // 5: judge.v1.JudgeAdminService.GetWorkerStatus:output_type -> judge.v1.GetWorkerStatusResponse
 	5, // [5:6] is the sub-list for method output_type
 	4, // [4:5] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
@@ -489,7 +708,7 @@ func file_api_judge_v1_judge_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_judge_v1_judge_proto_rawDesc), len(file_api_judge_v1_judge_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

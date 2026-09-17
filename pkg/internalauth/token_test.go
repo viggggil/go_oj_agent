@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,7 +65,16 @@ func TestInternalTokenRejectsWrongAudienceAndTamper(t *testing.T) {
 		t.Fatalf("aud err=%v", e)
 	}
 	valid, _ := NewVerifier(map[string][]byte{"gw-1": pub}, "gateway", "problem-service", "gateway-service", time.Minute, 0, func() time.Time { return now })
-	if _, e := valid.Verify(token[:len(token)-1]+"x", "/x"); !errors.Is(e, ErrInvalidToken) {
+	parts := strings.Split(token, ".")
+	signature := []byte(parts[2])
+	middle := len(signature) / 2
+	if signature[middle] == 'A' {
+		signature[middle] = 'B'
+	} else {
+		signature[middle] = 'A'
+	}
+	tampered := strings.Join([]string{parts[0], parts[1], string(signature)}, ".")
+	if _, e := valid.Verify(tampered, "/x"); !errors.Is(e, ErrInvalidToken) {
 		t.Fatalf("tamper err=%v", e)
 	}
 }

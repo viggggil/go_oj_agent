@@ -1,0 +1,43 @@
+service:
+  name: judge-service
+server:
+  grpc:
+    address: ":9003"
+data:
+  mysql_dsn: "user:pass@tcp(127.0.0.1:3306)/oj_submission?parseTime=true"
+  redis_addr: "127.0.0.1:6379"
+  redis_password: ""
+  redis_db: 0
+  redis_namespace: "go_oj_agent:judge"
+storage:
+  minio:
+    endpoint: "127.0.0.1:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    source_bucket: "submission-source"
+    problem_bucket: "problem-data"
+    use_ssl: false
+messaging:
+  rabbitmq:
+    url: "amqp://guest:guest@127.0.0.1:5672/"
+    exchange: "oj.events"
+    result_queue: "judge.results"
+    dead_letter_queue: "judge.dlq"
+    max_retries: 3
+    retry_delay: "5s"
+registry:
+  consul:
+    enabled: false
+    address: "127.0.0.1:8500"
+    scheme: "http"
+    datacenter: ""
+    token: ""
+    service_id: ""
+internal_auth:
+  public_key_file: ""
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
+  audience: "judge-service"
+  subject: "gateway-service"
+  max_token_ttl: "30s"
+  clock_skew: "5s"

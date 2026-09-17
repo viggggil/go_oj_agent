@@ -66,9 +66,9 @@ Client
 2. **运行形态。** 首版仅运行一个 `judge-service` 实例，并在同一进程中启动 API、Relay 和 Result Consumer。每个后台组件必须支持优雅停止，启动失败必须使服务启动失败，不能静默降级。
 3. **Outbox 领取。** 使用 MySQL 8 `SELECT ... FOR UPDATE SKIP LOCKED` 在短事务中领取批次，并记录 lease、attempt、next retry time。Publisher Confirm 前不得标记 published；整体仍按至少一次语义设计。
 4. **优先级。** 首版所有任务都是普通优先级，不接受客户端提供的 priority，也不创建多级优先队列。未来引入比赛或管理员优先级时另行版本化契约。
-5. **判题轮次。** 首次判题和每次重判都创建新的 `judge_attempt`。每个 attempt 有单调递增的 `attempt_no`，并在 `judge_revision` 中固定本轮使用的不可变测试集 revision。结果消息携带 `attempt_id` 和 `judge_revision`；旧 attempt 的迟到结果只能完成自身记录，不能覆盖 Submission 的当前结果。
+5. **Submission 即判题轮次。** 一个 `submission_id` 唯一标识一次逻辑判题，`judge_revision` 直接固定在 Submission 上。基础设施重试复用原 ID；管理员重判把旧 Submission 标记为 `INVALIDATED`，为同一用户创建新 Submission，并通过 `submission.invalidated` 让 Contest 撤销旧结果。不引入 `judge_attempt` 或 parent/root/origin 字段。
 6. **测试集快照。** Problem Service 发布 revision 时，把完整测试集写入 MinIO 不可变前缀 `problem-{problem_id}/judge-revisions/{judge_revision}/`，包含 `manifest.json` 及成对的 `testcases/{case_no}.in|out`。所有对象和 hash 完整后才能原子切换题目的 active revision。首版所有已发布 revision 均不覆盖、不物理删除，避免 Problem Service 跨库判断 Judge 引用关系。
 7. **源码存储。** 源码正文存入 MinIO 不可变对象，Judge 数据库只保存 `source_object_key`、SHA-256 和大小。RabbitMQ 只传对象引用和 hash，不传源码正文。
-8. **结果事务。** `processed_events` 去重、attempt 状态与 Case Result、Submission 当前结果以及 `submission.judged` Outbox 必须在同一事务内更新。
-9. **取消与超时。** Judge Service 是终态所有者。取消或系统超时通过 attempt 条件更新产生终态；Worker 的迟到消息保留审计信息但不能改写已终止 attempt 或更新 Submission 当前结果。
+8. **结果事务。** `processed_events` 去重、Submission 状态与 Case Result 以及 `submission.judged` Outbox 必须在同一事务内更新。
+9. **取消、作废与超时。** Judge Service 是终态所有者。取消、管理员作废或系统超时通过 Submission 条件更新产生终态；Worker 的迟到消息不能改写已终止的 Submission。
 10. **SSE 来源。** MySQL 是事实来源，Redis 只作为实时状态视图。结果事务提交后再更新或失效 Redis；SSE 断线重连必须从 MySQL 恢复状态。

@@ -35,6 +35,9 @@ var (
 	_ = sort.Sort
 )
 
+// define the regex for a UUID once up-front
+var _judge_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 // Validate checks the field values on JudgeCaseResult with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -167,13 +170,60 @@ func (m *JudgeResult) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for SubmissionId
+	if m.GetSubmissionId() <= 0 {
+		err := JudgeResultValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Verdict
+	if _, ok := _JudgeResult_Verdict_NotInLookup[m.GetVerdict()]; ok {
+		err := JudgeResultValidationError{
+			field:  "Verdict",
+			reason: "value must not be in list [JUDGE_VERDICT_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for TimeMs
+	if _, ok := JudgeVerdict_name[int32(m.GetVerdict())]; !ok {
+		err := JudgeResultValidationError{
+			field:  "Verdict",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for MemoryKb
+	if m.GetTimeMs() < 0 {
+		err := JudgeResultValidationError{
+			field:  "TimeMs",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetMemoryKb() < 0 {
+		err := JudgeResultValidationError{
+			field:  "MemoryKb",
+			reason: "value must be greater than or equal to 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	for idx, item := range m.GetCaseResults() {
 		_, _ = idx, item
@@ -209,8 +259,40 @@ func (m *JudgeResult) validate(all bool) error {
 
 	}
 
+	if utf8.RuneCountInString(m.GetJudgeRevision()) != 26 {
+		err := JudgeResultValidationError{
+			field:  "JudgeRevision",
+			reason: "value length must be 26 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if err := m._validateUuid(m.GetEventId()); err != nil {
+		err = JudgeResultValidationError{
+			field:  "EventId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if len(errors) > 0 {
 		return JudgeResultMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *JudgeResult) _validateUuid(uuid string) error {
+	if matched := _judge_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
 	}
 
 	return nil
@@ -285,6 +367,364 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = JudgeResultValidationError{}
+
+var _JudgeResult_Verdict_NotInLookup = map[JudgeVerdict]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on JudgeTask with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *JudgeTask) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on JudgeTask with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in JudgeTaskMultiError, or nil
+// if none found.
+func (m *JudgeTask) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *JudgeTask) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetEventId()); err != nil {
+		err = JudgeTaskValidationError{
+			field:  "EventId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSubmissionId() <= 0 {
+		err := JudgeTaskValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetProblemId() <= 0 {
+		err := JudgeTaskValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := utf8.RuneCountInString(m.GetLanguage()); l < 1 || l > 32 {
+		err := JudgeTaskValidationError{
+			field:  "Language",
+			reason: "value length must be between 1 and 32 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetJudgeRevision()) != 26 {
+		err := JudgeTaskValidationError{
+			field:  "JudgeRevision",
+			reason: "value length must be 26 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if l := utf8.RuneCountInString(m.GetSourceObjectKey()); l < 1 || l > 512 {
+		err := JudgeTaskValidationError{
+			field:  "SourceObjectKey",
+			reason: "value length must be between 1 and 512 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if !_JudgeTask_SourceSha256_Pattern.MatchString(m.GetSourceSha256()) {
+		err := JudgeTaskValidationError{
+			field:  "SourceSha256",
+			reason: "value does not match regex pattern \"^[a-f0-9]{64}$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSourceSizeBytes() <= 0 {
+		err := JudgeTaskValidationError{
+			field:  "SourceSizeBytes",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return JudgeTaskMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *JudgeTask) _validateUuid(uuid string) error {
+	if matched := _judge_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// JudgeTaskMultiError is an error wrapping multiple validation errors returned
+// by JudgeTask.ValidateAll() if the designated constraints aren't met.
+type JudgeTaskMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m JudgeTaskMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m JudgeTaskMultiError) AllErrors() []error { return m }
+
+// JudgeTaskValidationError is the validation error returned by
+// JudgeTask.Validate if the designated constraints aren't met.
+type JudgeTaskValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e JudgeTaskValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e JudgeTaskValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e JudgeTaskValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e JudgeTaskValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e JudgeTaskValidationError) ErrorName() string { return "JudgeTaskValidationError" }
+
+// Error satisfies the builtin error interface
+func (e JudgeTaskValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sJudgeTask.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = JudgeTaskValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = JudgeTaskValidationError{}
+
+var _JudgeTask_SourceSha256_Pattern = regexp.MustCompile("^[a-f0-9]{64}$")
+
+// Validate checks the field values on JudgeFailure with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *JudgeFailure) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on JudgeFailure with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in JudgeFailureMultiError, or
+// nil if none found.
+func (m *JudgeFailure) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *JudgeFailure) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateUuid(m.GetEventId()); err != nil {
+		err = JudgeFailureValidationError{
+			field:  "EventId",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetSubmissionId() <= 0 {
+		err := JudgeFailureValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetJudgeRevision()) != 26 {
+		err := JudgeFailureValidationError{
+			field:  "JudgeRevision",
+			reason: "value length must be 26 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if l := utf8.RuneCountInString(m.GetReason()); l < 1 || l > 128 {
+		err := JudgeFailureValidationError{
+			field:  "Reason",
+			reason: "value length must be between 1 and 128 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Retryable
+
+	if len(errors) > 0 {
+		return JudgeFailureMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *JudgeFailure) _validateUuid(uuid string) error {
+	if matched := _judge_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// JudgeFailureMultiError is an error wrapping multiple validation errors
+// returned by JudgeFailure.ValidateAll() if the designated constraints aren't met.
+type JudgeFailureMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m JudgeFailureMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m JudgeFailureMultiError) AllErrors() []error { return m }
+
+// JudgeFailureValidationError is the validation error returned by
+// JudgeFailure.Validate if the designated constraints aren't met.
+type JudgeFailureValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e JudgeFailureValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e JudgeFailureValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e JudgeFailureValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e JudgeFailureValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e JudgeFailureValidationError) ErrorName() string { return "JudgeFailureValidationError" }
+
+// Error satisfies the builtin error interface
+func (e JudgeFailureValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sJudgeFailure.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = JudgeFailureValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = JudgeFailureValidationError{}
 
 // Validate checks the field values on GetWorkerStatusRequest with the rules
 // defined in the proto definition for this message. If any rules are

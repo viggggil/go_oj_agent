@@ -235,7 +235,7 @@ problem-{problem_id}/judge-revisions/{judge_revision}/testcases/{case_no}.out
 并切换 `problems.active_judge_revision`。失败的未发布前缀由后台 GC 清理；
 首版所有已发布 revision 均不可覆盖、不可物理删除。未来若需要回收，必须
 通过显式事件或内部 API 建立引用与保留期，禁止 Problem Service 跨库查询
-`judge_attempt`。
+Judge Service 的 Submission 引用。
 
 ## 5.5 `problem_judge_revisions`
 
@@ -271,13 +271,17 @@ INDEX(problem_id, status, created_at)
 | `source_object_key` | VARCHAR(512) | Immutable MinIO key |
 | `source_sha256` | CHAR(64) | NOT NULL |
 | `source_size_bytes` | BIGINT | NOT NULL |
-| `current_attempt_id` | BIGINT | Nullable, current judge attempt |
-| `status` | VARCHAR(32) | QUEUED / COMPILING / RUNNING / DONE |
-| `verdict` | VARCHAR(32) | AC / WA / TLE / MLE / RE / CE |
+| `judge_revision` | CHAR(26) | Immutable testcase revision |
+| `status` | VARCHAR(32) | QUEUED / COMPILING / RUNNING / RETRY_WAIT / DONE / CANCELLED / INVALIDATED |
+| `verdict` | VARCHAR(32) | AC / WA / TLE / MLE / RE / CE / SYSTEM_ERROR |
 | `time_ms` | INT | Nullable |
 | `memory_kb` | INT | Nullable |
+| `retry_count` | INT | Infrastructure retry count, default 0 |
+| `system_error_reason` | VARCHAR(128) | Nullable stable reason code |
+| `judge_deadline_at` | DATETIME(3) | Overall execution deadline |
 | `created_at` | DATETIME(3) | NOT NULL |
 | `judged_at` | DATETIME(3) | Nullable |
+| `invalidated_at` | DATETIME(3) | Nullable admin rejudge invalidation time |
 | `updated_at` | DATETIME(3) | NOT NULL |
 
 建议索引：
@@ -289,47 +293,27 @@ INDEX(status, created_at)
 INDEX(verdict, created_at)
 ```
 
-状态更新需要防止重复 Event 造成非法回退。
+一个 Submission 就是一次逻辑判题。状态更新必须使用条件更新，防止重复或
+迟到 Event 造成非法回退；`INVALIDATED` 是终态，即使 Worker 随后返回结果也
+不得恢复。基础设施重试复用同一个 ID，`retry_count` 最多为 3。
 
 源码正文存入 MinIO `submission-source` bucket，使用随机 ULID 生成不可变 key，
-例如 `sources/{source_id}/source.cpp`。上传成功后再在 Submission + Attempt +
-Outbox 事务中记录 key、hash 和大小；事务失败产生的未引用对象由后台 GC
+例如 `sources/{source_id}/source.cpp`。上传成功后再在 Submission + Outbox
+事务中记录 key、hash 和大小；事务失败产生的未引用对象由后台 GC
 按安全保留期清理。源码对象不覆盖，重判复用同一源码对象。
 
-## 6.2 `judge_attempts`
+管理员重判必须在同一事务中把旧 Submission 标记为 `INVALIDATED`，写入
+`submission.invalidated` Outbox，并为原 `user_id` 创建使用当前
+`judge_revision` 的新 Submission 与 `judge.requested` Outbox。旧 Verdict 可以
+保留用于审计，但业务和 Contest 必须以 `INVALIDATED` 状态判定其结果无效。
+不保存 parent/root/origin 关系。
+
+## 6.2 `submission_case_results`
 
 | Column | Type | Note |
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `submission_id` | BIGINT | FK within `oj_submission` |
-| `attempt_no` | INT | Monotonic within submission |
-| `judge_revision` | CHAR(26) | Immutable testcase revision |
-| `status` | VARCHAR(32) | QUEUED / COMPILING / RUNNING / DONE / CANCELLED / SYSTEM_ERROR |
-| `verdict` | VARCHAR(32) | Nullable |
-| `time_ms` | INT | Nullable |
-| `memory_kb` | INT | Nullable |
-| `created_at` | DATETIME(3) | NOT NULL |
-| `started_at` | DATETIME(3) | Nullable |
-| `finished_at` | DATETIME(3) | Nullable |
-
-约束：
-
-```text
-UNIQUE(submission_id, attempt_no)
-INDEX(submission_id, created_at)
-INDEX(status, created_at)
-```
-
-首次判题与每次重判都创建新 attempt。`submissions.current_attempt_id` 只指向
-当前 attempt；旧 attempt 的迟到结果可以记录审计信息，但不得更新
-Submission 的当前状态、Verdict 或资源用量。
-
-## 6.3 `submission_case_results`
-
-| Column | Type | Note |
-| --- | --- | --- |
-| `id` | BIGINT | PK |
-| `attempt_id` | BIGINT | FK to judge_attempts |
 | `case_no` | INT | NOT NULL |
 | `verdict` | VARCHAR(32) | NOT NULL |
 | `time_ms` | INT | Nullable |
@@ -340,11 +324,11 @@ Submission 的当前状态、Verdict 或资源用量。
 约束：
 
 ```text
-UNIQUE(attempt_id, case_no)
-INDEX(attempt_id)
+UNIQUE(submission_id, case_no)
+INDEX(submission_id)
 ```
 
-## 6.4 `outbox_events`
+## 6.3 `outbox_events`
 
 用于 Transactional Outbox。
 
@@ -352,8 +336,8 @@ INDEX(attempt_id)
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `event_id` | CHAR(36) | UNIQUE |
-| `aggregate_type` | VARCHAR(64) | judge_attempt / submission |
-| `aggregate_id` | BIGINT | attempt_id or submission_id |
+| `aggregate_type` | VARCHAR(64) | submission |
+| `aggregate_id` | BIGINT | submission_id |
 | `event_type` | VARCHAR(128) | Internal intent, e.g. judge.requested |
 | `event_version` | INT | NOT NULL |
 | `payload` | JSON | Event Payload |
@@ -377,7 +361,7 @@ Relay 使用短事务和 `SELECT ... FOR UPDATE SKIP LOCKED` 领取未发布事�
 lease；发布成功并收到 Publisher Confirm 后标记 `published`。lease 只能降低
 并发碰撞，不能替代 Consumer 幂等。
 
-## 6.5 `processed_events`
+## 6.4 `processed_events`
 
 用于 Consumer 幂等去重的一种实现。
 
@@ -394,6 +378,27 @@ PRIMARY KEY(consumer_name, event_id)
 ```
 
 也可以使用业务唯一约束完成幂等；具体实现按 Consumer 选择。
+
+## 6.5 `idempotency_requests`
+
+用于 Create/Rejudge 写请求的网络重试去重，不表达 Submission 父子关系。
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `actor_id` | BIGINT | Authenticated caller ID |
+| `operation` | VARCHAR(64) | create_submission / rejudge_submission |
+| `idempotency_key` | CHAR(36) | Client-generated UUID |
+| `request_hash` | CHAR(64) | Reject same key with different payload |
+| `response` | JSON | First successful response |
+| `created_at` | DATETIME(3) | NOT NULL |
+| `expires_at` | DATETIME(3) | NOT NULL |
+
+约束：
+
+```text
+PRIMARY KEY(actor_id, operation, idempotency_key)
+INDEX(expires_at)
+```
 
 ---
 
