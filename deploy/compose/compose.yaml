@@ -21,6 +21,13 @@ services:
       - ../../migrations/problem/000002_create_tags.up.sql:/docker-entrypoint-initdb.d/202_create_tags.sql:ro
       - ../../migrations/problem/000003_create_problem_tags.up.sql:/docker-entrypoint-initdb.d/203_create_problem_tags.sql:ro
       - ../../migrations/problem/000004_create_testcases.up.sql:/docker-entrypoint-initdb.d/204_create_testcases.sql:ro
+      - ../../migrations/submission/000001_create_submissions.up.sql:/docker-entrypoint-initdb.d/301_create_submissions.sql:ro
+      - ../../migrations/submission/000002_create_submission_case_results.up.sql:/docker-entrypoint-initdb.d/302_create_submission_case_results.sql:ro
+      - ../../migrations/submission/000003_create_outbox_events.up.sql:/docker-entrypoint-initdb.d/303_create_outbox_events.sql:ro
+      - ../../migrations/submission/000004_create_processed_events.up.sql:/docker-entrypoint-initdb.d/304_create_processed_events.sql:ro
+      - ../../migrations/submission/000005_create_idempotency_requests.up.sql:/docker-entrypoint-initdb.d/305_create_idempotency_requests.sql:ro
+      - ../../migrations/submission/000006_align_submissions_with_judge_contract.up.sql:/docker-entrypoint-initdb.d/306_align_submissions_with_judge_contract.sql:ro
+      - ../../migrations/submission/000007_add_outbox_leasing.up.sql:/docker-entrypoint-initdb.d/307_add_outbox_leasing.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
