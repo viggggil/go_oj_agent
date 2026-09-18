@@ -4,6 +4,7 @@ import (
 	"github.com/google/wire"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
+	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 )
 
 const Name = "judge-service"
@@ -14,8 +15,9 @@ var ProviderSet = wire.NewSet(NewSubmissionService)
 // implemented incrementally. Embedded handlers return codes.Unimplemented.
 type SubmissionService struct {
 	submissionv1.UnimplementedSubmissionServiceServer
+	uc *biz.SubmissionUsecase
 }
 
-func NewSubmissionService() *SubmissionService {
-	return &SubmissionService{}
+func NewSubmissionService(uc *biz.SubmissionUsecase) *SubmissionService {
+	return &SubmissionService{uc: uc}
 }
