@@ -30,6 +30,7 @@ type Bootstrap struct {
 	Messaging     *MessagingProto        `protobuf:"bytes,5,opt,name=messaging,proto3" json:"messaging,omitempty"`
 	Registry      *RegistryProto         `protobuf:"bytes,6,opt,name=registry,proto3" json:"registry,omitempty"`
 	InternalAuth  *InternalAuthProto     `protobuf:"bytes,7,opt,name=internal_auth,json=internalAuth,proto3" json:"internal_auth,omitempty"`
+	Clients       *ClientsProto          `protobuf:"bytes,8,opt,name=clients,proto3" json:"clients,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -113,6 +114,157 @@ func (x *Bootstrap) GetInternalAuth() *InternalAuthProto {
 	return nil
 }
 
+func (x *Bootstrap) GetClients() *ClientsProto {
+	if x != nil {
+		return x.Clients
+	}
+	return nil
+}
+
+type ClientsProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problem       *ProblemClientProto    `protobuf:"bytes,1,opt,name=problem,proto3" json:"problem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClientsProto) Reset() {
+	*x = ClientsProto{}
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientsProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientsProto) ProtoMessage() {}
+
+func (x *ClientsProto) ProtoReflect() protoreflect.Message {
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientsProto.ProtoReflect.Descriptor instead.
+func (*ClientsProto) Descriptor() ([]byte, []int) {
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ClientsProto) GetProblem() *ProblemClientProto {
+	if x != nil {
+		return x.Problem
+	}
+	return nil
+}
+
+type ProblemClientProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Endpoint       string                 `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Timeout        string                 `protobuf:"bytes,2,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	PrivateKeyFile string                 `protobuf:"bytes,3,opt,name=private_key_file,json=privateKeyFile,proto3" json:"private_key_file,omitempty"`
+	KeyId          string                 `protobuf:"bytes,4,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Issuer         string                 `protobuf:"bytes,5,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Audience       string                 `protobuf:"bytes,6,opt,name=audience,proto3" json:"audience,omitempty"`
+	Subject        string                 `protobuf:"bytes,7,opt,name=subject,proto3" json:"subject,omitempty"`
+	TokenTtl       string                 `protobuf:"bytes,8,opt,name=token_ttl,json=tokenTtl,proto3" json:"token_ttl,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ProblemClientProto) Reset() {
+	*x = ProblemClientProto{}
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProblemClientProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProblemClientProto) ProtoMessage() {}
+
+func (x *ProblemClientProto) ProtoReflect() protoreflect.Message {
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProblemClientProto.ProtoReflect.Descriptor instead.
+func (*ProblemClientProto) Descriptor() ([]byte, []int) {
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ProblemClientProto) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetPrivateKeyFile() string {
+	if x != nil {
+		return x.PrivateKeyFile
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *ProblemClientProto) GetTokenTtl() string {
+	if x != nil {
+		return x.TokenTtl
+	}
+	return ""
+}
+
 type ServiceProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -122,7 +274,7 @@ type ServiceProto struct {
 
 func (x *ServiceProto) Reset() {
 	*x = ServiceProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[1]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -134,7 +286,7 @@ func (x *ServiceProto) String() string {
 func (*ServiceProto) ProtoMessage() {}
 
 func (x *ServiceProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[1]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -147,7 +299,7 @@ func (x *ServiceProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceProto.ProtoReflect.Descriptor instead.
 func (*ServiceProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{1}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ServiceProto) GetName() string {
@@ -166,7 +318,7 @@ type ServerProto struct {
 
 func (x *ServerProto) Reset() {
 	*x = ServerProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[2]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -178,7 +330,7 @@ func (x *ServerProto) String() string {
 func (*ServerProto) ProtoMessage() {}
 
 func (x *ServerProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[2]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -191,7 +343,7 @@ func (x *ServerProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerProto.ProtoReflect.Descriptor instead.
 func (*ServerProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{2}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ServerProto) GetGrpc() *GRPCProto {
@@ -210,7 +362,7 @@ type GRPCProto struct {
 
 func (x *GRPCProto) Reset() {
 	*x = GRPCProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[3]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -222,7 +374,7 @@ func (x *GRPCProto) String() string {
 func (*GRPCProto) ProtoMessage() {}
 
 func (x *GRPCProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[3]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -235,7 +387,7 @@ func (x *GRPCProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GRPCProto.ProtoReflect.Descriptor instead.
 func (*GRPCProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{3}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GRPCProto) GetAddress() string {
@@ -258,7 +410,7 @@ type DataProto struct {
 
 func (x *DataProto) Reset() {
 	*x = DataProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +422,7 @@ func (x *DataProto) String() string {
 func (*DataProto) ProtoMessage() {}
 
 func (x *DataProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +435,7 @@ func (x *DataProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataProto.ProtoReflect.Descriptor instead.
 func (*DataProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DataProto) GetMysqlDsn() string {
@@ -330,7 +482,7 @@ type StorageProto struct {
 
 func (x *StorageProto) Reset() {
 	*x = StorageProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -342,7 +494,7 @@ func (x *StorageProto) String() string {
 func (*StorageProto) ProtoMessage() {}
 
 func (x *StorageProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -355,7 +507,7 @@ func (x *StorageProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StorageProto.ProtoReflect.Descriptor instead.
 func (*StorageProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{5}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StorageProto) GetMinio() *MinIOProto {
@@ -379,7 +531,7 @@ type MinIOProto struct {
 
 func (x *MinIOProto) Reset() {
 	*x = MinIOProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +543,7 @@ func (x *MinIOProto) String() string {
 func (*MinIOProto) ProtoMessage() {}
 
 func (x *MinIOProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +556,7 @@ func (x *MinIOProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinIOProto.ProtoReflect.Descriptor instead.
 func (*MinIOProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{6}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *MinIOProto) GetEndpoint() string {
@@ -458,7 +610,7 @@ type MessagingProto struct {
 
 func (x *MessagingProto) Reset() {
 	*x = MessagingProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +622,7 @@ func (x *MessagingProto) String() string {
 func (*MessagingProto) ProtoMessage() {}
 
 func (x *MessagingProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +635,7 @@ func (x *MessagingProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessagingProto.ProtoReflect.Descriptor instead.
 func (*MessagingProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MessagingProto) GetRabbitmq() *RabbitMQProto {
@@ -507,7 +659,7 @@ type RabbitMQProto struct {
 
 func (x *RabbitMQProto) Reset() {
 	*x = RabbitMQProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +671,7 @@ func (x *RabbitMQProto) String() string {
 func (*RabbitMQProto) ProtoMessage() {}
 
 func (x *RabbitMQProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[8]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +684,7 @@ func (x *RabbitMQProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RabbitMQProto.ProtoReflect.Descriptor instead.
 func (*RabbitMQProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{8}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RabbitMQProto) GetUrl() string {
@@ -586,7 +738,7 @@ type RegistryProto struct {
 
 func (x *RegistryProto) Reset() {
 	*x = RegistryProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +750,7 @@ func (x *RegistryProto) String() string {
 func (*RegistryProto) ProtoMessage() {}
 
 func (x *RegistryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[9]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +763,7 @@ func (x *RegistryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegistryProto.ProtoReflect.Descriptor instead.
 func (*RegistryProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{9}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RegistryProto) GetConsul() *ConsulProto {
@@ -635,7 +787,7 @@ type ConsulProto struct {
 
 func (x *ConsulProto) Reset() {
 	*x = ConsulProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +799,7 @@ func (x *ConsulProto) String() string {
 func (*ConsulProto) ProtoMessage() {}
 
 func (x *ConsulProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[10]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +812,7 @@ func (x *ConsulProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsulProto.ProtoReflect.Descriptor instead.
 func (*ConsulProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{10}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ConsulProto) GetEnabled() bool {
@@ -720,7 +872,7 @@ type InternalAuthProto struct {
 
 func (x *InternalAuthProto) Reset() {
 	*x = InternalAuthProto{}
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[11]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -732,7 +884,7 @@ func (x *InternalAuthProto) String() string {
 func (*InternalAuthProto) ProtoMessage() {}
 
 func (x *InternalAuthProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[11]
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -745,7 +897,7 @@ func (x *InternalAuthProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InternalAuthProto.ProtoReflect.Descriptor instead.
 func (*InternalAuthProto) Descriptor() ([]byte, []int) {
-	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{11}
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *InternalAuthProto) GetPublicKeyFile() string {
@@ -802,7 +954,7 @@ var File_services_judge_internal_conf_conf_proto protoreflect.FileDescriptor
 const file_services_judge_internal_conf_conf_proto_rawDesc = "" +
 	"\n" +
 	"'services/judge/internal/conf/conf.proto\x12\n" +
-	"judge.conf\"\x84\x03\n" +
+	"judge.conf\"\xb8\x03\n" +
 	"\tBootstrap\x122\n" +
 	"\aservice\x18\x01 \x01(\v2\x18.judge.conf.ServiceProtoR\aservice\x12/\n" +
 	"\x06server\x18\x02 \x01(\v2\x17.judge.conf.ServerProtoR\x06server\x12)\n" +
@@ -810,7 +962,19 @@ const file_services_judge_internal_conf_conf_proto_rawDesc = "" +
 	"\astorage\x18\x04 \x01(\v2\x18.judge.conf.StorageProtoR\astorage\x128\n" +
 	"\tmessaging\x18\x05 \x01(\v2\x1a.judge.conf.MessagingProtoR\tmessaging\x125\n" +
 	"\bregistry\x18\x06 \x01(\v2\x19.judge.conf.RegistryProtoR\bregistry\x12B\n" +
-	"\rinternal_auth\x18\a \x01(\v2\x1d.judge.conf.InternalAuthProtoR\finternalAuth\"\"\n" +
+	"\rinternal_auth\x18\a \x01(\v2\x1d.judge.conf.InternalAuthProtoR\finternalAuth\x122\n" +
+	"\aclients\x18\b \x01(\v2\x18.judge.conf.ClientsProtoR\aclients\"H\n" +
+	"\fClientsProto\x128\n" +
+	"\aproblem\x18\x01 \x01(\v2\x1e.judge.conf.ProblemClientProtoR\aproblem\"\xf6\x01\n" +
+	"\x12ProblemClientProto\x12\x1a\n" +
+	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x18\n" +
+	"\atimeout\x18\x02 \x01(\tR\atimeout\x12(\n" +
+	"\x10private_key_file\x18\x03 \x01(\tR\x0eprivateKeyFile\x12\x15\n" +
+	"\x06key_id\x18\x04 \x01(\tR\x05keyId\x12\x16\n" +
+	"\x06issuer\x18\x05 \x01(\tR\x06issuer\x12\x1a\n" +
+	"\baudience\x18\x06 \x01(\tR\baudience\x12\x18\n" +
+	"\asubject\x18\a \x01(\tR\asubject\x12\x1b\n" +
+	"\ttoken_ttl\x18\b \x01(\tR\btokenTtl\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"8\n" +
 	"\vServerProto\x12)\n" +
@@ -881,38 +1045,42 @@ func file_services_judge_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_services_judge_internal_conf_conf_proto_rawDescData
 }
 
-var file_services_judge_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_services_judge_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_services_judge_internal_conf_conf_proto_goTypes = []any{
-	(*Bootstrap)(nil),         // 0: judge.conf.Bootstrap
-	(*ServiceProto)(nil),      // 1: judge.conf.ServiceProto
-	(*ServerProto)(nil),       // 2: judge.conf.ServerProto
-	(*GRPCProto)(nil),         // 3: judge.conf.GRPCProto
-	(*DataProto)(nil),         // 4: judge.conf.DataProto
-	(*StorageProto)(nil),      // 5: judge.conf.StorageProto
-	(*MinIOProto)(nil),        // 6: judge.conf.MinIOProto
-	(*MessagingProto)(nil),    // 7: judge.conf.MessagingProto
-	(*RabbitMQProto)(nil),     // 8: judge.conf.RabbitMQProto
-	(*RegistryProto)(nil),     // 9: judge.conf.RegistryProto
-	(*ConsulProto)(nil),       // 10: judge.conf.ConsulProto
-	(*InternalAuthProto)(nil), // 11: judge.conf.InternalAuthProto
+	(*Bootstrap)(nil),          // 0: judge.conf.Bootstrap
+	(*ClientsProto)(nil),       // 1: judge.conf.ClientsProto
+	(*ProblemClientProto)(nil), // 2: judge.conf.ProblemClientProto
+	(*ServiceProto)(nil),       // 3: judge.conf.ServiceProto
+	(*ServerProto)(nil),        // 4: judge.conf.ServerProto
+	(*GRPCProto)(nil),          // 5: judge.conf.GRPCProto
+	(*DataProto)(nil),          // 6: judge.conf.DataProto
+	(*StorageProto)(nil),       // 7: judge.conf.StorageProto
+	(*MinIOProto)(nil),         // 8: judge.conf.MinIOProto
+	(*MessagingProto)(nil),     // 9: judge.conf.MessagingProto
+	(*RabbitMQProto)(nil),      // 10: judge.conf.RabbitMQProto
+	(*RegistryProto)(nil),      // 11: judge.conf.RegistryProto
+	(*ConsulProto)(nil),        // 12: judge.conf.ConsulProto
+	(*InternalAuthProto)(nil),  // 13: judge.conf.InternalAuthProto
 }
 var file_services_judge_internal_conf_conf_proto_depIdxs = []int32{
-	1,  // 0: judge.conf.Bootstrap.service:type_name -> judge.conf.ServiceProto
-	2,  // 1: judge.conf.Bootstrap.server:type_name -> judge.conf.ServerProto
-	4,  // 2: judge.conf.Bootstrap.data:type_name -> judge.conf.DataProto
-	5,  // 3: judge.conf.Bootstrap.storage:type_name -> judge.conf.StorageProto
-	7,  // 4: judge.conf.Bootstrap.messaging:type_name -> judge.conf.MessagingProto
-	9,  // 5: judge.conf.Bootstrap.registry:type_name -> judge.conf.RegistryProto
-	11, // 6: judge.conf.Bootstrap.internal_auth:type_name -> judge.conf.InternalAuthProto
-	3,  // 7: judge.conf.ServerProto.grpc:type_name -> judge.conf.GRPCProto
-	6,  // 8: judge.conf.StorageProto.minio:type_name -> judge.conf.MinIOProto
-	8,  // 9: judge.conf.MessagingProto.rabbitmq:type_name -> judge.conf.RabbitMQProto
-	10, // 10: judge.conf.RegistryProto.consul:type_name -> judge.conf.ConsulProto
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	3,  // 0: judge.conf.Bootstrap.service:type_name -> judge.conf.ServiceProto
+	4,  // 1: judge.conf.Bootstrap.server:type_name -> judge.conf.ServerProto
+	6,  // 2: judge.conf.Bootstrap.data:type_name -> judge.conf.DataProto
+	7,  // 3: judge.conf.Bootstrap.storage:type_name -> judge.conf.StorageProto
+	9,  // 4: judge.conf.Bootstrap.messaging:type_name -> judge.conf.MessagingProto
+	11, // 5: judge.conf.Bootstrap.registry:type_name -> judge.conf.RegistryProto
+	13, // 6: judge.conf.Bootstrap.internal_auth:type_name -> judge.conf.InternalAuthProto
+	1,  // 7: judge.conf.Bootstrap.clients:type_name -> judge.conf.ClientsProto
+	2,  // 8: judge.conf.ClientsProto.problem:type_name -> judge.conf.ProblemClientProto
+	5,  // 9: judge.conf.ServerProto.grpc:type_name -> judge.conf.GRPCProto
+	8,  // 10: judge.conf.StorageProto.minio:type_name -> judge.conf.MinIOProto
+	10, // 11: judge.conf.MessagingProto.rabbitmq:type_name -> judge.conf.RabbitMQProto
+	12, // 12: judge.conf.RegistryProto.consul:type_name -> judge.conf.ConsulProto
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_services_judge_internal_conf_conf_proto_init() }
@@ -926,7 +1094,7 @@ func file_services_judge_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_judge_internal_conf_conf_proto_rawDesc), len(file_services_judge_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

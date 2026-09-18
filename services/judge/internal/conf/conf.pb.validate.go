@@ -260,6 +260,35 @@ func (m *Bootstrap) validate(all bool) error {
 		}
 	}
 
+	if all {
+		switch v := interface{}(m.GetClients()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "Clients",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "Clients",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetClients()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BootstrapValidationError{
+				field:  "Clients",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return BootstrapMultiError(errors)
 	}
@@ -336,6 +365,252 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = BootstrapValidationError{}
+
+// Validate checks the field values on ClientsProto with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ClientsProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ClientsProto with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ClientsProtoMultiError, or
+// nil if none found.
+func (m *ClientsProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ClientsProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetProblem()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ClientsProtoValidationError{
+					field:  "Problem",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ClientsProtoValidationError{
+					field:  "Problem",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetProblem()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ClientsProtoValidationError{
+				field:  "Problem",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ClientsProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// ClientsProtoMultiError is an error wrapping multiple validation errors
+// returned by ClientsProto.ValidateAll() if the designated constraints aren't met.
+type ClientsProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ClientsProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ClientsProtoMultiError) AllErrors() []error { return m }
+
+// ClientsProtoValidationError is the validation error returned by
+// ClientsProto.Validate if the designated constraints aren't met.
+type ClientsProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ClientsProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ClientsProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ClientsProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ClientsProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ClientsProtoValidationError) ErrorName() string { return "ClientsProtoValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ClientsProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sClientsProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ClientsProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ClientsProtoValidationError{}
+
+// Validate checks the field values on ProblemClientProto with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ProblemClientProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ProblemClientProto with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ProblemClientProtoMultiError, or nil if none found.
+func (m *ProblemClientProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ProblemClientProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Endpoint
+
+	// no validation rules for Timeout
+
+	// no validation rules for PrivateKeyFile
+
+	// no validation rules for KeyId
+
+	// no validation rules for Issuer
+
+	// no validation rules for Audience
+
+	// no validation rules for Subject
+
+	// no validation rules for TokenTtl
+
+	if len(errors) > 0 {
+		return ProblemClientProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// ProblemClientProtoMultiError is an error wrapping multiple validation errors
+// returned by ProblemClientProto.ValidateAll() if the designated constraints
+// aren't met.
+type ProblemClientProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ProblemClientProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ProblemClientProtoMultiError) AllErrors() []error { return m }
+
+// ProblemClientProtoValidationError is the validation error returned by
+// ProblemClientProto.Validate if the designated constraints aren't met.
+type ProblemClientProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ProblemClientProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ProblemClientProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ProblemClientProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ProblemClientProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ProblemClientProtoValidationError) ErrorName() string {
+	return "ProblemClientProtoValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ProblemClientProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sProblemClientProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ProblemClientProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ProblemClientProtoValidationError{}
 
 // Validate checks the field values on ServiceProto with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
