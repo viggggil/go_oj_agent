@@ -7,23 +7,44 @@
 package main
 
 import (
-	"github.com/go-kratos/kratos/v3"
+	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/judge/internal/data"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/server"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/service"
 )
 
 // Injectors from wire.go:
 
-func initApp(bc *conf.Bootstrap) (*kratos.App, func(), error) {
+func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	v := server.NewMiddlewares()
-	submissionService := service.NewSubmissionService()
-	grpcServer, err := server.NewGRPCServer(bc, v, submissionService)
+	db, cleanup, err := data.NewMySQLDB(bc)
 	if err != nil {
 		return nil, nil, err
 	}
+	storeSet := data.NewStoreSet(db)
+	minIOSourceStore, err := data.NewSourceStore(bc)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	problemClient, cleanup2, err := data.NewProblemClient(bc)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	submissionUsecase := biz.NewSubmissionUsecase(storeSet, minIOSourceStore, problemClient)
+	submissionService := service.NewSubmissionService(submissionUsecase)
+	grpcServer, err := server.NewGRPCServer(bc, v, submissionService)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
 	registrar := server.NewRegistrar(bc)
-	app := newApp(bc, grpcServer, registrar)
-	return app, func() {
+	v2 := newApp(bc, grpcServer, registrar)
+	return v2, func() {
+		cleanup2()
+		cleanup()
 	}, nil
 }

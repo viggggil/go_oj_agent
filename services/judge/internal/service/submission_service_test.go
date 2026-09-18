@@ -10,7 +10,7 @@ import (
 )
 
 func TestBootstrapHandlersRemainUnimplemented(t *testing.T) {
-	service := NewSubmissionService()
+	service := NewSubmissionService(nil)
 	_, err := service.CreateSubmission(context.Background(), &submissionv1.CreateSubmissionRequest{})
 	if status.Code(err) != codes.Unimplemented {
 		t.Fatalf("CreateSubmission status = %v, want %v", status.Code(err), codes.Unimplemented)
