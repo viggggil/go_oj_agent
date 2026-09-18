@@ -104,12 +104,13 @@ func (s *StoreSet) FindByID(ctx context.Context, problemID int64) (biz.Problem, 
 	}
 	var problem biz.Problem
 	var difficulty, problemStatus string
+	var activeJudgeRevision sql.NullString
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, title, slug, description, difficulty, time_limit_ms, memory_limit_kb,
-		       status, created_by, created_at, updated_at
-		FROM problems WHERE id = ?
-	`, problemID).Scan(&problem.ID, &problem.Title, &problem.Slug, &problem.Description,
-		&difficulty, &problem.TimeLimitMs, &problem.MemoryLimitKb, &problemStatus,
+			SELECT id, title, slug, description, difficulty, time_limit_ms, memory_limit_kb,
+			       active_judge_revision, status, created_by, created_at, updated_at
+			FROM problems WHERE id = ?
+		`, problemID).Scan(&problem.ID, &problem.Title, &problem.Slug, &problem.Description,
+		&difficulty, &problem.TimeLimitMs, &problem.MemoryLimitKb, &activeJudgeRevision, &problemStatus,
 		&problem.CreatedBy, &problem.CreatedAt, &problem.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return biz.Problem{}, biz.ErrorNotFound("problem not found")
@@ -127,6 +128,7 @@ func (s *StoreSet) FindByID(ctx context.Context, problemID int64) (biz.Problem, 
 	}
 	problem.Difficulty = problemv1.ProblemDifficulty(difficultyValue)
 	problem.Status = problemv1.ProblemStatus(statusValue)
+	problem.ActiveJudgeRevision = activeJudgeRevision.String
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT t.id, t.name
 		FROM tags t JOIN problem_tags pt ON pt.tag_id = t.id

@@ -50,8 +50,9 @@ type serviceFakeRepository struct {
 	err   error
 }
 
-func (*serviceFakeRepository) Create(_ context.Context, problem biz.Problem, _ []string) (biz.Problem, error) {
+func (r *serviceFakeRepository) Create(_ context.Context, problem biz.Problem, _ []string) (biz.Problem, error) {
 	problem.ID = 101
+	r.found = problem
 	return problem, nil
 }
 

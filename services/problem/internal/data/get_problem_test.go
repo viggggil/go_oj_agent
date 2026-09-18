@@ -17,8 +17,8 @@ func TestFindProblemByID(t *testing.T) {
 	defer db.Close()
 	now := time.Now().UTC()
 	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(9)).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "status", "created_by", "created_at", "updated_at"}).
-			AddRow(9, "A+B", "a-plus-b", "Statement", "PROBLEM_DIFFICULTY_EASY", 1000, 65536, "PROBLEM_STATUS_NORMAL", 1, now, now),
+		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}).
+			AddRow(9, "A+B", "a-plus-b", "Statement", "PROBLEM_DIFFICULTY_EASY", 1000, 65536, "01K5C6Y7N8P9Q0R1S2T3V4W5X6", "PROBLEM_STATUS_NORMAL", 1, now, now),
 	)
 	mock.ExpectQuery("SELECT t.id, t.name").WithArgs(int64(9)).WillReturnRows(
 		sqlmock.NewRows([]string{"id", "name"}).AddRow(2, "math"),
@@ -43,7 +43,7 @@ func TestFindProblemByIDNotFound(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(404)).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "status", "created_by", "created_at", "updated_at"}),
+		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}),
 	)
 	_, err = NewStoreSet(db).FindByID(context.Background(), 404)
 	if !problemv1.IsProblemErrorReasonNotFound(err) {

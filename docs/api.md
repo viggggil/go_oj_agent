@@ -389,8 +389,9 @@ Problem Service 在同一次业务操作中完成 MinIO 上传、SHA-256 计算�
 ### GET `/api/v1/problems/{problem_id}/testcases`
 
 管理员展示某题测试用例元信息时使用。内部对应的
-`ListProblemTestcases` RPC 同时供可信 Judge 调用方复用。默认只返回
-`ACTIVE` 测试用例，按 `case_no` 查询；管理员可以显式包含归档项。
+`ListProblemTestcases` RPC 供管理员测试点管理使用，也保留给需要诊断元数据的
+可信内部调用方。该列表默认只返回 `ACTIVE` 测试用例，按 `case_no` 查询；管理员
+可以显式包含归档项。Judge Service 创建提交时必须使用 `GetJudgeProfile`。
 
 ### DELETE `/api/v1/problems/{problem_id}/testcases/{testcase_id}`
 
@@ -707,16 +708,30 @@ service ProblemService {
   rpc ArchiveTestcase(ArchiveTestcaseRequest) returns (ArchiveTestcaseResponse);
   rpc ListProblemTestcases(ListProblemTestcasesRequest)
       returns (ListProblemTestcasesResponse);
+  rpc GetJudgeProfile(GetJudgeProfileRequest)
+      returns (GetJudgeProfileResponse);
 }
 ```
 
 `AddTestcase` 的内部请求携带配对文件名和文件 bytes。`.in/.out` 后缀、文件
 大小、题目 ID、版本和序号由生成的校验代码检查；Problem Service 负责生成
-MinIO object key，数据库只保存 object key、hash、大小、版本、序号和状态。
+MinIO object key，数据库只保存当前编辑态的 object key、hash、大小、序号和状态。
 
-`ListProblemTestcases` 是管理员页面与 Judge 的共享数据能力。具体授权仍在
-Problem Service 内完成：管理员身份来自可信用户上下文，Judge 身份来自后续
-内部服务认证，不能信任外部调用者伪造角色。
+`ListProblemTestcases` 是管理员页面与受信内部调用方的诊断能力。具体授权仍在
+Problem Service 内完成，不能信任外部调用者伪造角色；Judge Service 创建提交
+不得使用该列表临时拼装测试集。
+
+`GetJudgeProfile` 仅接受通过 RS256 服务间认证的 `judge-service` 调用方，返回
+题目 ID、状态、时间/内存限制和当前 `active_judge_revision`。题目归档、没有
+有效测试点或尚无已发布 revision 时返回 `FailedPrecondition`。Judge Service
+不得通过 `ListProblemTestcases` 临时拼装一次判题。
+
+新增或归档测试点时，Problem Service 先将完整快照写入 MinIO 的不可变
+`problem-{problem_id}/judge-revisions/{judge_revision}/` 前缀，最后才在一个
+MySQL 事务中提交测试点最新状态并切换 `active_judge_revision`。MySQL 不保存
+revision 历史；历史 manifest 与 `.in/.out` 文件只保存在 MinIO。
+归档最后一个有效测试点时不生成空 revision，而是清空 active 指针并保留旧
+MinIO 快照，因此新 Submission 会被拒绝，历史 Submission 仍可复现。
 
 Agent Tool 映射：
 

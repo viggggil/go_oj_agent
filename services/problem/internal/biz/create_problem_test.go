@@ -40,11 +40,11 @@ func TestCreateProblemRejectsNonAdmin(t *testing.T) {
 func TestCreateProblemStoresTestcases(t *testing.T) {
 	input := validCreateInput()
 	input.Testcases = []TestcaseContent{{CaseNo: 1, Input: []byte("in"), Output: []byte("out")}}
-	problems := &fakeProblemRepository{created: Problem{ID: 5}}
+	problems := &fakeProblemRepository{created: Problem{ID: 5, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL}}
 	testcases := &fakeTestcaseRepository{}
 	objects := &fakeObjectStore{}
 	_, err := NewProblemUsecaseWithStore(problems, testcases, objects, problems).Create(context.Background(), input)
-	if err != nil || testcases.created.ProblemID != 5 || len(objects.puts) != 2 {
+	if err != nil || testcases.created.ProblemID != 5 || len(objects.puts) != 5 {
 		t.Fatalf("error=%v testcase=%+v puts=%v", err, testcases.created, objects.puts)
 	}
 }

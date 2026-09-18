@@ -210,3 +210,26 @@ func (s *ProblemService) ArchiveTestcase(ctx context.Context, req *problemv1.Arc
 	}
 	return &problemv1.ArchiveTestcaseResponse{Testcase: toProtoTestcase(item)}, nil
 }
+
+func (s *ProblemService) GetJudgeProfile(ctx context.Context, req *problemv1.GetJudgeProfileRequest) (*problemv1.GetJudgeProfileResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid get judge profile request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	if err := requireJudgeService(ctx); err != nil {
+		return nil, err
+	}
+	problem, err := s.uc.GetJudgeProfile(ctx, req.GetProblemId())
+	if err != nil {
+		return nil, err
+	}
+	return &problemv1.GetJudgeProfileResponse{Profile: &problemv1.JudgeProfile{
+		ProblemId:           problem.ID,
+		Status:              problem.Status,
+		TimeLimitMs:         problem.TimeLimitMs,
+		MemoryLimitKb:       problem.MemoryLimitKb,
+		ActiveJudgeRevision: problem.ActiveJudgeRevision,
+	}}, nil
+}

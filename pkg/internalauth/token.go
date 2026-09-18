@@ -123,6 +123,40 @@ type Verifier struct {
 	now                       func() time.Time
 }
 
+type TokenVerifier interface {
+	Verify(string, string) (Claims, error)
+}
+
+type VerifierSet struct {
+	verifiers []TokenVerifier
+}
+
+func NewVerifierSet(verifiers ...TokenVerifier) (*VerifierSet, error) {
+	filtered := make([]TokenVerifier, 0, len(verifiers))
+	for _, verifier := range verifiers {
+		if verifier != nil {
+			filtered = append(filtered, verifier)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, ErrInvalidToken
+	}
+	return &VerifierSet{verifiers: filtered}, nil
+}
+
+func (v *VerifierSet) Verify(token, method string) (Claims, error) {
+	if v == nil {
+		return Claims{}, ErrInvalidToken
+	}
+	for _, verifier := range v.verifiers {
+		claims, err := verifier.Verify(token, method)
+		if err == nil {
+			return claims, nil
+		}
+	}
+	return Claims{}, ErrInvalidToken
+}
+
 func NewVerifier(publicKeys map[string][]byte, issuer, audience, subject string, maxTTL, skew time.Duration, now func() time.Time) (*Verifier, error) {
 	if len(publicKeys) == 0 || maxTTL <= 0 || maxTTL > time.Minute {
 		return nil, ErrInvalidToken

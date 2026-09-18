@@ -21,6 +21,9 @@ service ProblemService {
   rpc ArchiveTestcase(ArchiveTestcaseRequest) returns (ArchiveTestcaseResponse);
   // Shared by the admin UI and trusted judge callers.
   rpc ListProblemTestcases(ListProblemTestcasesRequest) returns (ListProblemTestcasesResponse);
+  // GetJudgeProfile is an internal-only contract used by judge-service when a
+  // submission pins the currently published immutable testcase revision.
+  rpc GetJudgeProfile(GetJudgeProfileRequest) returns (GetJudgeProfileResponse);
 }
 
 enum ProblemDifficulty {
@@ -216,4 +219,20 @@ message ListProblemTestcasesRequest {
 
 message ListProblemTestcasesResponse {
   repeated TestcaseMetadata items = 1;
+}
+
+message JudgeProfile {
+  int64 problem_id = 1 [(validate.rules).int64.gt = 0];
+  ProblemStatus status = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+  int32 time_limit_ms = 3 [(validate.rules).int32.gt = 0];
+  int32 memory_limit_kb = 4 [(validate.rules).int32.gt = 0];
+  string active_judge_revision = 5 [(validate.rules).string.len = 26];
+}
+
+message GetJudgeProfileRequest {
+  int64 problem_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message GetJudgeProfileResponse {
+  JudgeProfile profile = 1 [(validate.rules).message.required = true];
 }
