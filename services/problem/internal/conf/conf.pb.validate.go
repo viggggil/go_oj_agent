@@ -202,6 +202,35 @@ func (m *Bootstrap) validate(all bool) error {
 		}
 	}
 
+	if all {
+		switch v := interface{}(m.GetInternalAuth()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "InternalAuth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "InternalAuth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetInternalAuth()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BootstrapValidationError{
+				field:  "InternalAuth",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return BootstrapMultiError(errors)
 	}
@@ -278,6 +307,266 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = BootstrapValidationError{}
+
+// Validate checks the field values on InternalAuthProto with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *InternalAuthProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InternalAuthProto with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// InternalAuthProtoMultiError, or nil if none found.
+func (m *InternalAuthProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InternalAuthProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PublicKeyFile
+
+	// no validation rules for KeyId
+
+	// no validation rules for Issuer
+
+	// no validation rules for Audience
+
+	// no validation rules for Subject
+
+	// no validation rules for MaxTokenTtl
+
+	// no validation rules for ClockSkew
+
+	for idx, item := range m.GetAdditionalCallers() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InternalAuthProtoValidationError{
+						field:  fmt.Sprintf("AdditionalCallers[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InternalAuthProtoValidationError{
+						field:  fmt.Sprintf("AdditionalCallers[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InternalAuthProtoValidationError{
+					field:  fmt.Sprintf("AdditionalCallers[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return InternalAuthProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// InternalAuthProtoMultiError is an error wrapping multiple validation errors
+// returned by InternalAuthProto.ValidateAll() if the designated constraints
+// aren't met.
+type InternalAuthProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InternalAuthProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InternalAuthProtoMultiError) AllErrors() []error { return m }
+
+// InternalAuthProtoValidationError is the validation error returned by
+// InternalAuthProto.Validate if the designated constraints aren't met.
+type InternalAuthProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InternalAuthProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InternalAuthProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InternalAuthProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InternalAuthProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InternalAuthProtoValidationError) ErrorName() string {
+	return "InternalAuthProtoValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InternalAuthProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInternalAuthProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InternalAuthProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InternalAuthProtoValidationError{}
+
+// Validate checks the field values on InternalCallerProto with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *InternalCallerProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InternalCallerProto with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// InternalCallerProtoMultiError, or nil if none found.
+func (m *InternalCallerProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InternalCallerProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PublicKeyFile
+
+	// no validation rules for KeyId
+
+	// no validation rules for Issuer
+
+	// no validation rules for Subject
+
+	if len(errors) > 0 {
+		return InternalCallerProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// InternalCallerProtoMultiError is an error wrapping multiple validation
+// errors returned by InternalCallerProto.ValidateAll() if the designated
+// constraints aren't met.
+type InternalCallerProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InternalCallerProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InternalCallerProtoMultiError) AllErrors() []error { return m }
+
+// InternalCallerProtoValidationError is the validation error returned by
+// InternalCallerProto.Validate if the designated constraints aren't met.
+type InternalCallerProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InternalCallerProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InternalCallerProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InternalCallerProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InternalCallerProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InternalCallerProtoValidationError) ErrorName() string {
+	return "InternalCallerProtoValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InternalCallerProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInternalCallerProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InternalCallerProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InternalCallerProtoValidationError{}
 
 // Validate checks the field values on ServiceProto with the rules defined in
 // the proto definition for this message. If any rules are violated, the first

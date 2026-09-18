@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -35,6 +36,23 @@ func (s *MinIOStore) Put(ctx context.Context, key string, content []byte) error 
 	_, err := s.client.PutObject(ctx, s.bucket, key, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	return err
 }
+
+func (s *MinIOStore) PutImmutable(ctx context.Context, key string, content []byte, contentType string) error {
+	options := minio.PutObjectOptions{ContentType: contentType}
+	options.SetMatchETagExcept("*")
+	_, err := s.client.PutObject(ctx, s.bucket, key, bytes.NewReader(content), int64(len(content)), options)
+	return err
+}
+
+func (s *MinIOStore) Get(ctx context.Context, key string) ([]byte, error) {
+	object, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer object.Close()
+	return io.ReadAll(object)
+}
+
 func (s *MinIOStore) Delete(ctx context.Context, key string) error {
 	return s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 }

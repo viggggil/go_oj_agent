@@ -231,30 +231,15 @@ problem-{problem_id}/judge-revisions/{judge_revision}/testcases/{case_no}.out
 ```
 
 `manifest.json` 固化 case 顺序、对象 key、大小和 SHA-256。所有对象上传并
-校验成功后，Problem Service 才在一个 MySQL 事务中登记已发布 revision，
-并切换 `problems.active_judge_revision`。失败的未发布前缀由后台 GC 清理；
+校验成功后，Problem Service 才在提交测试用例最新状态的同一个 MySQL 事务中
+切换 `problems.active_judge_revision`。revision 历史和 manifest 仅保存在 MinIO，
+MySQL 不保存 revision 历史表。失败的未发布前缀由后台 GC 清理；
 首版所有已发布 revision 均不可覆盖、不可物理删除。未来若需要回收，必须
 通过显式事件或内部 API 建立引用与保留期，禁止 Problem Service 跨库查询
 Judge Service 的 Submission 引用。
 
-## 5.5 `problem_judge_revisions`
-
-| Column | Type | Note |
-| --- | --- | --- |
-| `judge_revision` | CHAR(26) | PK, ULID |
-| `problem_id` | BIGINT | FK within `oj_problem` |
-| `manifest_object_key` | VARCHAR(512) | Immutable MinIO key |
-| `manifest_sha256` | CHAR(64) | NOT NULL |
-| `case_count` | INT | NOT NULL |
-| `status` | VARCHAR(32) | published / retired |
-| `created_at` | DATETIME(3) | NOT NULL |
-
-约束：
-
-```text
-UNIQUE(problem_id, judge_revision)
-INDEX(problem_id, status, created_at)
-```
+归档最后一个有效测试点时不发布空 revision；MySQL 将
+`active_judge_revision` 置为 `NULL`，旧 MinIO revision 继续保留给历史 Submission。
 
 ---
 

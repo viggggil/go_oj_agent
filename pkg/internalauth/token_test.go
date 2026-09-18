@@ -91,3 +91,28 @@ func TestPrincipalMatchesRequestContext(t *testing.T) {
 		t.Fatal("different roles must not match")
 	}
 }
+
+func TestVerifierSetAcceptsDistinctTrustedIssuers(t *testing.T) {
+	now := time.Now().UTC()
+	gatewayPrivate, gatewayPublic := keys(t)
+	judgePrivate, judgePublic := keys(t)
+	gatewaySigner, _ := NewSigner(gatewayPrivate, "gateway", "go-oj-gateway", "problem-service", "gateway-service", 30*time.Second, func() time.Time { return now })
+	judgeSigner, _ := NewSigner(judgePrivate, "judge", "go-oj-judge", "problem-service", "judge-service", 30*time.Second, func() time.Time { return now })
+	gatewayVerifier, _ := NewVerifier(map[string][]byte{"gateway": gatewayPublic}, "go-oj-gateway", "problem-service", "gateway-service", time.Minute, 0, func() time.Time { return now })
+	judgeVerifier, _ := NewVerifier(map[string][]byte{"judge": judgePublic}, "go-oj-judge", "problem-service", "judge-service", time.Minute, 0, func() time.Time { return now })
+	set, err := NewVerifierSet(gatewayVerifier, judgeVerifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, signer := range map[string]*Signer{"gateway": gatewaySigner, "judge": judgeSigner} {
+		t.Run(name, func(t *testing.T) {
+			token, signErr := signer.Sign(Claims{RPC: "/problem.v1.ProblemService/GetJudgeProfile", TokenID: name})
+			if signErr != nil {
+				t.Fatal(signErr)
+			}
+			if _, verifyErr := set.Verify(token, "/problem.v1.ProblemService/GetJudgeProfile"); verifyErr != nil {
+				t.Fatalf("trusted signer rejected: %v", verifyErr)
+			}
+		})
+	}
+}

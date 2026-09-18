@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -48,10 +49,6 @@ func TestProblemInfrastructureIntegration(t *testing.T) {
 	if err != nil || updated.Title != created.Title {
 		t.Fatalf("Update() = %+v, %v", updated, err)
 	}
-	if _, err = store.Archive(ctx, created.ID); err != nil {
-		t.Fatal(err)
-	}
-
 	config := &conf.Bootstrap{Storage: &conf.StorageProto{Minio: &conf.MinIOProto{Endpoint: minioEndpoint, AccessKey: envOr("PROBLEM_TEST_MINIO_ACCESS_KEY", "minioadmin"), SecretKey: envOr("PROBLEM_TEST_MINIO_SECRET_KEY", "minioadmin"), Bucket: "problem-data"}}}
 	objects, err := NewMinIOStore(config)
 	if err != nil {
@@ -73,11 +70,55 @@ func TestProblemInfrastructureIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var activeRevision string
+	if err = db.QueryRowContext(ctx, `SELECT active_judge_revision FROM problems WHERE id = ?`, created.ID).Scan(&activeRevision); err != nil {
+		t.Fatal(err)
+	}
+	if len(activeRevision) != 26 {
+		t.Fatalf("active judge revision = %q", activeRevision)
+	}
+	revisionPrefix := fmt.Sprintf("problem-%d/judge-revisions/%s/", created.ID, activeRevision)
+	t.Cleanup(func() {
+		for object := range objects.client.ListObjects(context.Background(), objects.bucket, minio.ListObjectsOptions{Prefix: fmt.Sprintf("problem-%d/judge-revisions/", created.ID), Recursive: true}) {
+			if object.Err == nil {
+				_ = objects.Delete(context.Background(), object.Key)
+			}
+		}
+	})
+	manifestBytes, err := objects.Get(ctx, revisionPrefix+"manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		ProblemID     int64  `json:"problem_id"`
+		JudgeRevision string `json:"judge_revision"`
+		Testcases     []struct {
+			CaseNo int32 `json:"case_no"`
+		} `json:"testcases"`
+	}
+	if err = json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.ProblemID != created.ID || manifest.JudgeRevision != activeRevision || len(manifest.Testcases) != 1 || manifest.Testcases[0].CaseNo != 1 {
+		t.Fatalf("unexpected manifest: %+v", manifest)
+	}
+	profile, err := usecase.GetJudgeProfile(ctx, created.ID)
+	if err != nil || profile.ActiveJudgeRevision != activeRevision {
+		t.Fatalf("GetJudgeProfile() = %+v, %v", profile, err)
+	}
 	t.Cleanup(func() {
 		_ = objects.Delete(context.Background(), testcase.InputObjectKey)
 		_ = objects.Delete(context.Background(), testcase.OutputObjectKey)
 	})
-	if _, err = store.ArchiveTestcase(ctx, created.ID, testcase.ID); err != nil {
+	testcase2, err := usecase.AddTestcase(ctx, admin, created.ID, 2, []byte("2 3\n"), []byte("5\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = objects.Delete(context.Background(), testcase2.InputObjectKey)
+		_ = objects.Delete(context.Background(), testcase2.OutputObjectKey)
+	})
+	if _, err = usecase.ArchiveTestcase(ctx, admin, created.ID, testcase.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = objects.client.StatObject(ctx, objects.bucket, testcase.InputObjectKey, minio.StatObjectOptions{}); err != nil {
@@ -86,14 +127,31 @@ func TestProblemInfrastructureIntegration(t *testing.T) {
 
 	failing := failingTestcaseRepository{StoreSet: store}
 	failingUsecase := biz.NewProblemUsecaseWithStore(store, failing, objects, store)
-	if _, err = failingUsecase.AddTestcase(ctx, admin, created.ID, 2, []byte("in"), []byte("out")); err == nil {
+	var revisionBeforeFailure string
+	if err = db.QueryRowContext(ctx, `SELECT active_judge_revision FROM problems WHERE id = ?`, created.ID).Scan(&revisionBeforeFailure); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = failingUsecase.AddTestcase(ctx, admin, created.ID, 3, []byte("in"), []byte("out")); err == nil {
 		t.Fatal("expected metadata failure")
 	}
-	for object := range objects.client.ListObjects(ctx, objects.bucket, minio.ListObjectsOptions{Prefix: fmt.Sprintf("problem-%d/testcases/2/", created.ID), Recursive: true}) {
+	var revisionAfterFailure string
+	if err = db.QueryRowContext(ctx, `SELECT active_judge_revision FROM problems WHERE id = ?`, created.ID).Scan(&revisionAfterFailure); err != nil {
+		t.Fatal(err)
+	}
+	if revisionAfterFailure != revisionBeforeFailure {
+		t.Fatalf("failed commit changed active revision from %s to %s", revisionBeforeFailure, revisionAfterFailure)
+	}
+	for object := range objects.client.ListObjects(ctx, objects.bucket, minio.ListObjectsOptions{Prefix: fmt.Sprintf("problem-%d/testcases/3/", created.ID), Recursive: true}) {
 		if object.Err != nil {
 			t.Fatal(object.Err)
 		}
 		t.Fatalf("compensation left object %s", object.Key)
+	}
+	if _, err = store.Archive(ctx, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = usecase.GetJudgeProfile(ctx, created.ID); !problemv1.IsProblemErrorReasonInvalidStatus(err) {
+		t.Fatalf("archived profile error = %v", err)
 	}
 
 	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
@@ -123,6 +181,6 @@ func envOr(name, fallback string) string {
 
 type failingTestcaseRepository struct{ *StoreSet }
 
-func (failingTestcaseRepository) AddTestcase(context.Context, biz.Testcase) (biz.Testcase, error) {
+func (failingTestcaseRepository) CommitAddedTestcase(context.Context, biz.Testcase, string, string) (biz.Testcase, error) {
 	return biz.Testcase{}, errors.New("forced metadata failure")
 }

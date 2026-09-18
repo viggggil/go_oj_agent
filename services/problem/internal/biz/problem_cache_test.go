@@ -42,7 +42,7 @@ func TestUpdateProblemInvalidatesCache(t *testing.T) {
 
 func TestCreateProblemFailureInvalidatesPopulatedCache(t *testing.T) {
 	cache := &fakeProblemCache{}
-	problems := &fakeProblemRepository{created: Problem{ID: 5}}
+	problems := &fakeProblemRepository{created: Problem{ID: 5, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL}}
 	testcases := &fakeTestcaseRepository{err: errors.New("db failed")}
 	input := validCreateInput()
 	input.Testcases = []TestcaseContent{{CaseNo: 1, Input: []byte("in"), Output: []byte("out")}}

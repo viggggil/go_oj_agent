@@ -21,6 +21,7 @@ services:
       - ../../migrations/problem/000002_create_tags.up.sql:/docker-entrypoint-initdb.d/202_create_tags.sql:ro
       - ../../migrations/problem/000003_create_problem_tags.up.sql:/docker-entrypoint-initdb.d/203_create_problem_tags.sql:ro
       - ../../migrations/problem/000004_create_testcases.up.sql:/docker-entrypoint-initdb.d/204_create_testcases.sql:ro
+      - ../../migrations/problem/000005_add_active_judge_revision.up.sql:/docker-entrypoint-initdb.d/205_add_active_judge_revision.sql:ro
       - ../../migrations/submission/000001_create_submissions.up.sql:/docker-entrypoint-initdb.d/301_create_submissions.sql:ro
       - ../../migrations/submission/000002_create_submission_case_results.up.sql:/docker-entrypoint-initdb.d/302_create_submission_case_results.sql:ro
       - ../../migrations/submission/000003_create_outbox_events.up.sql:/docker-entrypoint-initdb.d/303_create_outbox_events.sql:ro
@@ -94,6 +95,8 @@ services:
         test -f /keys/user-public.pem || openssl rsa -in /keys/user-private.pem -pubout -out /keys/user-public.pem >/dev/null 2>&1 &&
         test -f /keys/gateway-private.pem || openssl genrsa -out /keys/gateway-private.pem 2048 >/dev/null 2>&1 &&
         test -f /keys/gateway-public.pem || openssl rsa -in /keys/gateway-private.pem -pubout -out /keys/gateway-public.pem >/dev/null 2>&1 &&
+        test -f /keys/judge-private.pem || openssl genrsa -out /keys/judge-private.pem 2048 >/dev/null 2>&1 &&
+        test -f /keys/judge-public.pem || openssl rsa -in /keys/judge-private.pem -pubout -out /keys/judge-public.pem >/dev/null 2>&1 &&
         chmod 644 /keys/*.pem
     volumes:
       - auth-keys:/keys

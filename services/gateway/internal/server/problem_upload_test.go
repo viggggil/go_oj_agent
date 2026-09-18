@@ -146,3 +146,6 @@ func (*fakeProblemClient) ArchiveTestcase(context.Context, *problemv1.ArchiveTes
 func (*fakeProblemClient) ListProblemTestcases(context.Context, *problemv1.ListProblemTestcasesRequest, ...grpc.CallOption) (*problemv1.ListProblemTestcasesResponse, error) {
 	return &problemv1.ListProblemTestcasesResponse{}, nil
 }
+func (*fakeProblemClient) GetJudgeProfile(context.Context, *problemv1.GetJudgeProfileRequest, ...grpc.CallOption) (*problemv1.GetJudgeProfileResponse, error) {
+	return &problemv1.GetJudgeProfileResponse{}, nil
+}

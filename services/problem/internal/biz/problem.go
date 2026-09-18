@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
@@ -12,23 +13,53 @@ import (
 const RoleAdmin = "admin"
 
 type Problem struct {
-	ID            int64
-	Title         string
-	Slug          string
-	Description   string
-	Difficulty    problemv1.ProblemDifficulty
-	TimeLimitMs   int32
-	MemoryLimitKb int32
-	Status        problemv1.ProblemStatus
-	CreatedBy     int64
-	Tags          []Tag
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                  int64
+	Title               string
+	Slug                string
+	Description         string
+	Difficulty          problemv1.ProblemDifficulty
+	TimeLimitMs         int32
+	MemoryLimitKb       int32
+	ActiveJudgeRevision string
+	Status              problemv1.ProblemStatus
+	CreatedBy           int64
+	Tags                []Tag
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type Tag struct {
 	ID   int64
 	Name string
+}
+
+func (uc *ProblemUsecase) GetJudgeProfile(ctx context.Context, problemID int64) (Problem, error) {
+	if uc == nil || uc.repo == nil || uc.testcases == nil {
+		return Problem{}, ErrorInternal("judge profile dependencies are not configured")
+	}
+	if problemID <= 0 {
+		return Problem{}, ErrorInvalidArgument("invalid problem id")
+	}
+	unlock := uc.lockProblem(problemID)
+	defer unlock()
+	problem, err := uc.repo.FindByID(ctx, problemID)
+	if err != nil {
+		return Problem{}, err
+	}
+	if problem.Status != problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL {
+		return Problem{}, ErrorInvalidStatus("archived problem cannot be judged")
+	}
+	if problem.ActiveJudgeRevision == "" {
+		return Problem{}, ErrorInvalidStatus("problem has no published judge revision")
+	}
+	items, err := uc.testcases.ListTestcases(ctx, problemID, false)
+	if err != nil {
+		return Problem{}, err
+	}
+	if len(items) == 0 {
+		return Problem{}, ErrorInvalidStatus("problem has no active testcases")
+	}
+	return problem, nil
 }
 
 type CreateProblemInput struct {
@@ -159,11 +190,13 @@ func (uc *ProblemUsecase) Get(ctx context.Context, requestContext *commonv1.Requ
 }
 
 type ProblemUsecase struct {
-	repo        ProblemRepository
-	testcases   TestcaseRepository
-	objects     ObjectStore
-	compensator ProblemCreationCompensator
-	cache       ProblemCache
+	repo            ProblemRepository
+	testcases       TestcaseRepository
+	testcaseCommits TestcaseChangeCommitter
+	objects         ObjectStore
+	compensator     ProblemCreationCompensator
+	cache           ProblemCache
+	problemLocks    sync.Map
 }
 
 func NewProblemUsecase(repo ProblemRepository) *ProblemUsecase {
@@ -177,7 +210,15 @@ type ProblemCache interface {
 }
 
 func NewProblemUsecaseWithDependencies(problems ProblemRepository, testcases TestcaseRepository, objects ObjectStore, compensator ProblemCreationCompensator, cache ProblemCache) *ProblemUsecase {
-	return &ProblemUsecase{repo: problems, testcases: testcases, objects: objects, compensator: compensator, cache: cache}
+	testcaseCommits, _ := testcases.(TestcaseChangeCommitter)
+	return &ProblemUsecase{repo: problems, testcases: testcases, testcaseCommits: testcaseCommits, objects: objects, compensator: compensator, cache: cache}
+}
+
+func (uc *ProblemUsecase) lockProblem(problemID int64) func() {
+	value, _ := uc.problemLocks.LoadOrStore(problemID, &sync.Mutex{})
+	mu := value.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 func requireAdmin(ctx *commonv1.RequestContext) error {
@@ -234,7 +275,7 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	}
 	stored := make([]Testcase, 0, len(input.Testcases))
 	for _, testcase := range input.Testcases {
-		item, addErr := uc.addTestcaseToProblem(ctx, created.ID, testcase.CaseNo, testcase.Input, testcase.Output)
+		item, addErr := uc.addTestcaseToProblem(ctx, created, testcase.CaseNo, testcase.Input, testcase.Output)
 		if addErr != nil {
 			if uc.cache != nil {
 				_ = uc.cache.Delete(ctx, created.ID)
@@ -249,6 +290,10 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 			return Problem{}, addErr
 		}
 		stored = append(stored, item)
+		created, err = uc.repo.FindByID(ctx, created.ID)
+		if err != nil {
+			return Problem{}, err
+		}
 	}
 	return created, nil
 }

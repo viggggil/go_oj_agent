@@ -21,6 +21,14 @@ message InternalAuthProto {
   string subject = 5;
   string max_token_ttl = 6;
   string clock_skew = 7;
+  repeated InternalCallerProto additional_callers = 8;
+}
+
+message InternalCallerProto {
+  string public_key_file = 1;
+  string key_id = 2;
+  string issuer = 3;
+  string subject = 4;
 }
 
 message ServiceProto {

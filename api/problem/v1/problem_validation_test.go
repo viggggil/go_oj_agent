@@ -73,3 +73,20 @@ func TestProblemRequestsValidate(t *testing.T) {
 		t.Fatal("expected unspecified difficulty to fail validation")
 	}
 }
+
+func TestJudgeProfileContractValidate(t *testing.T) {
+	if err := (&GetJudgeProfileRequest{ProblemId: 1}).Validate(); err != nil {
+		t.Fatalf("valid request rejected: %v", err)
+	}
+	if err := (&GetJudgeProfileRequest{}).Validate(); err == nil {
+		t.Fatal("expected missing problem id to fail validation")
+	}
+	profile := &JudgeProfile{ProblemId: 1, Status: ProblemStatus_PROBLEM_STATUS_NORMAL, TimeLimitMs: 1000, MemoryLimitKb: 65536, ActiveJudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6"}
+	if err := profile.Validate(); err != nil {
+		t.Fatalf("valid profile rejected: %v", err)
+	}
+	profile.ActiveJudgeRevision = "mutable"
+	if err := profile.Validate(); err == nil {
+		t.Fatal("expected invalid revision to fail validation")
+	}
+}

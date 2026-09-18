@@ -23,6 +23,10 @@ func ErrorPermissionDenied(format string, args ...interface{}) *kerrors.Error {
 	return problemv1.ErrorProblemErrorReasonPermissionDenied(format, args...)
 }
 
+func ErrorUnauthenticated(format string, args ...interface{}) *kerrors.Error {
+	return kerrors.Unauthorized("PROBLEM_UNAUTHENTICATED", fmt.Sprintf(format, args...))
+}
+
 func ErrorInvalidStatus(format string, args ...interface{}) *kerrors.Error {
 	return problemv1.ErrorProblemErrorReasonInvalidStatus(format, args...)
 }

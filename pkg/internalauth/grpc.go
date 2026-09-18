@@ -40,7 +40,7 @@ func UnaryClientInterceptor(signer *Signer, resolve ActorResolver) grpc.UnaryCli
 	}
 }
 
-func UnaryServerInterceptor(verifier *Verifier) grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(verifier TokenVerifier) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {

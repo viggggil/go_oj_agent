@@ -3278,3 +3278,428 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ListProblemTestcasesResponseValidationError{}
+
+// Validate checks the field values on JudgeProfile with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *JudgeProfile) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on JudgeProfile with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in JudgeProfileMultiError, or
+// nil if none found.
+func (m *JudgeProfile) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *JudgeProfile) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetProblemId() <= 0 {
+		err := JudgeProfileValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _JudgeProfile_Status_NotInLookup[m.GetStatus()]; ok {
+		err := JudgeProfileValidationError{
+			field:  "Status",
+			reason: "value must not be in list [PROBLEM_STATUS_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := ProblemStatus_name[int32(m.GetStatus())]; !ok {
+		err := JudgeProfileValidationError{
+			field:  "Status",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetTimeLimitMs() <= 0 {
+		err := JudgeProfileValidationError{
+			field:  "TimeLimitMs",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetMemoryLimitKb() <= 0 {
+		err := JudgeProfileValidationError{
+			field:  "MemoryLimitKb",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetActiveJudgeRevision()) != 26 {
+		err := JudgeProfileValidationError{
+			field:  "ActiveJudgeRevision",
+			reason: "value length must be 26 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+
+	}
+
+	if len(errors) > 0 {
+		return JudgeProfileMultiError(errors)
+	}
+
+	return nil
+}
+
+// JudgeProfileMultiError is an error wrapping multiple validation errors
+// returned by JudgeProfile.ValidateAll() if the designated constraints aren't met.
+type JudgeProfileMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m JudgeProfileMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m JudgeProfileMultiError) AllErrors() []error { return m }
+
+// JudgeProfileValidationError is the validation error returned by
+// JudgeProfile.Validate if the designated constraints aren't met.
+type JudgeProfileValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e JudgeProfileValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e JudgeProfileValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e JudgeProfileValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e JudgeProfileValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e JudgeProfileValidationError) ErrorName() string { return "JudgeProfileValidationError" }
+
+// Error satisfies the builtin error interface
+func (e JudgeProfileValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sJudgeProfile.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = JudgeProfileValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = JudgeProfileValidationError{}
+
+var _JudgeProfile_Status_NotInLookup = map[ProblemStatus]struct{}{
+	0: {},
+}
+
+// Validate checks the field values on GetJudgeProfileRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetJudgeProfileRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetJudgeProfileRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetJudgeProfileRequestMultiError, or nil if none found.
+func (m *GetJudgeProfileRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetJudgeProfileRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetProblemId() <= 0 {
+		err := GetJudgeProfileRequestValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return GetJudgeProfileRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetJudgeProfileRequestMultiError is an error wrapping multiple validation
+// errors returned by GetJudgeProfileRequest.ValidateAll() if the designated
+// constraints aren't met.
+type GetJudgeProfileRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetJudgeProfileRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetJudgeProfileRequestMultiError) AllErrors() []error { return m }
+
+// GetJudgeProfileRequestValidationError is the validation error returned by
+// GetJudgeProfileRequest.Validate if the designated constraints aren't met.
+type GetJudgeProfileRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetJudgeProfileRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetJudgeProfileRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetJudgeProfileRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetJudgeProfileRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetJudgeProfileRequestValidationError) ErrorName() string {
+	return "GetJudgeProfileRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetJudgeProfileRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetJudgeProfileRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetJudgeProfileRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetJudgeProfileRequestValidationError{}
+
+// Validate checks the field values on GetJudgeProfileResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetJudgeProfileResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetJudgeProfileResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetJudgeProfileResponseMultiError, or nil if none found.
+func (m *GetJudgeProfileResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetJudgeProfileResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetProfile() == nil {
+		err := GetJudgeProfileResponseValidationError{
+			field:  "Profile",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetProfile()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GetJudgeProfileResponseValidationError{
+					field:  "Profile",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GetJudgeProfileResponseValidationError{
+					field:  "Profile",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetProfile()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GetJudgeProfileResponseValidationError{
+				field:  "Profile",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GetJudgeProfileResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetJudgeProfileResponseMultiError is an error wrapping multiple validation
+// errors returned by GetJudgeProfileResponse.ValidateAll() if the designated
+// constraints aren't met.
+type GetJudgeProfileResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetJudgeProfileResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetJudgeProfileResponseMultiError) AllErrors() []error { return m }
+
+// GetJudgeProfileResponseValidationError is the validation error returned by
+// GetJudgeProfileResponse.Validate if the designated constraints aren't met.
+type GetJudgeProfileResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetJudgeProfileResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetJudgeProfileResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetJudgeProfileResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetJudgeProfileResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetJudgeProfileResponseValidationError) ErrorName() string {
+	return "GetJudgeProfileResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetJudgeProfileResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetJudgeProfileResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetJudgeProfileResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetJudgeProfileResponseValidationError{}
