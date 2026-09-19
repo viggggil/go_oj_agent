@@ -34,7 +34,7 @@ type uploadedTestcase struct {
 	OutputSHA256    string `json:"output_sha256"`
 	InputSizeBytes  int64  `json:"input_size_bytes"`
 	OutputSizeBytes int64  `json:"output_size_bytes"`
-	Status          string `json:"status"`
+	Status          int32  `json:"status"`
 }
 
 type judgeManifest struct {
@@ -240,7 +240,7 @@ func problemMultipartRequest(t *testing.T, baseURL string, problemID int64, toke
 
 func assertUploadedTestcase(t *testing.T, testcase uploadedTestcase, problemID int64, caseNo int32, input, output []byte) {
 	t.Helper()
-	if testcase.ID <= 0 || testcase.ProblemID != problemID || testcase.CaseNo != caseNo || testcase.Status != "TESTCASE_STATUS_ACTIVE" {
+	if testcase.ID <= 0 || testcase.ProblemID != problemID || testcase.CaseNo != caseNo || testcase.Status != 1 {
 		t.Fatalf("unexpected testcase metadata: %+v", testcase)
 	}
 	inputHash, outputHash := sha256.Sum256(input), sha256.Sum256(output)
