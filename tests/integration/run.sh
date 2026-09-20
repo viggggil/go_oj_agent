@@ -5,7 +5,6 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose_file="${repository_root}/deploy/compose/compose.yaml"
 project_name="go-oj-auth-integration"
-test_artifacts_dir="$(mktemp -d)"
 
 compose() {
   docker compose --project-name "${project_name}" -f "${compose_file}" "$@"
@@ -13,12 +12,14 @@ compose() {
 
 cleanup() {
   compose down --volumes --remove-orphans
-  rm -rf -- "${test_artifacts_dir}"
+  rm -rf -- "${test_artifacts_dir:-}"
 }
 
 trap cleanup EXIT
 
 cleanup
+
+test_artifacts_dir="$(mktemp -d)"
 
 export MYSQL_PORT="${AUTH_TEST_MYSQL_PORT:-13306}"
 export REDIS_PORT="${AUTH_TEST_REDIS_PORT:-16379}"
