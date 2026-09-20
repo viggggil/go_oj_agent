@@ -1,0 +1,36 @@
+service:
+  name: judge-service
+server:
+  grpc:
+    address: "${SERVER_GRPC_ADDRESS}"
+data:
+  mysql_dsn: "${DATA_MYSQL_DSN}"
+storage:
+  minio:
+    endpoint: "${STORAGE_MINIO_ENDPOINT}"
+    access_key: "${STORAGE_MINIO_ACCESS_KEY}"
+    secret_key: "${STORAGE_MINIO_SECRET_KEY}"
+    source_bucket: "submission-source"
+    problem_bucket: "problem-data"
+    use_ssl: false
+registry:
+  consul:
+    enabled: false
+internal_auth:
+  public_key_file: "/run/auth-keys/gateway-public.pem"
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
+  audience: "judge-service"
+  subject: "gateway-service"
+  max_token_ttl: "60s"
+  clock_skew: "5s"
+clients:
+  problem:
+    endpoint: "problem-service:9002"
+    timeout: "3s"
+    private_key_file: "/run/auth-keys/judge-private.pem"
+    key_id: "judge-internal-2026-09"
+    issuer: "go-oj-judge"
+    audience: "problem-service"
+    subject: "judge-service"
+    token_ttl: "30s"

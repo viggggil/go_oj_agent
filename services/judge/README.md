@@ -8,9 +8,10 @@ consumer remain separate internal modules but are not separate deployments.
 
 The service currently provides the submission domain and state machine, atomic
 MySQL submission/Outbox/idempotency repositories, immutable MinIO source
-storage, and an authenticated Problem Service Judge Profile client. The five
-Submission RPC handlers, RabbitMQ Relay/Retry/DLQ, and result consumers are
-implemented in later vertical slices.
+storage, an authenticated Problem Service Judge Profile client, and the
+`CreateSubmission`, `GetSubmission`, and `ListSubmissions` RPCs. Judge result,
+rejudge, RabbitMQ Relay/Retry/DLQ, and result consumers are implemented in later
+vertical slices.
 
 One `submission_id` identifies one logical judge run. Infrastructure retries
 reuse that ID. An administrator rejudge invalidates the old submission and
@@ -22,6 +23,11 @@ immutable `sources/{ulid}/source.{ext}` key. MySQL stores the object key,
 SHA-256, size, and the active Problem revision pinned when the submission is
 created. Rejudge reuses the source object and atomically invalidates the old
 submission before creating the replacement.
+
+Submission RPCs accept identity only from the verified internal RS256
+principal. Owners can read and list their own submissions; administrators can
+read other submissions and select a `user_id` filter. Lists use stable
+`created_at DESC, id DESC` ordering and cap `page_size` at 100.
 
 ```bash
 go run ./services/judge/cmd/judge-service -conf services/judge/configs/config.yaml
