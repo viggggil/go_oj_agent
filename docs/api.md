@@ -446,7 +446,9 @@ Judge Service 接收 `source_code` 后获取题目的 active `judge_revision`，
 
 返回提交元数据与当前判题结果。
 
-只有提交拥有者、授权角色或业务规则允许的用户可以读取私有源码。
+只有提交拥有者、管理员或明确授权的可信内部调用方可以读取；响应不返回源码正文、
+源码对象 key 或 MinIO 凭据。对普通用户，资源不存在与跨用户读取统一返回 NotFound，
+避免泄露 Submission 是否存在。
 
 ### GET `/api/v1/submissions`
 
@@ -751,14 +753,25 @@ syntax = "proto3";
 package submission.v1;
 
 service SubmissionService {
-  rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionReply);
-  rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionReply);
-  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsReply);
-  rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultReply);
+  rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse);
+  rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
+  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
+  rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse);
   rpc RejudgeSubmission(RejudgeSubmissionRequest)
-      returns (RejudgeSubmissionReply);
+      returns (RejudgeSubmissionResponse);
 }
 ```
+
+当前 `CreateSubmission`、`GetSubmission` 和 `ListSubmissions` 已在
+judge-service 中实现。调用身份只来自经过 RS256 校验的内部 Principal；请求体不携带
+也不能覆盖用户身份。Create 会在上传 MinIO 源码前检查已完成的幂等记录，并在一个
+MySQL 事务内提交 Submission、`judge.requested` Outbox 和幂等响应。Get 对非 owner
+返回与不存在资源相同的 NotFound；List 对普通用户强制使用当前 `actor_id`，管理员
+才可指定其他 `user_id`。列表按 `created_at DESC, id DESC` 排序，`page_size` 上限为
+100。
+
+本阶段只开放内部 gRPC；上文 `/api/v1/submissions` REST 路由仍由后续 Gateway
+接入实现。
 
 Agent Tool 映射：
 
