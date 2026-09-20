@@ -32,7 +32,11 @@ export ACCESS_TOKEN_TTL="2s"
 export REFRESH_TOKEN_TTL="5m"
 export AUTH_ACCESS_TOKEN_KEY="integration-test-access-token-key"
 
-compose up --build --detach --wait
+if ! compose up --build --detach --wait; then
+  echo "===== integration compose up failed; dumping service logs ====="
+  compose logs --no-color || true
+  exit 1
+fi
 compose cp gateway-service:/run/auth-keys/gateway-private.pem "${test_artifacts_dir}/gateway-private.pem"
 
 cd "${repository_root}"
