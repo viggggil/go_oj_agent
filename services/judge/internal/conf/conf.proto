@@ -12,6 +12,22 @@ message Bootstrap {
   MessagingProto messaging = 5;
   RegistryProto registry = 6;
   InternalAuthProto internal_auth = 7;
+  ClientsProto clients = 8;
+}
+
+message ClientsProto {
+  ProblemClientProto problem = 1;
+}
+
+message ProblemClientProto {
+  string endpoint = 1;
+  string timeout = 2;
+  string private_key_file = 3;
+  string key_id = 4;
+  string issuer = 5;
+  string audience = 6;
+  string subject = 7;
+  string token_ttl = 8;
 }
 
 message ServiceProto {

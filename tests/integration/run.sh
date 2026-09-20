@@ -38,4 +38,4 @@ PROBLEM_TEST_USER_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tc
 SUBMISSION_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_submission?parseTime=true" \
 PROBLEM_TEST_REDIS_ADDR="127.0.0.1:${REDIS_PORT}" \
 PROBLEM_TEST_MINIO_ENDPOINT="127.0.0.1:${MINIO_API_PORT}" \
-  go test -count=1 -v ./tests/integration
+  go test -count=1 -v ./services/judge/internal/data ./tests/integration

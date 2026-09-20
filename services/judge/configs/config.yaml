@@ -41,3 +41,13 @@ internal_auth:
   subject: "gateway-service"
   max_token_ttl: "30s"
   clock_skew: "5s"
+clients:
+  problem:
+    endpoint: "127.0.0.1:9002"
+    timeout: "3s"
+    private_key_file: "/run/auth-keys/judge-private.pem"
+    key_id: "judge-internal-2026-09"
+    issuer: "go-oj-judge"
+    audience: "problem-service"
+    subject: "judge-service"
+    token_ttl: "30s"
