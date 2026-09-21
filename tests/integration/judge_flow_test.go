@@ -97,6 +97,24 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 		t.Fatalf("admin GetSubmission() error = %v", err)
 	}
 
+	judgeResult, err := client.GetJudgeResult(userContext, &submissionv1.GetJudgeResultRequest{SubmissionId: created.GetSubmissionId()})
+	if err != nil {
+		t.Fatalf("owner GetJudgeResult() error = %v", err)
+	}
+	if judgeResult.GetResult().GetSubmissionId() != created.GetSubmissionId() ||
+		judgeResult.GetResult().GetStatus() != submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED ||
+		judgeResult.GetResult().GetVerdict() != submissionv1.JudgeVerdict_JUDGE_VERDICT_UNSPECIFIED ||
+		len(judgeResult.GetResult().GetCaseResults()) != 0 ||
+		judgeResult.GetResult().GetJudgeRevision() != got.GetSubmission().GetJudgeRevision() {
+		t.Fatalf("owner GetJudgeResult() = %+v", judgeResult.GetResult())
+	}
+	if _, err = client.GetJudgeResult(otherContext, &submissionv1.GetJudgeResultRequest{SubmissionId: created.GetSubmissionId()}); status.Code(err) != codes.NotFound {
+		t.Fatalf("cross-user GetJudgeResult status = %v, want %v", status.Code(err), codes.NotFound)
+	}
+	if _, err = client.GetJudgeResult(adminContext, &submissionv1.GetJudgeResultRequest{SubmissionId: created.GetSubmissionId()}); err != nil {
+		t.Fatalf("admin GetJudgeResult() error = %v", err)
+	}
+
 	listed, err := client.ListSubmissions(userContext, &submissionv1.ListSubmissionsRequest{
 		Page: &commonv1.PageRequest{Page: 1, PageSize: 1000}, ProblemId: problemID,
 		Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED, Language: "go",
@@ -136,6 +154,73 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	}
 	assertSubmissionSourceObject(t, minioEndpoint, objectKey, source)
 	assertSubmissionAtomicRecords(t, submissionDB, userID, created.GetSubmissionId(), idempotencyKey)
+
+	rejudgeKey := uuid.NewString()
+	rejudged, err := client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{
+		SubmissionId: created.GetSubmissionId(), IdempotencyKey: rejudgeKey,
+	})
+	if err != nil {
+		t.Fatalf("RejudgeSubmission() error = %v", err)
+	}
+	newSubmission := rejudged.GetSubmission()
+	if rejudged.GetInvalidatedSubmissionId() != created.GetSubmissionId() || newSubmission == nil ||
+		newSubmission.GetId() <= 0 || newSubmission.GetId() == created.GetSubmissionId() ||
+		newSubmission.GetUserId() != userID || newSubmission.GetProblemId() != problemID ||
+		newSubmission.GetLanguage() != "go" || newSubmission.GetStatus() != submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED ||
+		newSubmission.GetJudgeRevision() != problemRevision(t, problemDB, problemID) {
+		t.Fatalf("RejudgeSubmission() = %+v", rejudged)
+	}
+	replayRejudge, err := client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{
+		SubmissionId: created.GetSubmissionId(), IdempotencyKey: rejudgeKey,
+	})
+	if err != nil || replayRejudge.GetInvalidatedSubmissionId() != created.GetSubmissionId() || replayRejudge.GetSubmission().GetId() != newSubmission.GetId() {
+		t.Fatalf("RejudgeSubmission() replay = %+v, %v", replayRejudge, err)
+	}
+	if _, err = client.RejudgeSubmission(userContext, &submissionv1.RejudgeSubmissionRequest{
+		SubmissionId: created.GetSubmissionId(), IdempotencyKey: uuid.NewString(),
+	}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("ordinary user RejudgeSubmission status = %v, want %v", status.Code(err), codes.PermissionDenied)
+	}
+	if _, err = client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{
+		SubmissionId: created.GetSubmissionId(), IdempotencyKey: uuid.NewString(),
+	}); status.Code(err) != codes.Aborted {
+		t.Fatalf("second RejudgeSubmission status = %v, want %v", status.Code(err), codes.Aborted)
+	}
+
+	var oldStatus, replacementStatus, replacementKey, replacementHash string
+	var replacementSize int64
+	if err = submissionDB.QueryRowContext(t.Context(), `SELECT status FROM submissions WHERE id = ?`, created.GetSubmissionId()).Scan(&oldStatus); err != nil {
+		t.Fatalf("query invalidated submission: %v", err)
+	}
+	if err = submissionDB.QueryRowContext(t.Context(), `
+		SELECT status, source_object_key, source_sha256, source_size_bytes
+		FROM submissions WHERE id = ?
+	`, newSubmission.GetId()).Scan(&replacementStatus, &replacementKey, &replacementHash, &replacementSize); err != nil {
+		t.Fatalf("query replacement submission: %v", err)
+	}
+	if oldStatus != "INVALIDATED" || replacementStatus != "QUEUED" || replacementKey != objectKey || replacementHash != sourceSHA256 || replacementSize != sourceSize {
+		t.Fatalf("rejudge source/status old=%q replacement=%q key=%q hash=%q size=%d", oldStatus, replacementStatus, replacementKey, replacementHash, replacementSize)
+	}
+	var invalidatedEvents, requestedEvents int
+	if err = submissionDB.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM outbox_events WHERE aggregate_id = ? AND event_type = 'submission.invalidated'`, created.GetSubmissionId()).Scan(&invalidatedEvents); err != nil {
+		t.Fatalf("query invalidated outbox: %v", err)
+	}
+	if err = submissionDB.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM outbox_events WHERE aggregate_id = ? AND event_type = 'judge.requested'`, newSubmission.GetId()).Scan(&requestedEvents); err != nil {
+		t.Fatalf("query replacement outbox: %v", err)
+	}
+	if invalidatedEvents != 1 || requestedEvents != 1 {
+		t.Fatalf("rejudge outbox invalidated=%d requested=%d", invalidatedEvents, requestedEvents)
+	}
+	var rejudgeIdempotencyCount int
+	if err = submissionDB.QueryRowContext(t.Context(), `
+		SELECT COUNT(*) FROM idempotency_requests
+		WHERE actor_id = ? AND operation = 'RejudgeSubmission' AND idempotency_key = ? AND response IS NOT NULL
+	`, adminID, rejudgeKey).Scan(&rejudgeIdempotencyCount); err != nil {
+		t.Fatalf("query rejudge idempotency: %v", err)
+	}
+	if rejudgeIdempotencyCount != 1 {
+		t.Fatalf("rejudge idempotency records = %d, want 1", rejudgeIdempotencyCount)
+	}
 }
 
 func registerJudgeIntegrationUser(t *testing.T, api apiClient, userDB *sql.DB, prefix string, admin bool) (int64, string) {

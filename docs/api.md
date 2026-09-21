@@ -762,13 +762,16 @@ service SubmissionService {
 }
 ```
 
-当前 `CreateSubmission`、`GetSubmission` 和 `ListSubmissions` 已在
-judge-service 中实现。调用身份只来自经过 RS256 校验的内部 Principal；请求体不携带
-也不能覆盖用户身份。Create 会在上传 MinIO 源码前检查已完成的幂等记录，并在一个
-MySQL 事务内提交 Submission、`judge.requested` Outbox 和幂等响应。Get 对非 owner
-返回与不存在资源相同的 NotFound；List 对普通用户强制使用当前 `actor_id`，管理员
-才可指定其他 `user_id`。列表按 `created_at DESC, id DESC` 排序，`page_size` 上限为
-100。
+当前五个 Submission RPC 均已在 judge-service 中实现。调用身份只来自经过 RS256
+校验的内部 Principal；请求体不携带也不能覆盖用户身份。Create 会在上传 MinIO
+源码前检查已完成的幂等记录，并在一个 MySQL 事务内提交 Submission、
+`judge.requested` Outbox 和幂等响应。Get 和 GetJudgeResult 对非 owner 返回与不存在
+资源相同的 NotFound；List 对普通用户强制使用当前 `actor_id`，管理员才可指定其他
+`user_id`。列表按 `created_at DESC, id DESC` 排序，`page_size` 上限为 100。
+GetJudgeResult 在判题尚未完成时返回当前状态和空的 Case Results。Rejudge 仅允许
+管理员调用，在一个事务内作废旧 Submission、写入 `submission.invalidated`，创建
+复用源码对象且固定当前 revision 的新 QUEUED Submission，并写入新的
+`judge.requested` Outbox；相同幂等键会重放首次响应。
 
 本阶段只开放内部 gRPC；上文 `/api/v1/submissions` REST 路由仍由后续 Gateway
 接入实现。

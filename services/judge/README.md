@@ -8,10 +8,10 @@ consumer remain separate internal modules but are not separate deployments.
 
 The service currently provides the submission domain and state machine, atomic
 MySQL submission/Outbox/idempotency repositories, immutable MinIO source
-storage, an authenticated Problem Service Judge Profile client, and the
-`CreateSubmission`, `GetSubmission`, and `ListSubmissions` RPCs. Judge result,
-rejudge, RabbitMQ Relay/Retry/DLQ, and result consumers are implemented in later
-vertical slices.
+storage, an authenticated Problem Service Judge Profile client, and all five
+submission RPCs: `CreateSubmission`, `GetSubmission`, `ListSubmissions`,
+`GetJudgeResult`, and `RejudgeSubmission`. RabbitMQ Relay/Retry/DLQ and result
+consumers are implemented in later vertical slices.
 
 One `submission_id` identifies one logical judge run. Infrastructure retries
 reuse that ID. An administrator rejudge invalidates the old submission and

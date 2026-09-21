@@ -185,6 +185,12 @@ type CreateSubmissionInput struct {
 	IdempotencyKey string
 }
 
+type RejudgeSubmissionInput struct {
+	Actor          Actor
+	SubmissionID   int64
+	IdempotencyKey string
+}
+
 func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionInput) (CreateSubmissionResult, error) {
 	if err := requireActor(input.Actor); err != nil {
 		return CreateSubmissionResult{}, err
@@ -289,6 +295,77 @@ func (uc *SubmissionUsecase) List(ctx context.Context, actor Actor, filter ListF
 	return uc.repository.List(ctx, filter.Normalized())
 }
 
+func (uc *SubmissionUsecase) GetJudgeResult(ctx context.Context, actor Actor, submissionID int64) (JudgeResult, error) {
+	if err := requireActor(actor); err != nil {
+		return JudgeResult{}, err
+	}
+	if uc == nil || uc.repository == nil {
+		return JudgeResult{}, ErrorInternal("submission repository is not configured")
+	}
+	if submissionID <= 0 {
+		return JudgeResult{}, ErrorInvalidArgument("invalid submission id")
+	}
+	result, err := uc.repository.GetJudgeResult(ctx, submissionID)
+	if err != nil {
+		return JudgeResult{}, err
+	}
+	if result.Submission.UserID != actor.ID && !actorIsAdmin(actor) {
+		return JudgeResult{}, ErrorSubmissionNotFound()
+	}
+	return result, nil
+}
+
+func (uc *SubmissionUsecase) Rejudge(ctx context.Context, input RejudgeSubmissionInput) (RejudgeSubmissionResult, error) {
+	if err := requireActor(input.Actor); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if !actorIsAdmin(input.Actor) {
+		return RejudgeSubmissionResult{}, ErrorPermissionDenied("admin role required")
+	}
+	if uc == nil || uc.repository == nil || uc.problems == nil {
+		return RejudgeSubmissionResult{}, ErrorInternal("rejudge dependencies are not configured")
+	}
+	if input.SubmissionID <= 0 {
+		return RejudgeSubmissionResult{}, ErrorInvalidArgument("invalid submission id")
+	}
+	now := uc.currentTime()
+	idempotency := IdempotencyRequest{
+		ActorID:     input.Actor.ID,
+		Operation:   OperationRejudgeSubmission,
+		Key:         input.IdempotencyKey,
+		RequestHash: rejudgeRequestHash(input.SubmissionID),
+		ExpiresAt:   now.Add(IdempotencyTTL),
+	}
+	if err := ValidateIdempotency(idempotency, OperationRejudgeSubmission, now); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if result, found, err := uc.findRejudgeReplay(ctx, idempotency); err != nil || found {
+		return result, err
+	}
+	old, err := uc.repository.FindByID(ctx, input.SubmissionID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if !CanInvalidate(old.Status) {
+		if old.Status == submissionv1.SubmissionStatus_SUBMISSION_STATUS_INVALIDATED {
+			return RejudgeSubmissionResult{}, ErrorConcurrentRejudge()
+		}
+		return RejudgeSubmissionResult{}, ErrorInvalidTransition("submission in %s cannot be rejudged", old.Status.String())
+	}
+	profile, err := uc.problems.GetJudgeProfile(ctx, old.ProblemID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if err := validateJudgeProfile(profile, old.ProblemID); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	return uc.repository.InvalidateAndRequeueWithOutboxAndIdempotency(ctx, RejudgeSubmissionCommand{
+		SubmissionID: input.SubmissionID, JudgeRevision: profile.JudgeRevision,
+		JudgeDeadlineAt: now.Add(JudgeQueueDeadline), Idempotency: idempotency,
+		InvalidatedOutboxEventID: uc.eventID(), RequestedOutboxEventID: uc.eventID(),
+	})
+}
+
 func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest) (CreateSubmissionResult, bool, error) {
 	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
 	if err != nil || !found {
@@ -344,6 +421,38 @@ func createRequestHash(problemID int64, language string, source []byte) string {
 	_, _ = digest.Write([]byte{0})
 	_, _ = digest.Write(source)
 	return hex.EncodeToString(digest.Sum(nil))
+}
+
+func rejudgeRequestHash(submissionID int64) string {
+	var encodedID [8]byte
+	binary.BigEndian.PutUint64(encodedID[:], uint64(submissionID))
+	digest := sha256.Sum256(encodedID[:])
+	return hex.EncodeToString(digest[:])
+}
+
+func (uc *SubmissionUsecase) findRejudgeReplay(ctx context.Context, request IdempotencyRequest) (RejudgeSubmissionResult, bool, error) {
+	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
+	if err != nil || !found {
+		return RejudgeSubmissionResult{}, false, err
+	}
+	if record.RequestHash != request.RequestHash {
+		return RejudgeSubmissionResult{}, true, ErrorIdempotencyConflict()
+	}
+	if len(record.Response) == 0 {
+		return RejudgeSubmissionResult{}, true, ErrorIdempotencyInProgress()
+	}
+	var stored struct {
+		InvalidatedSubmissionID int64 `json:"invalidated_submission_id"`
+		SubmissionID            int64 `json:"submission_id"`
+	}
+	if err := json.Unmarshal(record.Response, &stored); err != nil || stored.InvalidatedSubmissionID <= 0 || stored.SubmissionID <= 0 {
+		return RejudgeSubmissionResult{}, true, ErrorInternal("stored rejudge response is invalid")
+	}
+	submission, err := uc.repository.FindByID(ctx, stored.SubmissionID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, true, err
+	}
+	return RejudgeSubmissionResult{InvalidatedSubmissionID: stored.InvalidatedSubmissionID, Submission: submission, Replayed: true}, true, nil
 }
 
 func (uc *SubmissionUsecase) currentTime() time.Time {

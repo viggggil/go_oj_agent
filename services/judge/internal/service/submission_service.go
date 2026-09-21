@@ -95,6 +95,42 @@ func (s *SubmissionService) ListSubmissions(ctx context.Context, req *submission
 	}, nil
 }
 
+func (s *SubmissionService) GetJudgeResult(ctx context.Context, req *submissionv1.GetJudgeResultRequest) (*submissionv1.GetJudgeResultResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid get judge result request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	actor, err := actorFromPrincipal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.uc.GetJudgeResult(ctx, actor, req.GetSubmissionId())
+	if err != nil {
+		return nil, err
+	}
+	return &submissionv1.GetJudgeResultResponse{Result: toProtoJudgeResult(result)}, nil
+}
+
+func (s *SubmissionService) RejudgeSubmission(ctx context.Context, req *submissionv1.RejudgeSubmissionRequest) (*submissionv1.RejudgeSubmissionResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid rejudge submission request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	actor, err := actorFromPrincipal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.uc.Rejudge(ctx, biz.RejudgeSubmissionInput{Actor: actor, SubmissionID: req.GetSubmissionId(), IdempotencyKey: strings.ToLower(req.GetIdempotencyKey())})
+	if err != nil {
+		return nil, err
+	}
+	return &submissionv1.RejudgeSubmissionResponse{InvalidatedSubmissionId: result.InvalidatedSubmissionID, Submission: toProtoSubmission(result.Submission)}, nil
+}
+
 func actorFromPrincipal(ctx context.Context) (biz.Actor, error) {
 	principal, ok := internalauth.PrincipalFromContext(ctx)
 	if !ok || principal.ActorID <= 0 {
@@ -132,4 +168,35 @@ func toProtoSubmission(submission biz.Submission) *submissionv1.Submission {
 		result.InvalidatedAt = timestamppb.New(*submission.InvalidatedAt)
 	}
 	return result
+}
+
+func toProtoJudgeResult(result biz.JudgeResult) *submissionv1.JudgeResult {
+	response := &submissionv1.JudgeResult{
+		SubmissionId:      result.Submission.ID,
+		Status:            result.Submission.Status,
+		Verdict:           result.Submission.Verdict,
+		JudgeRevision:     result.Submission.JudgeRevision,
+		SystemErrorReason: result.Submission.SystemErrorReason,
+	}
+	if result.Submission.TimeMS != nil {
+		response.TimeMs = *result.Submission.TimeMS
+	}
+	if result.Submission.MemoryKB != nil {
+		response.MemoryKb = *result.Submission.MemoryKB
+	}
+	response.CaseResults = make([]*submissionv1.SubmissionCaseResult, 0, len(result.Cases))
+	for _, item := range result.Cases {
+		caseResult := &submissionv1.SubmissionCaseResult{
+			Id: item.ID, SubmissionId: item.SubmissionID, CaseNo: item.CaseNo,
+			Verdict: item.Verdict, Message: item.Message,
+		}
+		if item.TimeMS != nil {
+			caseResult.TimeMs = *item.TimeMS
+		}
+		if item.MemoryKB != nil {
+			caseResult.MemoryKb = *item.MemoryKB
+		}
+		response.CaseResults = append(response.CaseResults, caseResult)
+	}
+	return response
 }

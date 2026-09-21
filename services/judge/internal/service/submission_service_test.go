@@ -52,10 +52,33 @@ func TestSubmissionServiceRejectsInvalidRequestAndMissingPrincipal(t *testing.T)
 	}
 }
 
+func TestSubmissionServiceGetJudgeResultAndRejudge(t *testing.T) {
+	repository := &serviceRepository{
+		submission:    biz.Submission{ID: 12, UserID: 5, ProblemID: 7, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE, Verdict: submissionv1.JudgeVerdict_JUDGE_VERDICT_AC, JudgeRevision: serviceTestRevision},
+		judgeResult:   biz.JudgeResult{Submission: biz.Submission{ID: 12, UserID: 5, ProblemID: 7, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE, Verdict: submissionv1.JudgeVerdict_JUDGE_VERDICT_AC, JudgeRevision: serviceTestRevision}, Cases: []biz.CaseResult{{ID: 1, SubmissionID: 12, CaseNo: 2, Verdict: submissionv1.JudgeVerdict_JUDGE_VERDICT_AC}}},
+		rejudgeResult: biz.RejudgeSubmissionResult{InvalidatedSubmissionID: 12, Submission: biz.Submission{ID: 13, UserID: 5, ProblemID: 7, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED, JudgeRevision: serviceTestRevision}},
+	}
+	uc := biz.NewSubmissionUsecase(repository, serviceSourceStore{}, serviceProblemCatalog{})
+	service := NewSubmissionService(uc)
+	result, err := service.GetJudgeResult(internalServiceContext(5, "user"), &submissionv1.GetJudgeResultRequest{SubmissionId: 12})
+	if err != nil || result.GetResult().GetVerdict() != submissionv1.JudgeVerdict_JUDGE_VERDICT_AC || len(result.GetResult().GetCaseResults()) != 1 {
+		t.Fatalf("GetJudgeResult() = %+v, %v", result, err)
+	}
+	if _, err = service.RejudgeSubmission(internalServiceContext(9, "admin"), &submissionv1.RejudgeSubmissionRequest{SubmissionId: 12, IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000"}); err != nil {
+		t.Fatalf("RejudgeSubmission() error = %v", err)
+	}
+}
+
+func internalServiceContext(id int64, role string) context.Context {
+	return internalauth.WithPrincipal(context.Background(), internalauth.Principal{ActorID: id, ActorRoles: []string{role}})
+}
+
 type serviceRepository struct {
-	createResult biz.CreateSubmissionResult
-	submission   biz.Submission
-	page         biz.SubmissionPage
+	createResult  biz.CreateSubmissionResult
+	submission    biz.Submission
+	page          biz.SubmissionPage
+	judgeResult   biz.JudgeResult
+	rejudgeResult biz.RejudgeSubmissionResult
 }
 
 func (r *serviceRepository) FindByID(context.Context, int64) (biz.Submission, error) {
@@ -65,7 +88,7 @@ func (r *serviceRepository) List(context.Context, biz.ListFilter) (biz.Submissio
 	return r.page, nil
 }
 func (r *serviceRepository) GetJudgeResult(context.Context, int64) (biz.JudgeResult, error) {
-	return biz.JudgeResult{}, nil
+	return r.judgeResult, nil
 }
 func (r *serviceRepository) FindIdempotency(context.Context, int64, string, string) (biz.IdempotencyRecord, bool, error) {
 	return biz.IdempotencyRecord{}, false, nil
@@ -74,7 +97,7 @@ func (r *serviceRepository) CreateWithOutboxAndIdempotency(context.Context, biz.
 	return r.createResult, nil
 }
 func (r *serviceRepository) InvalidateAndRequeueWithOutboxAndIdempotency(context.Context, biz.RejudgeSubmissionCommand) (biz.RejudgeSubmissionResult, error) {
-	return biz.RejudgeSubmissionResult{}, nil
+	return r.rejudgeResult, nil
 }
 
 type serviceSourceStore struct{}

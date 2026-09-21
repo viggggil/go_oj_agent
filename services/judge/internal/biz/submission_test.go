@@ -163,15 +163,51 @@ func TestSubmissionUsecaseListAuthorizationAndNormalization(t *testing.T) {
 	}
 }
 
+func TestSubmissionUsecaseGetJudgeResultAuthorization(t *testing.T) {
+	repository := &usecaseRepository{judgeResult: JudgeResult{Submission: Submission{ID: 11, UserID: 5, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED}}}
+	uc := NewSubmissionUsecase(repository, nil, nil)
+	result, err := uc.GetJudgeResult(context.Background(), Actor{ID: 5}, 11)
+	if err != nil || result.Submission.ID != 11 {
+		t.Fatalf("owner GetJudgeResult() = %+v, %v", result, err)
+	}
+	if _, err = uc.GetJudgeResult(context.Background(), Actor{ID: 6}, 11); !HasReason(err, ReasonSubmissionNotFound) {
+		t.Fatalf("cross-user GetJudgeResult() error = %v", err)
+	}
+}
+
+func TestSubmissionUsecaseRejudge(t *testing.T) {
+	now := time.Date(2026, 9, 20, 1, 2, 3, 0, time.UTC)
+	repository := &usecaseRepository{submission: Submission{ID: 11, UserID: 5, ProblemID: 7, Language: "go", SourceObjectKey: "sources/id/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 10, JudgeRevision: testRevision, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE}}
+	problems := &usecaseProblemCatalog{profile: JudgeProfile{ProblemID: 7, TimeLimitMS: 1000, MemoryLimitKB: 65536, JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5Y7"}}
+	repository.rejudgeResult = RejudgeSubmissionResult{InvalidatedSubmissionID: 11, Submission: Submission{ID: 12, UserID: 5, ProblemID: 7, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED, JudgeRevision: problems.profile.JudgeRevision}}
+	uc := NewSubmissionUsecase(repository, nil, problems)
+	uc.now = func() time.Time { return now }
+	ids := []string{"123e4567-e89b-12d3-a456-426614174001", "123e4567-e89b-12d3-a456-426614174002"}
+	uc.newEventID = func() string { value := ids[0]; ids = ids[1:]; return value }
+	result, err := uc.Rejudge(context.Background(), RejudgeSubmissionInput{Actor: Actor{ID: 9, Roles: []string{"admin"}}, SubmissionID: 11, IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000"})
+	if err != nil || result.InvalidatedSubmissionID != 11 || result.Submission.ID != 12 {
+		t.Fatalf("Rejudge() = %+v, %v", result, err)
+	}
+	if repository.rejudgeCommand.SubmissionID != 11 || repository.rejudgeCommand.JudgeRevision != problems.profile.JudgeRevision || repository.rejudgeCommand.JudgeDeadlineAt != now.Add(JudgeQueueDeadline) || repository.rejudgeCommand.InvalidatedOutboxEventID == repository.rejudgeCommand.RequestedOutboxEventID {
+		t.Fatalf("rejudge command = %+v", repository.rejudgeCommand)
+	}
+	if _, err = uc.Rejudge(context.Background(), RejudgeSubmissionInput{Actor: Actor{ID: 5, Roles: []string{"user"}}, SubmissionID: 11, IdempotencyKey: "123e4567-e89b-12d3-a456-426614174003"}); !HasReason(err, ReasonPermissionDenied) {
+		t.Fatalf("non-admin Rejudge() error = %v", err)
+	}
+}
+
 type usecaseRepository struct {
-	submission   Submission
-	page         SubmissionPage
-	record       IdempotencyRecord
-	found        bool
-	created      CreateSubmissionCommand
-	createResult CreateSubmissionResult
-	createCalls  int
-	listed       ListFilter
+	submission     Submission
+	judgeResult    JudgeResult
+	page           SubmissionPage
+	record         IdempotencyRecord
+	found          bool
+	created        CreateSubmissionCommand
+	createResult   CreateSubmissionResult
+	createCalls    int
+	listed         ListFilter
+	rejudgeResult  RejudgeSubmissionResult
+	rejudgeCommand RejudgeSubmissionCommand
 }
 
 func (r *usecaseRepository) FindByID(context.Context, int64) (Submission, error) {
@@ -182,7 +218,7 @@ func (r *usecaseRepository) List(_ context.Context, filter ListFilter) (Submissi
 	return r.page, nil
 }
 func (r *usecaseRepository) GetJudgeResult(context.Context, int64) (JudgeResult, error) {
-	return JudgeResult{}, nil
+	return r.judgeResult, nil
 }
 func (r *usecaseRepository) FindIdempotency(context.Context, int64, string, string) (IdempotencyRecord, bool, error) {
 	return r.record, r.found, nil
@@ -192,8 +228,10 @@ func (r *usecaseRepository) CreateWithOutboxAndIdempotency(_ context.Context, co
 	r.createCalls++
 	return r.createResult, nil
 }
-func (r *usecaseRepository) InvalidateAndRequeueWithOutboxAndIdempotency(context.Context, RejudgeSubmissionCommand) (RejudgeSubmissionResult, error) {
-	return RejudgeSubmissionResult{}, nil
+
+func (r *usecaseRepository) InvalidateAndRequeueWithOutboxAndIdempotency(_ context.Context, command RejudgeSubmissionCommand) (RejudgeSubmissionResult, error) {
+	r.rejudgeCommand = command
+	return r.rejudgeResult, nil
 }
 
 type usecaseSourceStore struct {
