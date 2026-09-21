@@ -112,6 +112,7 @@ General:
 - Do not add unrelated refactors.
 - Do not log secrets, tokens, passwords or private keys.
 - Issue、文档和代码注释默认使用简体中文作为主体语言，除非术语、接口名、命令或上游规范需要保留英文。
+- 使用简体中文简短说明阶段性进度
 
 ---
 

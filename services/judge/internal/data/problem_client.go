@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
@@ -46,16 +46,24 @@ func NewProblemClient(config *conf.Bootstrap) (*ProblemClient, func(), error) {
 			return nil, nil, fmt.Errorf("judge problem client timeout must be positive")
 		}
 	}
-	conn, err := kgrpc.NewClient(context.Background(),
-		kgrpc.WithEndpoint(cfg.GetEndpoint()),
-		kgrpc.WithTimeout(timeout),
-		kgrpc.WithUnaryInterceptor(interceptor),
+	conn, err := grpc.NewClient(
+		cfg.GetEndpoint(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(newTimeoutInterceptor(timeout), interceptor),
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanup := func() { _ = conn.Close() }
 	return &ProblemClient{client: problemv1.NewProblemServiceClient(conn)}, cleanup, nil
+}
+
+func newTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 func newProblemAuthInterceptor(cfg *conf.ProblemClientProto, privateKey []byte, now func() time.Time) (grpc.UnaryClientInterceptor, error) {
