@@ -1,7 +1,11 @@
 package biz
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -16,6 +20,8 @@ const (
 	MaxPageSize              = 100
 	DefaultPageSize          = 20
 	MaxRetryCount            = 3
+	IdempotencyTTL           = 24 * time.Hour
+	JudgeQueueDeadline       = 5 * time.Minute
 
 	OperationCreateSubmission  = "CreateSubmission"
 	OperationRejudgeSubmission = "RejudgeSubmission"
@@ -169,6 +175,298 @@ type SubmissionInvalidatedPayload struct {
 	ProblemID       int64     `json:"problem_id"`
 	PreviousVerdict string    `json:"previous_verdict,omitempty"`
 	InvalidatedAt   time.Time `json:"invalidated_at"`
+}
+
+type CreateSubmissionInput struct {
+	Actor          Actor
+	ProblemID      int64
+	Language       string
+	SourceCode     []byte
+	IdempotencyKey string
+}
+
+type RejudgeSubmissionInput struct {
+	Actor          Actor
+	SubmissionID   int64
+	IdempotencyKey string
+}
+
+func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionInput) (CreateSubmissionResult, error) {
+	if err := requireActor(input.Actor); err != nil {
+		return CreateSubmissionResult{}, err
+	}
+	if uc == nil || uc.repository == nil || uc.sources == nil || uc.problems == nil {
+		return CreateSubmissionResult{}, ErrorInternal("submission dependencies are not configured")
+	}
+	language := strings.ToLower(strings.TrimSpace(input.Language))
+	if input.ProblemID <= 0 || !SupportedLanguage(language) {
+		return CreateSubmissionResult{}, ErrorInvalidArgument("invalid submission problem or language")
+	}
+	if len(input.SourceCode) == 0 || int64(len(input.SourceCode)) > MaxSourceSizeBytes {
+		return CreateSubmissionResult{}, ErrorInvalidArgument("source size must be between 1 and %d bytes", MaxSourceSizeBytes)
+	}
+	now := uc.currentTime()
+	idempotency := IdempotencyRequest{
+		ActorID:     input.Actor.ID,
+		Operation:   OperationCreateSubmission,
+		Key:         input.IdempotencyKey,
+		RequestHash: createRequestHash(input.ProblemID, language, input.SourceCode),
+		ExpiresAt:   now.Add(IdempotencyTTL),
+	}
+	if err := ValidateIdempotency(idempotency, OperationCreateSubmission, now); err != nil {
+		return CreateSubmissionResult{}, err
+	}
+	if result, found, err := uc.findCreateReplay(ctx, idempotency); err != nil || found {
+		return result, err
+	}
+	profile, err := uc.problems.GetJudgeProfile(ctx, input.ProblemID)
+	if err != nil {
+		return CreateSubmissionResult{}, err
+	}
+	if err := validateJudgeProfile(profile, input.ProblemID); err != nil {
+		return CreateSubmissionResult{}, err
+	}
+	source, err := uc.sources.Put(ctx, language, input.SourceCode)
+	if err != nil {
+		return CreateSubmissionResult{}, err
+	}
+	command := CreateSubmissionCommand{
+		Submission: Submission{
+			UserID:          input.Actor.ID,
+			ProblemID:       input.ProblemID,
+			Language:        language,
+			SourceObjectKey: source.Key,
+			SourceSHA256:    source.SHA256,
+			SourceSizeBytes: source.Size,
+			JudgeRevision:   profile.JudgeRevision,
+			Status:          submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED,
+			JudgeDeadlineAt: now.Add(JudgeQueueDeadline),
+		},
+		Idempotency:   idempotency,
+		OutboxEventID: uc.eventID(),
+	}
+	return uc.repository.CreateWithOutboxAndIdempotency(ctx, command)
+}
+
+func (uc *SubmissionUsecase) Get(ctx context.Context, actor Actor, submissionID int64) (Submission, error) {
+	if err := requireActor(actor); err != nil {
+		return Submission{}, err
+	}
+	if uc == nil || uc.repository == nil {
+		return Submission{}, ErrorInternal("submission repository is not configured")
+	}
+	if submissionID <= 0 {
+		return Submission{}, ErrorInvalidArgument("invalid submission id")
+	}
+	submission, err := uc.repository.FindByID(ctx, submissionID)
+	if err != nil {
+		return Submission{}, err
+	}
+	if submission.UserID != actor.ID && !actorIsAdmin(actor) {
+		return Submission{}, ErrorSubmissionNotFound()
+	}
+	return submission, nil
+}
+
+func (uc *SubmissionUsecase) List(ctx context.Context, actor Actor, filter ListFilter) (SubmissionPage, error) {
+	if err := requireActor(actor); err != nil {
+		return SubmissionPage{}, err
+	}
+	if uc == nil || uc.repository == nil {
+		return SubmissionPage{}, ErrorInternal("submission repository is not configured")
+	}
+	if filter.UserID < 0 || filter.ProblemID < 0 || filter.Page < 0 || filter.PageSize < 0 {
+		return SubmissionPage{}, ErrorInvalidArgument("invalid submission filter")
+	}
+	if _, ok := submissionv1.SubmissionStatus_name[int32(filter.Status)]; !ok {
+		return SubmissionPage{}, ErrorInvalidArgument("invalid submission status")
+	}
+	filter.Language = strings.ToLower(strings.TrimSpace(filter.Language))
+	if filter.Language != "" && !SupportedLanguage(filter.Language) {
+		return SubmissionPage{}, ErrorInvalidArgument("unsupported submission language")
+	}
+	if actorIsAdmin(actor) {
+		return uc.repository.List(ctx, filter.Normalized())
+	}
+	if filter.UserID != 0 && filter.UserID != actor.ID {
+		return SubmissionPage{}, ErrorPermissionDenied("cannot list another user's submissions")
+	}
+	filter.UserID = actor.ID
+	return uc.repository.List(ctx, filter.Normalized())
+}
+
+func (uc *SubmissionUsecase) GetJudgeResult(ctx context.Context, actor Actor, submissionID int64) (JudgeResult, error) {
+	if err := requireActor(actor); err != nil {
+		return JudgeResult{}, err
+	}
+	if uc == nil || uc.repository == nil {
+		return JudgeResult{}, ErrorInternal("submission repository is not configured")
+	}
+	if submissionID <= 0 {
+		return JudgeResult{}, ErrorInvalidArgument("invalid submission id")
+	}
+	result, err := uc.repository.GetJudgeResult(ctx, submissionID)
+	if err != nil {
+		return JudgeResult{}, err
+	}
+	if result.Submission.UserID != actor.ID && !actorIsAdmin(actor) {
+		return JudgeResult{}, ErrorSubmissionNotFound()
+	}
+	return result, nil
+}
+
+func (uc *SubmissionUsecase) Rejudge(ctx context.Context, input RejudgeSubmissionInput) (RejudgeSubmissionResult, error) {
+	if err := requireActor(input.Actor); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if !actorIsAdmin(input.Actor) {
+		return RejudgeSubmissionResult{}, ErrorPermissionDenied("admin role required")
+	}
+	if uc == nil || uc.repository == nil || uc.problems == nil {
+		return RejudgeSubmissionResult{}, ErrorInternal("rejudge dependencies are not configured")
+	}
+	if input.SubmissionID <= 0 {
+		return RejudgeSubmissionResult{}, ErrorInvalidArgument("invalid submission id")
+	}
+	now := uc.currentTime()
+	idempotency := IdempotencyRequest{
+		ActorID:     input.Actor.ID,
+		Operation:   OperationRejudgeSubmission,
+		Key:         input.IdempotencyKey,
+		RequestHash: rejudgeRequestHash(input.SubmissionID),
+		ExpiresAt:   now.Add(IdempotencyTTL),
+	}
+	if err := ValidateIdempotency(idempotency, OperationRejudgeSubmission, now); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if result, found, err := uc.findRejudgeReplay(ctx, idempotency); err != nil || found {
+		return result, err
+	}
+	old, err := uc.repository.FindByID(ctx, input.SubmissionID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if !CanInvalidate(old.Status) {
+		if old.Status == submissionv1.SubmissionStatus_SUBMISSION_STATUS_INVALIDATED {
+			return RejudgeSubmissionResult{}, ErrorConcurrentRejudge()
+		}
+		return RejudgeSubmissionResult{}, ErrorInvalidTransition("submission in %s cannot be rejudged", old.Status.String())
+	}
+	profile, err := uc.problems.GetJudgeProfile(ctx, old.ProblemID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	if err := validateJudgeProfile(profile, old.ProblemID); err != nil {
+		return RejudgeSubmissionResult{}, err
+	}
+	return uc.repository.InvalidateAndRequeueWithOutboxAndIdempotency(ctx, RejudgeSubmissionCommand{
+		SubmissionID: input.SubmissionID, JudgeRevision: profile.JudgeRevision,
+		JudgeDeadlineAt: now.Add(JudgeQueueDeadline), Idempotency: idempotency,
+		InvalidatedOutboxEventID: uc.eventID(), RequestedOutboxEventID: uc.eventID(),
+	})
+}
+
+func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest) (CreateSubmissionResult, bool, error) {
+	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
+	if err != nil || !found {
+		return CreateSubmissionResult{}, false, err
+	}
+	if record.RequestHash != request.RequestHash {
+		return CreateSubmissionResult{}, true, ErrorIdempotencyConflict()
+	}
+	if len(record.Response) == 0 {
+		return CreateSubmissionResult{}, true, ErrorIdempotencyInProgress()
+	}
+	var result CreateSubmissionResult
+	if err := json.Unmarshal(record.Response, &result); err != nil || result.SubmissionID <= 0 || result.Status != submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED {
+		return CreateSubmissionResult{}, true, ErrorInternal("stored idempotency response is invalid")
+	}
+	result.Replayed = true
+	return result, true, nil
+}
+
+func requireActor(actor Actor) error {
+	if actor.ID <= 0 {
+		return ErrorUnauthenticated("trusted actor is missing")
+	}
+	return nil
+}
+
+func actorIsAdmin(actor Actor) bool {
+	for _, role := range actor.Roles {
+		if strings.EqualFold(strings.TrimSpace(role), "admin") {
+			return true
+		}
+	}
+	return false
+}
+
+func validateJudgeProfile(profile JudgeProfile, problemID int64) error {
+	if profile.ProblemID != problemID || profile.TimeLimitMS <= 0 || profile.MemoryLimitKB <= 0 {
+		return ErrorDependencyUnavailable("problem service returned an invalid judge profile")
+	}
+	if err := ValidateJudgeRevision(profile.JudgeRevision); err != nil {
+		return ErrorProblemUnavailable("problem has no valid judge revision")
+	}
+	return nil
+}
+
+func createRequestHash(problemID int64, language string, source []byte) string {
+	digest := sha256.New()
+	var encodedID [8]byte
+	binary.BigEndian.PutUint64(encodedID[:], uint64(problemID))
+	_, _ = digest.Write(encodedID[:])
+	_, _ = digest.Write([]byte{0})
+	_, _ = digest.Write([]byte(language))
+	_, _ = digest.Write([]byte{0})
+	_, _ = digest.Write(source)
+	return hex.EncodeToString(digest.Sum(nil))
+}
+
+func rejudgeRequestHash(submissionID int64) string {
+	var encodedID [8]byte
+	binary.BigEndian.PutUint64(encodedID[:], uint64(submissionID))
+	digest := sha256.Sum256(encodedID[:])
+	return hex.EncodeToString(digest[:])
+}
+
+func (uc *SubmissionUsecase) findRejudgeReplay(ctx context.Context, request IdempotencyRequest) (RejudgeSubmissionResult, bool, error) {
+	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
+	if err != nil || !found {
+		return RejudgeSubmissionResult{}, false, err
+	}
+	if record.RequestHash != request.RequestHash {
+		return RejudgeSubmissionResult{}, true, ErrorIdempotencyConflict()
+	}
+	if len(record.Response) == 0 {
+		return RejudgeSubmissionResult{}, true, ErrorIdempotencyInProgress()
+	}
+	var stored struct {
+		InvalidatedSubmissionID int64 `json:"invalidated_submission_id"`
+		SubmissionID            int64 `json:"submission_id"`
+	}
+	if err := json.Unmarshal(record.Response, &stored); err != nil || stored.InvalidatedSubmissionID <= 0 || stored.SubmissionID <= 0 {
+		return RejudgeSubmissionResult{}, true, ErrorInternal("stored rejudge response is invalid")
+	}
+	submission, err := uc.repository.FindByID(ctx, stored.SubmissionID)
+	if err != nil {
+		return RejudgeSubmissionResult{}, true, err
+	}
+	return RejudgeSubmissionResult{InvalidatedSubmissionID: stored.InvalidatedSubmissionID, Submission: submission, Replayed: true}, true, nil
+}
+
+func (uc *SubmissionUsecase) currentTime() time.Time {
+	if uc.now == nil {
+		return time.Now().UTC()
+	}
+	return uc.now().UTC()
+}
+
+func (uc *SubmissionUsecase) eventID() string {
+	if uc.newEventID == nil {
+		return uuid.NewString()
+	}
+	return uc.newEventID()
 }
 
 func SupportedLanguage(language string) bool {
