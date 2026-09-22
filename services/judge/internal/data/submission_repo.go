@@ -634,16 +634,18 @@ type rowScanner interface {
 
 func scanOutbox(row rowScanner) (biz.OutboxEvent, error) {
 	var event biz.OutboxEvent
+	var payload []byte
 	var nextRetryAt, leaseUntil, publishedAt sql.NullTime
 	var leaseOwner sql.NullString
 	if err := row.Scan(
 		&event.ID, &event.EventID, &event.AggregateType, &event.AggregateID,
-		&event.EventType, &event.EventVersion, &event.Payload, &event.Status,
+		&event.EventType, &event.EventVersion, &payload, &event.Status,
 		&event.RetryCount, &nextRetryAt, &leaseOwner, &leaseUntil,
 		&event.CreatedAt, &publishedAt,
 	); err != nil {
 		return biz.OutboxEvent{}, storageError(err)
 	}
+	event.Payload = append(json.RawMessage(nil), payload...)
 	event.NextRetryAt = nullableTime(nextRetryAt)
 	event.LeaseOwner = leaseOwner.String
 	event.LeaseUntil = nullableTime(leaseUntil)
