@@ -580,7 +580,6 @@ Migration 必须：
 000003_create_submissions.up.sql
 000004_create_outbox_events.up.sql
 000008_add_outbox_failure_reason.up.sql
-000009_create_processed_events.up.sql
 ```
 
 具体 Migration 工具在实现阶段确定并固定，不维护第二套平行流程。
