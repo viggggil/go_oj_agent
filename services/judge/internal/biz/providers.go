@@ -7,7 +7,7 @@ import (
 	"github.com/google/wire"
 )
 
-var ProviderSet = wire.NewSet(NewSubmissionUsecase)
+var ProviderSet = wire.NewSet(NewSubmissionUsecase, NewOutboxRelay)
 
 type SubmissionUsecase struct {
 	repository SubmissionRepository

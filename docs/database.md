@@ -326,11 +326,12 @@ INDEX(submission_id)
 | `event_type` | VARCHAR(128) | Internal intent, e.g. judge.requested |
 | `event_version` | INT | NOT NULL |
 | `payload` | JSON | Event Payload |
-| `status` | VARCHAR(32) | pending / published / failed |
+| `status` | VARCHAR(32) | pending / published / dead |
 | `retry_count` | INT | default 0 |
 | `next_retry_at` | DATETIME(3) | Nullable |
 | `lease_owner` | VARCHAR(128) | Nullable relay instance |
 | `lease_until` | DATETIME(3) | Nullable |
+| `last_error` | VARCHAR(255) | Last stable publish failure reason |
 | `created_at` | DATETIME(3) | NOT NULL |
 | `published_at` | DATETIME(3) | Nullable |
 
@@ -343,7 +344,8 @@ INDEX(aggregate_type, aggregate_id)
 ```
 
 Relay 使用短事务和 `SELECT ... FOR UPDATE SKIP LOCKED` 领取未发布事件并设置
-lease；发布成功并收到 Publisher Confirm 后标记 `published`。lease 只能降低
+lease；发布成功并收到 Publisher Confirm 后标记 `published`。临时失败按退避策略
+回到 `pending`，超过最大次数后进入 `dead` 并保留 `last_error`。lease 只能降低
 并发碰撞，不能替代 Consumer 幂等。
 
 ## 6.4 `processed_events`
@@ -577,6 +579,7 @@ Migration 必须：
 000002_create_problems.up.sql
 000003_create_submissions.up.sql
 000004_create_outbox_events.up.sql
+000008_add_outbox_failure_reason.up.sql
 ```
 
 具体 Migration 工具在实现阶段确定并固定，不维护第二套平行流程。

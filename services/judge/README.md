@@ -10,7 +10,8 @@ The service currently provides the submission domain and state machine, atomic
 MySQL submission/Outbox/idempotency repositories, immutable MinIO source
 storage, an authenticated Problem Service Judge Profile client, and all five
 submission RPCs: `CreateSubmission`, `GetSubmission`, `ListSubmissions`,
-`GetJudgeResult`, and `RejudgeSubmission`. RabbitMQ Relay/Retry/DLQ and result
+`GetJudgeResult`, and `RejudgeSubmission`. RabbitMQ publishing is managed by a
+Kratos application server backed by the `internal/message` adapter; result
 consumers are implemented in later vertical slices.
 
 One `submission_id` identifies one logical judge run. Infrastructure retries
@@ -28,6 +29,13 @@ Submission RPCs accept identity only from the verified internal RS256
 principal. Owners can read and list their own submissions; administrators can
 read other submissions and select a `user_id` filter. Lists use stable
 `created_at DESC, id DESC` ordering and cap `page_size` at 100.
+
+The Outbox Relay claims leased events from MySQL, publishes durable messages
+with RabbitMQ Publisher Confirms, and marks events published only after a
+positive confirmation. Temporary failures use bounded exponential backoff;
+events exceeding the retry limit are marked `DEAD`. The Relay is a Kratos
+server managed by the application lifecycle, while RabbitMQ SDK code remains
+isolated in `internal/message`.
 
 ```bash
 go run ./services/judge/cmd/judge-service -conf services/judge/configs/config.yaml

@@ -323,6 +323,112 @@ func (s *StoreSet) InvalidateAndRequeueWithOutboxAndIdempotency(ctx context.Cont
 	return biz.RejudgeSubmissionResult{InvalidatedSubmissionID: old.ID, Submission: replacement}, nil
 }
 
+func (s *StoreSet) ClaimOutbox(ctx context.Context, owner string, now, leaseUntil time.Time, limit int) (events []biz.OutboxEvent, err error) {
+	if s == nil || s.db == nil {
+		return nil, biz.ErrorInternal("submission repository is not configured")
+	}
+	if strings.TrimSpace(owner) == "" || limit <= 0 || !leaseUntil.After(now) {
+		return nil, biz.ErrorInvalidArgument("invalid outbox lease request")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, storageError(err)
+	}
+	defer rollbackOnError(tx, &err)
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, event_id, aggregate_type, aggregate_id, event_type, event_version,
+		       payload, status, retry_count, next_retry_at, lease_owner, lease_until,
+		       created_at, published_at
+		FROM outbox_events
+		WHERE status = ?
+		  AND (next_retry_at IS NULL OR next_retry_at <= ?)
+		  AND (lease_until IS NULL OR lease_until <= ?)
+		ORDER BY id ASC
+		LIMIT ?
+		FOR UPDATE SKIP LOCKED
+	`, biz.OutboxStatusPending, now, now, limit)
+	if err != nil {
+		return nil, storageError(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		event, scanErr := scanOutbox(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		event.LeaseOwner = owner
+		event.LeaseUntil = &leaseUntil
+		if _, err = tx.ExecContext(ctx, `
+			UPDATE outbox_events
+			SET lease_owner = ?, lease_until = ?
+			WHERE id = ? AND status = ?
+		`, owner, leaseUntil, event.ID, biz.OutboxStatusPending); err != nil {
+			return nil, storageError(err)
+		}
+		events = append(events, event)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, storageError(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, storageError(err)
+	}
+	return events, nil
+}
+
+func (s *StoreSet) MarkOutboxPublished(ctx context.Context, id int64, owner string, publishedAt time.Time) error {
+	if s == nil || s.db == nil {
+		return biz.ErrorInternal("submission repository is not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE outbox_events
+		SET status = ?, published_at = ?, lease_owner = NULL, lease_until = NULL
+		WHERE id = ? AND status = ? AND lease_owner = ?
+	`, biz.OutboxStatusPublished, publishedAt, id, biz.OutboxStatusPending, owner)
+	if err != nil {
+		return storageError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return storageError(err)
+	}
+	if affected != 1 {
+		return biz.ErrorInternal("outbox lease was lost before publish confirmation")
+	}
+	return nil
+}
+
+func (s *StoreSet) MarkOutboxFailure(ctx context.Context, id int64, owner string, nextRetryAt time.Time, dead bool, reason string) error {
+	if s == nil || s.db == nil {
+		return biz.ErrorInternal("submission repository is not configured")
+	}
+	status := biz.OutboxStatusPending
+	if dead {
+		status = biz.OutboxStatusDead
+	}
+	var retryAt any = nextRetryAt
+	if dead {
+		retryAt = nil
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE outbox_events
+		SET status = ?, retry_count = retry_count + 1, next_retry_at = ?,
+		    lease_owner = NULL, lease_until = NULL, last_error = ?
+		WHERE id = ? AND status = ? AND lease_owner = ?
+	`, status, retryAt, reason, id, biz.OutboxStatusPending, owner)
+	if err != nil {
+		return storageError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return storageError(err)
+	}
+	if affected != 1 {
+		return biz.ErrorInternal("outbox lease was lost before failure update")
+	}
+	return nil
+}
+
 func insertSubmission(ctx context.Context, tx *sql.Tx, submission biz.Submission) (int64, error) {
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO submissions (
@@ -442,6 +548,25 @@ func completeIdempotency(ctx context.Context, tx *sql.Tx, request biz.Idempotenc
 
 type rowScanner interface {
 	Scan(...any) error
+}
+
+func scanOutbox(row rowScanner) (biz.OutboxEvent, error) {
+	var event biz.OutboxEvent
+	var nextRetryAt, leaseUntil, publishedAt sql.NullTime
+	var leaseOwner sql.NullString
+	if err := row.Scan(
+		&event.ID, &event.EventID, &event.AggregateType, &event.AggregateID,
+		&event.EventType, &event.EventVersion, &event.Payload, &event.Status,
+		&event.RetryCount, &nextRetryAt, &leaseOwner, &leaseUntil,
+		&event.CreatedAt, &publishedAt,
+	); err != nil {
+		return biz.OutboxEvent{}, storageError(err)
+	}
+	event.NextRetryAt = nullableTime(nextRetryAt)
+	event.LeaseOwner = leaseOwner.String
+	event.LeaseUntil = nullableTime(leaseUntil)
+	event.PublishedAt = nullableTime(publishedAt)
+	return event, nil
 }
 
 func scanSubmission(row rowScanner) (biz.Submission, error) {

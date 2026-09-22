@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,8 +36,9 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	minioEndpoint := os.Getenv("PROBLEM_TEST_MINIO_ENDPOINT")
 	judgeEndpoint := os.Getenv("JUDGE_TEST_GRPC_ENDPOINT")
 	privateKeyFile := os.Getenv("JUDGE_TEST_GATEWAY_PRIVATE_KEY_FILE")
-	if baseURL == "" || userMySQLDSN == "" || problemMySQLDSN == "" || submissionMySQLDSN == "" || minioEndpoint == "" || judgeEndpoint == "" || privateKeyFile == "" {
-		t.Skip("set Gateway, MySQL, MinIO, Judge gRPC and signing-key integration settings")
+	rabbitURL := os.Getenv("JUDGE_TEST_RABBITMQ_URL")
+	if baseURL == "" || userMySQLDSN == "" || problemMySQLDSN == "" || submissionMySQLDSN == "" || minioEndpoint == "" || judgeEndpoint == "" || privateKeyFile == "" || rabbitURL == "" {
+		t.Skip("set Gateway, MySQL, MinIO, RabbitMQ, Judge gRPC and signing-key integration settings")
 	}
 
 	api := apiClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
@@ -154,6 +157,11 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	}
 	assertSubmissionSourceObject(t, minioEndpoint, objectKey, source)
 	assertSubmissionAtomicRecords(t, submissionDB, userID, created.GetSubmissionId(), idempotencyKey)
+	requested := waitForRelayMessage(t, rabbitURL, "judge.task.go", "judge.requested", created.GetSubmissionId())
+	if requested.MessageID != requested.EventID || requested.RoutingKey != "judge.task.go" {
+		t.Fatalf("judge task metadata = %+v", requested)
+	}
+	waitForOutboxStatus(t, submissionDB, requested.EventID, "published")
 
 	rejudgeKey := uuid.NewString()
 	rejudged, err := client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{
@@ -221,6 +229,77 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	if rejudgeIdempotencyCount != 1 {
 		t.Fatalf("rejudge idempotency records = %d, want 1", rejudgeIdempotencyCount)
 	}
+	replacementRequested := waitForRelayMessage(t, rabbitURL, "judge.task.go", "judge.requested", newSubmission.GetId())
+	invalidated := waitForRelayMessage(t, rabbitURL, "submission.invalidated", "submission.invalidated", created.GetSubmissionId())
+	waitForOutboxStatus(t, submissionDB, replacementRequested.EventID, "published")
+	waitForOutboxStatus(t, submissionDB, invalidated.EventID, "published")
+}
+
+type relayMessage struct {
+	EventID    string
+	MessageID  string
+	RoutingKey string
+}
+
+func waitForRelayMessage(t *testing.T, rabbitURL, queue, eventType string, submissionID int64) relayMessage {
+	t.Helper()
+	connection, err := amqp091.Dial(rabbitURL)
+	if err != nil {
+		t.Fatalf("connect RabbitMQ: %v", err)
+	}
+	defer connection.Close()
+	channel, err := connection.Channel()
+	if err != nil {
+		t.Fatalf("open RabbitMQ channel: %v", err)
+	}
+	defer channel.Close()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		delivery, ok, getErr := channel.Get(queue, true)
+		if getErr != nil {
+			t.Fatalf("get RabbitMQ message from %s: %v", queue, getErr)
+		}
+		if !ok {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		var envelope struct {
+			EventID   string          `json:"event_id"`
+			EventType string          `json:"event_type"`
+			Payload   json.RawMessage `json:"payload"`
+		}
+		var payload struct {
+			SubmissionID int64 `json:"submission_id"`
+		}
+		if json.Unmarshal(delivery.Body, &envelope) != nil || json.Unmarshal(envelope.Payload, &payload) != nil {
+			t.Fatalf("decode RabbitMQ message: %s", delivery.Body)
+		}
+		if envelope.EventType != eventType || payload.SubmissionID != submissionID {
+			continue
+		}
+		if delivery.DeliveryMode != amqp091.Persistent || delivery.MessageId == "" || envelope.EventID == "" || delivery.Type != eventType {
+			t.Fatalf("RabbitMQ delivery metadata = %+v envelope=%+v", delivery, envelope)
+		}
+		if bytes.Contains(delivery.Body, []byte("package main")) || bytes.Contains(delivery.Body, []byte("minioadmin")) {
+			t.Fatalf("RabbitMQ delivery leaked source or credentials: %s", delivery.Body)
+		}
+		return relayMessage{EventID: envelope.EventID, MessageID: delivery.MessageId, RoutingKey: delivery.RoutingKey}
+	}
+	t.Fatalf("timed out waiting for %s submission %d", eventType, submissionID)
+	return relayMessage{}
+}
+
+func waitForOutboxStatus(t *testing.T, db *sql.DB, eventID, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var status string
+		if err := db.QueryRowContext(t.Context(), `SELECT status FROM outbox_events WHERE event_id = ?`, eventID).Scan(&status); err == nil && status == want {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("outbox event %s did not reach status %s", eventID, want)
 }
 
 func registerJudgeIntegrationUser(t *testing.T, api apiClient, userDB *sql.DB, prefix string, admin bool) (int64, string) {
