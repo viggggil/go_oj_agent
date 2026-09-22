@@ -58,9 +58,7 @@ func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, relayServer *serve
 	options := []kratos.Option{
 		kratos.Name(config.GetService().GetName()),
 		kratos.Version("dev"),
-		kratos.Server(grpcServer),
-		kratos.Server(relayServer),
-		kratos.Server(resultConsumerServer),
+		kratos.Server(grpcServer, relayServer, resultConsumerServer),
 		kratos.Logger(newJSONLogger(os.Stdout)),
 	}
 	if registrar != nil {
