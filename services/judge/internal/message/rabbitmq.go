@@ -33,6 +33,8 @@ type RabbitResultConsumer struct {
 	cancel               context.CancelFunc
 }
 
+var judgeEventRoutes = []string{"judge.task.cpp", "judge.task.go", "judge.task.python", "judge.task.java", biz.EventTypeSubmissionInvalidated, biz.EventTypeSubmissionJudged}
+
 func NewRabbitResultConsumer(config *conf.Bootstrap, handler ResultHandler) (*RabbitResultConsumer, func(), error) {
 	if config == nil || config.GetMessaging() == nil || config.GetMessaging().GetRabbitmq() == nil {
 		return nil, func() {}, fmt.Errorf("judge rabbitmq configuration is required")
@@ -67,6 +69,18 @@ func (c *RabbitResultConsumer) Start(ctx context.Context) error {
 		_ = ch.Close()
 		_ = conn.Close()
 		return err
+	}
+	for _, route := range judgeEventRoutes {
+		if _, err = ch.QueueDeclare(route, true, false, false, false, nil); err != nil {
+			_ = ch.Close()
+			_ = conn.Close()
+			return err
+		}
+		if err = ch.QueueBind(route, route, c.exchange, false, nil); err != nil {
+			_ = ch.Close()
+			_ = conn.Close()
+			return err
+		}
 	}
 	for _, key := range []string{EventRoutingJudgeCompleted, EventRoutingJudgeFailed} {
 		if err = ch.QueueBind(c.queue, key, c.exchange, false, nil); err != nil {
@@ -212,7 +226,7 @@ func (p *RabbitPublisher) connectLocked() error {
 		_ = conn.Close()
 		return err
 	}
-	for _, route := range []string{"judge.task.cpp", "judge.task.go", "judge.task.python", "judge.task.java", biz.EventTypeSubmissionInvalidated, biz.EventTypeSubmissionJudged} {
+	for _, route := range judgeEventRoutes {
 		if _, err = channel.QueueDeclare(route, true, false, false, false, nil); err != nil {
 			_ = channel.Close()
 			_ = conn.Close()
