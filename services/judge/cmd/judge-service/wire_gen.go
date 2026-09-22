@@ -10,6 +10,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/data"
+	"github.com/viggggil/go_oj_agent/services/judge/internal/message"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/server"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/service"
 )
@@ -41,9 +42,18 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
+	rabbitPublisher, cleanup3, err := message.NewRabbitPublisher(bc)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	outboxRelay := biz.NewOutboxRelay(storeSet, rabbitPublisher)
+	relayServer := server.NewRelayServer(outboxRelay, bc)
 	registrar := server.NewRegistrar(bc)
-	v2 := newApp(bc, grpcServer, registrar)
+	v2 := newApp(bc, grpcServer, relayServer, registrar)
 	return v2, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil

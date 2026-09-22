@@ -13,6 +13,14 @@ storage:
     source_bucket: "submission-source"
     problem_bucket: "problem-data"
     use_ssl: false
+messaging:
+  rabbitmq:
+    url: "${MESSAGING_RABBITMQ_URL}"
+    exchange: "oj.events"
+    result_queue: "judge.results"
+    dead_letter_queue: "judge.dlq"
+    max_retries: 3
+    retry_delay: "5s"
 registry:
   consul:
     enabled: false

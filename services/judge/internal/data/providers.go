@@ -18,6 +18,7 @@ var ProviderSet = wire.NewSet(
 	NewSourceStore,
 	NewProblemClient,
 	wire.Bind(new(biz.SubmissionRepository), new(*StoreSet)),
+	wire.Bind(new(biz.OutboxRepository), new(*StoreSet)),
 	wire.Bind(new(biz.SourceStore), new(*MinIOSourceStore)),
 	wire.Bind(new(biz.ProblemCatalog), new(*ProblemClient)),
 )

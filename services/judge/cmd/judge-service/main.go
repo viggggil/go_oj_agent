@@ -13,6 +13,7 @@ import (
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/judge/internal/server"
 )
 
 type App = kratos.App
@@ -53,11 +54,12 @@ func newJSONLogger(output *os.File) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{}))
 }
 
-func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, registrar registry.Registrar) *kratos.App {
+func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, relayServer *server.RelayServer, registrar registry.Registrar) *kratos.App {
 	options := []kratos.Option{
 		kratos.Name(config.GetService().GetName()),
 		kratos.Version("dev"),
 		kratos.Server(grpcServer),
+		kratos.Server(relayServer),
 		kratos.Logger(newJSONLogger(os.Stdout)),
 	}
 	if registrar != nil {

@@ -15,6 +15,7 @@ require (
 	github.com/hashicorp/consul/api v1.34.2
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/oklog/ulid/v2 v2.1.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.12.1
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa
 	google.golang.org/grpc v1.83.2

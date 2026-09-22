@@ -35,7 +35,7 @@ func TestSubmissionSchema(t *testing.T) {
 		"invalidated_at",
 	})
 	assertMissingColumns(t, db, "submissions", []string{"source_code", "testcase_version"})
-	assertColumns(t, db, "outbox_events", []string{"lease_owner", "lease_until"})
+	assertColumns(t, db, "outbox_events", []string{"lease_owner", "lease_until", "last_error"})
 	assertColumns(t, db, "processed_events", []string{"consumer_name", "event_id", "processed_at"})
 	assertColumns(t, db, "idempotency_requests", []string{
 		"actor_id",

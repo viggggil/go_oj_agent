@@ -29,6 +29,7 @@ services:
       - ../../migrations/submission/000005_create_idempotency_requests.up.sql:/docker-entrypoint-initdb.d/305_create_idempotency_requests.sql:ro
       - ../../migrations/submission/000006_align_submissions_with_judge_contract.up.sql:/docker-entrypoint-initdb.d/306_align_submissions_with_judge_contract.sql:ro
       - ../../migrations/submission/000007_add_outbox_leasing.up.sql:/docker-entrypoint-initdb.d/307_add_outbox_leasing.sql:ro
+      - ../../migrations/submission/000008_add_outbox_failure_reason.up.sql:/docker-entrypoint-initdb.d/308_add_outbox_failure_reason.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
@@ -85,6 +86,22 @@ services:
       minio:
         condition: service_healthy
     restart: "no"
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-judge}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-judge-password}
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
 
   auth-key-init:
     image: alpine:3.23
@@ -193,6 +210,12 @@ services:
       KRATOS_STORAGE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       KRATOS_STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_MESSAGING_RABBITMQ_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
+      KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
+      KRATOS_MESSAGING_RABBITMQ_RESULT_QUEUE: "judge.results"
+      KRATOS_MESSAGING_RABBITMQ_DEAD_LETTER_QUEUE: "judge.dlq"
+      KRATOS_MESSAGING_RABBITMQ_MAX_RETRIES: "3"
+      KRATOS_MESSAGING_RABBITMQ_RETRY_DELAY: "5s"
     ports:
       - "127.0.0.1:${JUDGE_GRPC_PORT:-9004}:9003"
     volumes:
@@ -203,6 +226,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
       auth-key-init:
         condition: service_completed_successfully
       problem-service:
