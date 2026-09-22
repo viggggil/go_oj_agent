@@ -13,6 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/judge-service ./services/judge/cmd/judge-service
 
 FROM alpine:3.23
+RUN apk add --no-cache netcat-openbsd
 RUN addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
 WORKDIR /app
 COPY --from=builder /out/judge-service /app/judge-service
