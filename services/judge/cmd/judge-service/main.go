@@ -54,12 +54,13 @@ func newJSONLogger(output *os.File) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{}))
 }
 
-func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, relayServer *server.RelayServer, registrar registry.Registrar) *kratos.App {
+func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, relayServer *server.RelayServer, resultConsumerServer *server.ResultConsumerServer, registrar registry.Registrar) *kratos.App {
 	options := []kratos.Option{
 		kratos.Name(config.GetService().GetName()),
 		kratos.Version("dev"),
 		kratos.Server(grpcServer),
 		kratos.Server(relayServer),
+		kratos.Server(resultConsumerServer),
 		kratos.Logger(newJSONLogger(os.Stdout)),
 	}
 	if registrar != nil {

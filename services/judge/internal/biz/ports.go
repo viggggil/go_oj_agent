@@ -18,3 +18,7 @@ type SourceStore interface {
 type ProblemCatalog interface {
 	GetJudgeProfile(context.Context, int64) (JudgeProfile, error)
 }
+
+type JudgeResultRepository interface {
+	ApplyJudgeResult(context.Context, JudgeResultEvent) error
+}

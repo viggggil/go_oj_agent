@@ -209,6 +209,13 @@ func buildPublishedMessage(event OutboxEvent) (PublishedMessage, error) {
 		}
 		payload = value
 		routingKey = EventTypeSubmissionInvalidated
+	case EventTypeSubmissionJudged:
+		var value SubmissionJudgedPayload
+		if err := json.Unmarshal(event.Payload, &value); err != nil || value.SubmissionID <= 0 || value.UserID <= 0 || value.ProblemID <= 0 || value.JudgedAt.IsZero() {
+			return PublishedMessage{}, fmt.Errorf("invalid submission judged payload")
+		}
+		payload = value
+		routingKey = EventTypeSubmissionJudged
 	default:
 		return PublishedMessage{}, fmt.Errorf("unsupported outbox event type %q", event.EventType)
 	}
