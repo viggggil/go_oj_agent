@@ -9,10 +9,92 @@ import (
 	"time"
 
 	mysql "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 )
+
+func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEvent) (err error) {
+	if s == nil || s.db == nil {
+		return biz.ErrorInternal("submission repository is not configured")
+	}
+	if err = event.Validate(); err != nil {
+		return biz.ErrorInvalidArgument("invalid judge result: %s", err.Error())
+	}
+	now := s.now()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return storageError(err)
+	}
+	defer rollbackOnError(tx, &err)
+	result, err := tx.ExecContext(ctx, `INSERT IGNORE INTO processed_events (event_id, event_type, processed_at) VALUES (?, ?, ?)`, event.EventID, event.EventType, now)
+	if err != nil {
+		return storageError(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return storageError(err)
+	}
+	if affected == 0 {
+		if err = tx.Commit(); err != nil {
+			return storageError(err)
+		}
+		return nil
+	}
+	var userID, problemID int64
+	var revision, status string
+	if err = tx.QueryRowContext(ctx, `SELECT user_id, problem_id, judge_revision, status FROM submissions WHERE id = ? FOR UPDATE`, event.SubmissionID).Scan(&userID, &problemID, &revision, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return biz.ErrorSubmissionNotFound()
+		}
+		return storageError(err)
+	}
+	if revision != event.JudgeRevision {
+		return biz.ErrorInvalidArgument("judge result revision does not match submission")
+	}
+	if status == "done" || status == "invalidated" || status == "cancelled" {
+		if err = tx.Commit(); err != nil {
+			return storageError(err)
+		}
+		return nil
+	}
+	if event.EventType == biz.EventTypeJudgeCompleted {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'done', verdict = ?, time_ms = ?, memory_kb = ?, judged_at = ?, updated_at = ?, system_error_reason = NULL WHERE id = ?`, verdictToDB(event.Verdict), nullableInt32Value(event.TimeMS), nullableInt32Value(event.MemoryKB), event.OccurredAt, now, event.SubmissionID); err != nil {
+			return storageError(err)
+		}
+		for _, item := range event.CaseResults {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO submission_case_results (submission_id, case_no, verdict, time_ms, memory_kb, message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE verdict=VALUES(verdict), time_ms=VALUES(time_ms), memory_kb=VALUES(memory_kb), message=VALUES(message)`, event.SubmissionID, item.CaseNo, verdictToDB(item.Verdict), nullableInt32Value(item.TimeMS), nullableInt32Value(item.MemoryKB), nullableString(item.Message), now); err != nil {
+				return storageError(err)
+			}
+		}
+	} else if event.Retryable {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'retry_wait', retry_count = LEAST(retry_count + 1, 3), system_error_reason = ?, updated_at = ? WHERE id = ?`, event.Reason, now, event.SubmissionID); err != nil {
+			return storageError(err)
+		}
+		if err = tx.Commit(); err != nil {
+			return storageError(err)
+		}
+		return nil
+	} else {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'done', system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, event.Reason, event.OccurredAt, now, event.SubmissionID); err != nil {
+			return storageError(err)
+		}
+	}
+	payload := biz.SubmissionJudgedPayload{SubmissionID: event.SubmissionID, UserID: userID, ProblemID: problemID, Verdict: verdictToDB(event.Verdict), JudgedAt: event.OccurredAt}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return biz.ErrorInternal("judge result event cannot be encoded")
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO outbox_events (event_id, aggregate_type, aggregate_id, event_type, event_version, payload, status, retry_count, created_at) VALUES (?, 'submission', ?, ?, 1, ?, 'pending', 0, ?)`, uuid.NewString(), event.SubmissionID, biz.EventTypeSubmissionJudged, encoded, now)
+	if err != nil {
+		return storageError(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return storageError(err)
+	}
+	return nil
+}
 
 const submissionColumns = `id, user_id, problem_id, language, source_object_key,
 	source_sha256, source_size_bytes, judge_revision, status, verdict, time_ms,

@@ -9,7 +9,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
 )
 
-var ProviderSet = wire.NewSet(NewRegistrar, NewGRPCServer, NewRelayServer, NewMiddlewares)
+var ProviderSet = wire.NewSet(NewRegistrar, NewGRPCServer, NewRelayServer, NewResultConsumerServer, NewMiddlewares)
 
 func NewRegistrar(config *conf.Bootstrap) registry.Registrar {
 	if config == nil || config.GetRegistry() == nil || config.GetRegistry().GetConsul() == nil || !config.GetRegistry().GetConsul().GetEnabled() {

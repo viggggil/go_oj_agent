@@ -50,9 +50,19 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	}
 	outboxRelay := biz.NewOutboxRelay(storeSet, rabbitPublisher)
 	relayServer := server.NewRelayServer(outboxRelay, bc)
+	resultConsumer := biz.NewResultConsumer(storeSet)
+	rabbitResultConsumer, cleanup4, err := message.NewRabbitResultConsumer(bc, resultConsumer)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	resultConsumerServer := server.NewResultConsumerServer(rabbitResultConsumer)
 	registrar := server.NewRegistrar(bc)
-	v2 := newApp(bc, grpcServer, relayServer, registrar)
+	v2 := newApp(bc, grpcServer, relayServer, resultConsumerServer, registrar)
 	return v2, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()

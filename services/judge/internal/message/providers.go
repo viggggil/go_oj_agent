@@ -9,4 +9,5 @@ import (
 var ProviderSet = wire.NewSet(
 	NewRabbitPublisher,
 	wire.Bind(new(biz.MessagePublisher), new(*RabbitPublisher)),
+	NewRabbitResultConsumer,
 )
