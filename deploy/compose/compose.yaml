@@ -30,7 +30,6 @@ services:
       - ../../migrations/submission/000006_align_submissions_with_judge_contract.up.sql:/docker-entrypoint-initdb.d/306_align_submissions_with_judge_contract.sql:ro
       - ../../migrations/submission/000007_add_outbox_leasing.up.sql:/docker-entrypoint-initdb.d/307_add_outbox_leasing.sql:ro
       - ../../migrations/submission/000008_add_outbox_failure_reason.up.sql:/docker-entrypoint-initdb.d/308_add_outbox_failure_reason.sql:ro
-      - ../../migrations/submission/000009_create_processed_events.up.sql:/docker-entrypoint-initdb.d/309_create_processed_events.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
