@@ -452,6 +452,9 @@ func (s *StoreSet) ClaimOutbox(ctx context.Context, owner string, now, leaseUnti
 	if err = rows.Err(); err != nil {
 		return nil, storageError(err)
 	}
+	if err = rows.Close(); err != nil {
+		return nil, storageError(err)
+	}
 	if err = tx.Commit(); err != nil {
 		return nil, storageError(err)
 	}
