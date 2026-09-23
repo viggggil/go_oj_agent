@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 const (
@@ -159,15 +160,7 @@ type RejudgeSubmissionResult struct {
 	Replayed                bool       `json:"-"`
 }
 
-type JudgeRequestedPayload struct {
-	SubmissionID    int64  `json:"submission_id"`
-	ProblemID       int64  `json:"problem_id"`
-	Language        string `json:"language"`
-	JudgeRevision   string `json:"judge_revision"`
-	SourceObjectKey string `json:"source_object_key"`
-	SourceSHA256    string `json:"source_sha256"`
-	SourceSizeBytes int64  `json:"source_size_bytes"`
-}
+type JudgeRequestedPayload = mq.JudgeTask
 
 type SubmissionInvalidatedPayload struct {
 	SubmissionID    int64     `json:"submission_id"`

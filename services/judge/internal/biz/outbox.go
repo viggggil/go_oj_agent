@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 const (
@@ -191,17 +193,23 @@ func buildPublishedMessage(event OutboxEvent) (PublishedMessage, error) {
 	}
 	var payload any
 	routingKey := ""
+	publishedType := event.EventType
 	switch event.EventType {
 	case EventTypeJudgeRequested:
-		var value JudgeRequestedPayload
-		if err := json.Unmarshal(event.Payload, &value); err != nil || value.SubmissionID <= 0 || value.ProblemID <= 0 || !SupportedLanguage(value.Language) {
+		var value mq.JudgeTask
+		if err := json.Unmarshal(event.Payload, &value); err != nil {
 			return PublishedMessage{}, fmt.Errorf("invalid judge requested payload")
 		}
-		if err := ValidateJudgeRevision(value.JudgeRevision); err != nil || !validSHA256(value.SourceSHA256) || value.SourceSizeBytes <= 0 || value.SourceObjectKey == "" {
+		if err := value.Validate(); err != nil {
 			return PublishedMessage{}, fmt.Errorf("invalid judge requested source metadata")
 		}
 		payload = value
-		routingKey = "judge.task." + strings.ToLower(value.Language)
+		publishedType = mq.EventTypeJudgeTask
+		var err error
+		routingKey, err = mq.JudgeTaskRoutingKey(value.Language)
+		if err != nil {
+			return PublishedMessage{}, err
+		}
 	case EventTypeSubmissionInvalidated:
 		var value SubmissionInvalidatedPayload
 		if err := json.Unmarshal(event.Payload, &value); err != nil || value.SubmissionID <= 0 || value.UserID <= 0 || value.ProblemID <= 0 || value.InvalidatedAt.IsZero() {
@@ -219,18 +227,13 @@ func buildPublishedMessage(event OutboxEvent) (PublishedMessage, error) {
 	default:
 		return PublishedMessage{}, fmt.Errorf("unsupported outbox event type %q", event.EventType)
 	}
-	envelope := struct {
-		EventID      string `json:"event_id"`
-		EventType    string `json:"event_type"`
-		EventVersion int32  `json:"event_version"`
-		AggregateID  int64  `json:"aggregate_id"`
-		Payload      any    `json:"payload"`
-	}{event.EventID, event.EventType, event.EventVersion, event.AggregateID, payload}
-	body, err := json.Marshal(envelope)
+	body, err := mq.MarshalEnvelope(mq.EnvelopeMetadata{
+		EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, OccurredAt: event.CreatedAt,
+	}, payload)
 	if err != nil {
 		return PublishedMessage{}, fmt.Errorf("encode outbox message: %w", err)
 	}
-	return PublishedMessage{EventID: event.EventID, EventType: event.EventType, EventVersion: event.EventVersion, RoutingKey: routingKey, Body: body}, nil
+	return PublishedMessage{EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, RoutingKey: routingKey, Body: body}, nil
 }
 
 func stableFailure(err error) string {

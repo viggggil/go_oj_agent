@@ -563,9 +563,10 @@ submission.invalidated
 {
   "event_id": "0193...",
   "event_type": "judge.completed",
+	"event_version": 1,
   "occurred_at": "2026-08-30T10:00:00Z",
   "trace_id": "...",
-  "payload": {}
+	"data": {}
 }
 ```
 
@@ -579,9 +580,14 @@ submission.invalidated
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
   "source_sha256": "...",
-  "source_size_bytes": 1234
+	"source_size_bytes": 1234,
+	"judge_deadline_at": "2026-08-30T10:05:00Z"
 }
 ```
+
+Relay 发布的公共事件类型为 `judge.task`，语言由 `judge.task.<language>` routing
+key 表示；`judge.requested` 只存在于 Judge Service Outbox。公共消息契约集中在
+`pkg/mq`，不复用 ORM 或 Service 内部 domain struct。
 
 ---
 

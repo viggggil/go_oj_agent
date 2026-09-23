@@ -1,17 +1,21 @@
 package biz
 
 import (
-	"encoding/json"
 	"testing"
+	"time"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 func TestParseJudgeCompletedEvent(t *testing.T) {
-	body, _ := json.Marshal(map[string]any{"event_id": "evt-1", "event_type": EventTypeJudgeCompleted, "event_version": 1, "payload": map[string]any{
-		"submission_id": 9, "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6", "verdict": "AC", "time_ms": 3, "memory_kb": 4,
-		"case_results": []any{map[string]any{"case_no": 1, "verdict": "AC", "time_ms": 3, "memory_kb": 4}},
-	}})
+	body, _ := mq.MarshalEnvelope(mq.EnvelopeMetadata{
+		EventID: "123e4567-e89b-12d3-a456-426614174000", EventType: EventTypeJudgeCompleted,
+		EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(),
+	}, mq.JudgeCompleted{
+		SubmissionID: 9, JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6", Verdict: "AC", TimeMS: 3, MemoryKB: 4,
+		CaseResults: []mq.JudgeCaseResult{{CaseNo: 1, Verdict: "AC", TimeMS: 3, MemoryKB: 4}},
+	})
 	event, err := ParseJudgeResultEvent(EventTypeJudgeCompleted, body)
 	if err != nil || event.Verdict != submissionv1.JudgeVerdict_JUDGE_VERDICT_AC || len(event.CaseResults) != 1 {
 		t.Fatalf("ParseJudgeResultEvent() = %+v, %v", event, err)
@@ -19,7 +23,10 @@ func TestParseJudgeCompletedEvent(t *testing.T) {
 }
 
 func TestParseJudgeResultRejectsRevisionAndTypeMismatch(t *testing.T) {
-	body := []byte(`{"event_id":"evt-1","event_type":"judge.failed","payload":{"submission_id":9,"judge_revision":"short","reason":"x"}}`)
+	body, _ := mq.MarshalEnvelope(mq.EnvelopeMetadata{
+		EventID: "123e4567-e89b-12d3-a456-426614174001", EventType: EventTypeJudgeFailed,
+		EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(),
+	}, mq.JudgeFailed{SubmissionID: 9, JudgeRevision: "short", Reason: "x"})
 	if _, err := ParseJudgeResultEvent(EventTypeJudgeCompleted, body); err == nil {
 		t.Fatal("expected event type mismatch")
 	}

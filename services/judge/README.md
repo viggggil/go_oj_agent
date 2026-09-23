@@ -11,8 +11,8 @@ MySQL submission/Outbox/idempotency repositories, immutable MinIO source
 storage, an authenticated Problem Service Judge Profile client, and all five
 submission RPCs: `CreateSubmission`, `GetSubmission`, `ListSubmissions`,
 `GetJudgeResult`, and `RejudgeSubmission`. RabbitMQ publishing is managed by a
-Kratos application server backed by the `internal/message` adapter; result
-consumers are implemented in later vertical slices.
+Kratos application server backed by the `internal/message` adapter; the result
+consumer applies idempotent completed and failed events to submission state.
 
 One `submission_id` identifies one logical judge run. Infrastructure retries
 reuse that ID. An administrator rejudge invalidates the old submission and

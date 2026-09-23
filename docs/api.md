@@ -732,6 +732,28 @@ Problem Service 内完成，不能信任外部调用者伪造角色；Judge Serv
 `problem-{problem_id}/judge-revisions/{judge_revision}/` 前缀，最后才在一个
 MySQL 事务中提交测试点最新状态并切换 `active_judge_revision`。MySQL 不保存
 revision 历史；历史 manifest 与 `.in/.out` 文件只保存在 MinIO。
+manifest 顶层保存该题目 revision 的一份 `time_limit_ms` 和
+`memory_limit_kb`，同一 revision 下所有测试点共享这组限制。管理员修改任一
+限制时，即使测试点正文未变化，也必须发布新 revision 后再切换 active 指针。
+manifest 格式为：
+
+```json
+{
+  "manifest_version": 1,
+  "problem_id": 1001,
+  "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+  "time_limit_ms": 1000,
+  "memory_limit_kb": 65536,
+  "testcases": [
+    {
+      "case_no": 1,
+      "input": {"object_key": ".../1.in", "sha256": "...", "size_bytes": 4},
+      "output": {"object_key": ".../1.out", "sha256": "...", "size_bytes": 2}
+    }
+  ]
+}
+```
+
 归档最后一个有效测试点时不生成空 revision，而是清空 active 指针并保留旧
 MinIO 快照，因此新 Submission 会被拒绝，历史 Submission 仍可复现。
 
@@ -879,7 +901,8 @@ Payload：
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
   "source_sha256": "...",
-  "source_size_bytes": 1234
+  "source_size_bytes": 1234,
+  "judge_deadline_at": "2026-08-27T00:05:00Z"
 }
 ```
 
@@ -887,7 +910,7 @@ Payload：
 
 ---
 
-## 5.3 `judge.task.<language>`
+## 5.3 `judge.task`
 
 Producer：
 
@@ -920,9 +943,14 @@ Payload 至少包括：
   "judge_revision": "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
   "source_object_key": "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source.cpp",
   "source_sha256": "...",
-  "source_size_bytes": 1234
+  "source_size_bytes": 1234,
+  "judge_deadline_at": "2026-08-27T00:05:00Z"
 }
 ```
+
+公开消息的 `event_type` 固定为 `judge.task`，具体语言只通过 routing key 区分。
+`judge.requested` 不得作为 RabbitMQ 公共事件类型。公共 Envelope 与 Judge 消息
+数据结构以 `pkg/mq` 为唯一代码契约，业务体统一放在 `data` 字段。
 
 Worker 使用受限的服务凭据按对象引用读取源码，并根据 `judge_revision` 读取该 revision 的 `manifest.json` 和全部测试点。同一 Submission 不得读取其他 revision，也不得把源码或测试数据正文塞入 MQ。
 
@@ -951,7 +979,9 @@ Payload：
   "verdict": "AC",
   "time_ms": 32,
   "memory_kb": 4096,
-  "case_count": 15
+  "case_results": [
+    {"case_no": 1, "verdict": "AC", "time_ms": 12, "memory_kb": 4096}
+  ]
 }
 ```
 

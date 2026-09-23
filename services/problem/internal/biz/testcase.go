@@ -12,6 +12,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
+	judgecontract "github.com/viggggil/go_oj_agent/pkg/judge"
 )
 
 type Testcase struct {
@@ -72,7 +73,7 @@ func (uc *ProblemUsecase) ArchiveTestcase(ctx context.Context, requestContext *c
 		// active pointer is cleared until a testcase is added.
 		return uc.testcaseCommits.CommitArchivedTestcase(ctx, problemID, testcaseID, "", problem.ActiveJudgeRevision)
 	}
-	revision, err := uc.publishRevision(ctx, problemID, remaining)
+	revision, err := uc.publishRevision(ctx, problem, remaining)
 	if err != nil {
 		return Testcase{}, err
 	}
@@ -173,7 +174,7 @@ func (uc *ProblemUsecase) addTestcaseToProblem(ctx context.Context, problem Prob
 	if err == nil {
 		items = append(items, testcase)
 		var revision string
-		revision, err = uc.publishRevision(ctx, problem.ID, items)
+		revision, err = uc.publishRevision(ctx, problem, items)
 		if err == nil {
 			testcase, err = uc.testcaseCommits.CommitAddedTestcase(ctx, testcase, revision, problem.ActiveJudgeRevision)
 		}
@@ -191,32 +192,24 @@ func newUploadID() (string, error) {
 	return hex.EncodeToString(value[:]), nil
 }
 
-type manifestObject struct {
-	ObjectKey string `json:"object_key"`
-	SHA256    string `json:"sha256"`
-	Size      int64  `json:"size_bytes"`
-}
-
-type manifestTestcase struct {
-	CaseNo int32          `json:"case_no"`
-	Input  manifestObject `json:"input"`
-	Output manifestObject `json:"output"`
-}
-
-type judgeManifest struct {
-	ProblemID     int64              `json:"problem_id"`
-	JudgeRevision string             `json:"judge_revision"`
-	Testcases     []manifestTestcase `json:"testcases"`
-}
-
-func (uc *ProblemUsecase) publishRevision(ctx context.Context, problemID int64, items []Testcase) (string, error) {
+func (uc *ProblemUsecase) publishRevision(ctx context.Context, problem Problem, items []Testcase) (string, error) {
 	if len(items) == 0 {
 		return "", ErrorInvalidStatus("cannot publish an empty testcase revision")
 	}
+	if problem.ID <= 0 || problem.TimeLimitMs <= 0 || problem.MemoryLimitKb <= 0 {
+		return "", ErrorInvalidArgument("invalid judge revision limits")
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].CaseNo < items[j].CaseNo })
 	revisionID := ulid.Make().String()
-	prefix := fmt.Sprintf("problem-%d/judge-revisions/%s", problemID, revisionID)
-	manifest := judgeManifest{ProblemID: problemID, JudgeRevision: revisionID, Testcases: make([]manifestTestcase, 0, len(items))}
+	prefix := fmt.Sprintf("problem-%d/judge-revisions/%s", problem.ID, revisionID)
+	manifest := judgecontract.Manifest{
+		ManifestVersion: judgecontract.ManifestVersion,
+		ProblemID:       problem.ID,
+		JudgeRevision:   revisionID,
+		TimeLimitMS:     problem.TimeLimitMs,
+		MemoryLimitKB:   problem.MemoryLimitKb,
+		Testcases:       make([]judgecontract.Testcase, 0, len(items)),
+	}
 	for _, item := range items {
 		input, err := uc.readVerifiedObject(ctx, item.InputObjectKey, item.InputSHA256, item.InputSizeBytes)
 		if err != nil {
@@ -234,13 +227,27 @@ func (uc *ProblemUsecase) publishRevision(ctx context.Context, problemID int64, 
 		if err := uc.objects.PutImmutable(ctx, outputKey, output, "application/octet-stream"); err != nil {
 			return "", ErrorStorageUnavailable("publish testcase output: %v", err)
 		}
-		manifest.Testcases = append(manifest.Testcases, manifestTestcase{CaseNo: item.CaseNo, Input: manifestObject{ObjectKey: inputKey, SHA256: item.InputSHA256, Size: item.InputSizeBytes}, Output: manifestObject{ObjectKey: outputKey, SHA256: item.OutputSHA256, Size: item.OutputSizeBytes}})
+		manifest.Testcases = append(manifest.Testcases, judgecontract.Testcase{
+			CaseNo: item.CaseNo,
+			Input: judgecontract.Object{
+				ObjectKey: inputKey, SHA256: item.InputSHA256, SizeBytes: item.InputSizeBytes,
+			},
+			Output: judgecontract.Object{
+				ObjectKey: outputKey, SHA256: item.OutputSHA256, SizeBytes: item.OutputSizeBytes,
+			},
+		})
+	}
+	if err := manifest.Validate(); err != nil {
+		return "", ErrorInternal("validate judge manifest: %v", err)
 	}
 	content, err := json.Marshal(manifest)
 	if err != nil {
 		return "", ErrorInternal("marshal judge manifest: %v", err)
 	}
-	manifestKey := prefix + "/manifest.json"
+	manifestKey, err := judgecontract.ManifestObjectKey(problem.ID, revisionID)
+	if err != nil {
+		return "", ErrorInternal("build judge manifest key: %v", err)
+	}
 	if err := uc.objects.PutImmutable(ctx, manifestKey, content, "application/json"); err != nil {
 		return "", ErrorStorageUnavailable("publish judge manifest: %v", err)
 	}

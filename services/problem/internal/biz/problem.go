@@ -73,7 +73,7 @@ type ProblemRepository interface {
 	Create(context.Context, Problem, []string) (Problem, error)
 	FindByID(context.Context, int64) (Problem, error)
 	List(context.Context, int32, int32, bool) ([]Problem, int64, error)
-	Update(context.Context, Problem, []string) (Problem, error)
+	Update(context.Context, Problem, []string, string) (Problem, error)
 	Archive(context.Context, int64) (Problem, error)
 }
 
@@ -105,6 +105,8 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	if err := requireAdmin(requestContext); err != nil {
 		return Problem{}, err
 	}
+	unlock := uc.lockProblem(problemID)
+	defer unlock()
 	current, err := uc.repo.FindByID(ctx, problemID)
 	if err != nil {
 		return Problem{}, err
@@ -119,7 +121,25 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	input.Status = current.Status
 	input.CreatedBy = current.CreatedBy
 	input.CreatedAt = current.CreatedAt
-	updated, err := uc.repo.Update(ctx, input, normalizeTags(tags))
+	input.ActiveJudgeRevision = current.ActiveJudgeRevision
+	limitsChanged := input.TimeLimitMs != current.TimeLimitMs || input.MemoryLimitKb != current.MemoryLimitKb
+	if limitsChanged && current.ActiveJudgeRevision != "" {
+		if uc.testcases == nil || uc.objects == nil {
+			return Problem{}, ErrorInternal("judge revision dependencies are not configured")
+		}
+		items, listErr := uc.testcases.ListTestcases(ctx, problemID, false)
+		if listErr != nil {
+			return Problem{}, listErr
+		}
+		if len(items) == 0 {
+			return Problem{}, ErrorInvalidStatus("active judge revision has no testcases")
+		}
+		input.ActiveJudgeRevision, err = uc.publishRevision(ctx, input, items)
+		if err != nil {
+			return Problem{}, err
+		}
+	}
+	updated, err := uc.repo.Update(ctx, input, normalizeTags(tags), current.ActiveJudgeRevision)
 	if err == nil && uc.cache != nil {
 		_ = uc.cache.Delete(ctx, problemID)
 	}

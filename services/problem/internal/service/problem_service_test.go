@@ -156,13 +156,19 @@ func (r *serviceFakeRepository) Create(_ context.Context, problem biz.Problem, _
 }
 
 func (r *serviceFakeRepository) FindByID(context.Context, int64) (biz.Problem, error) {
+	if r.found.TimeLimitMs == 0 {
+		r.found.TimeLimitMs = 1000
+	}
+	if r.found.MemoryLimitKb == 0 {
+		r.found.MemoryLimitKb = 65536
+	}
 	return r.found, r.err
 }
 
 func (r *serviceFakeRepository) List(context.Context, int32, int32, bool) ([]biz.Problem, int64, error) {
 	return nil, 0, r.err
 }
-func (r *serviceFakeRepository) Update(_ context.Context, problem biz.Problem, _ []string) (biz.Problem, error) {
+func (r *serviceFakeRepository) Update(_ context.Context, problem biz.Problem, _ []string, _ string) (biz.Problem, error) {
 	return problem, r.err
 }
 func (r *serviceFakeRepository) Archive(context.Context, int64) (biz.Problem, error) {
@@ -240,7 +246,7 @@ func (*listServiceRepository) FindByID(context.Context, int64) (biz.Problem, err
 func (*listServiceRepository) List(context.Context, int32, int32, bool) ([]biz.Problem, int64, error) {
 	return []biz.Problem{{ID: 1, Title: "A+B", Slug: "a-plus-b", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL}}, 1, nil
 }
-func (*listServiceRepository) Update(context.Context, biz.Problem, []string) (biz.Problem, error) {
+func (*listServiceRepository) Update(context.Context, biz.Problem, []string, string) (biz.Problem, error) {
 	return biz.Problem{}, nil
 }
 func (*listServiceRepository) Archive(context.Context, int64) (biz.Problem, error) {

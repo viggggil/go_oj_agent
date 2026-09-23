@@ -27,6 +27,8 @@ import (
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
+	judgecontract "github.com/viggggil/go_oj_agent/pkg/judge"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 func TestJudgeSubmissionFlow(t *testing.T) {
@@ -48,6 +50,7 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	submissionDB := openIntegrationDB(t, submissionMySQLDSN)
 	adminID, adminToken := registerJudgeIntegrationUser(t, api, userDB, "judgeadmin", true)
 	problemID := createJudgeIntegrationProblem(t, api, adminToken)
+	assertJudgeRevisionManifest(t, minioEndpoint, problemID, problemRevision(t, problemDB, problemID), 1000, 65536)
 	userID, _ := registerJudgeIntegrationUser(t, api, userDB, "judgeuser", false)
 
 	client := newJudgeIntegrationClient(t, judgeEndpoint, privateKeyFile)
@@ -158,7 +161,7 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	}
 	assertSubmissionSourceObject(t, minioEndpoint, objectKey, source)
 	assertSubmissionAtomicRecords(t, submissionDB, userID, created.GetSubmissionId(), idempotencyKey)
-	requested := waitForRelayMessage(t, rabbitURL, "judge.task.go", "judge.requested", created.GetSubmissionId())
+	requested := waitForRelayMessage(t, rabbitURL, mq.RoutingJudgeTaskGo, mq.EventTypeJudgeTask, created.GetSubmissionId())
 	if requested.MessageID != requested.EventID || requested.RoutingKey != "judge.task.go" {
 		t.Fatalf("judge task metadata = %+v", requested)
 	}
@@ -230,7 +233,7 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	if rejudgeIdempotencyCount != 1 {
 		t.Fatalf("rejudge idempotency records = %d, want 1", rejudgeIdempotencyCount)
 	}
-	replacementRequested := waitForRelayMessage(t, rabbitURL, "judge.task.go", "judge.requested", newSubmission.GetId())
+	replacementRequested := waitForRelayMessage(t, rabbitURL, mq.RoutingJudgeTaskGo, mq.EventTypeJudgeTask, newSubmission.GetId())
 	invalidated := waitForRelayMessage(t, rabbitURL, "submission.invalidated", "submission.invalidated", created.GetSubmissionId())
 	waitForOutboxStatus(t, submissionDB, replacementRequested.EventID, "published")
 	waitForOutboxStatus(t, submissionDB, invalidated.EventID, "published")
@@ -264,12 +267,12 @@ func waitForRelayMessage(t *testing.T, rabbitURL, queue, eventType string, submi
 		var envelope struct {
 			EventID   string          `json:"event_id"`
 			EventType string          `json:"event_type"`
-			Payload   json.RawMessage `json:"payload"`
+			Data      json.RawMessage `json:"data"`
 		}
 		var payload struct {
 			SubmissionID int64 `json:"submission_id"`
 		}
-		if json.Unmarshal(delivery.Body, &envelope) != nil || json.Unmarshal(envelope.Payload, &payload) != nil {
+		if json.Unmarshal(delivery.Body, &envelope) != nil || json.Unmarshal(envelope.Data, &payload) != nil {
 			t.Fatalf("decode RabbitMQ message: %s", delivery.Body)
 		}
 		if envelope.EventType != eventType || payload.SubmissionID != submissionID {
@@ -421,6 +424,40 @@ func assertSubmissionSourceObject(t *testing.T, endpoint, key string, expected [
 	}
 	if !bytes.Equal(content, expected) {
 		t.Fatalf("submission source content = %q, want %q", content, expected)
+	}
+}
+
+func assertJudgeRevisionManifest(t *testing.T, endpoint string, problemID int64, revision string, timeLimitMS, memoryLimitKB int32) {
+	t.Helper()
+	client, err := minio.New(endpoint, &minio.Options{Creds: credentials.NewStaticV4(
+		integrationEnvOr("PROBLEM_TEST_MINIO_ACCESS_KEY", "minioadmin"),
+		integrationEnvOr("PROBLEM_TEST_MINIO_SECRET_KEY", "minioadmin"), "",
+	)})
+	if err != nil {
+		t.Fatalf("create MinIO client: %v", err)
+	}
+	key, err := judgecontract.ManifestObjectKey(problemID, revision)
+	if err != nil {
+		t.Fatalf("build judge manifest key: %v", err)
+	}
+	object, err := client.GetObject(t.Context(), "problem-data", key, minio.GetObjectOptions{})
+	if err != nil {
+		t.Fatalf("get judge manifest: %v", err)
+	}
+	defer object.Close()
+	content, err := io.ReadAll(object)
+	if err != nil {
+		t.Fatalf("read judge manifest: %v", err)
+	}
+	var manifest judgecontract.Manifest
+	if err = json.Unmarshal(content, &manifest); err != nil {
+		t.Fatalf("invalid judge manifest %s: %v", content, err)
+	}
+	if err = manifest.Validate(); err != nil {
+		t.Fatalf("invalid judge manifest %s: %v", content, err)
+	}
+	if manifest.ProblemID != problemID || manifest.JudgeRevision != revision || manifest.TimeLimitMS != timeLimitMS || manifest.MemoryLimitKB != memoryLimitKB || len(manifest.Testcases) != 1 {
+		t.Fatalf("judge manifest = %+v", manifest)
 	}
 }
 

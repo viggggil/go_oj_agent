@@ -63,6 +63,7 @@ func TestStoreCreateWithOutboxAndIdempotencyCommitsAtomically(t *testing.T) {
 		WithArgs(requestedEvent, int64(101), biz.EventTypeJudgeRequested, jsonArgument{biz.JudgeRequestedPayload{
 			SubmissionID: 101, ProblemID: 7, Language: "go", JudgeRevision: dataTestRevision,
 			SourceObjectKey: "sources/id/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 13,
+			JudgeDeadlineAt: now.Add(time.Minute),
 		}}, now).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec("UPDATE idempotency_requests").
@@ -163,6 +164,7 @@ func TestStoreInvalidateAndRequeueCommitsAtomically(t *testing.T) {
 		WithArgs(secondRequested, int64(45), biz.EventTypeJudgeRequested, jsonArgument{biz.JudgeRequestedPayload{
 			SubmissionID: 45, ProblemID: 7, Language: "go", JudgeRevision: dataTestRevision,
 			SourceObjectKey: "sources/id/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 13,
+			JudgeDeadlineAt: now.Add(2 * time.Minute),
 		}}, now).WillReturnResult(sqlmock.NewResult(2, 1))
 	mock.ExpectExec("UPDATE idempotency_requests").
 		WithArgs(jsonArgument{map[string]any{"invalidated_submission_id": int64(44), "submission_id": int64(45)}}, int64(9), biz.OperationRejudgeSubmission, rejudgeKey).

@@ -549,6 +549,7 @@ func insertJudgeRequestedOutbox(ctx context.Context, tx *sql.Tx, eventID string,
 		SubmissionID: submission.ID, ProblemID: submission.ProblemID, Language: submission.Language,
 		JudgeRevision: submission.JudgeRevision, SourceObjectKey: submission.SourceObjectKey,
 		SourceSHA256: submission.SourceSHA256, SourceSizeBytes: submission.SourceSizeBytes,
+		JudgeDeadlineAt: submission.JudgeDeadlineAt,
 	}
 	return insertOutbox(ctx, tx, eventID, submission.ID, biz.EventTypeJudgeRequested, payload, now)
 }

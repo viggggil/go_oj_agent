@@ -8,6 +8,7 @@ import (
 
 	"github.com/rabbitmq/amqp091-go"
 
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
 )
@@ -35,7 +36,7 @@ type RabbitResultConsumer struct {
 	cancel               context.CancelFunc
 }
 
-var judgeEventRoutes = []string{"judge.task.cpp", "judge.task.go", "judge.task.python", "judge.task.java", biz.EventTypeSubmissionInvalidated, biz.EventTypeSubmissionJudged}
+var judgeEventRoutes = append(mq.JudgeTaskRoutingKeys(), biz.EventTypeSubmissionInvalidated, biz.EventTypeSubmissionJudged)
 
 func NewRabbitResultConsumer(config *conf.Bootstrap, handler ResultHandler) (*RabbitResultConsumer, func(), error) {
 	if config == nil || config.GetMessaging() == nil || config.GetMessaging().GetRabbitmq() == nil {
@@ -169,8 +170,8 @@ func (c *RabbitResultConsumer) Close() error {
 }
 
 const (
-	EventRoutingJudgeCompleted = "judge.completed"
-	EventRoutingJudgeFailed    = "judge.failed"
+	EventRoutingJudgeCompleted = mq.RoutingJudgeCompleted
+	EventRoutingJudgeFailed    = mq.RoutingJudgeFailed
 )
 
 func NewRabbitPublisher(config *conf.Bootstrap) (*RabbitPublisher, func(), error) {

@@ -11,6 +11,7 @@ import (
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
+	judgecontract "github.com/viggggil/go_oj_agent/pkg/judge"
 )
 
 func TestAddTestcaseUploadsAndPersistsMetadata(t *testing.T) {
@@ -32,11 +33,12 @@ func TestAddTestcaseUploadsAndPersistsMetadata(t *testing.T) {
 		t.Fatalf("committed revision = %q", testcases.committedRevision)
 	}
 	manifestKey := "problem-2/judge-revisions/" + testcases.committedRevision + "/manifest.json"
-	var manifest judgeManifest
+	var manifest judgecontract.Manifest
 	if err := json.Unmarshal(objects.objects[manifestKey], &manifest); err != nil {
 		t.Fatalf("invalid manifest: %v", err)
 	}
-	if manifest.JudgeRevision != testcases.committedRevision || len(manifest.Testcases) != 1 || manifest.Testcases[0].CaseNo != 1 {
+	if manifest.ManifestVersion != judgecontract.ManifestVersion || manifest.JudgeRevision != testcases.committedRevision ||
+		manifest.TimeLimitMS != 1000 || manifest.MemoryLimitKB != 65536 || len(manifest.Testcases) != 1 || manifest.Testcases[0].CaseNo != 1 {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 }
@@ -252,18 +254,31 @@ func (r *fakeProblemRepository) Create(_ context.Context, problem Problem, tags 
 	}
 	if r.created.ID == 0 {
 		r.created = problem
+	} else {
+		if r.created.TimeLimitMs == 0 {
+			r.created.TimeLimitMs = problem.TimeLimitMs
+		}
+		if r.created.MemoryLimitKb == 0 {
+			r.created.MemoryLimitKb = problem.MemoryLimitKb
+		}
 	}
 	return r.created, nil
 }
 
 func (r *fakeProblemRepository) FindByID(context.Context, int64) (Problem, error) {
+	if r.created.TimeLimitMs == 0 {
+		r.created.TimeLimitMs = 1000
+	}
+	if r.created.MemoryLimitKb == 0 {
+		r.created.MemoryLimitKb = 65536
+	}
 	return r.created, r.err
 }
 
 func (r *fakeProblemRepository) List(context.Context, int32, int32, bool) ([]Problem, int64, error) {
 	return nil, 0, r.err
 }
-func (r *fakeProblemRepository) Update(_ context.Context, problem Problem, tags []string) (Problem, error) {
+func (r *fakeProblemRepository) Update(_ context.Context, problem Problem, tags []string, _ string) (Problem, error) {
 	r.input, r.tags = problem, tags
 	return problem, r.err
 }
@@ -345,7 +360,7 @@ func (r *listRepository) List(_ context.Context, _, _ int32, includeArchived boo
 	r.includeArchived = includeArchived
 	return []Problem{{ID: 1}}, 1, nil
 }
-func (*listRepository) Update(context.Context, Problem, []string) (Problem, error) {
+func (*listRepository) Update(context.Context, Problem, []string, string) (Problem, error) {
 	return Problem{}, nil
 }
 func (*listRepository) Archive(context.Context, int64) (Problem, error) { return Problem{}, nil }
@@ -396,6 +411,67 @@ func TestUpdateProblemInvalidatesCache(t *testing.T) {
 	_, err := NewProblemUsecaseWithDependencies(repo, nil, nil, nil, cache).Update(context.Background(), adminContext(), 2, Problem{Title: "A", Slug: "a", Description: "S", Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1, MemoryLimitKb: 1}, nil)
 	if err != nil || cache.deletes != 1 {
 		t.Fatalf("err=%v deletes=%d", err, cache.deletes)
+	}
+}
+
+func TestUpdateProblemLimitsPublishesNewJudgeRevision(t *testing.T) {
+	inputContent := []byte("1 2\n")
+	outputContent := []byte("3\n")
+	inputHash := sha256.Sum256(inputContent)
+	outputHash := sha256.Sum256(outputContent)
+	oldRevision := "01K5C6Y7N8P9Q0R1S2T3V4W5X6"
+	problem := Problem{
+		ID: 2, Title: "A+B", Slug: "a-plus-b", Description: "Add.",
+		Difficulty:  problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536, ActiveJudgeRevision: oldRevision,
+		Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL, CreatedBy: 1,
+	}
+	testcases := &fakeTestcaseRepository{items: []Testcase{{
+		ID: 1, ProblemID: 2, CaseNo: 1, InputObjectKey: "source/1.in", OutputObjectKey: "source/1.out",
+		InputSHA256: fmt.Sprintf("%x", inputHash), OutputSHA256: fmt.Sprintf("%x", outputHash),
+		InputSizeBytes: int64(len(inputContent)), OutputSizeBytes: int64(len(outputContent)),
+		Status: problemv1.TestcaseStatus_TESTCASE_STATUS_ACTIVE,
+	}}}
+	objects := &fakeObjectStore{objects: map[string][]byte{"source/1.in": inputContent, "source/1.out": outputContent}}
+	repo := &fakeProblemRepository{created: problem}
+	input := problem
+	input.TimeLimitMs = 2000
+	input.MemoryLimitKb = 131072
+
+	updated, err := NewProblemUsecaseWithDependencies(repo, testcases, objects, repo, nil).
+		Update(context.Background(), adminContext(), problem.ID, input, nil)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.ActiveJudgeRevision == "" || updated.ActiveJudgeRevision == oldRevision {
+		t.Fatalf("active revision = %q", updated.ActiveJudgeRevision)
+	}
+	manifestKey := fmt.Sprintf("problem-%d/judge-revisions/%s/manifest.json", problem.ID, updated.ActiveJudgeRevision)
+	var manifest judgecontract.Manifest
+	if err := json.Unmarshal(objects.objects[manifestKey], &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	if manifest.TimeLimitMS != 2000 || manifest.MemoryLimitKB != 131072 || len(manifest.Testcases) != 1 {
+		t.Fatalf("manifest = %+v", manifest)
+	}
+}
+
+func TestUpdateProblemMetadataKeepsJudgeRevision(t *testing.T) {
+	problem := Problem{
+		ID: 2, Title: "A+B", Slug: "a-plus-b", Description: "Add.",
+		Difficulty:  problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		ActiveJudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+		Status:              problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL,
+	}
+	repo := &fakeProblemRepository{created: problem}
+	input := problem
+	input.Title = "New title"
+	objects := &fakeObjectStore{}
+	updated, err := NewProblemUsecaseWithDependencies(repo, &fakeTestcaseRepository{}, objects, repo, nil).
+		Update(context.Background(), adminContext(), problem.ID, input, nil)
+	if err != nil || updated.ActiveJudgeRevision != problem.ActiveJudgeRevision || len(objects.puts) != 0 {
+		t.Fatalf("updated=%+v puts=%v err=%v", updated, objects.puts, err)
 	}
 }
 

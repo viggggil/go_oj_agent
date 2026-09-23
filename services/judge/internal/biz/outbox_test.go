@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 func TestOutboxRelayPublishesAndMarksEvent(t *testing.T) {
@@ -16,7 +18,8 @@ func TestOutboxRelayPublishesAndMarksEvent(t *testing.T) {
 		EventType: EventTypeJudgeRequested, EventVersion: 1, Payload: mustJSON(t, JudgeRequestedPayload{
 			SubmissionID: 9, ProblemID: 7, Language: "go", JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
 			SourceObjectKey: "sources/a/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 10,
-		}), RetryCount: 0,
+			JudgeDeadlineAt: now.Add(time.Minute),
+		}), RetryCount: 0, CreatedAt: now,
 	}}}
 	publisher := &publisherFake{}
 	relay := NewOutboxRelay(repository, publisher)
@@ -33,27 +36,25 @@ func TestOutboxRelayPublishesAndMarksEvent(t *testing.T) {
 	if repository.publishedID != 1 || repository.publishedOwner != "relay-1" {
 		t.Fatalf("published event = %d owner=%q", repository.publishedID, repository.publishedOwner)
 	}
-	var envelope struct {
-		EventID string `json:"event_id"`
-		Payload struct {
-			SourceObjectKey string `json:"source_object_key"`
-		} `json:"payload"`
-	}
-	if err := json.Unmarshal(publisher.messages[0].Body, &envelope); err != nil || envelope.EventID == "" || envelope.Payload.SourceObjectKey == "" {
+	var task mq.JudgeTask
+	envelope, err := mq.UnmarshalEnvelope(publisher.messages[0].Body, mq.EventTypeJudgeTask, &task)
+	if err != nil || envelope.EventID == "" || task.SourceObjectKey == "" || publisher.messages[0].EventType != mq.EventTypeJudgeTask {
 		t.Fatalf("message envelope = %s, error=%v", publisher.messages[0].Body, err)
 	}
 }
 
 func TestOutboxRelayBacksOffAndDeadLettersAfterMaxRetries(t *testing.T) {
+	now := time.Date(2026, 9, 21, 3, 0, 0, 0, time.UTC)
 	repository := &outboxRepositoryFake{events: []OutboxEvent{{
 		ID: 2, EventID: "123e4567-e89b-12d3-a456-426614174001", AggregateID: 9,
 		EventType: EventTypeJudgeRequested, EventVersion: 1, Payload: mustJSON(t, JudgeRequestedPayload{
 			SubmissionID: 9, ProblemID: 7, Language: "go", JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
 			SourceObjectKey: "sources/a/source.go", SourceSHA256: strings.Repeat("b", 64), SourceSizeBytes: 10,
-		}), RetryCount: 2,
+			JudgeDeadlineAt: now.Add(time.Minute),
+		}), RetryCount: 2, CreatedAt: now,
 	}}}
 	relay := NewOutboxRelay(repository, &publisherFake{err: errors.New("broker unavailable")})
-	relay.clock = func() time.Time { return time.Date(2026, 9, 21, 3, 0, 0, 0, time.UTC) }
+	relay.clock = func() time.Time { return now }
 	relay.Configure(OutboxRelayConfig{Owner: "relay-1", MaxRetries: 3, RetryDelay: time.Second})
 	if processed, err := relay.RunOnce(context.Background()); err != nil || processed != 1 {
 		t.Fatalf("RunOnce() = %d, %v", processed, err)

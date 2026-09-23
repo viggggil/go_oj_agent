@@ -189,7 +189,7 @@ func (s *StoreSet) List(ctx context.Context, page, pageSize int32, includeArchiv
 	return items, total, rows.Err()
 }
 
-func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []string) (updated biz.Problem, err error) {
+func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []string, expectedActiveRevision string) (updated biz.Problem, err error) {
 	if s == nil || s.db == nil {
 		return biz.Problem{}, biz.ErrorInternal("problem database is not configured")
 	}
@@ -204,10 +204,12 @@ func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []strin
 	}()
 	result, err := tx.ExecContext(ctx, `
 		UPDATE problems SET title = ?, slug = ?, description = ?, difficulty = ?,
-		       time_limit_ms = ?, memory_limit_kb = ?, updated_at = UTC_TIMESTAMP(3)
-		WHERE id = ? AND status = ?
+		       time_limit_ms = ?, memory_limit_kb = ?, active_judge_revision = NULLIF(?, ''),
+		       updated_at = UTC_TIMESTAMP(3)
+		WHERE id = ? AND status = ? AND active_judge_revision <=> NULLIF(?, '')
 	`, problem.Title, problem.Slug, problem.Description, problem.Difficulty.String(), problem.TimeLimitMs,
-		problem.MemoryLimitKb, problem.ID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String())
+		problem.MemoryLimitKb, problem.ActiveJudgeRevision, problem.ID,
+		problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String(), expectedActiveRevision)
 	if err != nil {
 		return biz.Problem{}, translateMySQLError(err)
 	}
@@ -216,7 +218,7 @@ func (s *StoreSet) Update(ctx context.Context, problem biz.Problem, tags []strin
 		return biz.Problem{}, err
 	}
 	if affected == 0 {
-		return biz.Problem{}, biz.ErrorInvalidStatus("problem is not updateable")
+		return biz.Problem{}, biz.ErrorInvalidStatus("problem or active judge revision changed concurrently")
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM problem_tags WHERE problem_id = ?`, problem.ID); err != nil {
 		return biz.Problem{}, err

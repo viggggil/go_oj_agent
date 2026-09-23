@@ -381,13 +381,15 @@ func TestUpdateProblemRepositoryReplacesTags(t *testing.T) {
 	p := repositoryProblem()
 	p.ID = 4
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE problems SET").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE problems SET").
+		WithArgs(p.Title, p.Slug, p.Description, p.Difficulty.String(), p.TimeLimitMs, p.MemoryLimitKb, "", p.ID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String(), "").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("DELETE FROM problem_tags").WithArgs(int64(4)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("SELECT id, name FROM tags").WithArgs("dp").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(2, "dp"))
 	mock.ExpectExec("INSERT INTO problem_tags").WithArgs(int64(4), int64(2)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("SELECT updated_at").WithArgs(int64(4)).WillReturnRows(sqlmock.NewRows([]string{"updated_at"}).AddRow(time.Now()))
 	mock.ExpectCommit()
-	updated, err := NewStoreSet(db).Update(context.Background(), p, []string{"dp"})
+	updated, err := NewStoreSet(db).Update(context.Background(), p, []string{"dp"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

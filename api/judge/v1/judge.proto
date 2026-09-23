@@ -28,6 +28,8 @@ enum JudgeVerdict {
   JUDGE_VERDICT_CE = 6;
 }
 
+// Legacy protobuf model. RabbitMQ contracts live in pkg/mq and must not be
+// used by new producers or consumers.
 message JudgeCaseResult {
   int32 case_no = 1;
   JudgeVerdict verdict = 2;
@@ -36,6 +38,7 @@ message JudgeCaseResult {
   string message = 5;
 }
 
+// Legacy protobuf model. RabbitMQ contracts live in pkg/mq.
 message JudgeResult {
   int64 submission_id = 1 [(validate.rules).int64.gt = 0];
   JudgeVerdict verdict = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
@@ -46,7 +49,7 @@ message JudgeResult {
   string event_id = 7 [(validate.rules).string.uuid = true];
 }
 
-// JudgeTask is the RabbitMQ payload published to judge.task.<language>.
+// Legacy protobuf model. The canonical RabbitMQ JudgeTask lives in pkg/mq.
 message JudgeTask {
   string event_id = 1 [(validate.rules).string.uuid = true];
   int64 submission_id = 2 [(validate.rules).int64.gt = 0];
@@ -58,8 +61,7 @@ message JudgeTask {
   int64 source_size_bytes = 8 [(validate.rules).int64.gt = 0];
 }
 
-// JudgeFailure reports an infrastructure failure. User-code verdicts such as
-// RE, CE, TLE and MLE are normal JudgeResult values, not JudgeFailure values.
+// Legacy protobuf model. The canonical RabbitMQ JudgeFailed lives in pkg/mq.
 message JudgeFailure {
   string event_id = 1 [(validate.rules).string.uuid = true];
   int64 submission_id = 2 [(validate.rules).int64.gt = 0];

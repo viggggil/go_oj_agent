@@ -448,6 +448,14 @@ Event Envelope：
 }
 ```
 
+Judge Task 的公共 `event_type` 为 `judge.task`，语言由 routing key 区分；
+`judge.requested` 只作为 Judge Service 内部 Outbox Intent。Envelope、Task、
+Completed 和 Failed 的代码契约统一放在 `pkg/mq`。
+
+Problem 的每个 immutable revision 在 manifest 顶层保存一份题目级时间和内存
+限制，该 revision 下所有测试点共享。修改限制与修改测试点一样会生成新
+revision，MySQL 仍只保存最新 active 指针。
+
 ---
 
 ## 8. Judge Worker

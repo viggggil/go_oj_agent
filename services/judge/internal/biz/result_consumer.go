@@ -2,17 +2,17 @@ package biz
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 const (
-	EventTypeJudgeCompleted   = "judge.completed"
-	EventTypeJudgeFailed      = "judge.failed"
+	EventTypeJudgeCompleted   = mq.EventTypeJudgeCompleted
+	EventTypeJudgeFailed      = mq.EventTypeJudgeFailed
 	EventTypeSubmissionJudged = "submission.judged"
 )
 
@@ -57,86 +57,40 @@ func (c *ResultConsumer) Handle(ctx context.Context, eventType string, body []by
 }
 
 func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, error) {
-	var envelope struct {
-		EventID      string          `json:"event_id"`
-		EventType    string          `json:"event_type"`
-		EventVersion int32           `json:"event_version"`
-		Payload      json.RawMessage `json:"payload"`
-		Data         json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge result envelope")
-	}
-	if envelope.EventType != "" && eventType != "" && envelope.EventType != eventType {
-		return JudgeResultEvent{}, ErrorInvalidArgument("judge result event type mismatch")
-	}
-	if eventType == "" {
-		eventType = envelope.EventType
-	}
-	payload := envelope.Payload
-	if len(payload) == 0 {
-		payload = envelope.Data
-	}
-	if envelope.EventID == "" || len(payload) == 0 {
-		return JudgeResultEvent{}, ErrorInvalidArgument("judge result envelope is incomplete")
-	}
-	result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion}
 	switch eventType {
 	case EventTypeJudgeCompleted:
-		var value struct {
-			SubmissionID  int64  `json:"submission_id"`
-			JudgeRevision string `json:"judge_revision"`
-			Verdict       string `json:"verdict"`
-			TimeMS        int32  `json:"time_ms"`
-			MemoryKB      int32  `json:"memory_kb"`
-			CaseResults   []struct {
-				CaseNo   int32  `json:"case_no"`
-				Verdict  string `json:"verdict"`
-				TimeMS   int32  `json:"time_ms"`
-				MemoryKB int32  `json:"memory_kb"`
-				Message  string `json:"message"`
-			} `json:"case_results"`
-			OccurredAt time.Time `json:"occurred_at"`
-		}
-		if err := json.Unmarshal(payload, &value); err != nil {
+		var value mq.JudgeCompleted
+		envelope, err := mq.UnmarshalEnvelope(body, eventType, &value)
+		if err != nil || value.Validate() != nil {
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge completed payload")
 		}
-		result.SubmissionID, result.JudgeRevision, result.OccurredAt = value.SubmissionID, value.JudgeRevision, value.OccurredAt
-		if value.OccurredAt.IsZero() {
-			result.OccurredAt = time.Now().UTC()
-		}
+		result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion}
+		result.SubmissionID, result.JudgeRevision, result.OccurredAt = value.SubmissionID, value.JudgeRevision, envelope.OccurredAt
 		result.Verdict, _ = verdictFromWire(value.Verdict)
-		if result.Verdict == submissionv1.JudgeVerdict_JUDGE_VERDICT_UNSPECIFIED || result.SubmissionID <= 0 || len(result.JudgeRevision) != 26 {
-			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge completed payload")
-		}
 		result.TimeMS, result.MemoryKB = &value.TimeMS, &value.MemoryKB
 		for _, item := range value.CaseResults {
 			verdict, ok := verdictFromWire(item.Verdict)
-			if !ok || item.CaseNo <= 0 {
+			if !ok {
 				return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge case result")
 			}
 			tm, mm := item.TimeMS, item.MemoryKB
 			result.CaseResults = append(result.CaseResults, CaseResult{CaseNo: item.CaseNo, Verdict: verdict, TimeMS: &tm, MemoryKB: &mm, Message: item.Message})
 		}
+		return result, nil
 	case EventTypeJudgeFailed:
-		var value struct {
-			SubmissionID  int64     `json:"submission_id"`
-			JudgeRevision string    `json:"judge_revision"`
-			Reason        string    `json:"reason"`
-			Retryable     bool      `json:"retryable"`
-			OccurredAt    time.Time `json:"occurred_at"`
-		}
-		if err := json.Unmarshal(payload, &value); err != nil || value.SubmissionID <= 0 || len(value.JudgeRevision) != 26 || strings.TrimSpace(value.Reason) == "" {
+		var value mq.JudgeFailed
+		envelope, err := mq.UnmarshalEnvelope(body, eventType, &value)
+		if err != nil || value.Validate() != nil {
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge failed payload")
 		}
-		result.SubmissionID, result.JudgeRevision, result.Reason, result.Retryable, result.OccurredAt = value.SubmissionID, value.JudgeRevision, value.Reason, value.Retryable, value.OccurredAt
-		if result.OccurredAt.IsZero() {
-			result.OccurredAt = time.Now().UTC()
-		}
+		return JudgeResultEvent{
+			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion,
+			SubmissionID: value.SubmissionID, JudgeRevision: value.JudgeRevision,
+			Reason: value.Reason, Retryable: value.Retryable, OccurredAt: envelope.OccurredAt,
+		}, nil
 	default:
 		return JudgeResultEvent{}, ErrorInvalidArgument("unsupported judge result event %q", eventType)
 	}
-	return result, nil
 }
 
 func verdictFromWire(value string) (submissionv1.JudgeVerdict, bool) {
