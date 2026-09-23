@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -248,12 +249,9 @@ func waitForRelayMessage(t *testing.T, rabbitURL, queue, eventType string, submi
 		t.Fatalf("connect RabbitMQ: %v", err)
 	}
 	defer connection.Close()
-	channel, err := connection.Channel()
-	if err != nil {
-		t.Fatalf("open RabbitMQ channel: %v", err)
-	}
-	defer channel.Close()
 	deadline := time.Now().Add(10 * time.Second)
+	channel := waitForRabbitQueue(t, connection, queue, deadline)
+	defer channel.Close()
 	for time.Now().Before(deadline) {
 		delivery, ok, getErr := channel.Get(queue, true)
 		if getErr != nil {
@@ -287,6 +285,27 @@ func waitForRelayMessage(t *testing.T, rabbitURL, queue, eventType string, submi
 	}
 	t.Fatalf("timed out waiting for %s submission %d", eventType, submissionID)
 	return relayMessage{}
+}
+
+func waitForRabbitQueue(t *testing.T, connection *amqp091.Connection, queue string, deadline time.Time) *amqp091.Channel {
+	t.Helper()
+	for time.Now().Before(deadline) {
+		channel, err := connection.Channel()
+		if err != nil {
+			t.Fatalf("open RabbitMQ channel: %v", err)
+		}
+		if _, err = channel.QueueDeclarePassive(queue, true, false, false, false, nil); err == nil {
+			return channel
+		}
+		_ = channel.Close()
+		var rabbitErr *amqp091.Error
+		if !errors.As(err, &rabbitErr) || rabbitErr.Code != 404 {
+			t.Fatalf("inspect RabbitMQ queue %s: %v", queue, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for RabbitMQ queue %s", queue)
+	return nil
 }
 
 func waitForOutboxStatus(t *testing.T, db *sql.DB, eventID, want string) {

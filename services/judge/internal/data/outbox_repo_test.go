@@ -20,7 +20,8 @@ func TestStoreClaimOutboxLeasesRows(t *testing.T) {
 		WithArgs(biz.OutboxStatusPending, now, now, 2).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "event_id", "aggregate_type", "aggregate_id", "event_type", "event_version", "payload", "status", "retry_count", "next_retry_at", "lease_owner", "lease_until", "created_at", "published_at",
-		}).AddRow(1, "123e4567-e89b-12d3-a456-426614174000", "submission", 9, biz.EventTypeJudgeRequested, 1, []byte(`{"submission_id":9}`), biz.OutboxStatusPending, 0, nil, nil, nil, now, nil))
+		}).AddRow(1, "123e4567-e89b-12d3-a456-426614174000", "submission", 9, biz.EventTypeJudgeRequested, 1, []byte(`{"submission_id":9}`), biz.OutboxStatusPending, 0, nil, nil, nil, now, nil)).
+		RowsWillBeClosed()
 	mock.ExpectExec("UPDATE outbox_events").
 		WithArgs("relay-1", leaseUntil, int64(1), biz.OutboxStatusPending).
 		WillReturnResult(sqlmock.NewResult(0, 1))

@@ -20,6 +20,8 @@ type RabbitPublisher struct {
 	channel  *amqp091.Channel
 }
 
+const publishConfirmTimeout = 5 * time.Second
+
 type ResultHandler interface {
 	Handle(context.Context, string, []byte) error
 }
@@ -60,34 +62,10 @@ func (c *RabbitResultConsumer) Start(ctx context.Context) error {
 		_ = conn.Close()
 		return err
 	}
-	if err = ch.ExchangeDeclare(c.exchange, amqp091.ExchangeTopic, true, false, false, false, nil); err != nil {
+	if err = c.declareTopology(ch); err != nil {
 		_ = ch.Close()
 		_ = conn.Close()
 		return err
-	}
-	if _, err = ch.QueueDeclare(c.queue, true, false, false, false, nil); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
-		return err
-	}
-	for _, route := range judgeEventRoutes {
-		if _, err = ch.QueueDeclare(route, true, false, false, false, nil); err != nil {
-			_ = ch.Close()
-			_ = conn.Close()
-			return err
-		}
-		if err = ch.QueueBind(route, route, c.exchange, false, nil); err != nil {
-			_ = ch.Close()
-			_ = conn.Close()
-			return err
-		}
-	}
-	for _, key := range []string{EventRoutingJudgeCompleted, EventRoutingJudgeFailed} {
-		if err = ch.QueueBind(c.queue, key, c.exchange, false, nil); err != nil {
-			_ = ch.Close()
-			_ = conn.Close()
-			return err
-		}
 	}
 	if err = ch.Qos(16, 0, false); err != nil {
 		_ = ch.Close()
@@ -126,6 +104,47 @@ func (c *RabbitResultConsumer) Start(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// Prepare declares durable topology before Kratos starts any transport server.
+func (c *RabbitResultConsumer) Prepare(context.Context) error {
+	if c == nil || c.handler == nil {
+		return fmt.Errorf("rabbitmq result consumer is not configured")
+	}
+	conn, err := amqp091.Dial(c.url)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	ch, err := conn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+	return c.declareTopology(ch)
+}
+
+func (c *RabbitResultConsumer) declareTopology(ch *amqp091.Channel) error {
+	if err := ch.ExchangeDeclare(c.exchange, amqp091.ExchangeTopic, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := ch.QueueDeclare(c.queue, true, false, false, false, nil); err != nil {
+		return err
+	}
+	for _, route := range judgeEventRoutes {
+		if _, err := ch.QueueDeclare(route, true, false, false, false, nil); err != nil {
+			return err
+		}
+		if err := ch.QueueBind(route, route, c.exchange, false, nil); err != nil {
+			return err
+		}
+	}
+	for _, key := range []string{EventRoutingJudgeCompleted, EventRoutingJudgeFailed} {
+		if err := ch.QueueBind(c.queue, key, c.exchange, false, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *RabbitResultConsumer) Close() error {
@@ -175,10 +194,12 @@ func (p *RabbitPublisher) Publish(ctx context.Context, message biz.PublishedMess
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	publishCtx, cancel := context.WithTimeout(ctx, publishConfirmTimeout)
+	defer cancel()
 	if err := p.ensureConnectedLocked(); err != nil {
 		return err
 	}
-	confirm, err := p.channel.PublishWithDeferredConfirmWithContext(ctx, p.exchange, message.RoutingKey, false, false, amqp091.Publishing{
+	confirm, err := p.channel.PublishWithDeferredConfirmWithContext(publishCtx, p.exchange, message.RoutingKey, false, false, amqp091.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp091.Persistent,
 		MessageId:    message.EventID,
@@ -194,7 +215,7 @@ func (p *RabbitPublisher) Publish(ctx context.Context, message biz.PublishedMess
 		p.resetLocked()
 		return fmt.Errorf("rabbitmq publisher confirm was not created")
 	}
-	confirmed, err := confirm.WaitContext(ctx)
+	confirmed, err := confirm.WaitContext(publishCtx)
 	if err != nil {
 		p.resetLocked()
 		return err

@@ -15,6 +15,8 @@ import (
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 )
 
+const resultConsumerName = "judge-result-consumer"
+
 func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEvent) (err error) {
 	if s == nil || s.db == nil {
 		return biz.ErrorInternal("submission repository is not configured")
@@ -28,7 +30,7 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		return storageError(err)
 	}
 	defer rollbackOnError(tx, &err)
-	result, err := tx.ExecContext(ctx, `INSERT IGNORE INTO processed_events (event_id, event_type, processed_at) VALUES (?, ?, ?)`, event.EventID, event.EventType, now)
+	result, err := tx.ExecContext(ctx, `INSERT IGNORE INTO processed_events (consumer_name, event_id, processed_at) VALUES (?, ?, ?)`, resultConsumerName, event.EventID, now)
 	if err != nil {
 		return storageError(err)
 	}
@@ -53,14 +55,16 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 	if revision != event.JudgeRevision {
 		return biz.ErrorInvalidArgument("judge result revision does not match submission")
 	}
-	if status == "done" || status == "invalidated" || status == "cancelled" {
+	if status == statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE) ||
+		status == statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_INVALIDATED) ||
+		status == statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_CANCELLED) {
 		if err = tx.Commit(); err != nil {
 			return storageError(err)
 		}
 		return nil
 	}
 	if event.EventType == biz.EventTypeJudgeCompleted {
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'done', verdict = ?, time_ms = ?, memory_kb = ?, judged_at = ?, updated_at = ?, system_error_reason = NULL WHERE id = ?`, verdictToDB(event.Verdict), nullableInt32Value(event.TimeMS), nullableInt32Value(event.MemoryKB), event.OccurredAt, now, event.SubmissionID); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, verdict = ?, time_ms = ?, memory_kb = ?, judged_at = ?, updated_at = ?, system_error_reason = NULL WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), verdictToDB(event.Verdict), nullableInt32Value(event.TimeMS), nullableInt32Value(event.MemoryKB), event.OccurredAt, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 		for _, item := range event.CaseResults {
@@ -69,7 +73,7 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 			}
 		}
 	} else if event.Retryable {
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'retry_wait', retry_count = LEAST(retry_count + 1, 3), system_error_reason = ?, updated_at = ? WHERE id = ?`, event.Reason, now, event.SubmissionID); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, retry_count = LEAST(retry_count + 1, 3), system_error_reason = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_RETRY_WAIT), event.Reason, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 		if err = tx.Commit(); err != nil {
@@ -77,7 +81,7 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		}
 		return nil
 	} else {
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = 'done', system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, event.Reason, event.OccurredAt, now, event.SubmissionID); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), event.Reason, event.OccurredAt, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 	}
@@ -432,14 +436,24 @@ func (s *StoreSet) ClaimOutbox(ctx context.Context, owner string, now, leaseUnti
 	if err != nil {
 		return nil, storageError(err)
 	}
-	defer rows.Close()
 	for rows.Next() {
 		event, scanErr := scanOutbox(rows)
 		if scanErr != nil {
+			_ = rows.Close()
 			return nil, scanErr
 		}
 		event.LeaseOwner = owner
 		event.LeaseUntil = &leaseUntil
+		events = append(events, event)
+	}
+	if err = rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, storageError(err)
+	}
+	if err = rows.Close(); err != nil {
+		return nil, storageError(err)
+	}
+	for _, event := range events {
 		if _, err = tx.ExecContext(ctx, `
 			UPDATE outbox_events
 			SET lease_owner = ?, lease_until = ?
@@ -447,13 +461,6 @@ func (s *StoreSet) ClaimOutbox(ctx context.Context, owner string, now, leaseUnti
 		`, owner, leaseUntil, event.ID, biz.OutboxStatusPending); err != nil {
 			return nil, storageError(err)
 		}
-		events = append(events, event)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, storageError(err)
-	}
-	if err = rows.Close(); err != nil {
-		return nil, storageError(err)
 	}
 	if err = tx.Commit(); err != nil {
 		return nil, storageError(err)

@@ -234,6 +234,58 @@ func TestStoreGetJudgeResultMapsNullableFieldsAndOrdersCases(t *testing.T) {
 	assertExpectations(t, mock)
 }
 
+func TestStoreApplyJudgeResultUsesConsumerIdentityAndCanonicalStatus(t *testing.T) {
+	store, mock, now := newMockStore(t)
+	event := biz.JudgeResultEvent{
+		EventID: "123e4567-e89b-12d3-a456-426614174005", EventType: biz.EventTypeJudgeCompleted,
+		EventVersion: 1, SubmissionID: 44, JudgeRevision: dataTestRevision,
+		Verdict: submissionv1.JudgeVerdict_JUDGE_VERDICT_AC, OccurredAt: now,
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT IGNORE INTO processed_events \\(consumer_name, event_id, processed_at\\)").
+		WithArgs(resultConsumerName, event.EventID, now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT user_id, problem_id, judge_revision, status FROM submissions WHERE id = \\? FOR UPDATE").
+		WithArgs(int64(44)).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "problem_id", "judge_revision", "status"}).AddRow(5, 7, dataTestRevision, "RUNNING"))
+	mock.ExpectExec("UPDATE submissions SET status = \\?, verdict = \\?").
+		WithArgs("DONE", "AC", nil, nil, now, now, int64(44)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO outbox_events").
+		WithArgs(sqlmock.AnyArg(), int64(44), biz.EventTypeSubmissionJudged, jsonArgument{biz.SubmissionJudgedPayload{
+			SubmissionID: 44, UserID: 5, ProblemID: 7, Verdict: "AC", JudgedAt: now,
+		}}, now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	if err := store.ApplyJudgeResult(context.Background(), event); err != nil {
+		t.Fatalf("ApplyJudgeResult() error = %v", err)
+	}
+	assertExpectations(t, mock)
+}
+
+func TestStoreApplyJudgeResultDoesNotOverwriteInvalidatedSubmission(t *testing.T) {
+	store, mock, now := newMockStore(t)
+	event := biz.JudgeResultEvent{
+		EventID: "123e4567-e89b-12d3-a456-426614174006", EventType: biz.EventTypeJudgeCompleted,
+		EventVersion: 1, SubmissionID: 44, JudgeRevision: dataTestRevision,
+		Verdict: submissionv1.JudgeVerdict_JUDGE_VERDICT_AC, OccurredAt: now,
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT IGNORE INTO processed_events \\(consumer_name, event_id, processed_at\\)").
+		WithArgs(resultConsumerName, event.EventID, now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT user_id, problem_id, judge_revision, status FROM submissions WHERE id = \\? FOR UPDATE").
+		WithArgs(int64(44)).
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "problem_id", "judge_revision", "status"}).AddRow(5, 7, dataTestRevision, "INVALIDATED"))
+	mock.ExpectCommit()
+
+	if err := store.ApplyJudgeResult(context.Background(), event); err != nil {
+		t.Fatalf("ApplyJudgeResult() error = %v", err)
+	}
+	assertExpectations(t, mock)
+}
+
 func newMockStore(t *testing.T) (*StoreSet, sqlmock.Sqlmock, time.Time) {
 	t.Helper()
 	db, mock, err := sqlmock.New()

@@ -59,6 +59,7 @@ func newApp(config *conf.Bootstrap, grpcServer *kgrpc.Server, relayServer *serve
 		kratos.Name(config.GetService().GetName()),
 		kratos.Version("dev"),
 		kratos.Server(grpcServer, relayServer, resultConsumerServer),
+		kratos.BeforeStart(resultConsumerServer.Prepare),
 		kratos.Logger(newJSONLogger(os.Stdout)),
 	}
 	if registrar != nil {
