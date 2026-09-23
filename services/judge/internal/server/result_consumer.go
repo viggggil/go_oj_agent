@@ -19,6 +19,13 @@ func NewResultConsumerServer(consumer *message.RabbitResultConsumer) *ResultCons
 	return &ResultConsumerServer{consumer: consumer}
 }
 
+func (s *ResultConsumerServer) Prepare(ctx context.Context) error {
+	if s == nil || s.consumer == nil {
+		return fmt.Errorf("judge result consumer server is not configured")
+	}
+	return s.consumer.Prepare(ctx)
+}
+
 func (s *ResultConsumerServer) Start(ctx context.Context) error {
 	if s == nil || s.consumer == nil {
 		return fmt.Errorf("judge result consumer server is not configured")
