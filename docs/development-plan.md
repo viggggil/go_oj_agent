@@ -986,6 +986,10 @@ task metadata normalization
 
 # 8.5 Judge Worker
 
+首版实现采用独立 `go-judge` gRPC 沙箱（v1.12.3），而不是在 Worker 中拼接 Docker
+命令或直接执行用户程序。Worker 只负责任务编排、输入校验、Go 编译/执行参数映射、
+Comparator 和结果模型；RabbitMQ consumer、MinIO loader 与 ACK/NACK 在后续阶段加入。
+
 建议模块：
 
 ```text

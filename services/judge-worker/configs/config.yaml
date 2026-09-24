@@ -1,0 +1,17 @@
+service:
+  name: judge-worker
+
+sandbox:
+  go_judge:
+    endpoint: go-judge:5051
+    token: local-development-go-judge-token
+    timeout: 30s
+
+language:
+  go:
+    compiler_path: /usr/local/go/bin/go
+    compile_time_limit: 10s
+    compile_memory_bytes: 536870912
+    process_limit: 64
+    output_limit_bytes: 1048576
+
