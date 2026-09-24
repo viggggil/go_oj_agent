@@ -6,6 +6,9 @@ services:
       context: ../..
       dockerfile: deploy/go-judge/Dockerfile
     privileged: true
+    # go-judge needs to create nested cgroups for each untrusted execution.
+    # Docker Desktop/WSL otherwise gives it an empty cgroup scope.
+    cgroup: host
     shm_size: 256m
     command:
       - -enable-grpc
