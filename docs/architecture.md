@@ -317,7 +317,8 @@ sequenceDiagram
     MQ->>JW: Consume judge task
     JW->>M: Download testcase
     JW->>JW: Compile
-    JW->>JW: Sandbox Execute
+    JW->>GJ: go-judge gRPC Execute
+    GJ->>GJ: Sandbox Execute
     JW->>JW: Compare / Aggregate
 
     JW->>MQ: Publish judge.completed
@@ -459,6 +460,11 @@ revision，MySQL 仍只保存最新 active 指针。
 ---
 
 ## 8. Judge Worker
+
+首版 Worker 通过 gRPC 调用独立的 `go-judge v1.12.3` Sandbox Service。Worker 不直接
+执行用户代码，go-judge 不持有 RabbitMQ、MinIO、MySQL 或业务 JWT 凭据；Worker 使用
+固定的 Go 编译参数和 manifest 中的题目级资源限制。正式消息消费与输入加载按 Worker
+Issue 分阶段接入。
 
 目录建议：
 
