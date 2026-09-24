@@ -10,6 +10,19 @@ type Bootstrap struct {
 	Service  Service  `json:"service" yaml:"service"`
 	Sandbox  Sandbox  `json:"sandbox" yaml:"sandbox"`
 	Language Language `json:"language" yaml:"language"`
+	Storage  Storage  `json:"storage" yaml:"storage"`
+}
+
+type Storage struct {
+	MinIO MinIO `json:"minio" yaml:"minio"`
+}
+type MinIO struct {
+	Endpoint      string `json:"endpoint" yaml:"endpoint"`
+	AccessKey     string `json:"access_key" yaml:"access_key"`
+	SecretKey     string `json:"secret_key" yaml:"secret_key"`
+	SourceBucket  string `json:"source_bucket" yaml:"source_bucket"`
+	ProblemBucket string `json:"problem_bucket" yaml:"problem_bucket"`
+	UseSSL        bool   `json:"use_ssl" yaml:"use_ssl"`
 }
 
 type Service struct {
@@ -50,6 +63,9 @@ func (c *Bootstrap) Validate() error {
 	}
 	if _, err := ParseDuration(c.Language.Go.CompileTimeLimit, 10*time.Second); err != nil {
 		return fmt.Errorf("invalid Go compile time limit: %w", err)
+	}
+	if strings.TrimSpace(c.Storage.MinIO.Endpoint) == "" || c.Storage.MinIO.AccessKey == "" || c.Storage.MinIO.SecretKey == "" || strings.TrimSpace(c.Storage.MinIO.SourceBucket) == "" || strings.TrimSpace(c.Storage.MinIO.ProblemBucket) == "" {
+		return fmt.Errorf("judge-worker minio endpoint, credentials and buckets are required")
 	}
 	return nil
 }

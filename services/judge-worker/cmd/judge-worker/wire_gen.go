@@ -7,22 +7,42 @@
 package main
 
 import (
-	"github.com/go-kratos/kratos/v3"
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/comparator"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/language"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/sandbox"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/server"
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/storage"
 )
 
 // Injectors from wire.go:
 
-func initApp(config *conf.Bootstrap) (*kratos.App, func(), error) {
+func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	goJudge, cleanup, err := sandbox.NewGoJudgeFromConfig(config)
 	if err != nil {
 		return nil, nil, err
 	}
-	worker := server.NewWorker(goJudge)
-	app := newApp(config, worker)
-	return app, func() {
+	minIOReader, err := storage.NewMinIOReader(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	loader, err := storage.NewLoaderFromConfig(minIOReader, config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	goRunner, err := language.NewGoRunnerFromConfig(goJudge, config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	text := comparator.NewText()
+	engine := biz.NewEngine(loader, goRunner, text)
+	worker := server.NewWorker(goJudge, engine)
+	v := newApp(config, worker)
+	return v, func() {
 		cleanup()
 	}, nil
 }

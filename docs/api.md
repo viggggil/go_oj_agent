@@ -953,6 +953,10 @@ Payload 至少包括：
 数据结构以 `pkg/mq` 为唯一代码契约，业务体统一放在 `data` 字段。
 
 Worker 使用受限的服务凭据按对象引用读取源码，并根据 `judge_revision` 读取该 revision 的 `manifest.json` 和全部测试点。同一 Submission 不得读取其他 revision，也不得把源码或测试数据正文塞入 MQ。
+源码必须匹配 `sources/{ulid}/source.{language-extension}`；manifest key 由 Worker 根据
+`problem_id + judge_revision` 构造，测试点 key 必须精确匹配该 revision 下的
+`testcases/{case_no}.in|out`。Worker 在执行前校验所有对象的 `size_bytes` 和 SHA-256；
+对象完整性或 revision 不一致不可重试，MinIO 暂时不可用则允许消息层重试。
 
 ---
 

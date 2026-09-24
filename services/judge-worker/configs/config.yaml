@@ -15,3 +15,11 @@ language:
     process_limit: 64
     output_limit_bytes: 1048576
 
+storage:
+  minio:
+    endpoint: minio:9000
+    access_key: minioadmin
+    secret_key: minioadmin
+    source_bucket: submission-source
+    problem_bucket: problem-data
+    use_ssl: false

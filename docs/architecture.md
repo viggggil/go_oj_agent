@@ -463,8 +463,10 @@ revision，MySQL 仍只保存最新 active 指针。
 
 首版 Worker 通过 gRPC 调用独立的 `go-judge v1.12.3` Sandbox Service。Worker 不直接
 执行用户代码，go-judge 不持有 RabbitMQ、MinIO、MySQL 或业务 JWT 凭据；Worker 使用
-固定的 Go 编译参数和 manifest 中的题目级资源限制。正式消息消费与输入加载按 Worker
-Issue 分阶段接入。
+固定的 Go 编译参数和 manifest 中的题目级资源限制。Worker 已接入 MinIO immutable
+input loader：源码来自 `submission-source`，manifest 和测试点来自 `problem-data`，
+下载后验证 revision、对象 key、size 与 SHA-256。正式消息消费仍按后续 Worker Issue
+接入。
 
 目录建议：
 
