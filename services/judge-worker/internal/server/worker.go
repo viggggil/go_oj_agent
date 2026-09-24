@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-kratos/kratos/v3/transport"
 
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/sandbox"
 )
 
@@ -14,15 +15,18 @@ import (
 // in the next issue; this server keeps the new deployment unit lifecycle-safe.
 type Worker struct {
 	sandbox sandbox.Executor
+	engine  *biz.Engine
 	mu      sync.Mutex
 	done    chan struct{}
 }
 
-func NewWorker(executor sandbox.Executor) *Worker { return &Worker{sandbox: executor} }
+func NewWorker(executor sandbox.Executor, engine *biz.Engine) *Worker {
+	return &Worker{sandbox: executor, engine: engine}
+}
 
 func (w *Worker) Start(ctx context.Context) error {
-	if w == nil || w.sandbox == nil {
-		return fmt.Errorf("judge-worker sandbox is not configured")
+	if w == nil || w.sandbox == nil || w.engine == nil {
+		return fmt.Errorf("judge-worker dependencies are not configured")
 	}
 	w.mu.Lock()
 	if w.done != nil {
