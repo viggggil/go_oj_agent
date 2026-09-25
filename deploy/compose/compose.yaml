@@ -103,6 +103,37 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  go-judge:
+    build:
+      context: ../..
+      dockerfile: deploy/go-judge/Dockerfile
+    privileged: true
+    cgroup: host
+    shm_size: 256m
+    command:
+      - -enable-grpc
+      - -grpc-addr
+      - :5051
+      - -http-addr
+      - 127.0.0.1:5050
+      - -auth-token
+      - ${GO_JUDGE_AUTH_TOKEN:-local-development-go-judge-token}
+      - -mount-conf
+      - /opt/mount.yaml
+      - -parallelism
+      - "2"
+      - -copy-out-limit
+      - 1m
+      - -output-limit
+      - 1m
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
   auth-key-init:
     image: alpine:3.23
     entrypoint: ["/bin/sh", "-c"]
@@ -234,6 +265,36 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9003"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  judge-worker:
+    build:
+      context: ../..
+      dockerfile: services/judge-worker/Dockerfile
+    environment:
+      KRATOS_SANDBOX_GO_JUDGE_ENDPOINT: "go-judge:5051"
+      KRATOS_SANDBOX_GO_JUDGE_TOKEN: "${GO_JUDGE_AUTH_TOKEN:-local-development-go-judge-token}"
+      KRATOS_STORAGE_MINIO_ENDPOINT: "minio:9000"
+      KRATOS_STORAGE_MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      KRATOS_STORAGE_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      KRATOS_MESSAGING_RABBITMQ_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
+      KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
+      KRATOS_MESSAGING_RABBITMQ_QUEUE: "judge.task.go"
+      KRATOS_WORKER_CONCURRENCY: "2"
+      KRATOS_WORKER_TASK_TIMEOUT: "60s"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      go-judge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 3s
       timeout: 3s
       retries: 20

@@ -1,4 +1,4 @@
-package integration_test
+package e2e_test
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +17,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,7 +26,6 @@ import (
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	judgecontract "github.com/viggggil/go_oj_agent/pkg/judge"
-	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
 
 func TestJudgeSubmissionFlow(t *testing.T) {
@@ -39,9 +36,8 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	minioEndpoint := os.Getenv("PROBLEM_TEST_MINIO_ENDPOINT")
 	judgeEndpoint := os.Getenv("JUDGE_TEST_GRPC_ENDPOINT")
 	privateKeyFile := os.Getenv("JUDGE_TEST_GATEWAY_PRIVATE_KEY_FILE")
-	rabbitURL := os.Getenv("JUDGE_TEST_RABBITMQ_URL")
-	if baseURL == "" || userMySQLDSN == "" || problemMySQLDSN == "" || submissionMySQLDSN == "" || minioEndpoint == "" || judgeEndpoint == "" || privateKeyFile == "" || rabbitURL == "" {
-		t.Skip("set Gateway, MySQL, MinIO, RabbitMQ, Judge gRPC and signing-key integration settings")
+	if baseURL == "" || userMySQLDSN == "" || problemMySQLDSN == "" || submissionMySQLDSN == "" || minioEndpoint == "" || judgeEndpoint == "" || privateKeyFile == "" {
+		t.Skip("set Gateway, MySQL, MinIO, Judge gRPC and signing-key e2e settings")
 	}
 
 	api := apiClient{baseURL: baseURL, client: &http.Client{Timeout: 10 * time.Second}}
@@ -62,7 +58,7 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 		t.Fatalf("unsigned actor GetSubmission status = %v, want %v", status.Code(err), codes.Unauthenticated)
 	}
 
-	source := []byte("package main\n\nfunc main() {}\n")
+	source := []byte("package main\n\nimport \"fmt\"\n\nfunc main() {\n\tvar a, b int\n\tfmt.Scan(&a, &b)\n\tfmt.Println(a + b)\n}\n")
 	idempotencyKey := uuid.NewString()
 	createRequest := &submissionv1.CreateSubmissionRequest{
 		ProblemId: problemID, Language: "go", SourceCode: string(source), IdempotencyKey: idempotencyKey,
@@ -161,11 +157,9 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	}
 	assertSubmissionSourceObject(t, minioEndpoint, objectKey, source)
 	assertSubmissionAtomicRecords(t, submissionDB, userID, created.GetSubmissionId(), idempotencyKey)
-	requested := waitForRelayMessage(t, rabbitURL, mq.RoutingJudgeTaskGo, mq.EventTypeJudgeTask, created.GetSubmissionId())
-	if requested.MessageID != requested.EventID || requested.RoutingKey != "judge.task.go" {
-		t.Fatalf("judge task metadata = %+v", requested)
-	}
-	waitForOutboxStatus(t, submissionDB, requested.EventID, "published")
+	waitForOutboxEventPublished(t, submissionDB, created.GetSubmissionId(), "judge.requested")
+	waitForJudgeResult(t, client, userContext, created.GetSubmissionId())
+	waitForJudgeResult(t, client, userContext, second.GetSubmissionId())
 
 	rejudgeKey := uuid.NewString()
 	rejudged, err := client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{
@@ -233,95 +227,48 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	if rejudgeIdempotencyCount != 1 {
 		t.Fatalf("rejudge idempotency records = %d, want 1", rejudgeIdempotencyCount)
 	}
-	replacementRequested := waitForRelayMessage(t, rabbitURL, mq.RoutingJudgeTaskGo, mq.EventTypeJudgeTask, newSubmission.GetId())
-	invalidated := waitForRelayMessage(t, rabbitURL, "submission.invalidated", "submission.invalidated", created.GetSubmissionId())
-	waitForOutboxStatus(t, submissionDB, replacementRequested.EventID, "published")
-	waitForOutboxStatus(t, submissionDB, invalidated.EventID, "published")
+	waitForOutboxEventPublished(t, submissionDB, newSubmission.GetId(), "judge.requested")
+	waitForOutboxEventPublished(t, submissionDB, created.GetSubmissionId(), "submission.invalidated")
+	waitForJudgeResult(t, client, userContext, newSubmission.GetId())
 }
 
-type relayMessage struct {
-	EventID    string
-	MessageID  string
-	RoutingKey string
-}
-
-func waitForRelayMessage(t *testing.T, rabbitURL, queue, eventType string, submissionID int64) relayMessage {
+func waitForJudgeResult(t *testing.T, client submissionv1.SubmissionServiceClient, ctx context.Context, submissionID int64) {
 	t.Helper()
-	connection, err := amqp091.Dial(rabbitURL)
-	if err != nil {
-		t.Fatalf("connect RabbitMQ: %v", err)
-	}
-	defer connection.Close()
-	deadline := time.Now().Add(10 * time.Second)
-	channel := waitForRabbitQueue(t, connection, queue, deadline)
-	defer channel.Close()
+	deadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(deadline) {
-		delivery, ok, getErr := channel.Get(queue, true)
-		if getErr != nil {
-			t.Fatalf("get RabbitMQ message from %s: %v", queue, getErr)
+		result, err := client.GetJudgeResult(ctx, &submissionv1.GetJudgeResultRequest{SubmissionId: submissionID})
+		if err == nil {
+			value := result.GetResult()
+			switch value.GetStatus() {
+			case submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE:
+				if value.GetVerdict() != submissionv1.JudgeVerdict_JUDGE_VERDICT_AC || len(value.GetCaseResults()) != 1 || value.GetCaseResults()[0].GetVerdict() != submissionv1.JudgeVerdict_JUDGE_VERDICT_AC {
+					t.Fatalf("submission %d completed with unexpected result: %+v", submissionID, value)
+				}
+				return
+			}
 		}
-		if !ok {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-		var envelope struct {
-			EventID   string          `json:"event_id"`
-			EventType string          `json:"event_type"`
-			Data      json.RawMessage `json:"data"`
-		}
-		var payload struct {
-			SubmissionID int64 `json:"submission_id"`
-		}
-		if json.Unmarshal(delivery.Body, &envelope) != nil || json.Unmarshal(envelope.Data, &payload) != nil {
-			t.Fatalf("decode RabbitMQ message: %s", delivery.Body)
-		}
-		if envelope.EventType != eventType || payload.SubmissionID != submissionID {
-			continue
-		}
-		if delivery.DeliveryMode != amqp091.Persistent || delivery.MessageId == "" || envelope.EventID == "" || delivery.Type != eventType {
-			t.Fatalf("RabbitMQ delivery metadata = %+v envelope=%+v", delivery, envelope)
-		}
-		if bytes.Contains(delivery.Body, []byte("package main")) || bytes.Contains(delivery.Body, []byte("minioadmin")) {
-			t.Fatalf("RabbitMQ delivery leaked source or credentials: %s", delivery.Body)
-		}
-		return relayMessage{EventID: envelope.EventID, MessageID: delivery.MessageId, RoutingKey: delivery.RoutingKey}
+		time.Sleep(250 * time.Millisecond)
 	}
-	t.Fatalf("timed out waiting for %s submission %d", eventType, submissionID)
-	return relayMessage{}
+	t.Fatalf("timed out waiting for completed judge result for submission %d", submissionID)
 }
 
-func waitForRabbitQueue(t *testing.T, connection *amqp091.Connection, queue string, deadline time.Time) *amqp091.Channel {
+func waitForOutboxEventPublished(t *testing.T, db *sql.DB, aggregateID int64, eventType string) string {
 	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		channel, err := connection.Channel()
-		if err != nil {
-			t.Fatalf("open RabbitMQ channel: %v", err)
-		}
-		if _, err = channel.QueueDeclarePassive(queue, true, false, false, false, nil); err == nil {
-			return channel
-		}
-		_ = channel.Close()
-		var rabbitErr *amqp091.Error
-		if !errors.As(err, &rabbitErr) || rabbitErr.Code != 404 {
-			t.Fatalf("inspect RabbitMQ queue %s: %v", queue, err)
+		var eventID, status string
+		err := db.QueryRowContext(t.Context(), `
+			SELECT event_id, status FROM outbox_events
+			WHERE aggregate_id = ? AND event_type = ?
+			ORDER BY id DESC LIMIT 1
+		`, aggregateID, eventType).Scan(&eventID, &status)
+		if err == nil && status == "published" {
+			return eventID
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("timed out waiting for RabbitMQ queue %s", queue)
-	return nil
-}
-
-func waitForOutboxStatus(t *testing.T, db *sql.DB, eventID, want string) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		var status string
-		if err := db.QueryRowContext(t.Context(), `SELECT status FROM outbox_events WHERE event_id = ?`, eventID).Scan(&status); err == nil && status == want {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("outbox event %s did not reach status %s", eventID, want)
+	t.Fatalf("outbox event %s for aggregate %d did not reach published", eventType, aggregateID)
+	return ""
 }
 
 func registerJudgeIntegrationUser(t *testing.T, api apiClient, userDB *sql.DB, prefix string, admin bool) (int64, string) {

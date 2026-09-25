@@ -90,7 +90,7 @@ test-integration:
 	@./tests/integration/run.sh
 
 test-e2e:
-	@echo "e2e tests are not wired yet"
+	@./tests/integration/run.sh
 
 agent-eval:
 	@echo "agent evaluation is not wired yet"

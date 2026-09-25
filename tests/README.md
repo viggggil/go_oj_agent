@@ -1,6 +1,8 @@
 # Tests
 
-Integration, contract, and e2e test suites live here.
+Integration, contract, and e2e test suites live here. The judge e2e flow is in
+`tests/e2e/judge_flow_test.go` and runs through RabbitMQ, judge-worker,
+go-judge, MinIO, judge-service, and the submission API.
 
 ## 认证集成测试
 

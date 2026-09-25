@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
 )
@@ -87,5 +88,33 @@ func TestHandleRequeuesOnPublishFailure(t *testing.T) {
 	(&Consumer{Engine: engine, Reporter: reporter, TaskTimeout: time.Second}).Handle(context.Background(), d)
 	if d.ack || !d.nack || !d.requeue || d.reject {
 		t.Fatalf("unexpected delivery state: %+v", d)
+	}
+}
+
+func TestRunDeliveryWorkersDrainsInFlightDeliveryBeforeDone(t *testing.T) {
+	deliveries := make(chan amqp091.Delivery, 1)
+	deliveries <- amqp091.Delivery{Body: []byte("in-flight")}
+	close(deliveries)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	done := runDeliveryWorkers(deliveries, 1, func(amqp091.Delivery) {
+		close(started)
+		<-release
+	})
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("worker did not receive delivery")
+	}
+	select {
+	case <-done:
+		t.Fatal("worker completed before in-flight delivery was released")
+	default:
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("worker did not drain in-flight delivery")
 	}
 }
