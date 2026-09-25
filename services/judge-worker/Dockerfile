@@ -9,7 +9,7 @@ COPY services/judge-worker ./services/judge-worker
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/judge-worker ./services/judge-worker/cmd/judge-worker
 
-FROM golang:1.26-alpine
+FROM alpine:3.23
 RUN addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
 WORKDIR /app
 COPY --from=builder /out/judge-worker /app/judge-worker
