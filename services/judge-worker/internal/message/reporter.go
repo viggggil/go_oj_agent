@@ -19,6 +19,13 @@ type Reporter interface {
 	ReportFailed(context.Context, mq.Envelope, mq.JudgeFailed) error
 }
 
+// RetryReporter publishes a retry task to the delayed retry queue. It is kept
+// separate from Reporter so protocol-only test reporters and custom result
+// reporters remain source compatible.
+type RetryReporter interface {
+	ReportRetry(context.Context, mq.Envelope, mq.JudgeTask) error
+}
+
 type Publisher interface {
 	Publish(context.Context, string, string, []byte) error
 }
@@ -43,6 +50,13 @@ func (r *PublisherReporter) ReportFailed(ctx context.Context, input mq.Envelope,
 	return r.report(ctx, input, mq.EventTypeJudgeFailed, mq.RoutingJudgeFailed, result)
 }
 
+func (r *PublisherReporter) ReportRetry(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
+	if err := task.Validate(); err != nil {
+		return err
+	}
+	return r.reportTask(ctx, input, task)
+}
+
 func (r *PublisherReporter) report(ctx context.Context, input mq.Envelope, eventType, route string, payload any) error {
 	if r == nil || r.Publisher == nil {
 		return fmt.Errorf("publisher reporter is not configured")
@@ -56,6 +70,21 @@ func (r *PublisherReporter) report(ctx context.Context, input mq.Envelope, event
 		return err
 	}
 	return r.Publisher.Publish(ctx, route, envelope.EventID, body)
+}
+
+func (r *PublisherReporter) reportTask(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
+	if r == nil || r.Publisher == nil {
+		return fmt.Errorf("publisher reporter is not configured")
+	}
+	body, err := marshalTask(input, task)
+	if err != nil {
+		return err
+	}
+	var envelope mq.Envelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return err
+	}
+	return r.Publisher.Publish(ctx, retryRoute(task.Language), envelope.EventID, body)
 }
 
 type RabbitReporter struct {
@@ -87,6 +116,13 @@ func (r *RabbitReporter) ReportFailed(ctx context.Context, input mq.Envelope, re
 	return r.report(ctx, input, mq.EventTypeJudgeFailed, mq.RoutingJudgeFailed, result)
 }
 
+func (r *RabbitReporter) ReportRetry(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
+	if err := task.Validate(); err != nil {
+		return err
+	}
+	return r.reportTask(ctx, input, task)
+}
+
 func (r *RabbitReporter) report(ctx context.Context, input mq.Envelope, eventType, route string, payload any) error {
 	if r == nil || r.url == "" || r.exchange == "" {
 		return fmt.Errorf("rabbit reporter is not configured")
@@ -102,8 +138,47 @@ func (r *RabbitReporter) report(ctx context.Context, input mq.Envelope, eventTyp
 	return r.publish(ctx, route, envelope.EventID, body)
 }
 
+func (r *RabbitReporter) reportTask(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
+	if r == nil || r.url == "" || r.exchange == "" {
+		return fmt.Errorf("rabbit reporter is not configured")
+	}
+	body, err := marshalTask(input, task)
+	if err != nil {
+		return err
+	}
+	var envelope mq.Envelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return err
+	}
+	return r.publish(ctx, retryRoute(task.Language), envelope.EventID, body)
+}
+
 func marshalResult(input mq.Envelope, eventType string, payload any) ([]byte, error) {
 	return mq.MarshalEnvelope(mq.EnvelopeMetadata{EventID: uuid.NewString(), EventType: eventType, EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(), TraceID: input.TraceID, CausationID: input.EventID}, payload)
+}
+
+func marshalTask(input mq.Envelope, task mq.JudgeTask) ([]byte, error) {
+	return mq.MarshalEnvelope(mq.EnvelopeMetadata{
+		EventID: uuid.NewString(), EventType: mq.EventTypeJudgeTask, EventVersion: mq.EventVersion1,
+		OccurredAt: time.Now().UTC(), TraceID: input.TraceID, CausationID: input.EventID,
+	}, task)
+}
+
+func retryRoute(language string) string {
+	// Retry queues are language-specific so a delayed message is routed back to
+	// the same worker queue when the TTL expires.
+	switch language {
+	case "go":
+		return "judge.retry.go"
+	case "cpp":
+		return "judge.retry.cpp"
+	case "python":
+		return "judge.retry.python"
+	case "java":
+		return "judge.retry.java"
+	default:
+		return "judge.retry.go"
+	}
 }
 
 func (r *RabbitReporter) publish(ctx context.Context, route, messageID string, body []byte) error {
