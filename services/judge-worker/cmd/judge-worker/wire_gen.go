@@ -11,6 +11,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/comparator"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/language"
+	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/message"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/sandbox"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/server"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/storage"
@@ -40,7 +41,17 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	}
 	text := comparator.NewText()
 	engine := biz.NewEngine(loader, goRunner, text)
-	worker := server.NewWorker(goJudge, engine)
+	rabbitReporter, err := message.NewReporterFromConfig(config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	consumer, err := message.NewConsumerFromConfig(config, engine, rabbitReporter)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	worker := server.NewWorkerWithConsumer(goJudge, engine, consumer)
 	v := newApp(config, worker)
 	return v, func() {
 		cleanup()
