@@ -12,7 +12,7 @@ func TestJudgeTaskEnvelopeRoundTrip(t *testing.T) {
 	task := JudgeTask{
 		SubmissionID: 9, ProblemID: 7, Language: "go", JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
 		SourceObjectKey: "sources/id/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 13,
-		JudgeDeadlineAt: now.Add(time.Minute),
+		JudgeDeadlineAt: now.Add(time.Minute), Attempt: 2,
 	}
 	if err := task.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
@@ -34,6 +34,17 @@ func TestJudgeTaskEnvelopeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestJudgeTaskRejectsNegativeAttempt(t *testing.T) {
+	task := JudgeTask{
+		SubmissionID: 9, ProblemID: 7, Language: "go", JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+		SourceObjectKey: "sources/id/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 13,
+		JudgeDeadlineAt: time.Now().UTC().Add(time.Minute), Attempt: -1,
+	}
+	if err := task.Validate(); err == nil {
+		t.Fatal("expected negative attempt to be rejected")
+	}
+}
+
 func TestJudgeResultEnvelopeRoundTrip(t *testing.T) {
 	now := time.Date(2026, 9, 23, 1, 2, 3, 0, time.UTC)
 	tests := []struct {
@@ -50,7 +61,7 @@ func TestJudgeResultEnvelopeRoundTrip(t *testing.T) {
 		},
 		{
 			name: "failed", eventType: EventTypeJudgeFailed,
-			value:   JudgeFailed{SubmissionID: 9, JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6", Reason: "SANDBOX_UNAVAILABLE", Retryable: true},
+			value:   JudgeFailed{SubmissionID: 9, JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6", Code: FailureSandboxUnavailable, Message: "sandbox transport unavailable", Retryable: true},
 			decoded: &JudgeFailed{},
 		},
 	}
@@ -76,5 +87,19 @@ func TestJudgeResultEnvelopeRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestJudgeFailedValidateSupportsStructuredCode(t *testing.T) {
+	result := JudgeFailed{
+		SubmissionID: 9, JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+		Code: FailureTaskExpired, Message: "deadline exceeded",
+	}
+	if err := result.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	result.Code = JudgeFailureCode("invalid code")
+	if err := result.Validate(); err == nil {
+		t.Fatal("expected malformed failure code to be rejected")
 	}
 }
