@@ -7,10 +7,26 @@ import (
 )
 
 type Bootstrap struct {
-	Service  Service  `json:"service" yaml:"service"`
-	Sandbox  Sandbox  `json:"sandbox" yaml:"sandbox"`
-	Language Language `json:"language" yaml:"language"`
-	Storage  Storage  `json:"storage" yaml:"storage"`
+	Service   Service   `json:"service" yaml:"service"`
+	Sandbox   Sandbox   `json:"sandbox" yaml:"sandbox"`
+	Language  Language  `json:"language" yaml:"language"`
+	Storage   Storage   `json:"storage" yaml:"storage"`
+	Worker    Worker    `json:"worker" yaml:"worker"`
+	Messaging Messaging `json:"messaging" yaml:"messaging"`
+}
+
+type Worker struct {
+	Concurrency int    `json:"concurrency" yaml:"concurrency"`
+	TaskTimeout string `json:"task_timeout" yaml:"task_timeout"`
+}
+type Messaging struct {
+	RabbitMQ RabbitMQ `json:"rabbitmq" yaml:"rabbitmq"`
+}
+type RabbitMQ struct {
+	URL            string `json:"url" yaml:"url"`
+	Exchange       string `json:"exchange" yaml:"exchange"`
+	Queue          string `json:"queue" yaml:"queue"`
+	ConfirmTimeout string `json:"confirm_timeout" yaml:"confirm_timeout"`
 }
 
 type Storage struct {
@@ -66,6 +82,26 @@ func (c *Bootstrap) Validate() error {
 	}
 	if strings.TrimSpace(c.Storage.MinIO.Endpoint) == "" || c.Storage.MinIO.AccessKey == "" || c.Storage.MinIO.SecretKey == "" || strings.TrimSpace(c.Storage.MinIO.SourceBucket) == "" || strings.TrimSpace(c.Storage.MinIO.ProblemBucket) == "" {
 		return fmt.Errorf("judge-worker minio endpoint, credentials and buckets are required")
+	}
+	if c.Worker.Concurrency == 0 {
+		c.Worker.Concurrency = 4
+	}
+	if c.Worker.Concurrency < 1 {
+		return fmt.Errorf("worker concurrency must be positive")
+	}
+	if _, err := ParseDuration(c.Worker.TaskTimeout, 60*time.Second); err != nil {
+		return fmt.Errorf("invalid worker task timeout: %w", err)
+	}
+	if c.Messaging.RabbitMQ.URL != "" {
+		if strings.TrimSpace(c.Messaging.RabbitMQ.Exchange) == "" {
+			return fmt.Errorf("rabbitmq exchange is required")
+		}
+		if c.Messaging.RabbitMQ.Queue == "" {
+			c.Messaging.RabbitMQ.Queue = "judge.task.go"
+		}
+		if _, err := ParseDuration(c.Messaging.RabbitMQ.ConfirmTimeout, 5*time.Second); err != nil {
+			return fmt.Errorf("invalid rabbitmq confirm timeout: %w", err)
+		}
 	}
 	return nil
 }

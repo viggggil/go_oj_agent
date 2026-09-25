@@ -23,3 +23,14 @@ storage:
     source_bucket: submission-source
     problem_bucket: problem-data
     use_ssl: false
+
+worker:
+  concurrency: 4
+  task_timeout: 60s
+
+messaging:
+  rabbitmq:
+    url: amqp://guest:guest@rabbitmq:5672/
+    exchange: oj.events
+    queue: judge.task.go
+    confirm_timeout: 5s
