@@ -37,7 +37,11 @@ type Consumer struct {
 	Logger               *slog.Logger
 	conn                 *amqp091.Connection
 	channel              *amqp091.Channel
-	closeOnce            sync.Once
+	consumerTag          string
+	stop                 context.CancelFunc
+	done                 chan struct{}
+	started              bool
+	mu                   sync.Mutex
 }
 
 func (c *Consumer) Handle(ctx context.Context, d Delivery) {
@@ -156,37 +160,69 @@ func (c *Consumer) Start(ctx context.Context) error {
 		_ = conn.Close()
 		return err
 	}
-	deliveries, err := ch.Consume(c.Queue, "", false, false, false, false, nil)
+	consumerTag := "judge-worker"
+	deliveries, err := ch.Consume(c.Queue, consumerTag, false, false, false, false, nil)
 	if err != nil {
 		_ = ch.Close()
 		_ = conn.Close()
 		return err
 	}
-	c.conn, c.channel = conn, ch
+	runCtx, stop := context.WithCancel(ctx)
+	done := make(chan struct{})
+	c.mu.Lock()
+	c.conn, c.channel, c.consumerTag = conn, ch, consumerTag
+	c.stop, c.done, c.started = stop, done, true
+	c.mu.Unlock()
+	defer func() {
+		_ = c.closeReporter()
+		c.mu.Lock()
+		c.conn, c.channel, c.stop, c.done, c.consumerTag, c.started = nil, nil, nil, nil, "", false
+		close(done)
+		c.mu.Unlock()
+	}()
 	workers := c.Concurrency
+	processingCtx := context.WithoutCancel(runCtx)
+	workersDone := runDeliveryWorkers(deliveries, workers, func(d amqp091.Delivery) {
+		c.Handle(processingCtx, delivery{d})
+	})
+	var runErr error
+	select {
+	case <-runCtx.Done():
+		// Cancel tells RabbitMQ to stop delivering new messages. The delivery
+		// channel is drained by the workers before any AMQP resource closes.
+		_ = ch.Cancel(consumerTag, false)
+		<-workersDone
+	case <-workersDone:
+		if ctx.Err() == nil {
+			runErr = fmt.Errorf("rabbitmq consumer delivery channel closed")
+		}
+	}
+	// All in-flight deliveries have completed before AMQP resources close.
+	_ = ch.Close()
+	_ = conn.Close()
+	return runErr
+}
+
+// runDeliveryWorkers drains the broker delivery channel before it reports
+// completion. Shutdown cancels the broker consumer first, then waits on this
+// channel before closing the AMQP channel and connection.
+func runDeliveryWorkers(deliveries <-chan amqp091.Delivery, workers int, handle func(amqp091.Delivery)) <-chan struct{} {
 	var wg sync.WaitGroup
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case d, ok := <-deliveries:
-					if !ok {
-						return
-					}
-					c.Handle(ctx, delivery{d})
-				}
+			for d := range deliveries {
+				handle(d)
 			}
 		}()
 	}
-	<-ctx.Done()
-	_ = ch.Close()
-	_ = conn.Close()
-	wg.Wait()
-	return nil
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	return done
 }
 
 func declareTopology(ch *amqp091.Channel, exchange, queue string) error {
@@ -203,16 +239,20 @@ func (c *Consumer) Close() error {
 	if c == nil {
 		return nil
 	}
-	c.closeOnce.Do(func() {
-		if c.channel != nil {
-			_ = c.channel.Close()
-		}
-		if c.conn != nil {
-			_ = c.conn.Close()
-		}
-		if closer, ok := c.Reporter.(interface{ Close() error }); ok {
-			_ = closer.Close()
-		}
-	})
+	c.mu.Lock()
+	stop, done, started := c.stop, c.done, c.started
+	c.mu.Unlock()
+	if started && stop != nil {
+		stop()
+		<-done
+		return nil
+	}
+	return c.closeReporter()
+}
+
+func (c *Consumer) closeReporter() error {
+	if closer, ok := c.Reporter.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
 	return nil
 }

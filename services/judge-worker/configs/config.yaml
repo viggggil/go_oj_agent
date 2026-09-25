@@ -30,7 +30,7 @@ worker:
 
 messaging:
   rabbitmq:
-    url: amqp://guest:guest@rabbitmq:5672/
+    url: amqp://judge:judge-password@rabbitmq:5672/
     exchange: oj.events
     queue: judge.task.go
     confirm_timeout: 5s

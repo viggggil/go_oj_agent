@@ -54,4 +54,4 @@ PROBLEM_TEST_MINIO_ENDPOINT="127.0.0.1:${MINIO_API_PORT}" \
 JUDGE_TEST_GRPC_ENDPOINT="127.0.0.1:${JUDGE_GRPC_PORT}" \
 JUDGE_TEST_GATEWAY_PRIVATE_KEY_FILE="${test_artifacts_dir}/gateway-private.pem" \
 JUDGE_TEST_RABBITMQ_URL="amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@127.0.0.1:${RABBITMQ_AMQP_PORT}/" \
-  go test -count=1 -v ./tests/integration
+  go test -count=1 -v ./tests/integration ./tests/e2e

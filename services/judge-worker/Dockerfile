@@ -17,4 +17,3 @@ COPY services/judge-worker/configs/config.yaml /app/config.yaml
 USER app
 ENTRYPOINT ["/app/judge-worker"]
 CMD ["-conf", "/app/config.yaml"]
-
