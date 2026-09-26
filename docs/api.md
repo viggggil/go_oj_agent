@@ -484,6 +484,15 @@ Create 和 Rejudge 的 `idempotency_key` 均为必填 UUID。同一调用身份�
 
 ### GET `/api/v1/submissions/{submission_id}/events`
 
+Gateway 第一版以短轮询 `judge-service/GetJudgeResult` 实现 SSE，不直接消费 RabbitMQ。
+连接建立后发送当前 `submission.snapshot`，状态发生变化时发送
+`submission.updated`；进入 `DONE`、`CANCELLED` 或 `INVALIDATED` 后发送最终事件并
+关闭连接。默认轮询间隔为 `500ms`，最大连接时长为 `2m`，由 Gateway 配置控制。
+
+下游调用失败时发送一次 `submission.error` 后关闭；客户端断开或请求超时必须停止
+轮询并释放 ticker。该接口不承诺 exactly-once 事件投递，客户端应按 submission 状态
+处理重复快照。
+
 SSE 判题状态流。
 
 示例：

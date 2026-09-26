@@ -15,7 +15,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 )
 
-var ProviderSet = wire.NewSet(NewClientContext, NewUserClient, NewProblemClient, ProvideUserServiceClient, ProvideProblemServiceClient)
+var ProviderSet = wire.NewSet(NewClientContext, NewUserClient, NewProblemClient, NewSubmissionClient, ProvideUserServiceClient, ProvideProblemServiceClient, ProvideSubmissionServiceClient)
 
 type UserClient struct {
 	userv1.UserServiceClient
