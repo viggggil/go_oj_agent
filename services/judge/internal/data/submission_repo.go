@@ -73,7 +73,11 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 			}
 		}
 	} else if event.Retryable {
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, retry_count = LEAST(retry_count + 1, 3), system_error_reason = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_RETRY_WAIT), event.Reason, now, event.SubmissionID); err != nil {
+		reason := event.Message
+		if reason == "" {
+			reason = event.Reason
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, retry_count = LEAST(retry_count + 1, 3), system_error_reason = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_RETRY_WAIT), reason, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 		if err = tx.Commit(); err != nil {
@@ -81,7 +85,11 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		}
 		return nil
 	} else {
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), event.Reason, event.OccurredAt, now, event.SubmissionID); err != nil {
+		reason := event.Message
+		if reason == "" {
+			reason = event.Reason
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), reason, event.OccurredAt, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 	}
