@@ -127,7 +127,7 @@ services:
       - -parallelism
       - "2"
       - -copy-out-limit
-      - 1m
+      - 64m
       - -output-limit
       - 1m
     healthcheck:
