@@ -43,6 +43,21 @@ func (s *GatewayService) GetSubmission(ctx context.Context, req *gatewayv1.GetSu
 	return &gatewayv1.GetSubmissionResponse{Submission: res.GetSubmission()}, nil
 }
 
+func (s *GatewayService) GetSubmissionSource(ctx context.Context, req *gatewayv1.GetSubmissionSourceRequest) (*gatewayv1.GetSubmissionSourceResponse, error) {
+	client, err := s.submissionClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.GetSubmissionSource(ctx, &submissionv1.GetSubmissionSourceRequest{SubmissionId: req.GetSubmissionId()})
+	if err != nil {
+		return nil, err
+	}
+	return &gatewayv1.GetSubmissionSourceResponse{
+		SubmissionId: res.GetSubmissionId(), Language: res.GetLanguage(), SourceCode: res.GetSourceCode(),
+		SizeBytes: res.GetSizeBytes(), Sha256: res.GetSha256(),
+	}, nil
+}
+
 func (s *GatewayService) GetJudgeResult(ctx context.Context, req *gatewayv1.GetJudgeResultRequest) (*gatewayv1.GetJudgeResultResponse, error) {
 	client, err := s.submissionClient(ctx)
 	if err != nil {

@@ -26,6 +26,7 @@ const OperationGatewayServiceGetCurrentUser = "/gateway.v1.GatewayService/GetCur
 const OperationGatewayServiceGetJudgeResult = "/gateway.v1.GatewayService/GetJudgeResult"
 const OperationGatewayServiceGetProblem = "/gateway.v1.GatewayService/GetProblem"
 const OperationGatewayServiceGetSubmission = "/gateway.v1.GatewayService/GetSubmission"
+const OperationGatewayServiceGetSubmissionSource = "/gateway.v1.GatewayService/GetSubmissionSource"
 const OperationGatewayServiceGetUser = "/gateway.v1.GatewayService/GetUser"
 const OperationGatewayServiceHealth = "/gateway.v1.GatewayService/Health"
 const OperationGatewayServiceListProblemTestcases = "/gateway.v1.GatewayService/ListProblemTestcases"
@@ -48,6 +49,7 @@ type GatewayServiceHTTPServer interface {
 	GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error)
 	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
 	GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error)
+	GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error)
@@ -80,6 +82,7 @@ func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServ
 	r.Handle("DELETE", "/api/v1/problems/{problem_id}/testcases/{testcase_id}", _GatewayService_ArchiveTestcase0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/submissions", _GatewayService_CreateSubmission0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/submissions/{submission_id}", _GatewayService_GetSubmission0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/submissions/{submission_id}/source", _GatewayService_GetSubmissionSource0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/submissions/{submission_id}/result", _GatewayService_GetJudgeResult0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/submissions", _GatewayService_ListSubmissions0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/submissions/{submission_id}/rejudge", _GatewayService_RejudgeSubmission0_HTTP_Handler(srv))
@@ -435,6 +438,28 @@ func _GatewayService_GetSubmission0_HTTP_Handler(srv GatewayServiceHTTPServer) f
 	}
 }
 
+func _GatewayService_GetSubmissionSource0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetSubmissionSourceRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceGetSubmissionSource)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetSubmissionSource(ctx, req.(*GetSubmissionSourceRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetSubmissionSourceResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _GatewayService_GetJudgeResult0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in GetJudgeResultRequest
@@ -508,6 +533,7 @@ type GatewayServiceHTTPClient interface {
 	GetJudgeResult(ctx context.Context, req *GetJudgeResultRequest, opts ...http.CallOption) (rsp *GetJudgeResultResponse, err error)
 	GetProblem(ctx context.Context, req *GetProblemRequest, opts ...http.CallOption) (rsp *GetProblemResponse, err error)
 	GetSubmission(ctx context.Context, req *GetSubmissionRequest, opts ...http.CallOption) (rsp *GetSubmissionResponse, err error)
+	GetSubmissionSource(ctx context.Context, req *GetSubmissionSourceRequest, opts ...http.CallOption) (rsp *GetSubmissionSourceResponse, err error)
 	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *GetUserResponse, err error)
 	Health(ctx context.Context, req *HealthRequest, opts ...http.CallOption) (rsp *HealthResponse, err error)
 	ListProblemTestcases(ctx context.Context, req *ListProblemTestcasesRequest, opts ...http.CallOption) (rsp *ListProblemTestcasesResponse, err error)
@@ -667,6 +693,22 @@ func (c *GatewayServiceHTTPClientImpl) GetSubmission(ctx context.Context, in *Ge
 	opts = append([]http.CallOption{
 		http.Accept("application/protojson"),
 		http.Operation(OperationGatewayServiceGetSubmission),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...http.CallOption) (*GetSubmissionSourceResponse, error) {
+	var out GetSubmissionSourceResponse
+	pattern := "/api/v1/submissions/{submission_id}/source"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceGetSubmissionSource),
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)

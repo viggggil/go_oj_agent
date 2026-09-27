@@ -68,6 +68,7 @@ service GatewayService {
 
   rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse) { option (google.api.http) = { post: "/api/v1/submissions" body: "*" }; }
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}" }; }
+  rpc GetSubmissionSource(GetSubmissionSourceRequest) returns (GetSubmissionSourceResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}/source" }; }
   rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}/result" }; }
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse) { option (google.api.http) = { get: "/api/v1/submissions" }; }
   rpc RejudgeSubmission(RejudgeSubmissionRequest) returns (RejudgeSubmissionResponse) { option (google.api.http) = { post: "/api/v1/submissions/{submission_id}/rejudge" body: "*" }; }
@@ -176,6 +177,14 @@ message CreateSubmissionRequest {
 message CreateSubmissionResponse { int64 submission_id = 1; submission.v1.SubmissionStatus status = 2; }
 message GetSubmissionRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; }
 message GetSubmissionResponse { submission.v1.Submission submission = 1; }
+message GetSubmissionSourceRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; }
+message GetSubmissionSourceResponse {
+  int64 submission_id = 1;
+  string language = 2;
+  string source_code = 3 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  int64 size_bytes = 4;
+  string sha256 = 5;
+}
 message GetJudgeResultRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; }
 message GetJudgeResultResponse { submission.v1.JudgeResult result = 1; }
 message ListSubmissionsRequest { common.v1.PageRequest page = 1 [(validate.rules).message.required = true]; int64 problem_id = 2; submission.v1.SubmissionStatus status = 3; string language = 4; int64 user_id = 5; }

@@ -23,6 +23,7 @@ type objectPutter interface {
 
 type MinIOSourceStore struct {
 	client objectPutter
+	reader *minio.Client
 	bucket string
 	newID  func() string
 }
@@ -42,7 +43,26 @@ func NewSourceStore(config *conf.Bootstrap) (*MinIOSourceStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MinIOSourceStore{client: client, bucket: cfg.GetSourceBucket(), newID: func() string { return ulid.Make().String() }}, nil
+	return &MinIOSourceStore{client: client, reader: client, bucket: cfg.GetSourceBucket(), newID: func() string { return ulid.Make().String() }}, nil
+}
+
+func (s *MinIOSourceStore) Get(ctx context.Context, key string) ([]byte, error) {
+	if s == nil || s.reader == nil || strings.TrimSpace(s.bucket) == "" || strings.TrimSpace(key) == "" {
+		return nil, biz.ErrorInternal("source store is not configured")
+	}
+	object, err := s.reader.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, biz.ErrorDependencyUnavailable("source storage is unavailable")
+	}
+	defer object.Close()
+	content, err := io.ReadAll(io.LimitReader(object, biz.MaxSourceSizeBytes+1))
+	if err != nil {
+		return nil, biz.ErrorDependencyUnavailable("source storage is unavailable")
+	}
+	if len(content) == 0 || int64(len(content)) > biz.MaxSourceSizeBytes {
+		return nil, biz.ErrorInternal("stored source exceeds maximum size")
+	}
+	return content, nil
 }
 
 func (s *MinIOSourceStore) Put(ctx context.Context, language string, source []byte) (biz.SourceObject, error) {

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	"github.com/google/wire"
@@ -65,6 +67,28 @@ func (s *SubmissionService) GetSubmission(ctx context.Context, req *submissionv1
 		return nil, err
 	}
 	return &submissionv1.GetSubmissionResponse{Submission: toProtoSubmission(submission)}, nil
+}
+
+func (s *SubmissionService) GetSubmissionSource(ctx context.Context, req *submissionv1.GetSubmissionSourceRequest) (*submissionv1.GetSubmissionSourceResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid get submission source request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	actor, err := actorFromPrincipal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	submission, source, err := s.uc.GetSource(ctx, actor, req.GetSubmissionId())
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256(source)
+	return &submissionv1.GetSubmissionSourceResponse{
+		SubmissionId: submission.ID, Language: submission.Language, SourceCode: string(source),
+		SizeBytes: int64(len(source)), Sha256: hex.EncodeToString(digest[:]),
+	}, nil
 }
 
 func (s *SubmissionService) ListSubmissions(ctx context.Context, req *submissionv1.ListSubmissionsRequest) (*submissionv1.ListSubmissionsResponse, error) {
