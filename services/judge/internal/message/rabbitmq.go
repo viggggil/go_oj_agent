@@ -16,6 +16,7 @@ import (
 type RabbitPublisher struct {
 	url      string
 	exchange string
+	dlq      string
 	mu       sync.Mutex
 	conn     *amqp091.Connection
 	channel  *amqp091.Channel
@@ -28,12 +29,12 @@ type ResultHandler interface {
 }
 
 type RabbitResultConsumer struct {
-	url, exchange, queue string
-	handler              ResultHandler
-	conn                 *amqp091.Connection
-	channel              *amqp091.Channel
-	mu                   sync.Mutex
-	cancel               context.CancelFunc
+	url, exchange, queue, dlq string
+	handler                   ResultHandler
+	conn                      *amqp091.Connection
+	channel                   *amqp091.Channel
+	mu                        sync.Mutex
+	cancel                    context.CancelFunc
 }
 
 var judgeEventRoutes = append(mq.JudgeTaskRoutingKeys(), biz.EventTypeSubmissionInvalidated, biz.EventTypeSubmissionJudged)
@@ -46,7 +47,7 @@ func NewRabbitResultConsumer(config *conf.Bootstrap, handler ResultHandler) (*Ra
 	if rabbit.GetUrl() == "" || rabbit.GetExchange() == "" || rabbit.GetResultQueue() == "" {
 		return nil, func() {}, fmt.Errorf("judge rabbitmq result consumer configuration is required")
 	}
-	c := &RabbitResultConsumer{url: rabbit.GetUrl(), exchange: rabbit.GetExchange(), queue: rabbit.GetResultQueue(), handler: handler}
+	c := &RabbitResultConsumer{url: rabbit.GetUrl(), exchange: rabbit.GetExchange(), queue: rabbit.GetResultQueue(), dlq: rabbit.GetDeadLetterQueue(), handler: handler}
 	return c, func() { _ = c.Close() }, nil
 }
 
@@ -133,7 +134,11 @@ func (c *RabbitResultConsumer) declareTopology(ch *amqp091.Channel) error {
 		return err
 	}
 	for _, route := range judgeEventRoutes {
-		if _, err := ch.QueueDeclare(route, true, false, false, false, nil); err != nil {
+		args := amqp091.Table(nil)
+		if mq.IsJudgeTaskRoutingKey(route) {
+			args = mq.JudgeTaskQueueArguments(c.exchange, c.dlq)
+		}
+		if _, err := ch.QueueDeclare(route, true, false, false, false, args); err != nil {
 			return err
 		}
 		if err := ch.QueueBind(route, route, c.exchange, false, nil); err != nil {
@@ -182,7 +187,7 @@ func NewRabbitPublisher(config *conf.Bootstrap) (*RabbitPublisher, func(), error
 	if rabbit.GetUrl() == "" || rabbit.GetExchange() == "" {
 		return nil, func() {}, fmt.Errorf("judge rabbitmq url and exchange are required")
 	}
-	publisher := &RabbitPublisher{url: rabbit.GetUrl(), exchange: rabbit.GetExchange()}
+	publisher := &RabbitPublisher{url: rabbit.GetUrl(), exchange: rabbit.GetExchange(), dlq: rabbit.GetDeadLetterQueue()}
 	return publisher, func() { _ = publisher.Close() }, nil
 }
 
@@ -249,7 +254,11 @@ func (p *RabbitPublisher) connectLocked() error {
 		return err
 	}
 	for _, route := range judgeEventRoutes {
-		if _, err = channel.QueueDeclare(route, true, false, false, false, nil); err != nil {
+		args := amqp091.Table(nil)
+		if mq.IsJudgeTaskRoutingKey(route) {
+			args = mq.JudgeTaskQueueArguments(p.exchange, p.dlq)
+		}
+		if _, err = channel.QueueDeclare(route, true, false, false, false, args); err != nil {
 			_ = channel.Close()
 			_ = conn.Close()
 			return err

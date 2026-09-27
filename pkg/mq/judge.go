@@ -22,6 +22,20 @@ const (
 	RoutingJudgeFailed     = EventTypeJudgeFailed
 )
 
+// JudgeTaskQueueArguments returns the durable task queue arguments shared by
+// producers and consumers. Every service that declares a judge.task.* queue
+// must use the same DLX configuration or RabbitMQ will reject the declaration
+// with PRECONDITION_FAILED.
+func JudgeTaskQueueArguments(exchange, deadLetterQueue string) map[string]interface{} {
+	if deadLetterQueue == "" {
+		deadLetterQueue = "judge.dlq"
+	}
+	return map[string]interface{}{
+		"x-dead-letter-exchange":    exchange,
+		"x-dead-letter-routing-key": deadLetterQueue,
+	}
+}
+
 // JudgeFailureCode is the stable, machine-readable classification for a
 // judge failure. Message is reserved for human diagnostics and must not be
 // used by retry policy decisions.
@@ -96,6 +110,15 @@ func JudgeTaskRoutingKey(language string) (string, error) {
 
 func JudgeTaskRoutingKeys() []string {
 	return []string{RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava}
+}
+
+func IsJudgeTaskRoutingKey(route string) bool {
+	switch route {
+	case RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava:
+		return true
+	default:
+		return false
+	}
 }
 
 func SupportedLanguage(language string) bool {

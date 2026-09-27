@@ -304,10 +304,7 @@ func declareTopology(ch *amqp091.Channel, exchange, queue, retryQueue, dlq strin
 	if err := ch.QueueBind(dlq, dlq, exchange, false, nil); err != nil {
 		return err
 	}
-	if _, err := ch.QueueDeclare(queue, true, false, false, false, amqp091.Table{
-		"x-dead-letter-exchange":    exchange,
-		"x-dead-letter-routing-key": dlq,
-	}); err != nil {
+	if _, err := ch.QueueDeclare(queue, true, false, false, false, amqp091.Table(mq.JudgeTaskQueueArguments(exchange, dlq))); err != nil {
 		return err
 	}
 	if err := ch.QueueBind(queue, mq.RoutingJudgeTaskGo, exchange, false, nil); err != nil {
