@@ -3,6 +3,7 @@ package language
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -65,7 +66,9 @@ func (r *GoRunner) Compile(ctx context.Context, source []byte) (biz.CompileResul
 		return biz.CompileResult{}, biz.NewSystemError("SANDBOX_INTERNAL_ERROR", true, nil)
 	}
 	if result.Status != sandbox.StatusAccepted {
-		return biz.CompileResult{Verdict: biz.VerdictCE, Message: boundedDiagnostic(result)}, nil
+		diagnostic := boundedDiagnostic(result)
+		slog.Warn("go compilation failed", "status", result.Status, "diagnostic", diagnostic)
+		return biz.CompileResult{Verdict: biz.VerdictCE, Message: diagnostic}, nil
 	}
 	fileID := result.FileIDs["main"]
 	if fileID == "" {
