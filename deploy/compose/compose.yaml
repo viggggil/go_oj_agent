@@ -129,7 +129,7 @@ services:
       - -copy-out-limit
       - 64m
       - -output-limit
-      - 1m
+      - 64m
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1"]
       interval: 2s

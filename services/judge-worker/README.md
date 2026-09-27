@@ -47,8 +47,9 @@ GO_JUDGE_TEST_TOKEN=local-development-go-judge-token \
 
 go-judge 使用 `v1.12.3`，只在内部网络监听 gRPC，启用 bearer token；它不持有 MQ、
 MinIO 或 MySQL 凭据。运行代码时，Worker 使用 manifest 顶层的题目级时间/内存限制，
-编译使用 Worker 固定限制；Compose 将 go-judge 单文件 copy-out 上限设为 `64 MiB`，
-避免 Go 标准库编译产物超过默认小体积限制。编译产物留在 go-judge file store 并在任务结束删除。
+编译使用 Worker 固定限制；Compose 将 go-judge 的进程输出和单文件 copy-out 上限设为
+`64 MiB`，避免 Go 标准库编译产物超过默认小体积限制。运行阶段仍由 Worker 的 stdout
+collector 按题目输出限制截断。编译产物留在 go-judge file store 并在任务结束删除。
 
 ## 配置和测试
 
