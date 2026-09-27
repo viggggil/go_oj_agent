@@ -26,7 +26,7 @@ clients:
     timeout: "30s"
   submission:
     name: judge-service
-    endpoint: ""
+    endpoint: "${CLIENTS_SUBMISSION_ENDPOINT}"
     timeout: "3s"
 registry:
   consul:
