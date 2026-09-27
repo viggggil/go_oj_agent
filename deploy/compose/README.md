@@ -12,6 +12,10 @@ MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保�
 启动 user-service、problem-service、gateway-service 和 Web，尚不启动
 RabbitMQ、Consul 或未实现的业务服务。
 
+MinIO 和 `mc` 不再直接从 Quay 拉取。Compose 使用固定版本的官方 GitHub
+Release 二进制构建本地镜像，并在 Docker build 阶段校验 SHA-256；这样 CI 不依赖
+Quay 匿名拉取权限，也避免官方 Docker 镜像下线后导致集成环境无法启动。
+
 ## 启动
 
 在仓库根目录执行：
@@ -95,6 +99,9 @@ Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrat
 ```bash
 docker compose -f deploy/compose/compose.yaml logs user-service gateway-service
 ```
+
+若 MinIO 镜像构建失败，请检查 runner 是否能访问 `github.com` 和公开的
+`alpine:3.23` 基础镜像；构建阶段会下载并校验固定版本的 MinIO server 与 `mc`。
 
 若宿主机端口已被占用，可通过环境变量覆盖，例如：
 

@@ -53,7 +53,9 @@ services:
     restart: unless-stopped
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    build:
+      context: ../..
+      dockerfile: deploy/compose/minio.Dockerfile
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -64,7 +66,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -72,7 +74,9 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    build:
+      context: ../..
+      dockerfile: deploy/compose/mc.Dockerfile
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
