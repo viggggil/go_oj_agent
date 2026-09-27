@@ -15,6 +15,7 @@ type GoConfig struct {
 	CompilerPath       string
 	CompileTimeLimit   time.Duration
 	CompileMemoryBytes uint64
+	CompileOutputBytes uint64
 	ProcessLimit       uint64
 	OutputLimitBytes   uint64
 }
@@ -28,6 +29,12 @@ func (c GoConfig) normalized() GoConfig {
 	}
 	if c.CompileMemoryBytes == 0 {
 		c.CompileMemoryBytes = 512 << 20
+	}
+	if c.CompileOutputBytes == 0 {
+		c.CompileOutputBytes = c.OutputLimitBytes
+		if c.CompileOutputBytes == 0 {
+			c.CompileOutputBytes = 64 << 20
+		}
 	}
 	if c.ProcessLimit == 0 {
 		c.ProcessLimit = 64
@@ -57,7 +64,7 @@ func (r *GoRunner) Compile(ctx context.Context, source []byte) (biz.CompileResul
 		Env:    []string{"PATH=/usr/local/go/bin:/usr/bin:/bin", "HOME=/tmp", "GOCACHE=/tmp/go-cache", "GOMODCACHE=/tmp/go-mod-cache", "CGO_ENABLED=0"},
 		CopyIn: map[string]sandbox.File{"main.go": {Content: source}}, CacheOut: []string{"main"},
 		CPULimit: config.CompileTimeLimit, ClockLimit: clockLimit(config.CompileTimeLimit),
-		MemoryLimit: config.CompileMemoryBytes, ProcessLimit: config.ProcessLimit, OutputLimit: config.OutputLimitBytes,
+		MemoryLimit: config.CompileMemoryBytes, ProcessLimit: config.ProcessLimit, OutputLimit: config.CompileOutputBytes,
 	})
 	if err != nil {
 		return biz.CompileResult{}, biz.NewSystemError("SANDBOX_UNAVAILABLE", true, err)
