@@ -7,6 +7,9 @@ import Register from './views/Register.vue'
 import Problems from './views/Problems.vue'
 import ProblemDetail from './views/ProblemDetail.vue'
 import ProblemEditor from './views/ProblemEditor.vue'
+import SubmissionList from './views/SubmissionList.vue'
+import SubmissionCreate from './views/SubmissionCreate.vue'
+import SubmissionDetail from './views/SubmissionDetail.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +22,9 @@ const router = createRouter({
     { path: '/problems/new', component: ProblemEditor, meta: { auth: true, admin: true } },
     { path: '/problems/:id', component: ProblemDetail, meta: { auth: true } },
     { path: '/problems/:id/edit', component: ProblemEditor, meta: { auth: true, admin: true } },
+    { path: '/submissions', component: SubmissionList, meta: { auth: true } },
+    { path: '/submissions/new', component: SubmissionCreate, meta: { auth: true } },
+    { path: '/submissions/:id', component: SubmissionDetail, meta: { auth: true } },
   ],
 })
 

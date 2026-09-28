@@ -1,6 +1,16 @@
 import axios from 'axios'
 import { reactive } from 'vue'
-import type { Problem, ProblemInput, ProblemSummary, Testcase, TokenPair, User } from './types'
+import type {
+  JudgeResult,
+  Problem,
+  ProblemInput,
+  ProblemSummary,
+  Submission,
+  SubmissionSource,
+  Testcase,
+  TokenPair,
+  User,
+} from './types'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/',
@@ -120,4 +130,42 @@ export const problemApi = {
   },
   archiveTestcase: (problemId: number, testcaseId: number) =>
     api.delete(`/api/v1/problems/${problemId}/testcases/${testcaseId}`),
+}
+
+export const submissionApi = {
+  list: (
+    params: {
+      page?: number
+      pageSize?: number
+      problemId?: number
+      status?: string
+      language?: string
+    } = {},
+  ) =>
+    api.get<{ items: Submission[]; page: { page: number; page_size: number; total: number } }>(
+      '/api/v1/submissions',
+      {
+        params: {
+          'page.page': params.page || 1,
+          'page.page_size': params.pageSize || 20,
+          ...(params.problemId ? { problem_id: params.problemId } : {}),
+          ...(params.status ? { status: params.status } : {}),
+          ...(params.language ? { language: params.language } : {}),
+        },
+      },
+    ),
+  create: (payload: {
+    problem_id: number
+    language: string
+    source_code: string
+    idempotency_key: string
+  }) => api.post<{ submission_id: number; status: string }>('/api/v1/submissions', payload),
+  get: (id: number) => api.get<{ submission: Submission }>(`/api/v1/submissions/${id}`),
+  result: (id: number) => api.get<{ result: JudgeResult }>(`/api/v1/submissions/${id}/result`),
+  source: (id: number) => api.get<SubmissionSource>(`/api/v1/submissions/${id}/source`),
+  rejudge: (id: number, idempotencyKey: string) =>
+    api.post<{ invalidated_submission_id: number; submission: Submission }>(
+      `/api/v1/submissions/${id}/rejudge`,
+      { idempotency_key: idempotencyKey },
+    ),
 }

@@ -55,3 +55,70 @@ export interface Testcase {
   created_at: string
   archived_at?: string
 }
+
+export type SubmissionStatus =
+  | 'SUBMISSION_STATUS_UNSPECIFIED'
+  | 'SUBMISSION_STATUS_QUEUED'
+  | 'SUBMISSION_STATUS_COMPILING'
+  | 'SUBMISSION_STATUS_RUNNING'
+  | 'SUBMISSION_STATUS_DONE'
+  | 'SUBMISSION_STATUS_RETRY_WAIT'
+  | 'SUBMISSION_STATUS_CANCELLED'
+  | 'SUBMISSION_STATUS_INVALIDATED'
+
+export type JudgeVerdict =
+  | 'JUDGE_VERDICT_UNSPECIFIED'
+  | 'JUDGE_VERDICT_AC'
+  | 'JUDGE_VERDICT_WA'
+  | 'JUDGE_VERDICT_TLE'
+  | 'JUDGE_VERDICT_MLE'
+  | 'JUDGE_VERDICT_RE'
+  | 'JUDGE_VERDICT_CE'
+  | 'JUDGE_VERDICT_SYSTEM_ERROR'
+
+export interface Submission {
+  id: number
+  user_id: number
+  problem_id: number
+  language: string
+  status: SubmissionStatus | number
+  verdict: JudgeVerdict | number
+  time_ms: number
+  memory_kb: number
+  judge_revision: string
+  retry_count: number
+  system_error_reason?: string
+  created_at?: string
+  updated_at?: string
+  judged_at?: string
+  invalidated_at?: string
+}
+
+export interface SubmissionCaseResult {
+  id: number
+  submission_id: number
+  case_no: number
+  verdict: JudgeVerdict | number
+  time_ms: number
+  memory_kb: number
+  message?: string
+}
+
+export interface JudgeResult {
+  submission_id: number
+  status: SubmissionStatus | number
+  verdict: JudgeVerdict | number
+  time_ms: number
+  memory_kb: number
+  case_results: SubmissionCaseResult[]
+  judge_revision: string
+  system_error_reason?: string
+}
+
+export interface SubmissionSource {
+  submission_id: number
+  language: string
+  source_code: string
+  size_bytes: number
+  sha256: string
+}
