@@ -49,6 +49,10 @@ func TestGoRunnerCompile(t *testing.T) {
 	if request.CPULimit != 3*time.Second || request.ClockLimit != 6*time.Second || request.MemoryLimit != 128<<20 || request.OutputLimit != 4096 {
 		t.Fatalf("compile limits = %+v", request)
 	}
+	environment := strings.Join(request.Env, "\n")
+	if !strings.Contains(environment, "GOMAXPROCS=2") || !strings.Contains(environment, "GOFLAGS=-p=2") {
+		t.Fatalf("compile environment does not bound Go parallelism: %q", environment)
+	}
 	if string(request.CopyIn["main.go"].Content) == "" || !reflect.DeepEqual(request.CacheOut, []string{"main"}) {
 		t.Fatalf("compile files = %+v", request)
 	}

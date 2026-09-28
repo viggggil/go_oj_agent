@@ -85,7 +85,7 @@ func (c *Bootstrap) Validate() error {
 	if _, err := ParseDuration(c.Sandbox.GoJudge.Timeout, 30*time.Second); err != nil {
 		return fmt.Errorf("invalid go-judge timeout: %w", err)
 	}
-	if _, err := ParseDuration(c.Language.Go.CompileTimeLimit, 10*time.Second); err != nil {
+	if _, err := ParseDuration(c.Language.Go.CompileTimeLimit, 30*time.Second); err != nil {
 		return fmt.Errorf("invalid Go compile time limit: %w", err)
 	}
 	if strings.TrimSpace(c.Storage.MinIO.Endpoint) == "" || c.Storage.MinIO.AccessKey == "" || c.Storage.MinIO.SecretKey == "" || strings.TrimSpace(c.Storage.MinIO.SourceBucket) == "" || strings.TrimSpace(c.Storage.MinIO.ProblemBucket) == "" {

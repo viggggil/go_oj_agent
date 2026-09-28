@@ -456,6 +456,40 @@ func TestUpdateProblemLimitsPublishesNewJudgeRevision(t *testing.T) {
 	}
 }
 
+func TestUpdateProblemPublishesMissingJudgeRevision(t *testing.T) {
+	inputContent := []byte("1 2\n")
+	outputContent := []byte("3\n")
+	inputHash := sha256.Sum256(inputContent)
+	outputHash := sha256.Sum256(outputContent)
+	problem := Problem{
+		ID: 2, Title: "A+B", Slug: "a-plus-b", Description: "Add.",
+		Difficulty:  problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL, CreatedBy: 1,
+	}
+	testcases := &fakeTestcaseRepository{items: []Testcase{{
+		ID: 1, ProblemID: 2, CaseNo: 1, InputObjectKey: "source/1.in", OutputObjectKey: "source/1.out",
+		InputSHA256: fmt.Sprintf("%x", inputHash), OutputSHA256: fmt.Sprintf("%x", outputHash),
+		InputSizeBytes: int64(len(inputContent)), OutputSizeBytes: int64(len(outputContent)),
+		Status: problemv1.TestcaseStatus_TESTCASE_STATUS_ACTIVE,
+	}}}
+	objects := &fakeObjectStore{objects: map[string][]byte{"source/1.in": inputContent, "source/1.out": outputContent}}
+	repo := &fakeProblemRepository{created: problem}
+
+	updated, err := NewProblemUsecaseWithDependencies(repo, testcases, objects, repo, nil).
+		Update(context.Background(), adminContext(), problem.ID, problem, nil)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if len(updated.ActiveJudgeRevision) != 26 {
+		t.Fatalf("active revision = %q", updated.ActiveJudgeRevision)
+	}
+	manifestKey := fmt.Sprintf("problem-%d/judge-revisions/%s/manifest.json", problem.ID, updated.ActiveJudgeRevision)
+	if _, ok := objects.objects[manifestKey]; !ok {
+		t.Fatalf("manifest %q was not published", manifestKey)
+	}
+}
+
 func TestUpdateProblemMetadataKeepsJudgeRevision(t *testing.T) {
 	problem := Problem{
 		ID: 2, Title: "A+B", Slug: "a-plus-b", Description: "Add.",
