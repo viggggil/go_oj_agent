@@ -3,7 +3,9 @@ package language
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +59,22 @@ func TestGoRunnerCompileErrorIsUserVerdict(t *testing.T) {
 	result, err := NewGoRunner(executor, GoConfig{}).Compile(t.Context(), []byte("invalid"))
 	if err != nil || result.Verdict != biz.VerdictCE || result.Message != "syntax error" {
 		t.Fatalf("Compile() = %+v, %v", result, err)
+	}
+}
+
+func TestGoRunnerCompileResourceFailureIsSystemError(t *testing.T) {
+	for _, status := range []sandbox.Status{sandbox.StatusTimeLimitExceeded, sandbox.StatusMemoryLimitExceeded, sandbox.StatusOutputLimitExceeded, sandbox.StatusInternalError} {
+		t.Run(fmt.Sprintf("status-%d", status), func(t *testing.T) {
+			runner := NewGoRunner(&fakeSandbox{results: []sandbox.Result{{Status: status, Time: 15 * time.Second, RunTime: 30 * time.Second}}}, GoConfig{})
+			_, err := runner.Compile(t.Context(), []byte("package main\nfunc main() {}"))
+			if err == nil {
+				t.Fatal("Compile() expected system error")
+			}
+			reason, retryable := biz.ClassifySystemError(err)
+			if reason == "" || !strings.HasPrefix(reason, "SANDBOX_") || !retryable {
+				t.Fatalf("system error = %q retryable=%v", reason, retryable)
+			}
+		})
 	}
 }
 

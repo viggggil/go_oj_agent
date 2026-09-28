@@ -10,7 +10,7 @@ sandbox:
 language:
   go:
     compiler_path: /usr/local/go/bin/go
-    compile_time_limit: 10s
+    compile_time_limit: 15s
     compile_memory_bytes: 536870912
     process_limit: 64
     output_limit_bytes: 1048576

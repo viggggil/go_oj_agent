@@ -23,6 +23,7 @@ type delivery struct{ amqp091.Delivery }
 
 func (d delivery) GetBody() []byte      { return d.Body }
 func (d delivery) GetMessageID() string { return d.MessageId }
+func (d delivery) IsRedelivered() bool  { return d.Redelivered }
 
 type Engine interface {
 	Execute(context.Context, mq.JudgeTask) biz.Outcome
@@ -65,7 +66,11 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		return
 	}
 	if c.Logger != nil {
-		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID)
+		redelivered := false
+		if metadata, ok := d.(interface{ IsRedelivered() bool }); ok {
+			redelivered = metadata.IsRedelivered()
+		}
+		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
 	}
 	deadline := time.Now().Add(c.TaskTimeout)
 	if c.TaskTimeout <= 0 {

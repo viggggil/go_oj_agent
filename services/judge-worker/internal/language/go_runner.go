@@ -70,18 +70,45 @@ func (r *GoRunner) Compile(ctx context.Context, source []byte) (biz.CompileResul
 		return biz.CompileResult{}, biz.NewSystemError("SANDBOX_UNAVAILABLE", true, err)
 	}
 	if result.Status == sandbox.StatusInternalError || result.Status == sandbox.StatusInvalid || result.Status == sandbox.StatusFileError {
-		return biz.CompileResult{}, biz.NewSystemError("SANDBOX_INTERNAL_ERROR", true, nil)
+		return biz.CompileResult{}, compileSystemError(result)
 	}
-	if result.Status != sandbox.StatusAccepted {
+	if result.Status == sandbox.StatusAccepted {
+		fileID := result.FileIDs["main"]
+		if fileID == "" {
+			return biz.CompileResult{}, biz.NewSystemError("COMPILE_ARTIFACT_MISSING", true, nil)
+		}
+		return biz.CompileResult{Artifact: biz.Artifact{ID: fileID}, Verdict: biz.VerdictAC}, nil
+	}
+	if result.Status != sandbox.StatusNonZeroExit {
+		return biz.CompileResult{}, compileSystemError(result)
+	}
+	if result.Status == sandbox.StatusNonZeroExit {
 		diagnostic := boundedDiagnostic(result)
-		slog.Warn("go compilation failed", "status", result.Status, "diagnostic", diagnostic)
+		slog.Warn("go compilation rejected", "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", diagnostic)
 		return biz.CompileResult{Verdict: biz.VerdictCE, Message: diagnostic}, nil
 	}
-	fileID := result.FileIDs["main"]
-	if fileID == "" {
-		return biz.CompileResult{}, biz.NewSystemError("COMPILE_ARTIFACT_MISSING", true, nil)
+	return biz.CompileResult{}, compileSystemError(result)
+}
+
+func compileSystemError(result sandbox.Result) error {
+	reason := "SANDBOX_COMPILE_FAILURE"
+	switch result.Status {
+	case sandbox.StatusTimeLimitExceeded:
+		reason = "SANDBOX_COMPILE_TIMEOUT"
+	case sandbox.StatusMemoryLimitExceeded:
+		reason = "SANDBOX_COMPILE_MEMORY_LIMIT"
+	case sandbox.StatusOutputLimitExceeded:
+		reason = "SANDBOX_COMPILE_OUTPUT_LIMIT"
+	case sandbox.StatusFileError:
+		reason = "SANDBOX_COMPILE_FILE_ERROR"
+	case sandbox.StatusSignalled, sandbox.StatusDangerousSyscall:
+		reason = "SANDBOX_COMPILE_TERMINATED"
+	case sandbox.StatusInternalError, sandbox.StatusInvalid:
+		reason = "SANDBOX_INTERNAL_ERROR"
 	}
-	return biz.CompileResult{Artifact: biz.Artifact{ID: fileID}, Verdict: biz.VerdictAC}, nil
+	diagnostic := boundedDiagnostic(result)
+	slog.Error("go compilation sandbox failure", "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", diagnostic)
+	return biz.NewSystemError(reason, true, fmt.Errorf("%s", diagnostic))
 }
 
 func (r *GoRunner) Run(ctx context.Context, artifact biz.Artifact, input []byte, limits biz.ResourceLimits) (biz.ExecutionResult, error) {

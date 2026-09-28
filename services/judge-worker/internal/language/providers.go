@@ -13,7 +13,7 @@ import (
 var ProviderSet = wire.NewSet(NewGoRunnerFromConfig, wire.Bind(new(biz.LanguageRunner), new(*GoRunner)))
 
 func NewGoRunnerFromConfig(executor sandbox.Executor, config *conf.Bootstrap) (*GoRunner, error) {
-	compileTimeout, err := conf.ParseDuration(config.Language.Go.CompileTimeLimit, 10*time.Second)
+	compileTimeout, err := conf.ParseDuration(config.Language.Go.CompileTimeLimit, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
