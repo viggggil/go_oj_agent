@@ -32,7 +32,11 @@ func NewSubmissionClient(ctx context.Context, config *conf.Bootstrap) (*Submissi
 		if err != nil {
 			return nil, nil, fmt.Errorf("internal token ttl: %w", err)
 		}
-		signer, err := internalauth.NewSigner(key, auth.GetInternalKeyId(), auth.GetInternalIssuer(), auth.GetInternalAudience(), "gateway-service", ttl, nil)
+		// Submission (Judge) has a different audience from Problem. Use the
+		// client target when configured, retaining the legacy global value as a
+		// fallback for minimal test configurations.
+		audience := internalAudience(config.GetClients().GetSubmission(), auth.GetInternalAudience())
+		signer, err := internalauth.NewSigner(key, auth.GetInternalKeyId(), auth.GetInternalIssuer(), audience, "gateway-service", ttl, nil)
 		if err != nil {
 			return nil, nil, err
 		}
