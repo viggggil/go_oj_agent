@@ -12,20 +12,38 @@ import (
 type Engine struct {
 	loader     TaskLoader
 	runner     LanguageRunner
+	runners    map[string]LanguageRunner
 	comparator Comparator
 	now        func() time.Time
 }
 
 func NewEngine(loader TaskLoader, runner LanguageRunner, comparator Comparator) *Engine {
-	return &Engine{loader: loader, runner: runner, comparator: comparator, now: func() time.Time { return time.Now().UTC() }}
+	return &Engine{loader: loader, runner: runner, runners: map[string]LanguageRunner{"go": runner}, comparator: comparator, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// NewEngineWithRunners selects an isolated runner from the task language while
+// preserving one shared loader, comparator and deadline/cleanup policy.
+func NewEngineWithRunners(loader TaskLoader, runners map[string]LanguageRunner, comparator Comparator) *Engine {
+	copyRunners := make(map[string]LanguageRunner, len(runners))
+	for language, runner := range runners {
+		copyRunners[language] = runner
+	}
+	return &Engine{loader: loader, runners: copyRunners, comparator: comparator, now: func() time.Time { return time.Now().UTC() }}
 }
 
 func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcome) {
 	if err := task.Validate(); err != nil {
 		return failed(task, "INVALID_TASK", false)
 	}
-	if e == nil || e.loader == nil || e.runner == nil || e.comparator == nil {
+	if e == nil || e.loader == nil || e.comparator == nil {
 		return failed(task, "WORKER_NOT_CONFIGURED", true)
+	}
+	runner := e.runners[task.Language]
+	if runner == nil {
+		runner = e.runner
+	}
+	if runner == nil {
+		return failed(task, "UNSUPPORTED_LANGUAGE", false)
 	}
 	if !e.now().Before(task.JudgeDeadlineAt) {
 		return failed(task, "JUDGE_DEADLINE_EXCEEDED", false)
@@ -38,7 +56,7 @@ func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcom
 		return outcomeFromError(task, err)
 	}
 
-	compile, err := e.runner.Compile(ctx, loaded.Source)
+	compile, err := runner.Compile(ctx, loaded.Source)
 	if err != nil {
 		return outcomeFromError(task, err)
 	}
@@ -46,7 +64,7 @@ func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcom
 		// Register cleanup before interpreting the compiler verdict so malformed
 		// runner responses cannot leak a cached executable.
 		defer func() {
-			if cleanupErr := e.runner.DeleteArtifact(context.WithoutCancel(ctx), compile.Artifact); cleanupErr != nil && outcome.Failed == nil {
+			if cleanupErr := runner.DeleteArtifact(context.WithoutCancel(ctx), compile.Artifact); cleanupErr != nil && outcome.Failed == nil {
 				outcome = outcomeFromError(task, NewSystemError("ARTIFACT_CLEANUP_FAILED", true, cleanupErr))
 			}
 		}()
@@ -59,10 +77,10 @@ func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcom
 	}
 	// The compiled file lives in go-judge's cache and must be removed on every
 	// path after compilation, including timeout, verdict, and runner errors.
-	return e.executeCases(ctx, task, compile.Artifact, loaded)
+	return e.executeCases(ctx, task, compile.Artifact, loaded, runner)
 }
 
-func (e *Engine) executeCases(ctx context.Context, task mq.JudgeTask, artifact Artifact, loaded LoadedTask) Outcome {
+func (e *Engine) executeCases(ctx context.Context, task mq.JudgeTask, artifact Artifact, loaded LoadedTask, runner LanguageRunner) Outcome {
 	limits := ResourceLimits{
 		TimeLimit:   time.Duration(loaded.Manifest.TimeLimitMS) * time.Millisecond,
 		MemoryBytes: uint64(loaded.Manifest.MemoryLimitKB) * 1024,
@@ -73,7 +91,7 @@ func (e *Engine) executeCases(ctx context.Context, task mq.JudgeTask, artifact A
 		if !e.now().Before(task.JudgeDeadlineAt) {
 			return failed(task, "JUDGE_DEADLINE_EXCEEDED", false)
 		}
-		run, err := e.runner.Run(ctx, artifact, testcase.Input, limits)
+		run, err := runner.Run(ctx, artifact, testcase.Input, limits)
 		if err != nil {
 			return outcomeFromError(task, err)
 		}

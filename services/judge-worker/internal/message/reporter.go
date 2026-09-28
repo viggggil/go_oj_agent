@@ -168,6 +168,8 @@ func retryRoute(language string) string {
 	// Retry queues are language-specific so a delayed message is routed back to
 	// the same worker queue when the TTL expires.
 	switch language {
+	case "c":
+		return "judge.retry.c"
 	case "go":
 		return "judge.retry.go"
 	case "cpp":

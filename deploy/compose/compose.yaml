@@ -287,7 +287,6 @@ services:
       KRATOS_STORAGE_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       KRATOS_MESSAGING_RABBITMQ_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
       KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
-      KRATOS_MESSAGING_RABBITMQ_QUEUE: "judge.task.go"
       KRATOS_WORKER_CONCURRENCY: "2"
       KRATOS_WORKER_TASK_TIMEOUT: "60s"
     depends_on:

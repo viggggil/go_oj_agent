@@ -16,7 +16,7 @@ import (
 )
 
 func initApp(config *conf.Bootstrap) (*App, func(), error) {
-	wire.Build(sandbox.ProviderSet, storage.ProviderSet, language.ProviderSet, comparator.ProviderSet, biz.NewEngine, message.NewReporterFromConfig, message.NewConsumerFromConfig, server.NewWorkerWithConsumer, newApp,
+	wire.Build(sandbox.ProviderSet, storage.ProviderSet, language.NewLanguageRunnersFromConfig, comparator.ProviderSet, biz.NewEngineWithRunners, message.NewReporterFromConfig, message.NewConsumerFromConfig, server.NewWorkerWithConsumer, newApp,
 		wire.Bind(new(message.Engine), new(*biz.Engine)),
 		wire.Bind(new(message.Reporter), new(*message.RabbitReporter)),
 	)

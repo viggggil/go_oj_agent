@@ -2,8 +2,9 @@
 
 当前目录是 Judge Worker 的可测试核心。它通过 `pkg/mq` 接收固定任务快照，从 MinIO
 的 `submission-source` 加载源码，并从 `problem-data` 加载对应 `problem_id +
-judge_revision` 的 immutable manifest 与测试点，最后把 Go 编译/执行委托给独立的
-`go-judge` gRPC 服务。
+judge_revision` 的 immutable manifest 与测试点，最后把 C、C++、Go、Java、Python
+编译/执行委托给独立的 `go-judge` gRPC 服务。每种语言使用独立的任务队列和
+toolchain runner；编译产物以 go-judge cached file 传给测试点执行。
 
 Loader 严格校验源码 key 的语言后缀和 ULID、manifest identity、测试点对象 key、对象
 size 与 SHA-256。存储读取失败是可重试系统错误；快照或完整性不匹配不可重试。
@@ -17,12 +18,12 @@ state 去重。
 默认拓扑为：
 
 ```text
-judge.task.go -> judge-worker
-                     | retryable
-                     v
-                judge.retry.go -- TTL/DLX --> judge.task.go
-                     |
-                malformed reject(false) -> judge.dlq
+judge.task.{c,cpp,go,java,python} -> judge-worker
+                                      | retryable
+                                      v
+                 judge.retry.<language> -- TTL/DLX --> judge.task.<language>
+                                      |
+                         malformed reject(false) -> judge.dlq
 ```
 
 retry task 会递增 `attempt`，生成新的 `event_id`，保留 `trace_id`，并把原任务事件
@@ -49,7 +50,9 @@ go-judge 使用 `v1.12.3`，只在内部网络监听 gRPC，启用 bearer token�
 MinIO 或 MySQL 凭据。运行代码时，Worker 使用 manifest 顶层的题目级时间/内存限制，
 编译使用 Worker 固定限制；Compose 将 go-judge 的进程输出和单文件 copy-out 上限设为
 `64 MiB`，避免 Go 标准库编译产物超过默认小体积限制。运行阶段仍由 Worker 的 stdout
-collector 按题目输出限制截断。编译产物留在 go-judge file store 并在任务结束删除。
+collector 按题目输出限制截断。C/C++ 使用 gcc/g++，Java 使用 OpenJDK 17，Python
+使用 Python 3；所有命令显式设置 `/usr/local/go/bin:/usr/bin:/bin` PATH。编译产物留在
+go-judge file store 并在任务结束删除。
 
 ## 配置和测试
 
@@ -69,6 +72,11 @@ worker:
 
 ```bash
 go test ./services/judge-worker/...
+
+# 真实 go-judge 集成测试（在 compose 网络内执行）
+GO_JUDGE_TEST_ENDPOINT=go-judge:5051 \
+GO_JUDGE_TEST_TOKEN=local-development-go-judge-token \
+go test ./services/judge-worker/integration -v
 ```
 
 需要 RabbitMQ、MinIO 和 go-judge 的真实环境时，使用 `services/judge-worker/integration`

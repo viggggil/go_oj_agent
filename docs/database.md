@@ -252,7 +252,7 @@ Judge Service 的 Submission 引用。
 | `id` | BIGINT | PK |
 | `user_id` | BIGINT | User ID reference, no cross-DB FK |
 | `problem_id` | BIGINT | Problem ID reference, no cross-DB FK |
-| `language` | VARCHAR(32) | cpp / go / python / java |
+| `language` | VARCHAR(32) | c / cpp / go / python / java |
 | `source_object_key` | VARCHAR(512) | Immutable MinIO key |
 | `source_sha256` | CHAR(64) | NOT NULL |
 | `source_size_bytes` | BIGINT | NOT NULL |

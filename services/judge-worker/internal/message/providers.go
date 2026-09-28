@@ -33,7 +33,7 @@ func NewConsumerFromConfig(config *conf.Bootstrap, engine Engine, reporter Repor
 	if err != nil {
 		return nil, err
 	}
-	return &Consumer{URL: rabbit.URL, Exchange: rabbit.Exchange, Queue: rabbit.Queue, RetryQueue: rabbit.RetryQueue, DLQ: rabbit.DLQ, Concurrency: config.Worker.Concurrency, TaskTimeout: timeout, ShutdownTimeout: shutdownTimeout, MaxRetries: config.Worker.Retry.MaxRetries, RetryDelay: retryDelay, Engine: engine, Reporter: reporter}, nil
+	return &Consumer{URL: rabbit.URL, Exchange: rabbit.Exchange, Queue: rabbit.Queue, Queues: append([]string(nil), rabbit.Queues...), RetryQueue: rabbit.RetryQueue, DLQ: rabbit.DLQ, Concurrency: config.Worker.Concurrency, TaskTimeout: timeout, ShutdownTimeout: shutdownTimeout, MaxRetries: config.Worker.Retry.MaxRetries, RetryDelay: retryDelay, Engine: engine, Reporter: reporter}, nil
 }
 
 func NewReporterFromConfig(config *conf.Bootstrap) (*RabbitReporter, error) {

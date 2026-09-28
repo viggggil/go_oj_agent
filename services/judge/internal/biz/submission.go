@@ -492,7 +492,7 @@ func (uc *SubmissionUsecase) eventID() string {
 
 func SupportedLanguage(language string) bool {
 	switch strings.ToLower(strings.TrimSpace(language)) {
-	case "cpp", "go", "python", "java":
+	case "c", "cpp", "go", "python", "java":
 		return true
 	default:
 		return false
@@ -501,6 +501,8 @@ func SupportedLanguage(language string) bool {
 
 func LanguageExtension(language string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "c":
+		return "c", true
 	case "cpp":
 		return "cpp", true
 	case "go":

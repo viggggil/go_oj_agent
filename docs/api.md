@@ -937,6 +937,7 @@ Routing Keys：
 
 ```text
 judge.task.cpp
+judge.task.c
 judge.task.go
 judge.task.python
 judge.task.java

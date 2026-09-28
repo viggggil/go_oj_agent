@@ -10,7 +10,7 @@ sandbox:
 language:
   go:
     compiler_path: /usr/local/go/bin/go
-    compile_time_limit: 30s
+    compile_time_limit: 60s
     compile_memory_bytes: 536870912
     process_limit: 64
     output_limit_bytes: 1048576
@@ -36,7 +36,7 @@ messaging:
   rabbitmq:
     url: amqp://judge:judge-password@rabbitmq:5672/
     exchange: oj.events
-    queue: judge.task.go
+    queues: [judge.task.c, judge.task.cpp, judge.task.go, judge.task.java, judge.task.python]
     retry_queue: judge.retry.go
     dlq: judge.dlq
     confirm_timeout: 5s
