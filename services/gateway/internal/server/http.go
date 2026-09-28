@@ -70,6 +70,7 @@ func NewHTTPServer(
 		gatewayv1.OperationGatewayServiceArchiveTestcase,
 		gatewayv1.OperationGatewayServiceCreateSubmission,
 		gatewayv1.OperationGatewayServiceGetSubmission,
+		gatewayv1.OperationGatewayServiceGetSubmissionSource,
 		gatewayv1.OperationGatewayServiceGetJudgeResult,
 		gatewayv1.OperationGatewayServiceListSubmissions,
 		gatewayv1.OperationGatewayServiceRejudgeSubmission,

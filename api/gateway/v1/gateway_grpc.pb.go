@@ -36,6 +36,7 @@ const (
 	GatewayService_ArchiveTestcase_FullMethodName      = "/gateway.v1.GatewayService/ArchiveTestcase"
 	GatewayService_CreateSubmission_FullMethodName     = "/gateway.v1.GatewayService/CreateSubmission"
 	GatewayService_GetSubmission_FullMethodName        = "/gateway.v1.GatewayService/GetSubmission"
+	GatewayService_GetSubmissionSource_FullMethodName  = "/gateway.v1.GatewayService/GetSubmissionSource"
 	GatewayService_GetJudgeResult_FullMethodName       = "/gateway.v1.GatewayService/GetJudgeResult"
 	GatewayService_ListSubmissions_FullMethodName      = "/gateway.v1.GatewayService/ListSubmissions"
 	GatewayService_RejudgeSubmission_FullMethodName    = "/gateway.v1.GatewayService/RejudgeSubmission"
@@ -62,6 +63,7 @@ type GatewayServiceClient interface {
 	ArchiveTestcase(ctx context.Context, in *ArchiveTestcaseRequest, opts ...grpc.CallOption) (*ArchiveTestcaseResponse, error)
 	CreateSubmission(ctx context.Context, in *CreateSubmissionRequest, opts ...grpc.CallOption) (*CreateSubmissionResponse, error)
 	GetSubmission(ctx context.Context, in *GetSubmissionRequest, opts ...grpc.CallOption) (*GetSubmissionResponse, error)
+	GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...grpc.CallOption) (*GetSubmissionSourceResponse, error)
 	GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error)
 	ListSubmissions(ctx context.Context, in *ListSubmissionsRequest, opts ...grpc.CallOption) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(ctx context.Context, in *RejudgeSubmissionRequest, opts ...grpc.CallOption) (*RejudgeSubmissionResponse, error)
@@ -245,6 +247,16 @@ func (c *gatewayServiceClient) GetSubmission(ctx context.Context, in *GetSubmiss
 	return out, nil
 }
 
+func (c *gatewayServiceClient) GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...grpc.CallOption) (*GetSubmissionSourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubmissionSourceResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetSubmissionSource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetJudgeResultResponse)
@@ -296,6 +308,7 @@ type GatewayServiceServer interface {
 	ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error)
 	CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error)
 	GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error)
+	GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error)
 	GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error)
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error)
@@ -359,6 +372,9 @@ func (UnimplementedGatewayServiceServer) CreateSubmission(context.Context, *Crea
 }
 func (UnimplementedGatewayServiceServer) GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSubmission not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSubmissionSource not implemented")
 }
 func (UnimplementedGatewayServiceServer) GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetJudgeResult not implemented")
@@ -696,6 +712,24 @@ func _GatewayService_GetSubmission_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_GetSubmissionSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubmissionSourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetSubmissionSource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetSubmissionSource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetSubmissionSource(ctx, req.(*GetSubmissionSourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_GetJudgeResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetJudgeResultRequest)
 	if err := dec(in); err != nil {
@@ -824,6 +858,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSubmission",
 			Handler:    _GatewayService_GetSubmission_Handler,
+		},
+		{
+			MethodName: "GetSubmissionSource",
+			Handler:    _GatewayService_GetSubmissionSource_Handler,
 		},
 		{
 			MethodName: "GetJudgeResult",

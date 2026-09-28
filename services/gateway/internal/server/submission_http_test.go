@@ -25,6 +25,9 @@ func (f *httpSubmissionClient) CreateSubmission(_ context.Context, req *submissi
 func (f *httpSubmissionClient) GetSubmission(context.Context, *submissionv1.GetSubmissionRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionResponse, error) {
 	return &submissionv1.GetSubmissionResponse{}, nil
 }
+func (f *httpSubmissionClient) GetSubmissionSource(context.Context, *submissionv1.GetSubmissionSourceRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionSourceResponse, error) {
+	return &submissionv1.GetSubmissionSourceResponse{}, nil
+}
 func (f *httpSubmissionClient) ListSubmissions(context.Context, *submissionv1.ListSubmissionsRequest, ...grpc.CallOption) (*submissionv1.ListSubmissionsResponse, error) {
 	return &submissionv1.ListSubmissionsResponse{}, nil
 }

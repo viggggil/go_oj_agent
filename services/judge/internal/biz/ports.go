@@ -15,6 +15,10 @@ type SourceStore interface {
 	Put(context.Context, string, []byte) (SourceObject, error)
 }
 
+type SourceReader interface {
+	Get(context.Context, string) ([]byte, error)
+}
+
 type ProblemCatalog interface {
 	GetJudgeProfile(context.Context, int64) (JudgeProfile, error)
 }

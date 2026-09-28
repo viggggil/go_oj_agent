@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SubmissionService_CreateSubmission_FullMethodName  = "/submission.v1.SubmissionService/CreateSubmission"
-	SubmissionService_GetSubmission_FullMethodName     = "/submission.v1.SubmissionService/GetSubmission"
-	SubmissionService_ListSubmissions_FullMethodName   = "/submission.v1.SubmissionService/ListSubmissions"
-	SubmissionService_GetJudgeResult_FullMethodName    = "/submission.v1.SubmissionService/GetJudgeResult"
-	SubmissionService_RejudgeSubmission_FullMethodName = "/submission.v1.SubmissionService/RejudgeSubmission"
+	SubmissionService_CreateSubmission_FullMethodName    = "/submission.v1.SubmissionService/CreateSubmission"
+	SubmissionService_GetSubmission_FullMethodName       = "/submission.v1.SubmissionService/GetSubmission"
+	SubmissionService_GetSubmissionSource_FullMethodName = "/submission.v1.SubmissionService/GetSubmissionSource"
+	SubmissionService_ListSubmissions_FullMethodName     = "/submission.v1.SubmissionService/ListSubmissions"
+	SubmissionService_GetJudgeResult_FullMethodName      = "/submission.v1.SubmissionService/GetJudgeResult"
+	SubmissionService_RejudgeSubmission_FullMethodName   = "/submission.v1.SubmissionService/RejudgeSubmission"
 )
 
 // SubmissionServiceClient is the client API for SubmissionService service.
@@ -32,6 +33,7 @@ const (
 type SubmissionServiceClient interface {
 	CreateSubmission(ctx context.Context, in *CreateSubmissionRequest, opts ...grpc.CallOption) (*CreateSubmissionResponse, error)
 	GetSubmission(ctx context.Context, in *GetSubmissionRequest, opts ...grpc.CallOption) (*GetSubmissionResponse, error)
+	GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...grpc.CallOption) (*GetSubmissionSourceResponse, error)
 	// ListSubmissions also covers recent submissions through stable descending
 	// pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
 	ListSubmissions(ctx context.Context, in *ListSubmissionsRequest, opts ...grpc.CallOption) (*ListSubmissionsResponse, error)
@@ -63,6 +65,16 @@ func (c *submissionServiceClient) GetSubmission(ctx context.Context, in *GetSubm
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSubmissionResponse)
 	err := c.cc.Invoke(ctx, SubmissionService_GetSubmission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *submissionServiceClient) GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...grpc.CallOption) (*GetSubmissionSourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubmissionSourceResponse)
+	err := c.cc.Invoke(ctx, SubmissionService_GetSubmissionSource_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +117,7 @@ func (c *submissionServiceClient) RejudgeSubmission(ctx context.Context, in *Rej
 type SubmissionServiceServer interface {
 	CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error)
 	GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error)
+	GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error)
 	// ListSubmissions also covers recent submissions through stable descending
 	// pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
@@ -127,6 +140,9 @@ func (UnimplementedSubmissionServiceServer) CreateSubmission(context.Context, *C
 }
 func (UnimplementedSubmissionServiceServer) GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSubmission not implemented")
+}
+func (UnimplementedSubmissionServiceServer) GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSubmissionSource not implemented")
 }
 func (UnimplementedSubmissionServiceServer) ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSubmissions not implemented")
@@ -190,6 +206,24 @@ func _SubmissionService_GetSubmission_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SubmissionServiceServer).GetSubmission(ctx, req.(*GetSubmissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SubmissionService_GetSubmissionSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubmissionSourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SubmissionServiceServer).GetSubmissionSource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SubmissionService_GetSubmissionSource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SubmissionServiceServer).GetSubmissionSource(ctx, req.(*GetSubmissionSourceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -262,6 +296,10 @@ var SubmissionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSubmission",
 			Handler:    _SubmissionService_GetSubmission_Handler,
+		},
+		{
+			MethodName: "GetSubmissionSource",
+			Handler:    _SubmissionService_GetSubmissionSource_Handler,
 		},
 		{
 			MethodName: "ListSubmissions",

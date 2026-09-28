@@ -708,6 +708,126 @@ func (x *GetSubmissionResponse) GetSubmission() *Submission {
 	return nil
 }
 
+type GetSubmissionSourceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  int64                  `protobuf:"varint,2,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubmissionSourceRequest) Reset() {
+	*x = GetSubmissionSourceRequest{}
+	mi := &file_api_submission_v1_submission_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubmissionSourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubmissionSourceRequest) ProtoMessage() {}
+
+func (x *GetSubmissionSourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_submission_v1_submission_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubmissionSourceRequest.ProtoReflect.Descriptor instead.
+func (*GetSubmissionSourceRequest) Descriptor() ([]byte, []int) {
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetSubmissionSourceRequest) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+type GetSubmissionSourceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  int64                  `protobuf:"varint,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	Language      string                 `protobuf:"bytes,2,opt,name=language,proto3" json:"language,omitempty"`
+	SourceCode    string                 `protobuf:"bytes,3,opt,name=source_code,json=sourceCode,proto3" json:"source_code,omitempty"`
+	SizeBytes     int64                  `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	Sha256        string                 `protobuf:"bytes,5,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubmissionSourceResponse) Reset() {
+	*x = GetSubmissionSourceResponse{}
+	mi := &file_api_submission_v1_submission_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubmissionSourceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubmissionSourceResponse) ProtoMessage() {}
+
+func (x *GetSubmissionSourceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_submission_v1_submission_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubmissionSourceResponse.ProtoReflect.Descriptor instead.
+func (*GetSubmissionSourceResponse) Descriptor() ([]byte, []int) {
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetSubmissionSourceResponse) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+func (x *GetSubmissionSourceResponse) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *GetSubmissionSourceResponse) GetSourceCode() string {
+	if x != nil {
+		return x.SourceCode
+	}
+	return ""
+}
+
+func (x *GetSubmissionSourceResponse) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *GetSubmissionSourceResponse) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
 type ListSubmissionsRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Page      *v1.PageRequest        `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
@@ -723,7 +843,7 @@ type ListSubmissionsRequest struct {
 
 func (x *ListSubmissionsRequest) Reset() {
 	*x = ListSubmissionsRequest{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[7]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -735,7 +855,7 @@ func (x *ListSubmissionsRequest) String() string {
 func (*ListSubmissionsRequest) ProtoMessage() {}
 
 func (x *ListSubmissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[7]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -748,7 +868,7 @@ func (x *ListSubmissionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubmissionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSubmissionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{7}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListSubmissionsRequest) GetPage() *v1.PageRequest {
@@ -796,7 +916,7 @@ type ListSubmissionsResponse struct {
 
 func (x *ListSubmissionsResponse) Reset() {
 	*x = ListSubmissionsResponse{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[8]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -808,7 +928,7 @@ func (x *ListSubmissionsResponse) String() string {
 func (*ListSubmissionsResponse) ProtoMessage() {}
 
 func (x *ListSubmissionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[8]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -821,7 +941,7 @@ func (x *ListSubmissionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubmissionsResponse.ProtoReflect.Descriptor instead.
 func (*ListSubmissionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{8}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListSubmissionsResponse) GetItems() []*Submission {
@@ -847,7 +967,7 @@ type GetJudgeResultRequest struct {
 
 func (x *GetJudgeResultRequest) Reset() {
 	*x = GetJudgeResultRequest{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[9]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -859,7 +979,7 @@ func (x *GetJudgeResultRequest) String() string {
 func (*GetJudgeResultRequest) ProtoMessage() {}
 
 func (x *GetJudgeResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[9]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -872,7 +992,7 @@ func (x *GetJudgeResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJudgeResultRequest.ProtoReflect.Descriptor instead.
 func (*GetJudgeResultRequest) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{9}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetJudgeResultRequest) GetSubmissionId() int64 {
@@ -891,7 +1011,7 @@ type GetJudgeResultResponse struct {
 
 func (x *GetJudgeResultResponse) Reset() {
 	*x = GetJudgeResultResponse{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[10]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -903,7 +1023,7 @@ func (x *GetJudgeResultResponse) String() string {
 func (*GetJudgeResultResponse) ProtoMessage() {}
 
 func (x *GetJudgeResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[10]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -916,7 +1036,7 @@ func (x *GetJudgeResultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJudgeResultResponse.ProtoReflect.Descriptor instead.
 func (*GetJudgeResultResponse) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{10}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetJudgeResultResponse) GetResult() *JudgeResult {
@@ -936,7 +1056,7 @@ type RejudgeSubmissionRequest struct {
 
 func (x *RejudgeSubmissionRequest) Reset() {
 	*x = RejudgeSubmissionRequest{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[11]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +1068,7 @@ func (x *RejudgeSubmissionRequest) String() string {
 func (*RejudgeSubmissionRequest) ProtoMessage() {}
 
 func (x *RejudgeSubmissionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[11]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +1081,7 @@ func (x *RejudgeSubmissionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejudgeSubmissionRequest.ProtoReflect.Descriptor instead.
 func (*RejudgeSubmissionRequest) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{11}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RejudgeSubmissionRequest) GetSubmissionId() int64 {
@@ -988,7 +1108,7 @@ type RejudgeSubmissionResponse struct {
 
 func (x *RejudgeSubmissionResponse) Reset() {
 	*x = RejudgeSubmissionResponse{}
-	mi := &file_api_submission_v1_submission_proto_msgTypes[12]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1000,7 +1120,7 @@ func (x *RejudgeSubmissionResponse) String() string {
 func (*RejudgeSubmissionResponse) ProtoMessage() {}
 
 func (x *RejudgeSubmissionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_submission_v1_submission_proto_msgTypes[12]
+	mi := &file_api_submission_v1_submission_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1013,7 +1133,7 @@ func (x *RejudgeSubmissionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejudgeSubmissionResponse.ProtoReflect.Descriptor instead.
 func (*RejudgeSubmissionResponse) Descriptor() ([]byte, []int) {
-	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{12}
+	return file_api_submission_v1_submission_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RejudgeSubmissionResponse) GetInvalidatedSubmissionId() int64 {
@@ -1089,7 +1209,17 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\x15GetSubmissionResponse\x129\n" +
 	"\n" +
 	"submission\x18\x01 \x01(\v2\x19.submission.v1.SubmissionR\n" +
-	"submission\"\x8f\x02\n" +
+	"submission\"Y\n" +
+	"\x1aGetSubmissionSourceRequest\x12,\n" +
+	"\rsubmission_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionIdJ\x04\b\x01\x10\x02R\acontext\"\xc3\x01\n" +
+	"\x1bGetSubmissionSourceResponse\x12#\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03R\fsubmissionId\x12\x1a\n" +
+	"\blanguage\x18\x02 \x01(\tR\blanguage\x12,\n" +
+	"\vsource_code\x18\x03 \x01(\tB\v\xfaB\br\x06\x10\x01(\x80\x80@R\n" +
+	"sourceCode\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x04 \x01(\x03R\tsizeBytes\x12\x16\n" +
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\x8f\x02\n" +
 	"\x16ListSubmissionsRequest\x124\n" +
 	"\x04page\x18\x02 \x01(\v2\x16.common.v1.PageRequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04page\x12&\n" +
 	"\n" +
@@ -1129,10 +1259,11 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\x11JUDGE_VERDICT_MLE\x10\x04\x12\x14\n" +
 	"\x10JUDGE_VERDICT_RE\x10\x05\x12\x14\n" +
 	"\x10JUDGE_VERDICT_CE\x10\x06\x12\x1e\n" +
-	"\x1aJUDGE_VERDICT_SYSTEM_ERROR\x10\a2\xfd\x03\n" +
+	"\x1aJUDGE_VERDICT_SYSTEM_ERROR\x10\a2\xeb\x04\n" +
 	"\x11SubmissionService\x12c\n" +
 	"\x10CreateSubmission\x12&.submission.v1.CreateSubmissionRequest\x1a'.submission.v1.CreateSubmissionResponse\x12Z\n" +
-	"\rGetSubmission\x12#.submission.v1.GetSubmissionRequest\x1a$.submission.v1.GetSubmissionResponse\x12`\n" +
+	"\rGetSubmission\x12#.submission.v1.GetSubmissionRequest\x1a$.submission.v1.GetSubmissionResponse\x12l\n" +
+	"\x13GetSubmissionSource\x12).submission.v1.GetSubmissionSourceRequest\x1a*.submission.v1.GetSubmissionSourceResponse\x12`\n" +
 	"\x0fListSubmissions\x12%.submission.v1.ListSubmissionsRequest\x1a&.submission.v1.ListSubmissionsResponse\x12]\n" +
 	"\x0eGetJudgeResult\x12$.submission.v1.GetJudgeResultRequest\x1a%.submission.v1.GetJudgeResultResponse\x12f\n" +
 	"\x11RejudgeSubmission\x12'.submission.v1.RejudgeSubmissionRequest\x1a(.submission.v1.RejudgeSubmissionResponseB@Z>github.com/viggggil/go_oj_agent/api/submission/v1;submissionv1b\x06proto3"
@@ -1150,58 +1281,62 @@ func file_api_submission_v1_submission_proto_rawDescGZIP() []byte {
 }
 
 var file_api_submission_v1_submission_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_submission_v1_submission_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_api_submission_v1_submission_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_api_submission_v1_submission_proto_goTypes = []any{
-	(SubmissionStatus)(0),             // 0: submission.v1.SubmissionStatus
-	(JudgeVerdict)(0),                 // 1: submission.v1.JudgeVerdict
-	(*Submission)(nil),                // 2: submission.v1.Submission
-	(*SubmissionCaseResult)(nil),      // 3: submission.v1.SubmissionCaseResult
-	(*JudgeResult)(nil),               // 4: submission.v1.JudgeResult
-	(*CreateSubmissionRequest)(nil),   // 5: submission.v1.CreateSubmissionRequest
-	(*CreateSubmissionResponse)(nil),  // 6: submission.v1.CreateSubmissionResponse
-	(*GetSubmissionRequest)(nil),      // 7: submission.v1.GetSubmissionRequest
-	(*GetSubmissionResponse)(nil),     // 8: submission.v1.GetSubmissionResponse
-	(*ListSubmissionsRequest)(nil),    // 9: submission.v1.ListSubmissionsRequest
-	(*ListSubmissionsResponse)(nil),   // 10: submission.v1.ListSubmissionsResponse
-	(*GetJudgeResultRequest)(nil),     // 11: submission.v1.GetJudgeResultRequest
-	(*GetJudgeResultResponse)(nil),    // 12: submission.v1.GetJudgeResultResponse
-	(*RejudgeSubmissionRequest)(nil),  // 13: submission.v1.RejudgeSubmissionRequest
-	(*RejudgeSubmissionResponse)(nil), // 14: submission.v1.RejudgeSubmissionResponse
-	(*timestamppb.Timestamp)(nil),     // 15: google.protobuf.Timestamp
-	(*v1.PageRequest)(nil),            // 16: common.v1.PageRequest
-	(*v1.PageResponse)(nil),           // 17: common.v1.PageResponse
+	(SubmissionStatus)(0),               // 0: submission.v1.SubmissionStatus
+	(JudgeVerdict)(0),                   // 1: submission.v1.JudgeVerdict
+	(*Submission)(nil),                  // 2: submission.v1.Submission
+	(*SubmissionCaseResult)(nil),        // 3: submission.v1.SubmissionCaseResult
+	(*JudgeResult)(nil),                 // 4: submission.v1.JudgeResult
+	(*CreateSubmissionRequest)(nil),     // 5: submission.v1.CreateSubmissionRequest
+	(*CreateSubmissionResponse)(nil),    // 6: submission.v1.CreateSubmissionResponse
+	(*GetSubmissionRequest)(nil),        // 7: submission.v1.GetSubmissionRequest
+	(*GetSubmissionResponse)(nil),       // 8: submission.v1.GetSubmissionResponse
+	(*GetSubmissionSourceRequest)(nil),  // 9: submission.v1.GetSubmissionSourceRequest
+	(*GetSubmissionSourceResponse)(nil), // 10: submission.v1.GetSubmissionSourceResponse
+	(*ListSubmissionsRequest)(nil),      // 11: submission.v1.ListSubmissionsRequest
+	(*ListSubmissionsResponse)(nil),     // 12: submission.v1.ListSubmissionsResponse
+	(*GetJudgeResultRequest)(nil),       // 13: submission.v1.GetJudgeResultRequest
+	(*GetJudgeResultResponse)(nil),      // 14: submission.v1.GetJudgeResultResponse
+	(*RejudgeSubmissionRequest)(nil),    // 15: submission.v1.RejudgeSubmissionRequest
+	(*RejudgeSubmissionResponse)(nil),   // 16: submission.v1.RejudgeSubmissionResponse
+	(*timestamppb.Timestamp)(nil),       // 17: google.protobuf.Timestamp
+	(*v1.PageRequest)(nil),              // 18: common.v1.PageRequest
+	(*v1.PageResponse)(nil),             // 19: common.v1.PageResponse
 }
 var file_api_submission_v1_submission_proto_depIdxs = []int32{
 	0,  // 0: submission.v1.Submission.status:type_name -> submission.v1.SubmissionStatus
 	1,  // 1: submission.v1.Submission.verdict:type_name -> submission.v1.JudgeVerdict
-	15, // 2: submission.v1.Submission.created_at:type_name -> google.protobuf.Timestamp
-	15, // 3: submission.v1.Submission.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 4: submission.v1.Submission.judged_at:type_name -> google.protobuf.Timestamp
-	15, // 5: submission.v1.Submission.invalidated_at:type_name -> google.protobuf.Timestamp
+	17, // 2: submission.v1.Submission.created_at:type_name -> google.protobuf.Timestamp
+	17, // 3: submission.v1.Submission.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 4: submission.v1.Submission.judged_at:type_name -> google.protobuf.Timestamp
+	17, // 5: submission.v1.Submission.invalidated_at:type_name -> google.protobuf.Timestamp
 	1,  // 6: submission.v1.SubmissionCaseResult.verdict:type_name -> submission.v1.JudgeVerdict
 	0,  // 7: submission.v1.JudgeResult.status:type_name -> submission.v1.SubmissionStatus
 	1,  // 8: submission.v1.JudgeResult.verdict:type_name -> submission.v1.JudgeVerdict
 	3,  // 9: submission.v1.JudgeResult.case_results:type_name -> submission.v1.SubmissionCaseResult
 	0,  // 10: submission.v1.CreateSubmissionResponse.status:type_name -> submission.v1.SubmissionStatus
 	2,  // 11: submission.v1.GetSubmissionResponse.submission:type_name -> submission.v1.Submission
-	16, // 12: submission.v1.ListSubmissionsRequest.page:type_name -> common.v1.PageRequest
+	18, // 12: submission.v1.ListSubmissionsRequest.page:type_name -> common.v1.PageRequest
 	0,  // 13: submission.v1.ListSubmissionsRequest.status:type_name -> submission.v1.SubmissionStatus
 	2,  // 14: submission.v1.ListSubmissionsResponse.items:type_name -> submission.v1.Submission
-	17, // 15: submission.v1.ListSubmissionsResponse.page:type_name -> common.v1.PageResponse
+	19, // 15: submission.v1.ListSubmissionsResponse.page:type_name -> common.v1.PageResponse
 	4,  // 16: submission.v1.GetJudgeResultResponse.result:type_name -> submission.v1.JudgeResult
 	2,  // 17: submission.v1.RejudgeSubmissionResponse.submission:type_name -> submission.v1.Submission
 	5,  // 18: submission.v1.SubmissionService.CreateSubmission:input_type -> submission.v1.CreateSubmissionRequest
 	7,  // 19: submission.v1.SubmissionService.GetSubmission:input_type -> submission.v1.GetSubmissionRequest
-	9,  // 20: submission.v1.SubmissionService.ListSubmissions:input_type -> submission.v1.ListSubmissionsRequest
-	11, // 21: submission.v1.SubmissionService.GetJudgeResult:input_type -> submission.v1.GetJudgeResultRequest
-	13, // 22: submission.v1.SubmissionService.RejudgeSubmission:input_type -> submission.v1.RejudgeSubmissionRequest
-	6,  // 23: submission.v1.SubmissionService.CreateSubmission:output_type -> submission.v1.CreateSubmissionResponse
-	8,  // 24: submission.v1.SubmissionService.GetSubmission:output_type -> submission.v1.GetSubmissionResponse
-	10, // 25: submission.v1.SubmissionService.ListSubmissions:output_type -> submission.v1.ListSubmissionsResponse
-	12, // 26: submission.v1.SubmissionService.GetJudgeResult:output_type -> submission.v1.GetJudgeResultResponse
-	14, // 27: submission.v1.SubmissionService.RejudgeSubmission:output_type -> submission.v1.RejudgeSubmissionResponse
-	23, // [23:28] is the sub-list for method output_type
-	18, // [18:23] is the sub-list for method input_type
+	9,  // 20: submission.v1.SubmissionService.GetSubmissionSource:input_type -> submission.v1.GetSubmissionSourceRequest
+	11, // 21: submission.v1.SubmissionService.ListSubmissions:input_type -> submission.v1.ListSubmissionsRequest
+	13, // 22: submission.v1.SubmissionService.GetJudgeResult:input_type -> submission.v1.GetJudgeResultRequest
+	15, // 23: submission.v1.SubmissionService.RejudgeSubmission:input_type -> submission.v1.RejudgeSubmissionRequest
+	6,  // 24: submission.v1.SubmissionService.CreateSubmission:output_type -> submission.v1.CreateSubmissionResponse
+	8,  // 25: submission.v1.SubmissionService.GetSubmission:output_type -> submission.v1.GetSubmissionResponse
+	10, // 26: submission.v1.SubmissionService.GetSubmissionSource:output_type -> submission.v1.GetSubmissionSourceResponse
+	12, // 27: submission.v1.SubmissionService.ListSubmissions:output_type -> submission.v1.ListSubmissionsResponse
+	14, // 28: submission.v1.SubmissionService.GetJudgeResult:output_type -> submission.v1.GetJudgeResultResponse
+	16, // 29: submission.v1.SubmissionService.RejudgeSubmission:output_type -> submission.v1.RejudgeSubmissionResponse
+	24, // [24:30] is the sub-list for method output_type
+	18, // [18:24] is the sub-list for method input_type
 	18, // [18:18] is the sub-list for extension type_name
 	18, // [18:18] is the sub-list for extension extendee
 	0,  // [0:18] is the sub-list for field type_name
@@ -1218,7 +1353,7 @@ func file_api_submission_v1_submission_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_submission_v1_submission_proto_rawDesc), len(file_api_submission_v1_submission_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
