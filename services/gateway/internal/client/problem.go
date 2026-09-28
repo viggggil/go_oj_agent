@@ -29,7 +29,11 @@ func NewProblemClient(ctx context.Context, config *conf.Bootstrap) (*ProblemClie
 		if parseErr != nil {
 			return nil, nil, fmt.Errorf("internal token ttl: %w", parseErr)
 		}
-		signer, signErr := internalauth.NewSigner(key, auth.GetInternalKeyId(), auth.GetInternalIssuer(), auth.GetInternalAudience(), "gateway-service", ttl, nil)
+		// Internal tokens are audience-bound to the downstream service. The
+		// gateway talks to both Problem and Judge services, so a single global
+		// audience would make one of those calls fail authentication.
+		audience := internalAudience(config.GetClients().GetProblem(), auth.GetInternalAudience())
+		signer, signErr := internalauth.NewSigner(key, auth.GetInternalKeyId(), auth.GetInternalIssuer(), audience, "gateway-service", ttl, nil)
 		if signErr != nil {
 			return nil, nil, signErr
 		}

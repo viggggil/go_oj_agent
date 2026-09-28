@@ -9,9 +9,14 @@
           ><span>{{ problem.time_limit_ms }} ms</span><span>{{ problem.memory_limit_kb }} KB</span>
         </div>
       </div>
-      <RouterLink v-if="isAdmin" class="button secondary" :to="`/problems/${problem.id}/edit`"
-        >管理</RouterLink
-      >
+      <div class="detail-actions">
+        <RouterLink class="button" :to="`/submissions/new?problem_id=${problem.id}`"
+          >提交代码</RouterLink
+        >
+        <RouterLink v-if="isAdmin" class="button secondary" :to="`/problems/${problem.id}/edit`"
+          >管理</RouterLink
+        >
+      </div>
     </header>
     <div class="tags">
       <span v-for="tag in problem.tags" :key="tag.id">{{ tag.name }}</span>

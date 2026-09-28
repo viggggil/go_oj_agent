@@ -123,7 +123,9 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	input.CreatedAt = current.CreatedAt
 	input.ActiveJudgeRevision = current.ActiveJudgeRevision
 	limitsChanged := input.TimeLimitMs != current.TimeLimitMs || input.MemoryLimitKb != current.MemoryLimitKb
-	if limitsChanged && current.ActiveJudgeRevision != "" {
+	shouldPublishRevision := limitsChanged && current.ActiveJudgeRevision != "" ||
+		current.ActiveJudgeRevision == "" && uc.testcases != nil && uc.objects != nil
+	if shouldPublishRevision {
 		if uc.testcases == nil || uc.objects == nil {
 			return Problem{}, ErrorInternal("judge revision dependencies are not configured")
 		}
@@ -132,11 +134,14 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 			return Problem{}, listErr
 		}
 		if len(items) == 0 {
-			return Problem{}, ErrorInvalidStatus("active judge revision has no testcases")
-		}
-		input.ActiveJudgeRevision, err = uc.publishRevision(ctx, input, items)
-		if err != nil {
-			return Problem{}, err
+			if current.ActiveJudgeRevision != "" {
+				return Problem{}, ErrorInvalidStatus("active judge revision has no testcases")
+			}
+		} else {
+			input.ActiveJudgeRevision, err = uc.publishRevision(ctx, input, items)
+			if err != nil {
+				return Problem{}, err
+			}
 		}
 	}
 	updated, err := uc.repo.Update(ctx, input, normalizeTags(tags), current.ActiveJudgeRevision)

@@ -25,7 +25,7 @@ func (c GoConfig) normalized() GoConfig {
 		c.CompilerPath = "/usr/local/go/bin/go"
 	}
 	if c.CompileTimeLimit <= 0 {
-		c.CompileTimeLimit = 10 * time.Second
+		c.CompileTimeLimit = 30 * time.Second
 	}
 	if c.CompileMemoryBytes == 0 {
 		c.CompileMemoryBytes = 512 << 20
@@ -61,7 +61,10 @@ func (r *GoRunner) Compile(ctx context.Context, source []byte) (biz.CompileResul
 	config := r.config.normalized()
 	result, err := r.sandbox.Execute(ctx, sandbox.Request{
 		RequestID: "compile", Args: []string{config.CompilerPath, "build", "-trimpath", "-o", "main", "main.go"},
-		Env:    []string{"PATH=/usr/local/go/bin:/usr/bin:/bin", "HOME=/tmp", "GOCACHE=/tmp/go-cache", "GOMODCACHE=/tmp/go-mod-cache", "CGO_ENABLED=0"},
+		Env: []string{
+			"PATH=/usr/local/go/bin:/usr/bin:/bin", "HOME=/tmp", "GOCACHE=/tmp/go-cache", "GOMODCACHE=/tmp/go-mod-cache",
+			"CGO_ENABLED=0", "GOMAXPROCS=2", "GOFLAGS=-p=2",
+		},
 		CopyIn: map[string]sandbox.File{"main.go": {Content: source}}, CacheOut: []string{"main"},
 		CPULimit: config.CompileTimeLimit, ClockLimit: clockLimit(config.CompileTimeLimit),
 		MemoryLimit: config.CompileMemoryBytes, ProcessLimit: config.ProcessLimit, OutputLimit: config.CompileOutputBytes,
