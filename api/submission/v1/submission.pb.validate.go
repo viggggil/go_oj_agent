@@ -1067,6 +1067,252 @@ var _ interface {
 	ErrorName() string
 } = GetSubmissionResponseValidationError{}
 
+// Validate checks the field values on GetSubmissionSourceRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetSubmissionSourceRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetSubmissionSourceRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetSubmissionSourceRequestMultiError, or nil if none found.
+func (m *GetSubmissionSourceRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetSubmissionSourceRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetSubmissionId() <= 0 {
+		err := GetSubmissionSourceRequestValidationError{
+			field:  "SubmissionId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return GetSubmissionSourceRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetSubmissionSourceRequestMultiError is an error wrapping multiple
+// validation errors returned by GetSubmissionSourceRequest.ValidateAll() if
+// the designated constraints aren't met.
+type GetSubmissionSourceRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetSubmissionSourceRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetSubmissionSourceRequestMultiError) AllErrors() []error { return m }
+
+// GetSubmissionSourceRequestValidationError is the validation error returned
+// by GetSubmissionSourceRequest.Validate if the designated constraints aren't met.
+type GetSubmissionSourceRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetSubmissionSourceRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetSubmissionSourceRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetSubmissionSourceRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetSubmissionSourceRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetSubmissionSourceRequestValidationError) ErrorName() string {
+	return "GetSubmissionSourceRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetSubmissionSourceRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetSubmissionSourceRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetSubmissionSourceRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetSubmissionSourceRequestValidationError{}
+
+// Validate checks the field values on GetSubmissionSourceResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetSubmissionSourceResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetSubmissionSourceResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetSubmissionSourceResponseMultiError, or nil if none found.
+func (m *GetSubmissionSourceResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetSubmissionSourceResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SubmissionId
+
+	// no validation rules for Language
+
+	if utf8.RuneCountInString(m.GetSourceCode()) < 1 {
+		err := GetSubmissionSourceResponseValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSourceCode()) > 1048576 {
+		err := GetSubmissionSourceResponseValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at most 1048576 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for SizeBytes
+
+	// no validation rules for Sha256
+
+	if len(errors) > 0 {
+		return GetSubmissionSourceResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetSubmissionSourceResponseMultiError is an error wrapping multiple
+// validation errors returned by GetSubmissionSourceResponse.ValidateAll() if
+// the designated constraints aren't met.
+type GetSubmissionSourceResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetSubmissionSourceResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetSubmissionSourceResponseMultiError) AllErrors() []error { return m }
+
+// GetSubmissionSourceResponseValidationError is the validation error returned
+// by GetSubmissionSourceResponse.Validate if the designated constraints
+// aren't met.
+type GetSubmissionSourceResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetSubmissionSourceResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetSubmissionSourceResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetSubmissionSourceResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetSubmissionSourceResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetSubmissionSourceResponseValidationError) ErrorName() string {
+	return "GetSubmissionSourceResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetSubmissionSourceResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetSubmissionSourceResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetSubmissionSourceResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetSubmissionSourceResponseValidationError{}
+
 // Validate checks the field values on ListSubmissionsRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

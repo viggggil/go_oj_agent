@@ -261,6 +261,34 @@ func (uc *SubmissionUsecase) Get(ctx context.Context, actor Actor, submissionID 
 	return submission, nil
 }
 
+func (uc *SubmissionUsecase) GetSource(ctx context.Context, actor Actor, submissionID int64) (Submission, []byte, error) {
+	if err := requireActor(actor); err != nil {
+		return Submission{}, nil, err
+	}
+	if uc == nil || uc.repository == nil {
+		return Submission{}, nil, ErrorInternal("submission repository is not configured")
+	}
+	if submissionID <= 0 {
+		return Submission{}, nil, ErrorInvalidArgument("invalid submission id")
+	}
+	submission, err := uc.repository.FindByID(ctx, submissionID)
+	if err != nil {
+		return Submission{}, nil, err
+	}
+	if submission.UserID != actor.ID && !actorIsAdmin(actor) {
+		return Submission{}, nil, ErrorSubmissionNotFound()
+	}
+	reader, ok := uc.sources.(SourceReader)
+	if !ok {
+		return Submission{}, nil, ErrorInternal("source reader is not configured")
+	}
+	source, err := reader.Get(ctx, submission.SourceObjectKey)
+	if err != nil {
+		return Submission{}, nil, err
+	}
+	return submission, source, nil
+}
+
 func (uc *SubmissionUsecase) List(ctx context.Context, actor Actor, filter ListFilter) (SubmissionPage, error) {
 	if err := requireActor(actor); err != nil {
 		return SubmissionPage{}, err

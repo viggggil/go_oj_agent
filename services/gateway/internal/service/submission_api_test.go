@@ -23,6 +23,9 @@ func (f *fakeSubmissionClient) CreateSubmission(_ context.Context, req *submissi
 func (f *fakeSubmissionClient) GetSubmission(context.Context, *submissionv1.GetSubmissionRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionResponse, error) {
 	return &submissionv1.GetSubmissionResponse{}, nil
 }
+func (f *fakeSubmissionClient) GetSubmissionSource(context.Context, *submissionv1.GetSubmissionSourceRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionSourceResponse, error) {
+	return &submissionv1.GetSubmissionSourceResponse{}, nil
+}
 func (f *fakeSubmissionClient) ListSubmissions(context.Context, *submissionv1.ListSubmissionsRequest, ...grpc.CallOption) (*submissionv1.ListSubmissionsResponse, error) {
 	return &submissionv1.ListSubmissionsResponse{}, nil
 }

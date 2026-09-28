@@ -11,6 +11,7 @@ import "validate/validate.proto";
 service SubmissionService {
   rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse);
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
+  rpc GetSubmissionSource(GetSubmissionSourceRequest) returns (GetSubmissionSourceResponse);
   // ListSubmissions also covers recent submissions through stable descending
   // pagination; a separate ListRecentSubmissions RPC is intentionally omitted.
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
@@ -111,6 +112,20 @@ message GetSubmissionRequest {
 
 message GetSubmissionResponse {
   Submission submission = 1;
+}
+
+message GetSubmissionSourceRequest {
+  reserved 1;
+  reserved "context";
+  int64 submission_id = 2 [(validate.rules).int64.gt = 0];
+}
+
+message GetSubmissionSourceResponse {
+  int64 submission_id = 1;
+  string language = 2;
+  string source_code = 3 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  int64 size_bytes = 4;
+  string sha256 = 5;
 }
 
 message ListSubmissionsRequest {
