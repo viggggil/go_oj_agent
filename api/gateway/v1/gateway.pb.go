@@ -10,6 +10,7 @@ import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	v11 "github.com/viggggil/go_oj_agent/api/common/v1"
 	v1 "github.com/viggggil/go_oj_agent/api/problem/v1"
+	v12 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1541,12 +1542,540 @@ func (x *ArchiveTestcaseResponse) GetTestcase() *v1.TestcaseMetadata {
 	return nil
 }
 
+type CreateSubmissionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProblemId      int64                  `protobuf:"varint,1,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	Language       string                 `protobuf:"bytes,2,opt,name=language,proto3" json:"language,omitempty"`
+	SourceCode     string                 `protobuf:"bytes,3,opt,name=source_code,json=sourceCode,proto3" json:"source_code,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateSubmissionRequest) Reset() {
+	*x = CreateSubmissionRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSubmissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSubmissionRequest) ProtoMessage() {}
+
+func (x *CreateSubmissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSubmissionRequest.ProtoReflect.Descriptor instead.
+func (*CreateSubmissionRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *CreateSubmissionRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *CreateSubmissionRequest) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *CreateSubmissionRequest) GetSourceCode() string {
+	if x != nil {
+		return x.SourceCode
+	}
+	return ""
+}
+
+func (x *CreateSubmissionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type CreateSubmissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  int64                  `protobuf:"varint,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	Status        v12.SubmissionStatus   `protobuf:"varint,2,opt,name=status,proto3,enum=submission.v1.SubmissionStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateSubmissionResponse) Reset() {
+	*x = CreateSubmissionResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSubmissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSubmissionResponse) ProtoMessage() {}
+
+func (x *CreateSubmissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSubmissionResponse.ProtoReflect.Descriptor instead.
+func (*CreateSubmissionResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *CreateSubmissionResponse) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+func (x *CreateSubmissionResponse) GetStatus() v12.SubmissionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v12.SubmissionStatus(0)
+}
+
+type GetSubmissionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  int64                  `protobuf:"varint,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubmissionRequest) Reset() {
+	*x = GetSubmissionRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubmissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubmissionRequest) ProtoMessage() {}
+
+func (x *GetSubmissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubmissionRequest.ProtoReflect.Descriptor instead.
+func (*GetSubmissionRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetSubmissionRequest) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+type GetSubmissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Submission    *v12.Submission        `protobuf:"bytes,1,opt,name=submission,proto3" json:"submission,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubmissionResponse) Reset() {
+	*x = GetSubmissionResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubmissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubmissionResponse) ProtoMessage() {}
+
+func (x *GetSubmissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubmissionResponse.ProtoReflect.Descriptor instead.
+func (*GetSubmissionResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetSubmissionResponse) GetSubmission() *v12.Submission {
+	if x != nil {
+		return x.Submission
+	}
+	return nil
+}
+
+type GetJudgeResultRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  int64                  `protobuf:"varint,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetJudgeResultRequest) Reset() {
+	*x = GetJudgeResultRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetJudgeResultRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetJudgeResultRequest) ProtoMessage() {}
+
+func (x *GetJudgeResultRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetJudgeResultRequest.ProtoReflect.Descriptor instead.
+func (*GetJudgeResultRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetJudgeResultRequest) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+type GetJudgeResultResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *v12.JudgeResult       `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetJudgeResultResponse) Reset() {
+	*x = GetJudgeResultResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetJudgeResultResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetJudgeResultResponse) ProtoMessage() {}
+
+func (x *GetJudgeResultResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetJudgeResultResponse.ProtoReflect.Descriptor instead.
+func (*GetJudgeResultResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *GetJudgeResultResponse) GetResult() *v12.JudgeResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ListSubmissionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          *v11.PageRequest       `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
+	ProblemId     int64                  `protobuf:"varint,2,opt,name=problem_id,json=problemId,proto3" json:"problem_id,omitempty"`
+	Status        v12.SubmissionStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=submission.v1.SubmissionStatus" json:"status,omitempty"`
+	Language      string                 `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
+	UserId        int64                  `protobuf:"varint,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSubmissionsRequest) Reset() {
+	*x = ListSubmissionsRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSubmissionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSubmissionsRequest) ProtoMessage() {}
+
+func (x *ListSubmissionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSubmissionsRequest.ProtoReflect.Descriptor instead.
+func (*ListSubmissionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ListSubmissionsRequest) GetPage() *v11.PageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *ListSubmissionsRequest) GetProblemId() int64 {
+	if x != nil {
+		return x.ProblemId
+	}
+	return 0
+}
+
+func (x *ListSubmissionsRequest) GetStatus() v12.SubmissionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v12.SubmissionStatus(0)
+}
+
+func (x *ListSubmissionsRequest) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *ListSubmissionsRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+type ListSubmissionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*v12.Submission      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Page          *v11.PageResponse      `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSubmissionsResponse) Reset() {
+	*x = ListSubmissionsResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSubmissionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSubmissionsResponse) ProtoMessage() {}
+
+func (x *ListSubmissionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSubmissionsResponse.ProtoReflect.Descriptor instead.
+func (*ListSubmissionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ListSubmissionsResponse) GetItems() []*v12.Submission {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListSubmissionsResponse) GetPage() *v11.PageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type RejudgeSubmissionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId   int64                  `protobuf:"varint,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RejudgeSubmissionRequest) Reset() {
+	*x = RejudgeSubmissionRequest{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejudgeSubmissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejudgeSubmissionRequest) ProtoMessage() {}
+
+func (x *RejudgeSubmissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejudgeSubmissionRequest.ProtoReflect.Descriptor instead.
+func (*RejudgeSubmissionRequest) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *RejudgeSubmissionRequest) GetSubmissionId() int64 {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return 0
+}
+
+func (x *RejudgeSubmissionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type RejudgeSubmissionResponse struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	InvalidatedSubmissionId int64                  `protobuf:"varint,1,opt,name=invalidated_submission_id,json=invalidatedSubmissionId,proto3" json:"invalidated_submission_id,omitempty"`
+	Submission              *v12.Submission        `protobuf:"bytes,2,opt,name=submission,proto3" json:"submission,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *RejudgeSubmissionResponse) Reset() {
+	*x = RejudgeSubmissionResponse{}
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejudgeSubmissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejudgeSubmissionResponse) ProtoMessage() {}
+
+func (x *RejudgeSubmissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_gateway_v1_gateway_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejudgeSubmissionResponse.ProtoReflect.Descriptor instead.
+func (*RejudgeSubmissionResponse) Descriptor() ([]byte, []int) {
+	return file_api_gateway_v1_gateway_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *RejudgeSubmissionResponse) GetInvalidatedSubmissionId() int64 {
+	if x != nil {
+		return x.InvalidatedSubmissionId
+	}
+	return 0
+}
+
+func (x *RejudgeSubmissionResponse) GetSubmission() *v12.Submission {
+	if x != nil {
+		return x.Submission
+	}
+	return nil
+}
+
 var File_api_gateway_v1_gateway_proto protoreflect.FileDescriptor
 
 const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\n" +
 	"\x1capi/gateway/v1/gateway.proto\x12\n" +
-	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17validate/validate.proto\x1a\x1aapi/common/v1/common.proto\x1a\x1capi/problem/v1/problem.proto\"}\n" +
+	"gateway.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17validate/validate.proto\x1a\x1aapi/common/v1/common.proto\x1a\x1capi/problem/v1/problem.proto\x1a\"api/submission/v1/submission.proto\"}\n" +
 	"\vUserSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
@@ -1640,7 +2169,45 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\vtestcase_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\n" +
 	"testcaseId\"S\n" +
 	"\x17ArchiveTestcaseResponse\x128\n" +
-	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase2\xea\r\n" +
+	"\btestcase\x18\x01 \x01(\v2\x1c.problem.v1.TestcaseMetadataR\btestcase\"\xde\x01\n" +
+	"\x17CreateSubmissionRequest\x12&\n" +
+	"\n" +
+	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12:\n" +
+	"\blanguage\x18\x02 \x01(\tB\x1e\xfaB\x1br\x19\x10\x01\x18 2\x13^[a-z][a-z0-9_+-]*$R\blanguage\x12,\n" +
+	"\vsource_code\x18\x03 \x01(\tB\v\xfaB\br\x06\x10\x01(\x80\x80@R\n" +
+	"sourceCode\x121\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x0eidempotencyKey\"x\n" +
+	"\x18CreateSubmissionResponse\x12#\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03R\fsubmissionId\x127\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x1f.submission.v1.SubmissionStatusR\x06status\"D\n" +
+	"\x14GetSubmissionRequest\x12,\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\"R\n" +
+	"\x15GetSubmissionResponse\x129\n" +
+	"\n" +
+	"submission\x18\x01 \x01(\v2\x19.submission.v1.SubmissionR\n" +
+	"submission\"E\n" +
+	"\x15GetJudgeResultRequest\x12,\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\"L\n" +
+	"\x16GetJudgeResultResponse\x122\n" +
+	"\x06result\x18\x01 \x01(\v2\x1a.submission.v1.JudgeResultR\x06result\"\xdb\x01\n" +
+	"\x16ListSubmissionsRequest\x124\n" +
+	"\x04page\x18\x01 \x01(\v2\x16.common.v1.PageRequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04page\x12\x1d\n" +
+	"\n" +
+	"problem_id\x18\x02 \x01(\x03R\tproblemId\x127\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x1f.submission.v1.SubmissionStatusR\x06status\x12\x1a\n" +
+	"\blanguage\x18\x04 \x01(\tR\blanguage\x12\x17\n" +
+	"\auser_id\x18\x05 \x01(\x03R\x06userId\"w\n" +
+	"\x17ListSubmissionsResponse\x12/\n" +
+	"\x05items\x18\x01 \x03(\v2\x19.submission.v1.SubmissionR\x05items\x12+\n" +
+	"\x04page\x18\x02 \x01(\v2\x17.common.v1.PageResponseR\x04page\"{\n" +
+	"\x18RejudgeSubmissionRequest\x12,\n" +
+	"\rsubmission_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\fsubmissionId\x121\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x0eidempotencyKey\"\x92\x01\n" +
+	"\x19RejudgeSubmissionResponse\x12:\n" +
+	"\x19invalidated_submission_id\x18\x01 \x01(\x03R\x17invalidatedSubmissionId\x129\n" +
+	"\n" +
+	"submission\x18\x02 \x01(\v2\x19.submission.v1.SubmissionR\n" +
+	"submission2\x8f\x13\n" +
 	"\x0eGatewayService\x12Q\n" +
 	"\x06Health\x12\x19.gateway.v1.HealthRequest\x1a\x1a.gateway.v1.HealthResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
 	"\x12\b/healthz\x12g\n" +
@@ -1658,7 +2225,12 @@ const file_api_gateway_v1_gateway_proto_rawDesc = "" +
 	"\x0eArchiveProblem\x12!.gateway.v1.ArchiveProblemRequest\x1a\".gateway.v1.ArchiveProblemResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/problems/{problem_id}\x12\x82\x01\n" +
 	"\vAddTestcase\x12\x1e.gateway.v1.AddTestcaseRequest\x1a\x1f.gateway.v1.AddTestcaseResponse\"2\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/problems/{problem_id}/testcases\x12\x9a\x01\n" +
 	"\x14ListProblemTestcases\x12'.gateway.v1.ListProblemTestcasesRequest\x1a(.gateway.v1.ListProblemTestcasesResponse\"/\x82\xd3\xe4\x93\x02)\x12'/api/v1/problems/{problem_id}/testcases\x12\x99\x01\n" +
-	"\x0fArchiveTestcase\x12\".gateway.v1.ArchiveTestcaseRequest\x1a#.gateway.v1.ArchiveTestcaseResponse\"=\x82\xd3\xe4\x93\x027*5/api/v1/problems/{problem_id}/testcases/{testcase_id}B:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
+	"\x0fArchiveTestcase\x12\".gateway.v1.ArchiveTestcaseRequest\x1a#.gateway.v1.ArchiveTestcaseResponse\"=\x82\xd3\xe4\x93\x027*5/api/v1/problems/{problem_id}/testcases/{testcase_id}\x12}\n" +
+	"\x10CreateSubmission\x12#.gateway.v1.CreateSubmissionRequest\x1a$.gateway.v1.CreateSubmissionResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/api/v1/submissions\x12\x81\x01\n" +
+	"\rGetSubmission\x12 .gateway.v1.GetSubmissionRequest\x1a!.gateway.v1.GetSubmissionResponse\"+\x82\xd3\xe4\x93\x02%\x12#/api/v1/submissions/{submission_id}\x12\x8b\x01\n" +
+	"\x0eGetJudgeResult\x12!.gateway.v1.GetJudgeResultRequest\x1a\".gateway.v1.GetJudgeResultResponse\"2\x82\xd3\xe4\x93\x02,\x12*/api/v1/submissions/{submission_id}/result\x12w\n" +
+	"\x0fListSubmissions\x12\".gateway.v1.ListSubmissionsRequest\x1a#.gateway.v1.ListSubmissionsResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/submissions\x12\x98\x01\n" +
+	"\x11RejudgeSubmission\x12$.gateway.v1.RejudgeSubmissionRequest\x1a%.gateway.v1.RejudgeSubmissionResponse\"6\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/submissions/{submission_id}/rejudgeB:Z8github.com/viggggil/go_oj_agent/api/gateway/v1;gatewayv1b\x06proto3"
 
 var (
 	file_api_gateway_v1_gateway_proto_rawDescOnce sync.Once
@@ -1672,7 +2244,7 @@ func file_api_gateway_v1_gateway_proto_rawDescGZIP() []byte {
 	return file_api_gateway_v1_gateway_proto_rawDescData
 }
 
-var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_api_gateway_v1_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_api_gateway_v1_gateway_proto_goTypes = []any{
 	(*UserSummary)(nil),                  // 0: gateway.v1.UserSummary
 	(*HealthRequest)(nil),                // 1: gateway.v1.HealthRequest
@@ -1705,66 +2277,97 @@ var file_api_gateway_v1_gateway_proto_goTypes = []any{
 	(*ListProblemTestcasesResponse)(nil), // 28: gateway.v1.ListProblemTestcasesResponse
 	(*ArchiveTestcaseRequest)(nil),       // 29: gateway.v1.ArchiveTestcaseRequest
 	(*ArchiveTestcaseResponse)(nil),      // 30: gateway.v1.ArchiveTestcaseResponse
-	(*v1.ProblemInput)(nil),              // 31: problem.v1.ProblemInput
-	(*v1.TestcaseInput)(nil),             // 32: problem.v1.TestcaseInput
-	(*v1.Problem)(nil),                   // 33: problem.v1.Problem
-	(*v11.PageRequest)(nil),              // 34: common.v1.PageRequest
-	(*v1.ProblemSummary)(nil),            // 35: problem.v1.ProblemSummary
-	(*v11.PageResponse)(nil),             // 36: common.v1.PageResponse
-	(*v1.TestcaseMetadata)(nil),          // 37: problem.v1.TestcaseMetadata
+	(*CreateSubmissionRequest)(nil),      // 31: gateway.v1.CreateSubmissionRequest
+	(*CreateSubmissionResponse)(nil),     // 32: gateway.v1.CreateSubmissionResponse
+	(*GetSubmissionRequest)(nil),         // 33: gateway.v1.GetSubmissionRequest
+	(*GetSubmissionResponse)(nil),        // 34: gateway.v1.GetSubmissionResponse
+	(*GetJudgeResultRequest)(nil),        // 35: gateway.v1.GetJudgeResultRequest
+	(*GetJudgeResultResponse)(nil),       // 36: gateway.v1.GetJudgeResultResponse
+	(*ListSubmissionsRequest)(nil),       // 37: gateway.v1.ListSubmissionsRequest
+	(*ListSubmissionsResponse)(nil),      // 38: gateway.v1.ListSubmissionsResponse
+	(*RejudgeSubmissionRequest)(nil),     // 39: gateway.v1.RejudgeSubmissionRequest
+	(*RejudgeSubmissionResponse)(nil),    // 40: gateway.v1.RejudgeSubmissionResponse
+	(*v1.ProblemInput)(nil),              // 41: problem.v1.ProblemInput
+	(*v1.TestcaseInput)(nil),             // 42: problem.v1.TestcaseInput
+	(*v1.Problem)(nil),                   // 43: problem.v1.Problem
+	(*v11.PageRequest)(nil),              // 44: common.v1.PageRequest
+	(*v1.ProblemSummary)(nil),            // 45: problem.v1.ProblemSummary
+	(*v11.PageResponse)(nil),             // 46: common.v1.PageResponse
+	(*v1.TestcaseMetadata)(nil),          // 47: problem.v1.TestcaseMetadata
+	(v12.SubmissionStatus)(0),            // 48: submission.v1.SubmissionStatus
+	(*v12.Submission)(nil),               // 49: submission.v1.Submission
+	(*v12.JudgeResult)(nil),              // 50: submission.v1.JudgeResult
 }
 var file_api_gateway_v1_gateway_proto_depIdxs = []int32{
 	0,  // 0: gateway.v1.RegisterResponse.user:type_name -> gateway.v1.UserSummary
 	0,  // 1: gateway.v1.GetCurrentUserResponse.user:type_name -> gateway.v1.UserSummary
 	0,  // 2: gateway.v1.GetUserResponse.user:type_name -> gateway.v1.UserSummary
-	31, // 3: gateway.v1.CreateProblemRequest.problem:type_name -> problem.v1.ProblemInput
-	32, // 4: gateway.v1.CreateProblemRequest.testcases:type_name -> problem.v1.TestcaseInput
-	33, // 5: gateway.v1.CreateProblemResponse.problem:type_name -> problem.v1.Problem
-	33, // 6: gateway.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
-	34, // 7: gateway.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
-	35, // 8: gateway.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
-	36, // 9: gateway.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
-	31, // 10: gateway.v1.UpdateProblemRequest.problem:type_name -> problem.v1.ProblemInput
-	33, // 11: gateway.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
-	33, // 12: gateway.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
-	37, // 13: gateway.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
-	37, // 14: gateway.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
-	37, // 15: gateway.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
-	1,  // 16: gateway.v1.GatewayService.Health:input_type -> gateway.v1.HealthRequest
-	3,  // 17: gateway.v1.GatewayService.Register:input_type -> gateway.v1.RegisterRequest
-	5,  // 18: gateway.v1.GatewayService.Login:input_type -> gateway.v1.LoginRequest
-	7,  // 19: gateway.v1.GatewayService.RefreshToken:input_type -> gateway.v1.RefreshTokenRequest
-	9,  // 20: gateway.v1.GatewayService.Logout:input_type -> gateway.v1.LogoutRequest
-	11, // 21: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
-	12, // 22: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
-	15, // 23: gateway.v1.GatewayService.CreateProblem:input_type -> gateway.v1.CreateProblemRequest
-	17, // 24: gateway.v1.GatewayService.GetProblem:input_type -> gateway.v1.GetProblemRequest
-	19, // 25: gateway.v1.GatewayService.ListProblems:input_type -> gateway.v1.ListProblemsRequest
-	21, // 26: gateway.v1.GatewayService.UpdateProblem:input_type -> gateway.v1.UpdateProblemRequest
-	23, // 27: gateway.v1.GatewayService.ArchiveProblem:input_type -> gateway.v1.ArchiveProblemRequest
-	25, // 28: gateway.v1.GatewayService.AddTestcase:input_type -> gateway.v1.AddTestcaseRequest
-	27, // 29: gateway.v1.GatewayService.ListProblemTestcases:input_type -> gateway.v1.ListProblemTestcasesRequest
-	29, // 30: gateway.v1.GatewayService.ArchiveTestcase:input_type -> gateway.v1.ArchiveTestcaseRequest
-	2,  // 31: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
-	4,  // 32: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
-	6,  // 33: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
-	8,  // 34: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
-	10, // 35: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
-	13, // 36: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
-	14, // 37: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
-	16, // 38: gateway.v1.GatewayService.CreateProblem:output_type -> gateway.v1.CreateProblemResponse
-	18, // 39: gateway.v1.GatewayService.GetProblem:output_type -> gateway.v1.GetProblemResponse
-	20, // 40: gateway.v1.GatewayService.ListProblems:output_type -> gateway.v1.ListProblemsResponse
-	22, // 41: gateway.v1.GatewayService.UpdateProblem:output_type -> gateway.v1.UpdateProblemResponse
-	24, // 42: gateway.v1.GatewayService.ArchiveProblem:output_type -> gateway.v1.ArchiveProblemResponse
-	26, // 43: gateway.v1.GatewayService.AddTestcase:output_type -> gateway.v1.AddTestcaseResponse
-	28, // 44: gateway.v1.GatewayService.ListProblemTestcases:output_type -> gateway.v1.ListProblemTestcasesResponse
-	30, // 45: gateway.v1.GatewayService.ArchiveTestcase:output_type -> gateway.v1.ArchiveTestcaseResponse
-	31, // [31:46] is the sub-list for method output_type
-	16, // [16:31] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	41, // 3: gateway.v1.CreateProblemRequest.problem:type_name -> problem.v1.ProblemInput
+	42, // 4: gateway.v1.CreateProblemRequest.testcases:type_name -> problem.v1.TestcaseInput
+	43, // 5: gateway.v1.CreateProblemResponse.problem:type_name -> problem.v1.Problem
+	43, // 6: gateway.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
+	44, // 7: gateway.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
+	45, // 8: gateway.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
+	46, // 9: gateway.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
+	41, // 10: gateway.v1.UpdateProblemRequest.problem:type_name -> problem.v1.ProblemInput
+	43, // 11: gateway.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
+	43, // 12: gateway.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
+	47, // 13: gateway.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	47, // 14: gateway.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
+	47, // 15: gateway.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
+	48, // 16: gateway.v1.CreateSubmissionResponse.status:type_name -> submission.v1.SubmissionStatus
+	49, // 17: gateway.v1.GetSubmissionResponse.submission:type_name -> submission.v1.Submission
+	50, // 18: gateway.v1.GetJudgeResultResponse.result:type_name -> submission.v1.JudgeResult
+	44, // 19: gateway.v1.ListSubmissionsRequest.page:type_name -> common.v1.PageRequest
+	48, // 20: gateway.v1.ListSubmissionsRequest.status:type_name -> submission.v1.SubmissionStatus
+	49, // 21: gateway.v1.ListSubmissionsResponse.items:type_name -> submission.v1.Submission
+	46, // 22: gateway.v1.ListSubmissionsResponse.page:type_name -> common.v1.PageResponse
+	49, // 23: gateway.v1.RejudgeSubmissionResponse.submission:type_name -> submission.v1.Submission
+	1,  // 24: gateway.v1.GatewayService.Health:input_type -> gateway.v1.HealthRequest
+	3,  // 25: gateway.v1.GatewayService.Register:input_type -> gateway.v1.RegisterRequest
+	5,  // 26: gateway.v1.GatewayService.Login:input_type -> gateway.v1.LoginRequest
+	7,  // 27: gateway.v1.GatewayService.RefreshToken:input_type -> gateway.v1.RefreshTokenRequest
+	9,  // 28: gateway.v1.GatewayService.Logout:input_type -> gateway.v1.LogoutRequest
+	11, // 29: gateway.v1.GatewayService.GetCurrentUser:input_type -> gateway.v1.GetCurrentUserRequest
+	12, // 30: gateway.v1.GatewayService.GetUser:input_type -> gateway.v1.GetUserRequest
+	15, // 31: gateway.v1.GatewayService.CreateProblem:input_type -> gateway.v1.CreateProblemRequest
+	17, // 32: gateway.v1.GatewayService.GetProblem:input_type -> gateway.v1.GetProblemRequest
+	19, // 33: gateway.v1.GatewayService.ListProblems:input_type -> gateway.v1.ListProblemsRequest
+	21, // 34: gateway.v1.GatewayService.UpdateProblem:input_type -> gateway.v1.UpdateProblemRequest
+	23, // 35: gateway.v1.GatewayService.ArchiveProblem:input_type -> gateway.v1.ArchiveProblemRequest
+	25, // 36: gateway.v1.GatewayService.AddTestcase:input_type -> gateway.v1.AddTestcaseRequest
+	27, // 37: gateway.v1.GatewayService.ListProblemTestcases:input_type -> gateway.v1.ListProblemTestcasesRequest
+	29, // 38: gateway.v1.GatewayService.ArchiveTestcase:input_type -> gateway.v1.ArchiveTestcaseRequest
+	31, // 39: gateway.v1.GatewayService.CreateSubmission:input_type -> gateway.v1.CreateSubmissionRequest
+	33, // 40: gateway.v1.GatewayService.GetSubmission:input_type -> gateway.v1.GetSubmissionRequest
+	35, // 41: gateway.v1.GatewayService.GetJudgeResult:input_type -> gateway.v1.GetJudgeResultRequest
+	37, // 42: gateway.v1.GatewayService.ListSubmissions:input_type -> gateway.v1.ListSubmissionsRequest
+	39, // 43: gateway.v1.GatewayService.RejudgeSubmission:input_type -> gateway.v1.RejudgeSubmissionRequest
+	2,  // 44: gateway.v1.GatewayService.Health:output_type -> gateway.v1.HealthResponse
+	4,  // 45: gateway.v1.GatewayService.Register:output_type -> gateway.v1.RegisterResponse
+	6,  // 46: gateway.v1.GatewayService.Login:output_type -> gateway.v1.LoginResponse
+	8,  // 47: gateway.v1.GatewayService.RefreshToken:output_type -> gateway.v1.RefreshTokenResponse
+	10, // 48: gateway.v1.GatewayService.Logout:output_type -> gateway.v1.LogoutResponse
+	13, // 49: gateway.v1.GatewayService.GetCurrentUser:output_type -> gateway.v1.GetCurrentUserResponse
+	14, // 50: gateway.v1.GatewayService.GetUser:output_type -> gateway.v1.GetUserResponse
+	16, // 51: gateway.v1.GatewayService.CreateProblem:output_type -> gateway.v1.CreateProblemResponse
+	18, // 52: gateway.v1.GatewayService.GetProblem:output_type -> gateway.v1.GetProblemResponse
+	20, // 53: gateway.v1.GatewayService.ListProblems:output_type -> gateway.v1.ListProblemsResponse
+	22, // 54: gateway.v1.GatewayService.UpdateProblem:output_type -> gateway.v1.UpdateProblemResponse
+	24, // 55: gateway.v1.GatewayService.ArchiveProblem:output_type -> gateway.v1.ArchiveProblemResponse
+	26, // 56: gateway.v1.GatewayService.AddTestcase:output_type -> gateway.v1.AddTestcaseResponse
+	28, // 57: gateway.v1.GatewayService.ListProblemTestcases:output_type -> gateway.v1.ListProblemTestcasesResponse
+	30, // 58: gateway.v1.GatewayService.ArchiveTestcase:output_type -> gateway.v1.ArchiveTestcaseResponse
+	32, // 59: gateway.v1.GatewayService.CreateSubmission:output_type -> gateway.v1.CreateSubmissionResponse
+	34, // 60: gateway.v1.GatewayService.GetSubmission:output_type -> gateway.v1.GetSubmissionResponse
+	36, // 61: gateway.v1.GatewayService.GetJudgeResult:output_type -> gateway.v1.GetJudgeResultResponse
+	38, // 62: gateway.v1.GatewayService.ListSubmissions:output_type -> gateway.v1.ListSubmissionsResponse
+	40, // 63: gateway.v1.GatewayService.RejudgeSubmission:output_type -> gateway.v1.RejudgeSubmissionResponse
+	44, // [44:64] is the sub-list for method output_type
+	24, // [24:44] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_api_gateway_v1_gateway_proto_init() }
@@ -1778,7 +2381,7 @@ func file_api_gateway_v1_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_gateway_v1_gateway_proto_rawDesc), len(file_api_gateway_v1_gateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

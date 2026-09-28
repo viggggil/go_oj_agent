@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "validate/validate.proto";
 import "api/common/v1/common.proto";
 import "api/problem/v1/problem.proto";
+import "api/submission/v1/submission.proto";
 
 service GatewayService {
   rpc Health(HealthRequest) returns (HealthResponse) {
@@ -64,6 +65,12 @@ service GatewayService {
   rpc AddTestcase(AddTestcaseRequest) returns (AddTestcaseResponse) { option (google.api.http) = { post: "/api/v1/problems/{problem_id}/testcases" body: "*" }; }
   rpc ListProblemTestcases(ListProblemTestcasesRequest) returns (ListProblemTestcasesResponse) { option (google.api.http) = { get: "/api/v1/problems/{problem_id}/testcases" }; }
   rpc ArchiveTestcase(ArchiveTestcaseRequest) returns (ArchiveTestcaseResponse) { option (google.api.http) = { delete: "/api/v1/problems/{problem_id}/testcases/{testcase_id}" }; }
+
+  rpc CreateSubmission(CreateSubmissionRequest) returns (CreateSubmissionResponse) { option (google.api.http) = { post: "/api/v1/submissions" body: "*" }; }
+  rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}" }; }
+  rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}/result" }; }
+  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse) { option (google.api.http) = { get: "/api/v1/submissions" }; }
+  rpc RejudgeSubmission(RejudgeSubmissionRequest) returns (RejudgeSubmissionResponse) { option (google.api.http) = { post: "/api/v1/submissions/{submission_id}/rejudge" body: "*" }; }
 }
 
 message UserSummary {
@@ -159,3 +166,19 @@ message ListProblemTestcasesRequest { int64 problem_id = 1 [(validate.rules).int
 message ListProblemTestcasesResponse { repeated problem.v1.TestcaseMetadata items = 1; }
 message ArchiveTestcaseRequest { int64 problem_id = 1 [(validate.rules).int64.gt = 0]; int64 testcase_id = 2 [(validate.rules).int64.gt = 0]; }
 message ArchiveTestcaseResponse { problem.v1.TestcaseMetadata testcase = 1; }
+
+message CreateSubmissionRequest {
+  int64 problem_id = 1 [(validate.rules).int64.gt = 0];
+  string language = 2 [(validate.rules).string = {min_len: 1, max_len: 32, pattern: "^[a-z][a-z0-9_+-]*$"}];
+  string source_code = 3 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  string idempotency_key = 4 [(validate.rules).string.uuid = true];
+}
+message CreateSubmissionResponse { int64 submission_id = 1; submission.v1.SubmissionStatus status = 2; }
+message GetSubmissionRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; }
+message GetSubmissionResponse { submission.v1.Submission submission = 1; }
+message GetJudgeResultRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; }
+message GetJudgeResultResponse { submission.v1.JudgeResult result = 1; }
+message ListSubmissionsRequest { common.v1.PageRequest page = 1 [(validate.rules).message.required = true]; int64 problem_id = 2; submission.v1.SubmissionStatus status = 3; string language = 4; int64 user_id = 5; }
+message ListSubmissionsResponse { repeated submission.v1.Submission items = 1; common.v1.PageResponse page = 2; }
+message RejudgeSubmissionRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; string idempotency_key = 2 [(validate.rules).string.uuid = true]; }
+message RejudgeSubmissionResponse { int64 invalidated_submission_id = 1; submission.v1.Submission submission = 2; }

@@ -431,6 +431,35 @@ func (m *ServerProto) validate(all bool) error {
 		}
 	}
 
+	if all {
+		switch v := interface{}(m.GetSse()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ServerProtoValidationError{
+					field:  "Sse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ServerProtoValidationError{
+					field:  "Sse",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSse()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ServerProtoValidationError{
+				field:  "Sse",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return ServerProtoMultiError(errors)
 	}
@@ -611,6 +640,109 @@ var _ interface {
 	ErrorName() string
 } = HTTPProtoValidationError{}
 
+// Validate checks the field values on SSEProto with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *SSEProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SSEProto with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in SSEProtoMultiError, or nil
+// if none found.
+func (m *SSEProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SSEProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for PollInterval
+
+	// no validation rules for MaxDuration
+
+	if len(errors) > 0 {
+		return SSEProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// SSEProtoMultiError is an error wrapping multiple validation errors returned
+// by SSEProto.ValidateAll() if the designated constraints aren't met.
+type SSEProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SSEProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SSEProtoMultiError) AllErrors() []error { return m }
+
+// SSEProtoValidationError is the validation error returned by
+// SSEProto.Validate if the designated constraints aren't met.
+type SSEProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SSEProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SSEProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SSEProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SSEProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SSEProtoValidationError) ErrorName() string { return "SSEProtoValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SSEProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSSEProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SSEProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SSEProtoValidationError{}
+
 // Validate checks the field values on AuthProto with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -634,6 +766,20 @@ func (m *AuthProto) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for AccessTokenKey
+
+	// no validation rules for AccessTokenPublicKeyFile
+
+	// no validation rules for AccessTokenKeyId
+
+	// no validation rules for InternalPrivateKeyFile
+
+	// no validation rules for InternalKeyId
+
+	// no validation rules for InternalIssuer
+
+	// no validation rules for InternalAudience
+
+	// no validation rules for InternalTokenTtl
 
 	// no validation rules for Issuer
 

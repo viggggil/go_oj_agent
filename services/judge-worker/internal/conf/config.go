@@ -16,8 +16,14 @@ type Bootstrap struct {
 }
 
 type Worker struct {
-	Concurrency int    `json:"concurrency" yaml:"concurrency"`
-	TaskTimeout string `json:"task_timeout" yaml:"task_timeout"`
+	Concurrency     int    `json:"concurrency" yaml:"concurrency"`
+	TaskTimeout     string `json:"task_timeout" yaml:"task_timeout"`
+	ShutdownTimeout string `json:"shutdown_timeout" yaml:"shutdown_timeout"`
+	Retry           Retry  `json:"retry" yaml:"retry"`
+}
+type Retry struct {
+	MaxRetries int    `json:"max_retries" yaml:"max_retries"`
+	Delay      string `json:"delay" yaml:"delay"`
 }
 type Messaging struct {
 	RabbitMQ RabbitMQ `json:"rabbitmq" yaml:"rabbitmq"`
@@ -26,6 +32,8 @@ type RabbitMQ struct {
 	URL            string `json:"url" yaml:"url"`
 	Exchange       string `json:"exchange" yaml:"exchange"`
 	Queue          string `json:"queue" yaml:"queue"`
+	RetryQueue     string `json:"retry_queue" yaml:"retry_queue"`
+	DLQ            string `json:"dlq" yaml:"dlq"`
 	ConfirmTimeout string `json:"confirm_timeout" yaml:"confirm_timeout"`
 }
 
@@ -92,12 +100,27 @@ func (c *Bootstrap) Validate() error {
 	if _, err := ParseDuration(c.Worker.TaskTimeout, 60*time.Second); err != nil {
 		return fmt.Errorf("invalid worker task timeout: %w", err)
 	}
+	if _, err := ParseDuration(c.Worker.ShutdownTimeout, 30*time.Second); err != nil {
+		return fmt.Errorf("invalid worker shutdown timeout: %w", err)
+	}
+	if c.Worker.Retry.MaxRetries < 0 {
+		return fmt.Errorf("worker retry max retries cannot be negative")
+	}
+	if _, err := ParseDuration(c.Worker.Retry.Delay, 5*time.Second); err != nil {
+		return fmt.Errorf("invalid worker retry delay: %w", err)
+	}
 	if c.Messaging.RabbitMQ.URL != "" {
 		if strings.TrimSpace(c.Messaging.RabbitMQ.Exchange) == "" {
 			return fmt.Errorf("rabbitmq exchange is required")
 		}
 		if c.Messaging.RabbitMQ.Queue == "" {
 			c.Messaging.RabbitMQ.Queue = "judge.task.go"
+		}
+		if c.Messaging.RabbitMQ.RetryQueue == "" {
+			c.Messaging.RabbitMQ.RetryQueue = "judge.retry.go"
+		}
+		if c.Messaging.RabbitMQ.DLQ == "" {
+			c.Messaging.RabbitMQ.DLQ = "judge.dlq"
 		}
 		if _, err := ParseDuration(c.Messaging.RabbitMQ.ConfirmTimeout, 5*time.Second); err != nil {
 			return fmt.Errorf("invalid rabbitmq confirm timeout: %w", err)

@@ -73,6 +73,12 @@ func RequestContextFromContext(ctx context.Context) (*commonv1.RequestContext, b
 	return requestContext, ok && requestContext != nil
 }
 
+// WithRequestContext is used by non-HTTP adapters and focused service tests
+// that already performed authentication upstream.
+func WithRequestContext(ctx context.Context, requestContext *commonv1.RequestContext) context.Context {
+	return context.WithValue(ctx, requestContextKey, requestContext)
+}
+
 func newRequestID() string {
 	data := make([]byte, 16)
 	if _, err := rand.Read(data); err != nil {

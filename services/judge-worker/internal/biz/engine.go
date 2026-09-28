@@ -20,7 +20,7 @@ func NewEngine(loader TaskLoader, runner LanguageRunner, comparator Comparator) 
 	return &Engine{loader: loader, runner: runner, comparator: comparator, now: func() time.Time { return time.Now().UTC() }}
 }
 
-func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) Outcome {
+func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcome) {
 	if err := task.Validate(); err != nil {
 		return failed(task, "INVALID_TASK", false)
 	}
@@ -42,18 +42,24 @@ func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) Outcome {
 	if err != nil {
 		return outcomeFromError(task, err)
 	}
+	if compile.Artifact.ID != "" {
+		// Register cleanup before interpreting the compiler verdict so malformed
+		// runner responses cannot leak a cached executable.
+		defer func() {
+			if cleanupErr := e.runner.DeleteArtifact(context.WithoutCancel(ctx), compile.Artifact); cleanupErr != nil && outcome.Failed == nil {
+				outcome = outcomeFromError(task, NewSystemError("ARTIFACT_CLEANUP_FAILED", true, cleanupErr))
+			}
+		}()
+	}
 	if compile.Verdict == VerdictCE {
 		return completed(task, VerdictCE, 0, 0, nil)
 	}
 	if compile.Verdict != VerdictAC || compile.Artifact.ID == "" {
 		return failed(task, "INVALID_COMPILE_RESULT", true)
 	}
-
-	result := e.executeCases(ctx, task, compile.Artifact, loaded)
-	if err = e.runner.DeleteArtifact(context.WithoutCancel(ctx), compile.Artifact); err != nil && result.Failed == nil {
-		return outcomeFromError(task, NewSystemError("ARTIFACT_CLEANUP_FAILED", true, err))
-	}
-	return result
+	// The compiled file lives in go-judge's cache and must be removed on every
+	// path after compilation, including timeout, verdict, and runner errors.
+	return e.executeCases(ctx, task, compile.Artifact, loaded)
 }
 
 func (e *Engine) executeCases(ctx context.Context, task mq.JudgeTask, artifact Artifact, loaded LoadedTask) Outcome {
@@ -120,13 +126,19 @@ func validateLoadedTask(task mq.JudgeTask, loaded LoadedTask) error {
 }
 
 func outcomeFromError(task mq.JudgeTask, err error) Outcome {
-	reason, retryable := ClassifySystemError(err)
-	return failed(task, reason, retryable)
+	code, message, retryable := ClassifyFailure(err)
+	reason, _ := ClassifySystemError(err)
+	return failedCode(task, code, reason, message, retryable)
 }
 
 func failed(task mq.JudgeTask, reason string, retryable bool) Outcome {
+	code, _, _ := ClassifyFailure(NewSystemError(reason, retryable, nil))
+	return failedCode(task, code, reason, reason, retryable)
+}
+
+func failedCode(task mq.JudgeTask, code mq.JudgeFailureCode, reason, message string, retryable bool) Outcome {
 	return Outcome{Failed: &mq.JudgeFailed{
-		SubmissionID: task.SubmissionID, JudgeRevision: task.JudgeRevision, Reason: reason, Retryable: retryable,
+		SubmissionID: task.SubmissionID, JudgeRevision: task.JudgeRevision, Code: code, Message: message, Reason: reason, Retryable: retryable,
 	}}
 }
 

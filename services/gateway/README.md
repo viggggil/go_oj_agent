@@ -10,8 +10,8 @@
 - `internal/conf`：Gateway 配置契约。
 - `internal/server`：HTTP Server、Proto 生成 API 注册和 Consul Registrar。
 - `internal/middleware`：Bearer Token 校验、认证 claims 和请求上下文构造。
-- `internal/client`：User gRPC client 已接入，Problem、Submission 先保留扩展点。
-- `internal/service`：GatewayService 实现由 Proto 生成的 HTTP 接口，Auth、当前用户和按 ID 查询转发到 user-service，Problem、Submission 先保留扩展点。
+- `internal/client`：User、Problem 和 Submission gRPC client 已接入。
+- `internal/service`：GatewayService 实现认证、用户、题目和 Submission/Judge HTTP 转发。
 - `configs/config.yaml`：本地默认配置。
 - `/healthz`：健康检查接口。
 - `POST /api/v1/auth/register`：转发到 `user.v1.UserService/Register`。
@@ -21,7 +21,30 @@
 - `GET /api/v1/users/me`：需要 Bearer Token，转发到 `user.v1.UserService/GetCurrentUser`。
 - `GET /api/v1/users/{id}`：需要 Bearer Token，转发到 `user.v1.UserService/GetUser`。
 
-Problem 和 Submission 目录先保留扩展位置，不在当前阶段实现真实转发。
+Submission/Judge API 已通过内部 gRPC 转发到 judge-service。判题事件 SSE 第一版采用
+Gateway 短轮询 `GetJudgeResult`，不直接消费 RabbitMQ。
+
+## Submission/Judge API
+
+受保护接口均需要 `Authorization: Bearer <access-token>`：
+
+```text
+POST /api/v1/submissions
+GET  /api/v1/submissions/{submission_id}
+GET  /api/v1/submissions/{submission_id}/result
+GET  /api/v1/submissions
+POST /api/v1/submissions/{submission_id}/rejudge
+GET  /api/v1/submissions/{submission_id}/events
+```
+
+`CreateSubmission` 和 `RejudgeSubmission` 的 `idempotency_key` 原样透传给
+judge-service。Gateway 不访问数据库、MinIO 或 RabbitMQ，也不复制 judge-service 的
+资源授权与状态机逻辑。
+
+SSE 接口返回 `text/event-stream`，连接建立后立即发送当前快照，之后按
+`server.sse.poll_interval` 短轮询 judge-service。状态进入 `DONE`、`CANCELLED` 或
+`INVALIDATED` 后发送最终事件并关闭连接；默认轮询间隔为 `500ms`，最大连接时长为
+`2m`，可在配置中调整。
 
 ## 目录结构
 

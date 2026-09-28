@@ -39,29 +39,32 @@ func TestGoJudgeEngine(t *testing.T) {
 
 	tests := []struct {
 		name, source, expected, verdict string
-		timeLimitMS                     int32
+		timeLimitMS, memoryLimitKB      int32
 	}{
 		{"accepted", `package main
 import ("bufio"; "fmt"; "os")
 func main(){ in:=bufio.NewReader(os.Stdin); var a,b int; fmt.Fscan(in,&a,&b); fmt.Println(a+b) }
-`, "3\n", biz.VerdictAC, 1000},
+`, "3\n", biz.VerdictAC, 1000, 65536},
 		{"wrong-answer", `package main
 import "fmt"
 func main(){ fmt.Println(4) }
-`, "3\n", biz.VerdictWA, 1000},
+`, "3\n", biz.VerdictWA, 1000, 65536},
 		{"compile-error", `package main
 func main() { this is invalid }
-`, "", biz.VerdictCE, 1000},
+`, "", biz.VerdictCE, 1000, 65536},
 		{"time-limit", `package main
 func main(){ for {} }
-`, "", biz.VerdictTLE, 100},
+`, "", biz.VerdictTLE, 100, 65536},
+		{"memory-limit", `package main
+func main(){ b:=make([]byte, 128<<20); b[0]=1; select{} }
+`, "", biz.VerdictMLE, 1000, 16384},
 		{"runtime-error", `package main
 func main(){ panic("boom") }
-`, "", biz.VerdictRE, 1000},
+`, "", biz.VerdictRE, 1000, 65536},
 	}
 	for index, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			task, loaded := integrationTask(int64(index+1), test.source, test.expected, test.timeLimitMS)
+			task, loaded := integrationTask(int64(index+1), test.source, test.expected, test.timeLimitMS, test.memoryLimitKB)
 			engine := biz.NewEngine(staticLoader{loaded: loaded}, runner, comparator.NewText())
 			outcome := engine.Execute(t.Context(), task)
 			if outcome.Failed != nil || outcome.Completed == nil || outcome.Completed.Verdict != test.verdict {
@@ -71,7 +74,7 @@ func main(){ panic("boom") }
 	}
 }
 
-func integrationTask(submissionID int64, source, expected string, timeLimitMS int32) (mq.JudgeTask, biz.LoadedTask) {
+func integrationTask(submissionID int64, source, expected string, timeLimitMS, memoryLimitKB int32) (mq.JudgeTask, biz.LoadedTask) {
 	revision := "01K5C6Y7N8P9Q0R1S2T3V4W5X6"
 	task := mq.JudgeTask{
 		SubmissionID: submissionID, ProblemID: 7, Language: "go", JudgeRevision: revision,
@@ -80,7 +83,7 @@ func integrationTask(submissionID int64, source, expected string, timeLimitMS in
 	}
 	manifest := judgecontract.Manifest{
 		ManifestVersion: judgecontract.ManifestVersion, ProblemID: 7, JudgeRevision: revision,
-		TimeLimitMS: timeLimitMS, MemoryLimitKB: 65536,
+		TimeLimitMS: timeLimitMS, MemoryLimitKB: memoryLimitKB,
 		Testcases: []judgecontract.Testcase{{
 			CaseNo: 1,
 			Input:  judgecontract.Object{ObjectKey: "problem-7/judge-revisions/" + revision + "/testcases/1.in", SHA256: strings.Repeat("b", 64), SizeBytes: 4},

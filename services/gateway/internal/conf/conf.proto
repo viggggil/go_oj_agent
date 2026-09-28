@@ -18,11 +18,17 @@ message ServiceProto {
 
 message ServerProto {
   HTTPProto http = 1;
+  SSEProto sse = 3;
 }
 
 message HTTPProto {
   string address = 1;
   string timeout = 2;
+}
+
+message SSEProto {
+  string poll_interval = 1;
+  string max_duration = 2;
 }
 
 message AuthProto {

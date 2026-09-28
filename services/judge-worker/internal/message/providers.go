@@ -25,7 +25,15 @@ func NewConsumerFromConfig(config *conf.Bootstrap, engine Engine, reporter Repor
 	if rabbit.URL == "" || rabbit.Exchange == "" {
 		return nil, fmt.Errorf("rabbitmq url and exchange are required")
 	}
-	return &Consumer{URL: rabbit.URL, Exchange: rabbit.Exchange, Queue: rabbit.Queue, Concurrency: config.Worker.Concurrency, TaskTimeout: timeout, Engine: engine, Reporter: reporter}, nil
+	shutdownTimeout, err := conf.ParseDuration(config.Worker.ShutdownTimeout, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	retryDelay, err := conf.ParseDuration(config.Worker.Retry.Delay, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &Consumer{URL: rabbit.URL, Exchange: rabbit.Exchange, Queue: rabbit.Queue, RetryQueue: rabbit.RetryQueue, DLQ: rabbit.DLQ, Concurrency: config.Worker.Concurrency, TaskTimeout: timeout, ShutdownTimeout: shutdownTimeout, MaxRetries: config.Worker.Retry.MaxRetries, RetryDelay: retryDelay, Engine: engine, Reporter: reporter}, nil
 }
 
 func NewReporterFromConfig(config *conf.Bootstrap) (*RabbitReporter, error) {

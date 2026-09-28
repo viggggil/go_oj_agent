@@ -20,12 +20,22 @@ func NewHTTPServer(
 ) *khttp.Server {
 	address := ":8080"
 	timeout := 3 * time.Second
+	sseInterval := 500 * time.Millisecond
+	sseMaxDuration := 2 * time.Minute
 	if config != nil && config.GetServer() != nil && config.GetServer().GetHttp() != nil {
 		if config.GetServer().GetHttp().GetAddress() != "" {
 			address = config.GetServer().GetHttp().GetAddress()
 		}
 		if parsed, err := time.ParseDuration(config.GetServer().GetHttp().GetTimeout()); err == nil && parsed > 0 {
 			timeout = parsed
+		}
+		if config.GetServer().GetSse() != nil {
+			if parsed, err := time.ParseDuration(config.GetServer().GetSse().GetPollInterval()); err == nil && parsed > 0 {
+				sseInterval = parsed
+			}
+			if parsed, err := time.ParseDuration(config.GetServer().GetSse().GetMaxDuration()); err == nil && parsed > 0 {
+				sseMaxDuration = parsed
+			}
 		}
 	}
 
@@ -40,6 +50,7 @@ func NewHTTPServer(
 	)
 	gatewayv1.RegisterGatewayServiceHTTPServer(server, gatewayService)
 	registerProblemUploadRoute(server, gatewayService)
+	registerSubmissionEventsRoute(server, gatewayService, sseInterval, sseMaxDuration)
 	server.Use(
 		gatewayv1.OperationGatewayServiceGetCurrentUser,
 		authMiddleware.Middleware(),
@@ -57,6 +68,11 @@ func NewHTTPServer(
 		gatewayv1.OperationGatewayServiceAddTestcase,
 		gatewayv1.OperationGatewayServiceListProblemTestcases,
 		gatewayv1.OperationGatewayServiceArchiveTestcase,
+		gatewayv1.OperationGatewayServiceCreateSubmission,
+		gatewayv1.OperationGatewayServiceGetSubmission,
+		gatewayv1.OperationGatewayServiceGetJudgeResult,
+		gatewayv1.OperationGatewayServiceListSubmissions,
+		gatewayv1.OperationGatewayServiceRejudgeSubmission,
 	} {
 		server.Use(operation, authMiddleware.Middleware())
 	}

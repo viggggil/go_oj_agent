@@ -23,6 +23,7 @@ type delivery struct{ amqp091.Delivery }
 
 func (d delivery) GetBody() []byte      { return d.Body }
 func (d delivery) GetMessageID() string { return d.MessageId }
+func (d delivery) IsRedelivered() bool  { return d.Redelivered }
 
 type Engine interface {
 	Execute(context.Context, mq.JudgeTask) biz.Outcome
@@ -30,8 +31,12 @@ type Engine interface {
 
 type Consumer struct {
 	URL, Exchange, Queue string
+	RetryQueue, DLQ      string
 	Concurrency          int
 	TaskTimeout          time.Duration
+	ShutdownTimeout      time.Duration
+	MaxRetries           int
+	RetryDelay           time.Duration
 	Engine               Engine
 	Reporter             Reporter
 	Logger               *slog.Logger
@@ -61,7 +66,11 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		return
 	}
 	if c.Logger != nil {
-		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID)
+		redelivered := false
+		if metadata, ok := d.(interface{ IsRedelivered() bool }); ok {
+			redelivered = metadata.IsRedelivered()
+		}
+		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
 	}
 	deadline := time.Now().Add(c.TaskTimeout)
 	if c.TaskTimeout <= 0 {
@@ -79,6 +88,17 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		_ = d.Nack(false, true)
 		return
 	}
+	// Expired tasks are terminal and must never reach the sandbox. This check
+	// remains here in addition to Engine's guard for protocol-only engines.
+	if !time.Now().Before(task.JudgeDeadlineAt) {
+		failed := mq.JudgeFailed{SubmissionID: task.SubmissionID, JudgeRevision: task.JudgeRevision, Code: mq.FailureTaskExpired, Message: "judge deadline exceeded", Reason: "JUDGE_DEADLINE_EXCEEDED", Retryable: false}
+		if err := c.Reporter.ReportFailed(ctx, envelope, failed); err != nil {
+			_ = d.Nack(false, true)
+			return
+		}
+		_ = d.Ack(false)
+		return
+	}
 	outcome := c.Engine.Execute(taskCtx, task)
 	if outcome.Completed != nil {
 		if c.Logger != nil {
@@ -88,6 +108,28 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		// verdict; otherwise an expired task could be requeued forever.
 		err = c.Reporter.ReportCompleted(ctx, envelope, *outcome.Completed)
 	} else if outcome.Failed != nil {
+		// Retry is an explicit publish to a delayed queue. Never NACK/requeue a
+		// retryable engine result directly, otherwise a busy loop can starve the
+		// worker and defeat the retry counter.
+		if outcome.Failed.Retryable && c.retryAllowed(task) {
+			retryTask := task
+			retryTask.Attempt++
+			if retryReporter, ok := c.Reporter.(RetryReporter); ok {
+				err = retryReporter.ReportRetry(ctx, envelope, retryTask)
+				if err == nil {
+					err = d.Ack(false)
+				}
+				if err != nil {
+					_ = d.Nack(false, true)
+				}
+				return
+			}
+			_ = d.Nack(false, true)
+			return
+		}
+		// Retry budget/deadline exhausted: emit a terminal failure while
+		// preserving the structured diagnostic code and message.
+		outcome.Failed.Retryable = false
 		if c.Logger != nil {
 			c.Logger.Warn("judge failed", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "reason", outcome.Failed.Reason)
 		}
@@ -108,6 +150,21 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	if err = d.Ack(false); err != nil && c.Logger != nil {
 		c.Logger.Error("task ack failed", "event_id", envelope.EventID, "error", err)
 	}
+}
+
+func (c *Consumer) retryAllowed(task mq.JudgeTask) bool {
+	maxRetries := int32(c.MaxRetries)
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	if task.Attempt >= maxRetries {
+		return false
+	}
+	delay := c.RetryDelay
+	if delay <= 0 {
+		delay = 5 * time.Second
+	}
+	return time.Now().Add(delay).Before(task.JudgeDeadlineAt)
 }
 
 func decodeTask(body []byte) (mq.Envelope, mq.JudgeTask, error) {
@@ -150,7 +207,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 		_ = conn.Close()
 		return err
 	}
-	if err = declareTopology(ch, c.Exchange, c.Queue); err != nil {
+	if err = declareTopology(ch, c.Exchange, c.Queue, c.RetryQueue, c.DLQ, c.RetryDelay); err != nil {
 		_ = ch.Close()
 		_ = conn.Close()
 		return err
@@ -191,7 +248,18 @@ func (c *Consumer) Start(ctx context.Context) error {
 		// Cancel tells RabbitMQ to stop delivering new messages. The delivery
 		// channel is drained by the workers before any AMQP resource closes.
 		_ = ch.Cancel(consumerTag, false)
-		<-workersDone
+		waitCtx := context.Background()
+		if c.ShutdownTimeout > 0 {
+			var cancel context.CancelFunc
+			waitCtx, cancel = context.WithTimeout(waitCtx, c.ShutdownTimeout)
+			defer cancel()
+		}
+		select {
+		case <-workersDone:
+		case <-waitCtx.Done():
+			// Closing the channel below leaves unfinished deliveries unacked so
+			// RabbitMQ can redeliver them after reconnect.
+		}
 	case <-workersDone:
 		if ctx.Err() == nil {
 			runErr = fmt.Errorf("rabbitmq consumer delivery channel closed")
@@ -225,14 +293,41 @@ func runDeliveryWorkers(deliveries <-chan amqp091.Delivery, workers int, handle 
 	return done
 }
 
-func declareTopology(ch *amqp091.Channel, exchange, queue string) error {
+func declareTopology(ch *amqp091.Channel, exchange, queue, retryQueue, dlq string, retryDelay time.Duration) error {
 	if err := ch.ExchangeDeclare(exchange, amqp091.ExchangeTopic, true, false, false, false, nil); err != nil {
 		return err
 	}
-	if _, err := ch.QueueDeclare(queue, true, false, false, false, nil); err != nil {
+	if dlq == "" {
+		dlq = "judge.dlq"
+	}
+	if retryQueue == "" {
+		retryQueue = "judge.retry.go"
+	}
+	if _, err := ch.QueueDeclare(dlq, true, false, false, false, nil); err != nil {
 		return err
 	}
-	return ch.QueueBind(queue, mq.RoutingJudgeTaskGo, exchange, false, nil)
+	if err := ch.QueueBind(dlq, dlq, exchange, false, nil); err != nil {
+		return err
+	}
+	if _, err := ch.QueueDeclare(queue, true, false, false, false, amqp091.Table(mq.JudgeTaskQueueArguments(exchange, dlq))); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(queue, mq.RoutingJudgeTaskGo, exchange, false, nil); err != nil {
+		return err
+	}
+	// The retry queue has no consumer. Messages are held for a fixed delay and
+	// dead-lettered back to the original task routing key.
+	if retryDelay <= 0 {
+		retryDelay = 5 * time.Second
+	}
+	if _, err := ch.QueueDeclare(retryQueue, true, false, false, false, amqp091.Table{
+		"x-message-ttl":             int32(retryDelay / time.Millisecond),
+		"x-dead-letter-exchange":    exchange,
+		"x-dead-letter-routing-key": mq.RoutingJudgeTaskGo,
+	}); err != nil {
+		return err
+	}
+	return ch.QueueBind(retryQueue, "judge.retry.go", exchange, false, nil)
 }
 
 func (c *Consumer) Close() error {

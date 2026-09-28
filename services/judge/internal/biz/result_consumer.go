@@ -35,6 +35,8 @@ type JudgeResultEvent struct {
 	MemoryKB      *int32
 	CaseResults   []CaseResult
 	Reason        string
+	Code          mq.JudgeFailureCode
+	Message       string
 	Retryable     bool
 	OccurredAt    time.Time
 }
@@ -86,7 +88,7 @@ func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, err
 		return JudgeResultEvent{
 			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion,
 			SubmissionID: value.SubmissionID, JudgeRevision: value.JudgeRevision,
-			Reason: value.Reason, Retryable: value.Retryable, OccurredAt: envelope.OccurredAt,
+			Reason: value.Reason, Code: value.Code, Message: value.Message, Retryable: value.Retryable, OccurredAt: envelope.OccurredAt,
 		}, nil
 	default:
 		return JudgeResultEvent{}, ErrorInvalidArgument("unsupported judge result event %q", eventType)

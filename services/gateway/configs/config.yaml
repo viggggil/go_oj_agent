@@ -4,6 +4,9 @@ server:
   http:
     address: ":8080"
     timeout: "30s"
+  sse:
+    poll_interval: "500ms"
+    max_duration: "2m"
 auth:
   access_token_key: "replace-with-the-same-secret-as-user-service"
   access_token_public_key_file: ""

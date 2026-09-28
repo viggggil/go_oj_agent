@@ -11,13 +11,20 @@ compose() {
 }
 
 cleanup() {
+	status=$?
+	trap - EXIT
+	if [[ ${status} -ne 0 ]]; then
+		echo "===== integration test failed; dumping service logs ====="
+		compose logs --no-color || true
+	fi
   compose down --volumes --remove-orphans
   rm -rf -- "${test_artifacts_dir:-}"
+  exit "${status}"
 }
 
 trap cleanup EXIT
 
-cleanup
+compose down --volumes --remove-orphans
 
 test_artifacts_dir="$(mktemp -d)"
 

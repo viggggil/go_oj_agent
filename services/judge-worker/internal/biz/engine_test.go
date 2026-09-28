@@ -129,6 +129,20 @@ func TestEngineStopsAfterFirstFailedCase(t *testing.T) {
 	}
 }
 
+func TestEngineCleansArtifactAfterRunFailure(t *testing.T) {
+	task, loaded := validLoadedTask()
+	runner := &fakeRunner{
+		compile: CompileResult{Artifact: Artifact{ID: "binary"}, Verdict: VerdictAC},
+		runErr:  NewSystemError("SANDBOX_UNAVAILABLE", true, errors.New("offline")),
+	}
+	engine := NewEngine(&fakeLoader{loaded: loaded}, runner, exactComparator{})
+	engine.now = func() time.Time { return time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC) }
+	outcome := engine.Execute(t.Context(), task)
+	if outcome.Failed == nil || runner.deleted != 1 {
+		t.Fatalf("outcome=%+v deleted=%d", outcome, runner.deleted)
+	}
+}
+
 func validLoadedTask() (mq.JudgeTask, LoadedTask) {
 	revision := "01K5C6Y7N8P9Q0R1S2T3V4W5X6"
 	task := mq.JudgeTask{
