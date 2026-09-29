@@ -72,8 +72,15 @@ func (r *Repository) List(ctx context.Context, page, pageSize int32, filter cont
 		return nil, 0, status.Error(codes.Internal, "contest database is not configured")
 	}
 	where, args := "status <> ?", []interface{}{"archived"}
-	if filter != contestv1.ContestStatus_CONTEST_STATUS_UNSPECIFIED {
-		where, args = "status = ?", []interface{}{toDBStatus(filter)}
+	switch filter {
+	case contestv1.ContestStatus_CONTEST_STATUS_DRAFT:
+		where, args = "status = 'draft' AND start_at > UTC_TIMESTAMP(3)", nil
+	case contestv1.ContestStatus_CONTEST_STATUS_RUNNING:
+		where, args = "status = 'draft' AND start_at <= UTC_TIMESTAMP(3) AND end_at > UTC_TIMESTAMP(3)", nil
+	case contestv1.ContestStatus_CONTEST_STATUS_ENDED:
+		where, args = "status = 'draft' AND end_at <= UTC_TIMESTAMP(3)", nil
+	case contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED:
+		where, args = "status = 'archived'", nil
 	}
 	var total int64
 	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM contests WHERE "+where, args...).Scan(&total); err != nil {
