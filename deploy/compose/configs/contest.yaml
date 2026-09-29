@@ -1,0 +1,17 @@
+service:
+  name: contest-service
+server:
+  grpc:
+    address: ":9005"
+    max_receive_message_bytes: 35651584
+registry:
+  consul:
+    enabled: false
+internal_auth:
+  public_key_file: ""
+  key_id: "contest-internal-2026-09"
+  issuer: "go-oj-contest"
+  audience: "contest-service"
+  subject: ""
+  max_token_ttl: "30s"
+  clock_skew: "5s"

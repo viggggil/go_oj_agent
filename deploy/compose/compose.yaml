@@ -275,6 +275,26 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  contest-service:
+    build:
+      context: ../..
+      dockerfile: services/contest/Dockerfile
+    environment:
+      KRATOS_SERVER_GRPC_ADDRESS: ":9005"
+      KRATOS_SERVER_GRPC_MAX_RECEIVE_MESSAGE_BYTES: "35651584"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${CONTEST_GRPC_PORT:-9005}:9005"
+    volumes:
+      - ./configs/contest.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9005"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
   judge-worker:
     build:
       context: ../..
