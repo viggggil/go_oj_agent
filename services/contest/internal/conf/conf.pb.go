@@ -25,8 +25,9 @@ type Bootstrap struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Service       *ServiceProto          `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`
 	Server        *ServerProto           `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"`
-	Registry      *RegistryProto         `protobuf:"bytes,3,opt,name=registry,proto3" json:"registry,omitempty"`
-	InternalAuth  *InternalAuthProto     `protobuf:"bytes,4,opt,name=internal_auth,json=internalAuth,proto3" json:"internal_auth,omitempty"`
+	Data          *DataProto             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Registry      *RegistryProto         `protobuf:"bytes,4,opt,name=registry,proto3" json:"registry,omitempty"`
+	InternalAuth  *InternalAuthProto     `protobuf:"bytes,5,opt,name=internal_auth,json=internalAuth,proto3" json:"internal_auth,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,6 +72,13 @@ func (x *Bootstrap) GetService() *ServiceProto {
 func (x *Bootstrap) GetServer() *ServerProto {
 	if x != nil {
 		return x.Server
+	}
+	return nil
+}
+
+func (x *Bootstrap) GetData() *DataProto {
+	if x != nil {
+		return x.Data
 	}
 	return nil
 }
@@ -229,6 +237,50 @@ func (x *GRPCProto) GetMaxReceiveMessageBytes() int32 {
 	return 0
 }
 
+type DataProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MysqlDsn      string                 `protobuf:"bytes,1,opt,name=mysql_dsn,json=mysqlDsn,proto3" json:"mysql_dsn,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DataProto) Reset() {
+	*x = DataProto{}
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DataProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataProto) ProtoMessage() {}
+
+func (x *DataProto) ProtoReflect() protoreflect.Message {
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataProto.ProtoReflect.Descriptor instead.
+func (*DataProto) Descriptor() ([]byte, []int) {
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DataProto) GetMysqlDsn() string {
+	if x != nil {
+		return x.MysqlDsn
+	}
+	return ""
+}
+
 type RegistryProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Consul        *ConsulProto           `protobuf:"bytes,1,opt,name=consul,proto3" json:"consul,omitempty"`
@@ -238,7 +290,7 @@ type RegistryProto struct {
 
 func (x *RegistryProto) Reset() {
 	*x = RegistryProto{}
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +302,7 @@ func (x *RegistryProto) String() string {
 func (*RegistryProto) ProtoMessage() {}
 
 func (x *RegistryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[4]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +315,7 @@ func (x *RegistryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegistryProto.ProtoReflect.Descriptor instead.
 func (*RegistryProto) Descriptor() ([]byte, []int) {
-	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{4}
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RegistryProto) GetConsul() *ConsulProto {
@@ -287,7 +339,7 @@ type ConsulProto struct {
 
 func (x *ConsulProto) Reset() {
 	*x = ConsulProto{}
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -299,7 +351,7 @@ func (x *ConsulProto) String() string {
 func (*ConsulProto) ProtoMessage() {}
 
 func (x *ConsulProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[5]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -312,7 +364,7 @@ func (x *ConsulProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsulProto.ProtoReflect.Descriptor instead.
 func (*ConsulProto) Descriptor() ([]byte, []int) {
-	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{5}
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ConsulProto) GetEnabled() bool {
@@ -373,7 +425,7 @@ type InternalAuthProto struct {
 
 func (x *InternalAuthProto) Reset() {
 	*x = InternalAuthProto{}
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -385,7 +437,7 @@ func (x *InternalAuthProto) String() string {
 func (*InternalAuthProto) ProtoMessage() {}
 
 func (x *InternalAuthProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[6]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -398,7 +450,7 @@ func (x *InternalAuthProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InternalAuthProto.ProtoReflect.Descriptor instead.
 func (*InternalAuthProto) Descriptor() ([]byte, []int) {
-	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{6}
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *InternalAuthProto) GetPublicKeyFile() string {
@@ -469,7 +521,7 @@ type InternalCallerProto struct {
 
 func (x *InternalCallerProto) Reset() {
 	*x = InternalCallerProto{}
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +533,7 @@ func (x *InternalCallerProto) String() string {
 func (*InternalCallerProto) ProtoMessage() {}
 
 func (x *InternalCallerProto) ProtoReflect() protoreflect.Message {
-	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[7]
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +546,7 @@ func (x *InternalCallerProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InternalCallerProto.ProtoReflect.Descriptor instead.
 func (*InternalCallerProto) Descriptor() ([]byte, []int) {
-	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{7}
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *InternalCallerProto) GetPublicKeyFile() string {
@@ -529,19 +581,22 @@ var File_services_contest_internal_conf_conf_proto protoreflect.FileDescriptor
 
 const file_services_contest_internal_conf_conf_proto_rawDesc = "" +
 	"\n" +
-	")services/contest/internal/conf/conf.proto\x12\fcontest.conf\"\xf3\x01\n" +
+	")services/contest/internal/conf/conf.proto\x12\fcontest.conf\"\xa0\x02\n" +
 	"\tBootstrap\x124\n" +
 	"\aservice\x18\x01 \x01(\v2\x1a.contest.conf.ServiceProtoR\aservice\x121\n" +
-	"\x06server\x18\x02 \x01(\v2\x19.contest.conf.ServerProtoR\x06server\x127\n" +
-	"\bregistry\x18\x03 \x01(\v2\x1b.contest.conf.RegistryProtoR\bregistry\x12D\n" +
-	"\rinternal_auth\x18\x04 \x01(\v2\x1f.contest.conf.InternalAuthProtoR\finternalAuth\"\"\n" +
+	"\x06server\x18\x02 \x01(\v2\x19.contest.conf.ServerProtoR\x06server\x12+\n" +
+	"\x04data\x18\x03 \x01(\v2\x17.contest.conf.DataProtoR\x04data\x127\n" +
+	"\bregistry\x18\x04 \x01(\v2\x1b.contest.conf.RegistryProtoR\bregistry\x12D\n" +
+	"\rinternal_auth\x18\x05 \x01(\v2\x1f.contest.conf.InternalAuthProtoR\finternalAuth\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\":\n" +
 	"\vServerProto\x12+\n" +
 	"\x04grpc\x18\x01 \x01(\v2\x17.contest.conf.GRPCProtoR\x04grpc\"`\n" +
 	"\tGRPCProto\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x129\n" +
-	"\x19max_receive_message_bytes\x18\x02 \x01(\x05R\x16maxReceiveMessageBytes\"B\n" +
+	"\x19max_receive_message_bytes\x18\x02 \x01(\x05R\x16maxReceiveMessageBytes\"(\n" +
+	"\tDataProto\x12\x1b\n" +
+	"\tmysql_dsn\x18\x01 \x01(\tR\bmysqlDsn\"B\n" +
 	"\rRegistryProto\x121\n" +
 	"\x06consul\x18\x01 \x01(\v2\x19.contest.conf.ConsulProtoR\x06consul\"\xae\x01\n" +
 	"\vConsulProto\x12\x18\n" +
@@ -582,30 +637,32 @@ func file_services_contest_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_services_contest_internal_conf_conf_proto_rawDescData
 }
 
-var file_services_contest_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_services_contest_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_services_contest_internal_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: contest.conf.Bootstrap
 	(*ServiceProto)(nil),        // 1: contest.conf.ServiceProto
 	(*ServerProto)(nil),         // 2: contest.conf.ServerProto
 	(*GRPCProto)(nil),           // 3: contest.conf.GRPCProto
-	(*RegistryProto)(nil),       // 4: contest.conf.RegistryProto
-	(*ConsulProto)(nil),         // 5: contest.conf.ConsulProto
-	(*InternalAuthProto)(nil),   // 6: contest.conf.InternalAuthProto
-	(*InternalCallerProto)(nil), // 7: contest.conf.InternalCallerProto
+	(*DataProto)(nil),           // 4: contest.conf.DataProto
+	(*RegistryProto)(nil),       // 5: contest.conf.RegistryProto
+	(*ConsulProto)(nil),         // 6: contest.conf.ConsulProto
+	(*InternalAuthProto)(nil),   // 7: contest.conf.InternalAuthProto
+	(*InternalCallerProto)(nil), // 8: contest.conf.InternalCallerProto
 }
 var file_services_contest_internal_conf_conf_proto_depIdxs = []int32{
 	1, // 0: contest.conf.Bootstrap.service:type_name -> contest.conf.ServiceProto
 	2, // 1: contest.conf.Bootstrap.server:type_name -> contest.conf.ServerProto
-	4, // 2: contest.conf.Bootstrap.registry:type_name -> contest.conf.RegistryProto
-	6, // 3: contest.conf.Bootstrap.internal_auth:type_name -> contest.conf.InternalAuthProto
-	3, // 4: contest.conf.ServerProto.grpc:type_name -> contest.conf.GRPCProto
-	5, // 5: contest.conf.RegistryProto.consul:type_name -> contest.conf.ConsulProto
-	7, // 6: contest.conf.InternalAuthProto.additional_callers:type_name -> contest.conf.InternalCallerProto
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	4, // 2: contest.conf.Bootstrap.data:type_name -> contest.conf.DataProto
+	5, // 3: contest.conf.Bootstrap.registry:type_name -> contest.conf.RegistryProto
+	7, // 4: contest.conf.Bootstrap.internal_auth:type_name -> contest.conf.InternalAuthProto
+	3, // 5: contest.conf.ServerProto.grpc:type_name -> contest.conf.GRPCProto
+	6, // 6: contest.conf.RegistryProto.consul:type_name -> contest.conf.ConsulProto
+	8, // 7: contest.conf.InternalAuthProto.additional_callers:type_name -> contest.conf.InternalCallerProto
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_services_contest_internal_conf_conf_proto_init() }
@@ -619,7 +676,7 @@ func file_services_contest_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_contest_internal_conf_conf_proto_rawDesc), len(file_services_contest_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

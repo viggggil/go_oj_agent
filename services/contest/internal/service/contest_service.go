@@ -5,6 +5,7 @@ import (
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
+	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,8 +16,24 @@ type ContestService struct {
 	uc *biz.ContestUsecase
 }
 
-func NewContestService(uc *biz.ContestUsecase) *ContestService {
-	return &ContestService{uc: uc}
+func NewContestService(uc *biz.ContestUsecase) *ContestService { return &ContestService{uc: uc} }
+
+func (s *ContestService) CreateContest(ctx context.Context, req *contestv1.CreateContestRequest) (*contestv1.CreateContestReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid create contest request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	actor, err := requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	contest, err := s.uc.Create(ctx, actor, req.GetContest())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.CreateContestReply{Contest: toProtoContest(contest)}, nil
 }
 
 func (s *ContestService) GetContest(ctx context.Context, req *contestv1.GetContestRequest) (*contestv1.GetContestReply, error) {
@@ -26,11 +43,15 @@ func (s *ContestService) GetContest(ctx context.Context, req *contestv1.GetConte
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	contest, err := s.uc.Get(ctx, req.GetContestId())
+	actor, err := requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &contestv1.GetContestReply{Contest: contest}, nil
+	contest, err := s.uc.Get(ctx, actor, req.GetContestId())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.GetContestReply{Contest: toProtoContest(contest)}, nil
 }
 
 func (s *ContestService) ListContests(ctx context.Context, req *contestv1.ListContestsRequest) (*contestv1.ListContestsReply, error) {
@@ -41,14 +62,22 @@ func (s *ContestService) ListContests(ctx context.Context, req *contestv1.ListCo
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	page := req.GetPage()
-	if err := biz.ValidatePage(page.GetPage(), page.GetPageSize()); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	if page.GetPage() <= 0 || page.GetPageSize() <= 0 || page.GetPageSize() > 100 {
+		return nil, status.Error(codes.InvalidArgument, "invalid page")
 	}
-	items, total, err := s.uc.List(ctx, page.GetPage(), page.GetPageSize(), req.GetStatus())
+	actor, err := requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &contestv1.ListContestsReply{Items: items, Page: &commonv1.PageResponse{Page: page.GetPage(), PageSize: page.GetPageSize(), Total: total}}, nil
+	items, total, err := s.uc.List(ctx, actor, page.GetPage(), page.GetPageSize(), req.GetStatus())
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*contestv1.ContestSummary, 0, len(items))
+	for _, item := range items {
+		result = append(result, toProtoSummary(item))
+	}
+	return &contestv1.ListContestsReply{Items: result, Page: &commonv1.PageResponse{Page: page.GetPage(), PageSize: page.GetPageSize(), Total: total}}, nil
 }
 
 func (s *ContestService) UpdateContest(ctx context.Context, req *contestv1.UpdateContestRequest) (*contestv1.UpdateContestReply, error) {
@@ -58,27 +87,43 @@ func (s *ContestService) UpdateContest(ctx context.Context, req *contestv1.Updat
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	contest, err := s.uc.Update(ctx, req.GetContestId(), req.GetContest())
+	actor, err := requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &contestv1.UpdateContestReply{Contest: contest}, nil
+	contest, err := s.uc.Update(ctx, actor, req.GetContestId(), req.GetContest())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.UpdateContestReply{Contest: toProtoContest(contest)}, nil
 }
 
-func (s *ContestService) GetLeaderboard(ctx context.Context, req *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
+func (s *ContestService) ArchiveContest(ctx context.Context, req *contestv1.ArchiveContestRequest) (*contestv1.ArchiveContestReply, error) {
 	if req == nil || s == nil || s.uc == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid get leaderboard request")
+		return nil, status.Error(codes.InvalidArgument, "invalid archive contest request")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	page := req.GetPage()
-	if err := biz.ValidatePage(page.GetPage(), page.GetPageSize()); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-	items, total, err := s.uc.Leaderboard(ctx, req.GetContestId(), page.GetPage(), page.GetPageSize())
+	actor, err := requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &contestv1.GetLeaderboardReply{Items: items, Page: &commonv1.PageResponse{Page: page.GetPage(), PageSize: page.GetPageSize(), Total: total}}, nil
+	contest, err := s.uc.Archive(ctx, actor, req.GetContestId())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.ArchiveContestReply{Contest: toProtoContest(contest)}, nil
+}
+
+func (s *ContestService) GetLeaderboard(context.Context, *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
+	return nil, status.Error(codes.Unimplemented, "contest leaderboard is not implemented")
+}
+
+func requestContext(ctx context.Context) (*commonv1.RequestContext, error) {
+	principal, ok := internalauth.PrincipalFromContext(ctx)
+	if !ok || principal.ActorID <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "authenticated actor is required")
+	}
+	return &commonv1.RequestContext{UserId: principal.ActorID, Roles: append([]string(nil), principal.ActorRoles...), RequestId: principal.RequestID, TraceId: principal.TraceID}, nil
 }

@@ -13,6 +13,9 @@ func ValidateConfig(c *Bootstrap) error {
 	if c.GetServer() == nil || c.GetServer().GetGrpc() == nil || strings.TrimSpace(c.GetServer().GetGrpc().GetAddress()) == "" {
 		return fmt.Errorf("contest gRPC address is required")
 	}
+	if c.GetData() == nil || strings.TrimSpace(c.GetData().GetMysqlDsn()) == "" {
+		return fmt.Errorf("contest mysql dsn is required")
+	}
 	if auth := c.GetInternalAuth(); auth != nil && strings.TrimSpace(auth.GetPublicKeyFile()) != "" {
 		if _, err := time.ParseDuration(auth.GetMaxTokenTtl()); err != nil {
 			return fmt.Errorf("invalid internal auth max token ttl: %w", err)

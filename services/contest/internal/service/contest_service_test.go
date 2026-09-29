@@ -7,6 +7,7 @@ import (
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
+	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,15 +26,16 @@ func TestContestServiceRejectsInvalidRequests(t *testing.T) {
 
 func TestContestServiceDoesNotInventData(t *testing.T) {
 	svc := NewContestService(biz.NewContestUsecase())
-	_, err := svc.GetContest(context.Background(), &contestv1.GetContestRequest{ContestId: 1})
+	ctx := internalauth.WithPrincipal(context.Background(), internalauth.Principal{ActorID: 1, ActorRoles: []string{"admin"}})
+	_, err := svc.GetContest(ctx, &contestv1.GetContestRequest{ContestId: 1})
 	if status.Code(err) != codes.Unimplemented {
 		t.Fatalf("GetContest code = %v, want Unimplemented", status.Code(err))
 	}
-	_, err = svc.GetLeaderboard(context.Background(), &contestv1.GetLeaderboardRequest{ContestId: 1, Page: &commonv1.PageRequest{Page: 1, PageSize: 20}})
+	_, err = svc.GetLeaderboard(ctx, &contestv1.GetLeaderboardRequest{ContestId: 1, Page: &commonv1.PageRequest{Page: 1, PageSize: 20}})
 	if status.Code(err) != codes.Unimplemented {
 		t.Fatalf("GetLeaderboard code = %v, want Unimplemented", status.Code(err))
 	}
-	_, err = svc.UpdateContest(context.Background(), &contestv1.UpdateContestRequest{
+	_, err = svc.UpdateContest(ctx, &contestv1.UpdateContestRequest{
 		ContestId: 1,
 		Contest: &contestv1.ContestUpdate{
 			Title:    "Contest",

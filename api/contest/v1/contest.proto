@@ -9,10 +9,12 @@ import "google/protobuf/timestamp.proto";
 import "validate/validate.proto";
 
 service ContestService {
+  rpc CreateContest(CreateContestRequest) returns (CreateContestReply);
   rpc GetContest(GetContestRequest) returns (GetContestReply);
   rpc ListContests(ListContestsRequest) returns (ListContestsReply);
   // Administrators may replace all editable fields while the contest is still draft.
   rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
+  rpc ArchiveContest(ArchiveContestRequest) returns (ArchiveContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
 }
 
@@ -21,6 +23,7 @@ enum ContestStatus {
   CONTEST_STATUS_DRAFT = 1;
   CONTEST_STATUS_RUNNING = 2;
   CONTEST_STATUS_ENDED = 3;
+  CONTEST_STATUS_ARCHIVED = 4;
 }
 
 message ContestProblem {
@@ -47,6 +50,14 @@ message ContestSummary {
   ContestStatus status = 3;
   google.protobuf.Timestamp start_at = 4;
   google.protobuf.Timestamp end_at = 5;
+}
+
+message CreateContestRequest {
+  ContestUpdate contest = 1 [(validate.rules).message.required = true];
+}
+
+message CreateContestReply {
+  Contest contest = 1;
 }
 
 message LeaderboardEntry {
@@ -80,6 +91,14 @@ message UpdateContestRequest {
 }
 
 message UpdateContestReply {
+  Contest contest = 1;
+}
+
+message ArchiveContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message ArchiveContestReply {
   Contest contest = 1;
 }
 
