@@ -29,13 +29,13 @@ type Messaging struct {
 	RabbitMQ RabbitMQ `json:"rabbitmq" yaml:"rabbitmq"`
 }
 type RabbitMQ struct {
-	URL            string `json:"url" yaml:"url"`
-	Exchange       string `json:"exchange" yaml:"exchange"`
-	Queue          string `json:"queue" yaml:"queue"`
+	URL            string   `json:"url" yaml:"url"`
+	Exchange       string   `json:"exchange" yaml:"exchange"`
+	Queue          string   `json:"queue" yaml:"queue"`
 	Queues         []string `json:"queues" yaml:"queues"`
-	RetryQueue     string `json:"retry_queue" yaml:"retry_queue"`
-	DLQ            string `json:"dlq" yaml:"dlq"`
-	ConfirmTimeout string `json:"confirm_timeout" yaml:"confirm_timeout"`
+	RetryQueue     string   `json:"retry_queue" yaml:"retry_queue"`
+	DLQ            string   `json:"dlq" yaml:"dlq"`
+	ConfirmTimeout string   `json:"confirm_timeout" yaml:"confirm_timeout"`
 }
 
 type Storage struct {

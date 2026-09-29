@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package contest.v1;
+
+option go_package = "github.com/viggggil/go_oj_agent/api/contest/v1;contestv1";
+
+import "api/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
+
+service ContestService {
+  rpc GetContest(GetContestRequest) returns (GetContestReply);
+  rpc ListContests(ListContestsRequest) returns (ListContestsReply);
+  // Administrators may replace all editable fields while the contest is still draft.
+  rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
+}
+
+enum ContestStatus {
+  CONTEST_STATUS_UNSPECIFIED = 0;
+  CONTEST_STATUS_DRAFT = 1;
+  CONTEST_STATUS_RUNNING = 2;
+  CONTEST_STATUS_ENDED = 3;
+}
+
+message ContestProblem {
+  int64 problem_id = 1 [(validate.rules).int64.gt = 0];
+  int32 sort_order = 2 [(validate.rules).int32.gt = 0];
+  int32 score = 3 [(validate.rules).int32.gte = 0];
+}
+
+message Contest {
+  int64 id = 1;
+  string title = 2;
+  ContestStatus status = 3;
+  google.protobuf.Timestamp start_at = 4;
+  google.protobuf.Timestamp end_at = 5;
+  int64 created_by = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  repeated ContestProblem problems = 9;
+}
+
+message ContestSummary {
+  int64 id = 1;
+  string title = 2;
+  ContestStatus status = 3;
+  google.protobuf.Timestamp start_at = 4;
+  google.protobuf.Timestamp end_at = 5;
+}
+
+message LeaderboardEntry {
+  int32 rank = 1;
+  int64 user_id = 2;
+  int32 score = 3;
+  int64 penalty = 4;
+  int32 accepted_count = 5;
+}
+
+message GetContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message GetContestReply {
+  Contest contest = 1;
+}
+
+// ContestUpdate is intentionally a complete replacement, not a patch. The
+// service rejects updates once the contest has started.
+message ContestUpdate {
+  string title = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  google.protobuf.Timestamp start_at = 2 [(validate.rules).timestamp.required = true];
+  google.protobuf.Timestamp end_at = 3 [(validate.rules).timestamp.required = true];
+  repeated ContestProblem problems = 4 [(validate.rules).repeated = {min_items: 1, max_items: 100}];
+}
+
+message UpdateContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+  ContestUpdate contest = 2 [(validate.rules).message.required = true];
+}
+
+message UpdateContestReply {
+  Contest contest = 1;
+}
+
+message ListContestsRequest {
+  common.v1.PageRequest page = 1 [(validate.rules).message.required = true];
+  ContestStatus status = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+message ListContestsReply {
+  repeated ContestSummary items = 1;
+  common.v1.PageResponse page = 2;
+}
+
+message GetLeaderboardRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+  common.v1.PageRequest page = 2 [(validate.rules).message.required = true];
+}
+
+message GetLeaderboardReply {
+  repeated LeaderboardEntry items = 1;
+  common.v1.PageResponse page = 2;
+}

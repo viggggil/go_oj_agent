@@ -13,6 +13,7 @@ lint:
     PACKAGE_DIRECTORY_MATCH:
       - errors/errors.proto
       - api/common/v1/common.proto
+      - api/contest/v1/contest.proto
       - api/gateway/v1/gateway.proto
       - api/judge/v1/judge.proto
       - api/problem/v1/errors.proto
@@ -23,6 +24,7 @@ lint:
       - services/gateway/internal/conf/conf.proto
       - services/judge/internal/conf/conf.proto
       - services/problem/internal/conf/conf.proto
+      - services/contest/internal/conf/conf.proto
       - services/user/internal/conf/conf.proto
     PACKAGE_VERSION_SUFFIX:
       - errors/errors.proto
@@ -30,6 +32,9 @@ lint:
       - services/gateway/internal/conf/conf.proto
       - services/judge/internal/conf/conf.proto
       - services/problem/internal/conf/conf.proto
+      - services/contest/internal/conf/conf.proto
+    RPC_RESPONSE_STANDARD_NAME:
+      - api/contest/v1/contest.proto
 
 breaking:
   use:
