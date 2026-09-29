@@ -51,6 +51,20 @@ func (s *ContestService) ListContests(ctx context.Context, req *contestv1.ListCo
 	return &contestv1.ListContestsReply{Items: items, Page: &commonv1.PageResponse{Page: page.GetPage(), PageSize: page.GetPageSize(), Total: total}}, nil
 }
 
+func (s *ContestService) UpdateContest(ctx context.Context, req *contestv1.UpdateContestRequest) (*contestv1.UpdateContestReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid update contest request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	contest, err := s.uc.Update(ctx, req.GetContestId(), req.GetContest())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.UpdateContestReply{Contest: contest}, nil
+}
+
 func (s *ContestService) GetLeaderboard(ctx context.Context, req *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid get leaderboard request")

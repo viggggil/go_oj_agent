@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ContestService_GetContest_FullMethodName     = "/contest.v1.ContestService/GetContest"
 	ContestService_ListContests_FullMethodName   = "/contest.v1.ContestService/ListContests"
+	ContestService_UpdateContest_FullMethodName  = "/contest.v1.ContestService/UpdateContest"
 	ContestService_GetLeaderboard_FullMethodName = "/contest.v1.ContestService/GetLeaderboard"
 )
 
@@ -30,6 +31,8 @@ const (
 type ContestServiceClient interface {
 	GetContest(ctx context.Context, in *GetContestRequest, opts ...grpc.CallOption) (*GetContestReply, error)
 	ListContests(ctx context.Context, in *ListContestsRequest, opts ...grpc.CallOption) (*ListContestsReply, error)
+	// Administrators may replace all editable fields while the contest is still draft.
+	UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestReply, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardReply, error)
 }
 
@@ -61,6 +64,16 @@ func (c *contestServiceClient) ListContests(ctx context.Context, in *ListContest
 	return out, nil
 }
 
+func (c *contestServiceClient) UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateContestReply)
+	err := c.cc.Invoke(ctx, ContestService_UpdateContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *contestServiceClient) GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetLeaderboardReply)
@@ -77,6 +90,8 @@ func (c *contestServiceClient) GetLeaderboard(ctx context.Context, in *GetLeader
 type ContestServiceServer interface {
 	GetContest(context.Context, *GetContestRequest) (*GetContestReply, error)
 	ListContests(context.Context, *ListContestsRequest) (*ListContestsReply, error)
+	// Administrators may replace all editable fields while the contest is still draft.
+	UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestReply, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error)
 	mustEmbedUnimplementedContestServiceServer()
 }
@@ -93,6 +108,9 @@ func (UnimplementedContestServiceServer) GetContest(context.Context, *GetContest
 }
 func (UnimplementedContestServiceServer) ListContests(context.Context, *ListContestsRequest) (*ListContestsReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListContests not implemented")
+}
+func (UnimplementedContestServiceServer) UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateContest not implemented")
 }
 func (UnimplementedContestServiceServer) GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeaderboard not implemented")
@@ -154,6 +172,24 @@ func _ContestService_ListContests_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContestService_UpdateContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContestServiceServer).UpdateContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContestService_UpdateContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContestServiceServer).UpdateContest(ctx, req.(*UpdateContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ContestService_GetLeaderboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetLeaderboardRequest)
 	if err := dec(in); err != nil {
@@ -186,6 +222,10 @@ var ContestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListContests",
 			Handler:    _ContestService_ListContests_Handler,
+		},
+		{
+			MethodName: "UpdateContest",
+			Handler:    _ContestService_UpdateContest_Handler,
 		},
 		{
 			MethodName: "GetLeaderboard",

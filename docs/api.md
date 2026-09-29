@@ -829,6 +829,7 @@ package contest.v1;
 service ContestService {
   rpc GetContest(GetContestRequest) returns (GetContestReply);
   rpc ListContests(ListContestsRequest) returns (ListContestsReply);
+  rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
 }
 ```

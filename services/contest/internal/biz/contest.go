@@ -23,6 +23,10 @@ func (u *ContestUsecase) List(context.Context, int32, int32, contestv1.ContestSt
 	return nil, 0, status.Error(codes.Unimplemented, "contest data is not implemented")
 }
 
+func (u *ContestUsecase) Update(context.Context, int64, *contestv1.ContestUpdate) (*contestv1.Contest, error) {
+	return nil, status.Error(codes.Unimplemented, "contest data is not implemented")
+}
+
 func (u *ContestUsecase) Leaderboard(context.Context, int64, int32, int32) ([]*contestv1.LeaderboardEntry, int64, error) {
 	return nil, 0, status.Error(codes.Unimplemented, "contest leaderboard is not implemented")
 }

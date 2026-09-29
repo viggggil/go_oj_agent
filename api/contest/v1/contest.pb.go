@@ -484,6 +484,172 @@ func (x *GetContestReply) GetContest() *Contest {
 	return nil
 }
 
+// ContestUpdate is intentionally a complete replacement, not a patch. The
+// service rejects updates once the contest has started.
+type ContestUpdate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	StartAt       *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=start_at,json=startAt,proto3" json:"start_at,omitempty"`
+	EndAt         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=end_at,json=endAt,proto3" json:"end_at,omitempty"`
+	Problems      []*ContestProblem      `protobuf:"bytes,4,rep,name=problems,proto3" json:"problems,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContestUpdate) Reset() {
+	*x = ContestUpdate{}
+	mi := &file_api_contest_v1_contest_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContestUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContestUpdate) ProtoMessage() {}
+
+func (x *ContestUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_api_contest_v1_contest_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContestUpdate.ProtoReflect.Descriptor instead.
+func (*ContestUpdate) Descriptor() ([]byte, []int) {
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ContestUpdate) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ContestUpdate) GetStartAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartAt
+	}
+	return nil
+}
+
+func (x *ContestUpdate) GetEndAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndAt
+	}
+	return nil
+}
+
+func (x *ContestUpdate) GetProblems() []*ContestProblem {
+	if x != nil {
+		return x.Problems
+	}
+	return nil
+}
+
+type UpdateContestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ContestId     int64                  `protobuf:"varint,1,opt,name=contest_id,json=contestId,proto3" json:"contest_id,omitempty"`
+	Contest       *ContestUpdate         `protobuf:"bytes,2,opt,name=contest,proto3" json:"contest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateContestRequest) Reset() {
+	*x = UpdateContestRequest{}
+	mi := &file_api_contest_v1_contest_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateContestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateContestRequest) ProtoMessage() {}
+
+func (x *UpdateContestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_contest_v1_contest_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateContestRequest.ProtoReflect.Descriptor instead.
+func (*UpdateContestRequest) Descriptor() ([]byte, []int) {
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateContestRequest) GetContestId() int64 {
+	if x != nil {
+		return x.ContestId
+	}
+	return 0
+}
+
+func (x *UpdateContestRequest) GetContest() *ContestUpdate {
+	if x != nil {
+		return x.Contest
+	}
+	return nil
+}
+
+type UpdateContestReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Contest       *Contest               `protobuf:"bytes,1,opt,name=contest,proto3" json:"contest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateContestReply) Reset() {
+	*x = UpdateContestReply{}
+	mi := &file_api_contest_v1_contest_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateContestReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateContestReply) ProtoMessage() {}
+
+func (x *UpdateContestReply) ProtoReflect() protoreflect.Message {
+	mi := &file_api_contest_v1_contest_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateContestReply.ProtoReflect.Descriptor instead.
+func (*UpdateContestReply) Descriptor() ([]byte, []int) {
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateContestReply) GetContest() *Contest {
+	if x != nil {
+		return x.Contest
+	}
+	return nil
+}
+
 type ListContestsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Page          *v1.PageRequest        `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
@@ -494,7 +660,7 @@ type ListContestsRequest struct {
 
 func (x *ListContestsRequest) Reset() {
 	*x = ListContestsRequest{}
-	mi := &file_api_contest_v1_contest_proto_msgTypes[6]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -506,7 +672,7 @@ func (x *ListContestsRequest) String() string {
 func (*ListContestsRequest) ProtoMessage() {}
 
 func (x *ListContestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_contest_v1_contest_proto_msgTypes[6]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -519,7 +685,7 @@ func (x *ListContestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContestsRequest.ProtoReflect.Descriptor instead.
 func (*ListContestsRequest) Descriptor() ([]byte, []int) {
-	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{6}
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListContestsRequest) GetPage() *v1.PageRequest {
@@ -546,7 +712,7 @@ type ListContestsReply struct {
 
 func (x *ListContestsReply) Reset() {
 	*x = ListContestsReply{}
-	mi := &file_api_contest_v1_contest_proto_msgTypes[7]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -558,7 +724,7 @@ func (x *ListContestsReply) String() string {
 func (*ListContestsReply) ProtoMessage() {}
 
 func (x *ListContestsReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_contest_v1_contest_proto_msgTypes[7]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -571,7 +737,7 @@ func (x *ListContestsReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContestsReply.ProtoReflect.Descriptor instead.
 func (*ListContestsReply) Descriptor() ([]byte, []int) {
-	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{7}
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListContestsReply) GetItems() []*ContestSummary {
@@ -598,7 +764,7 @@ type GetLeaderboardRequest struct {
 
 func (x *GetLeaderboardRequest) Reset() {
 	*x = GetLeaderboardRequest{}
-	mi := &file_api_contest_v1_contest_proto_msgTypes[8]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -610,7 +776,7 @@ func (x *GetLeaderboardRequest) String() string {
 func (*GetLeaderboardRequest) ProtoMessage() {}
 
 func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_contest_v1_contest_proto_msgTypes[8]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +789,7 @@ func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardRequest.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardRequest) Descriptor() ([]byte, []int) {
-	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{8}
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetLeaderboardRequest) GetContestId() int64 {
@@ -650,7 +816,7 @@ type GetLeaderboardReply struct {
 
 func (x *GetLeaderboardReply) Reset() {
 	*x = GetLeaderboardReply{}
-	mi := &file_api_contest_v1_contest_proto_msgTypes[9]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +828,7 @@ func (x *GetLeaderboardReply) String() string {
 func (*GetLeaderboardReply) ProtoMessage() {}
 
 func (x *GetLeaderboardReply) ProtoReflect() protoreflect.Message {
-	mi := &file_api_contest_v1_contest_proto_msgTypes[9]
+	mi := &file_api_contest_v1_contest_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +841,7 @@ func (x *GetLeaderboardReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardReply.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardReply) Descriptor() ([]byte, []int) {
-	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{9}
+	return file_api_contest_v1_contest_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetLeaderboardReply) GetItems() []*LeaderboardEntry {
@@ -733,6 +899,19 @@ const file_api_contest_v1_contest_proto_rawDesc = "" +
 	"\n" +
 	"contest_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tcontestId\"@\n" +
 	"\x0fGetContestReply\x12-\n" +
+	"\acontest\x18\x01 \x01(\v2\x13.contest.v1.ContestR\acontest\"\xf3\x01\n" +
+	"\rContestUpdate\x12 \n" +
+	"\x05title\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\x18\xff\x01R\x05title\x12?\n" +
+	"\bstart_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02\b\x01R\astartAt\x12;\n" +
+	"\x06end_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02\b\x01R\x05endAt\x12B\n" +
+	"\bproblems\x18\x04 \x03(\v2\x1a.contest.v1.ContestProblemB\n" +
+	"\xfaB\a\x92\x01\x04\b\x01\x10dR\bproblems\"}\n" +
+	"\x14UpdateContestRequest\x12&\n" +
+	"\n" +
+	"contest_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tcontestId\x12=\n" +
+	"\acontest\x18\x02 \x01(\v2\x19.contest.v1.ContestUpdateB\b\xfaB\x05\x8a\x01\x02\x10\x01R\acontest\"C\n" +
+	"\x12UpdateContestReply\x12-\n" +
 	"\acontest\x18\x01 \x01(\v2\x13.contest.v1.ContestR\acontest\"\x88\x01\n" +
 	"\x13ListContestsRequest\x124\n" +
 	"\x04page\x18\x01 \x01(\v2\x16.common.v1.PageRequestB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04page\x12;\n" +
@@ -751,11 +930,12 @@ const file_api_contest_v1_contest_proto_rawDesc = "" +
 	"\x1aCONTEST_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14CONTEST_STATUS_DRAFT\x10\x01\x12\x1a\n" +
 	"\x16CONTEST_STATUS_RUNNING\x10\x02\x12\x18\n" +
-	"\x14CONTEST_STATUS_ENDED\x10\x032\x80\x02\n" +
+	"\x14CONTEST_STATUS_ENDED\x10\x032\xd3\x02\n" +
 	"\x0eContestService\x12H\n" +
 	"\n" +
 	"GetContest\x12\x1d.contest.v1.GetContestRequest\x1a\x1b.contest.v1.GetContestReply\x12N\n" +
-	"\fListContests\x12\x1f.contest.v1.ListContestsRequest\x1a\x1d.contest.v1.ListContestsReply\x12T\n" +
+	"\fListContests\x12\x1f.contest.v1.ListContestsRequest\x1a\x1d.contest.v1.ListContestsReply\x12Q\n" +
+	"\rUpdateContest\x12 .contest.v1.UpdateContestRequest\x1a\x1e.contest.v1.UpdateContestReply\x12T\n" +
 	"\x0eGetLeaderboard\x12!.contest.v1.GetLeaderboardRequest\x1a\x1f.contest.v1.GetLeaderboardReplyB:Z8github.com/viggggil/go_oj_agent/api/contest/v1;contestv1b\x06proto3"
 
 var (
@@ -771,7 +951,7 @@ func file_api_contest_v1_contest_proto_rawDescGZIP() []byte {
 }
 
 var file_api_contest_v1_contest_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_contest_v1_contest_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_api_contest_v1_contest_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_api_contest_v1_contest_proto_goTypes = []any{
 	(ContestStatus)(0),            // 0: contest.v1.ContestStatus
 	(*ContestProblem)(nil),        // 1: contest.v1.ContestProblem
@@ -780,43 +960,53 @@ var file_api_contest_v1_contest_proto_goTypes = []any{
 	(*LeaderboardEntry)(nil),      // 4: contest.v1.LeaderboardEntry
 	(*GetContestRequest)(nil),     // 5: contest.v1.GetContestRequest
 	(*GetContestReply)(nil),       // 6: contest.v1.GetContestReply
-	(*ListContestsRequest)(nil),   // 7: contest.v1.ListContestsRequest
-	(*ListContestsReply)(nil),     // 8: contest.v1.ListContestsReply
-	(*GetLeaderboardRequest)(nil), // 9: contest.v1.GetLeaderboardRequest
-	(*GetLeaderboardReply)(nil),   // 10: contest.v1.GetLeaderboardReply
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
-	(*v1.PageRequest)(nil),        // 12: common.v1.PageRequest
-	(*v1.PageResponse)(nil),       // 13: common.v1.PageResponse
+	(*ContestUpdate)(nil),         // 7: contest.v1.ContestUpdate
+	(*UpdateContestRequest)(nil),  // 8: contest.v1.UpdateContestRequest
+	(*UpdateContestReply)(nil),    // 9: contest.v1.UpdateContestReply
+	(*ListContestsRequest)(nil),   // 10: contest.v1.ListContestsRequest
+	(*ListContestsReply)(nil),     // 11: contest.v1.ListContestsReply
+	(*GetLeaderboardRequest)(nil), // 12: contest.v1.GetLeaderboardRequest
+	(*GetLeaderboardReply)(nil),   // 13: contest.v1.GetLeaderboardReply
+	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
+	(*v1.PageRequest)(nil),        // 15: common.v1.PageRequest
+	(*v1.PageResponse)(nil),       // 16: common.v1.PageResponse
 }
 var file_api_contest_v1_contest_proto_depIdxs = []int32{
 	0,  // 0: contest.v1.Contest.status:type_name -> contest.v1.ContestStatus
-	11, // 1: contest.v1.Contest.start_at:type_name -> google.protobuf.Timestamp
-	11, // 2: contest.v1.Contest.end_at:type_name -> google.protobuf.Timestamp
-	11, // 3: contest.v1.Contest.created_at:type_name -> google.protobuf.Timestamp
-	11, // 4: contest.v1.Contest.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 1: contest.v1.Contest.start_at:type_name -> google.protobuf.Timestamp
+	14, // 2: contest.v1.Contest.end_at:type_name -> google.protobuf.Timestamp
+	14, // 3: contest.v1.Contest.created_at:type_name -> google.protobuf.Timestamp
+	14, // 4: contest.v1.Contest.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 5: contest.v1.Contest.problems:type_name -> contest.v1.ContestProblem
 	0,  // 6: contest.v1.ContestSummary.status:type_name -> contest.v1.ContestStatus
-	11, // 7: contest.v1.ContestSummary.start_at:type_name -> google.protobuf.Timestamp
-	11, // 8: contest.v1.ContestSummary.end_at:type_name -> google.protobuf.Timestamp
+	14, // 7: contest.v1.ContestSummary.start_at:type_name -> google.protobuf.Timestamp
+	14, // 8: contest.v1.ContestSummary.end_at:type_name -> google.protobuf.Timestamp
 	2,  // 9: contest.v1.GetContestReply.contest:type_name -> contest.v1.Contest
-	12, // 10: contest.v1.ListContestsRequest.page:type_name -> common.v1.PageRequest
-	0,  // 11: contest.v1.ListContestsRequest.status:type_name -> contest.v1.ContestStatus
-	3,  // 12: contest.v1.ListContestsReply.items:type_name -> contest.v1.ContestSummary
-	13, // 13: contest.v1.ListContestsReply.page:type_name -> common.v1.PageResponse
-	12, // 14: contest.v1.GetLeaderboardRequest.page:type_name -> common.v1.PageRequest
-	4,  // 15: contest.v1.GetLeaderboardReply.items:type_name -> contest.v1.LeaderboardEntry
-	13, // 16: contest.v1.GetLeaderboardReply.page:type_name -> common.v1.PageResponse
-	5,  // 17: contest.v1.ContestService.GetContest:input_type -> contest.v1.GetContestRequest
-	7,  // 18: contest.v1.ContestService.ListContests:input_type -> contest.v1.ListContestsRequest
-	9,  // 19: contest.v1.ContestService.GetLeaderboard:input_type -> contest.v1.GetLeaderboardRequest
-	6,  // 20: contest.v1.ContestService.GetContest:output_type -> contest.v1.GetContestReply
-	8,  // 21: contest.v1.ContestService.ListContests:output_type -> contest.v1.ListContestsReply
-	10, // 22: contest.v1.ContestService.GetLeaderboard:output_type -> contest.v1.GetLeaderboardReply
-	20, // [20:23] is the sub-list for method output_type
-	17, // [17:20] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	14, // 10: contest.v1.ContestUpdate.start_at:type_name -> google.protobuf.Timestamp
+	14, // 11: contest.v1.ContestUpdate.end_at:type_name -> google.protobuf.Timestamp
+	1,  // 12: contest.v1.ContestUpdate.problems:type_name -> contest.v1.ContestProblem
+	7,  // 13: contest.v1.UpdateContestRequest.contest:type_name -> contest.v1.ContestUpdate
+	2,  // 14: contest.v1.UpdateContestReply.contest:type_name -> contest.v1.Contest
+	15, // 15: contest.v1.ListContestsRequest.page:type_name -> common.v1.PageRequest
+	0,  // 16: contest.v1.ListContestsRequest.status:type_name -> contest.v1.ContestStatus
+	3,  // 17: contest.v1.ListContestsReply.items:type_name -> contest.v1.ContestSummary
+	16, // 18: contest.v1.ListContestsReply.page:type_name -> common.v1.PageResponse
+	15, // 19: contest.v1.GetLeaderboardRequest.page:type_name -> common.v1.PageRequest
+	4,  // 20: contest.v1.GetLeaderboardReply.items:type_name -> contest.v1.LeaderboardEntry
+	16, // 21: contest.v1.GetLeaderboardReply.page:type_name -> common.v1.PageResponse
+	5,  // 22: contest.v1.ContestService.GetContest:input_type -> contest.v1.GetContestRequest
+	10, // 23: contest.v1.ContestService.ListContests:input_type -> contest.v1.ListContestsRequest
+	8,  // 24: contest.v1.ContestService.UpdateContest:input_type -> contest.v1.UpdateContestRequest
+	12, // 25: contest.v1.ContestService.GetLeaderboard:input_type -> contest.v1.GetLeaderboardRequest
+	6,  // 26: contest.v1.ContestService.GetContest:output_type -> contest.v1.GetContestReply
+	11, // 27: contest.v1.ContestService.ListContests:output_type -> contest.v1.ListContestsReply
+	9,  // 28: contest.v1.ContestService.UpdateContest:output_type -> contest.v1.UpdateContestReply
+	13, // 29: contest.v1.ContestService.GetLeaderboard:output_type -> contest.v1.GetLeaderboardReply
+	26, // [26:30] is the sub-list for method output_type
+	22, // [22:26] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_api_contest_v1_contest_proto_init() }
@@ -830,7 +1020,7 @@ func file_api_contest_v1_contest_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_contest_v1_contest_proto_rawDesc), len(file_api_contest_v1_contest_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

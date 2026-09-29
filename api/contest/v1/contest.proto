@@ -11,6 +11,8 @@ import "validate/validate.proto";
 service ContestService {
   rpc GetContest(GetContestRequest) returns (GetContestReply);
   rpc ListContests(ListContestsRequest) returns (ListContestsReply);
+  // Administrators may replace all editable fields while the contest is still draft.
+  rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
 }
 
@@ -60,6 +62,24 @@ message GetContestRequest {
 }
 
 message GetContestReply {
+  Contest contest = 1;
+}
+
+// ContestUpdate is intentionally a complete replacement, not a patch. The
+// service rejects updates once the contest has started.
+message ContestUpdate {
+  string title = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  google.protobuf.Timestamp start_at = 2 [(validate.rules).timestamp.required = true];
+  google.protobuf.Timestamp end_at = 3 [(validate.rules).timestamp.required = true];
+  repeated ContestProblem problems = 4 [(validate.rules).repeated = {min_items: 1, max_items: 100}];
+}
+
+message UpdateContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+  ContestUpdate contest = 2 [(validate.rules).message.required = true];
+}
+
+message UpdateContestReply {
   Contest contest = 1;
 }
 
