@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ type Engine interface {
 
 type Consumer struct {
 	URL, Exchange, Queue string
+	Queues               []string
 	RetryQueue, DLQ      string
 	Concurrency          int
 	TaskTimeout          time.Duration
@@ -173,9 +175,6 @@ func decodeTask(body []byte) (mq.Envelope, mq.JudgeTask, error) {
 	if err != nil {
 		return mq.Envelope{}, task, err
 	}
-	if task.Language != "go" {
-		return envelope, task, fmt.Errorf("unsupported language %q", task.Language)
-	}
 	if err = task.Validate(); err != nil {
 		return envelope, task, err
 	}
@@ -192,8 +191,13 @@ func (c *Consumer) Start(ctx context.Context) error {
 	if c.URL == "" || c.Exchange == "" {
 		return fmt.Errorf("rabbitmq url and exchange are required")
 	}
-	if c.Queue == "" {
-		c.Queue = mq.RoutingJudgeTaskGo
+	queues := c.Queues
+	if len(queues) == 0 {
+		if c.Queue != "" {
+			queues = []string{c.Queue}
+		} else {
+			queues = mq.JudgeTaskRoutingKeys()
+		}
 	}
 	if c.Concurrency < 1 {
 		return fmt.Errorf("consumer concurrency must be positive")
@@ -207,19 +211,24 @@ func (c *Consumer) Start(ctx context.Context) error {
 		_ = conn.Close()
 		return err
 	}
-	if err = declareTopology(ch, c.Exchange, c.Queue, c.RetryQueue, c.DLQ, c.RetryDelay); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
-		return err
+	deliveryChannels := make([]<-chan amqp091.Delivery, 0, len(queues))
+	for _, queue := range queues {
+		if err = declareTopologyForLanguage(ch, c.Exchange, queue, c.DLQ, c.RetryDelay); err != nil {
+			_ = ch.Close()
+			_ = conn.Close()
+			return err
+		}
+		consumerTag := "judge-worker-" + queue
+		var deliveries <-chan amqp091.Delivery
+		deliveries, err = ch.Consume(queue, consumerTag, false, false, false, false, nil)
+		if err != nil {
+			_ = ch.Close()
+			_ = conn.Close()
+			return err
+		}
+		deliveryChannels = append(deliveryChannels, deliveries)
 	}
 	if err = ch.Qos(c.Concurrency, 0, false); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
-		return err
-	}
-	consumerTag := "judge-worker"
-	deliveries, err := ch.Consume(c.Queue, consumerTag, false, false, false, false, nil)
-	if err != nil {
 		_ = ch.Close()
 		_ = conn.Close()
 		return err
@@ -227,7 +236,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	runCtx, stop := context.WithCancel(ctx)
 	done := make(chan struct{})
 	c.mu.Lock()
-	c.conn, c.channel, c.consumerTag = conn, ch, consumerTag
+	c.conn, c.channel, c.consumerTag = conn, ch, "judge-worker"
 	c.stop, c.done, c.started = stop, done, true
 	c.mu.Unlock()
 	defer func() {
@@ -239,6 +248,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	}()
 	workers := c.Concurrency
 	processingCtx := context.WithoutCancel(runCtx)
+	deliveries := mergeDeliveries(runCtx, deliveryChannels)
 	workersDone := runDeliveryWorkers(deliveries, workers, func(d amqp091.Delivery) {
 		c.Handle(processingCtx, delivery{d})
 	})
@@ -247,7 +257,9 @@ func (c *Consumer) Start(ctx context.Context) error {
 	case <-runCtx.Done():
 		// Cancel tells RabbitMQ to stop delivering new messages. The delivery
 		// channel is drained by the workers before any AMQP resource closes.
-		_ = ch.Cancel(consumerTag, false)
+		for _, queue := range queues {
+			_ = ch.Cancel("judge-worker-"+queue, false)
+		}
 		waitCtx := context.Background()
 		if c.ShutdownTimeout > 0 {
 			var cancel context.CancelFunc
@@ -294,15 +306,18 @@ func runDeliveryWorkers(deliveries <-chan amqp091.Delivery, workers int, handle 
 }
 
 func declareTopology(ch *amqp091.Channel, exchange, queue, retryQueue, dlq string, retryDelay time.Duration) error {
+	return declareTopologyForLanguage(ch, exchange, queue, dlq, retryDelay)
+}
+
+func declareTopologyForLanguage(ch *amqp091.Channel, exchange, queue, dlq string, retryDelay time.Duration) error {
 	if err := ch.ExchangeDeclare(exchange, amqp091.ExchangeTopic, true, false, false, false, nil); err != nil {
 		return err
 	}
 	if dlq == "" {
 		dlq = "judge.dlq"
 	}
-	if retryQueue == "" {
-		retryQueue = "judge.retry.go"
-	}
+	language := strings.TrimPrefix(queue, "judge.task.")
+	retryQueue := "judge.retry." + language
 	if _, err := ch.QueueDeclare(dlq, true, false, false, false, nil); err != nil {
 		return err
 	}
@@ -312,7 +327,7 @@ func declareTopology(ch *amqp091.Channel, exchange, queue, retryQueue, dlq strin
 	if _, err := ch.QueueDeclare(queue, true, false, false, false, amqp091.Table(mq.JudgeTaskQueueArguments(exchange, dlq))); err != nil {
 		return err
 	}
-	if err := ch.QueueBind(queue, mq.RoutingJudgeTaskGo, exchange, false, nil); err != nil {
+	if err := ch.QueueBind(queue, queue, exchange, false, nil); err != nil {
 		return err
 	}
 	// The retry queue has no consumer. Messages are held for a fixed delay and
@@ -323,11 +338,41 @@ func declareTopology(ch *amqp091.Channel, exchange, queue, retryQueue, dlq strin
 	if _, err := ch.QueueDeclare(retryQueue, true, false, false, false, amqp091.Table{
 		"x-message-ttl":             int32(retryDelay / time.Millisecond),
 		"x-dead-letter-exchange":    exchange,
-		"x-dead-letter-routing-key": mq.RoutingJudgeTaskGo,
+		"x-dead-letter-routing-key": queue,
 	}); err != nil {
 		return err
 	}
-	return ch.QueueBind(retryQueue, "judge.retry.go", exchange, false, nil)
+	return ch.QueueBind(retryQueue, retryQueue, exchange, false, nil)
+}
+
+func mergeDeliveries(ctx context.Context, channels []<-chan amqp091.Delivery) <-chan amqp091.Delivery {
+	out := make(chan amqp091.Delivery)
+	var wg sync.WaitGroup
+	wg.Add(len(channels))
+	for _, input := range channels {
+		go func(input <-chan amqp091.Delivery) {
+			defer wg.Done()
+			for {
+				var d amqp091.Delivery
+				var ok bool
+				select {
+				case d, ok = <-input:
+					if !ok {
+						return
+					}
+				case <-ctx.Done():
+					return
+				}
+				select {
+				case out <- d:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}(input)
+	}
+	go func() { wg.Wait(); close(out) }()
+	return out
 }
 
 func (c *Consumer) Close() error {

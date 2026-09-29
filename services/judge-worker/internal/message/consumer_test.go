@@ -74,6 +74,22 @@ func TestDecodeTaskRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestDecodeTaskAcceptsAllConfiguredLanguages(t *testing.T) {
+	for _, language := range []string{"c", "cpp", "go", "java", "python"} {
+		t.Run(language, func(t *testing.T) {
+			ext := map[string]string{"c": "c", "cpp": "cpp", "go": "go", "java": "java", "python": "py"}[language]
+			task := mq.JudgeTask{SubmissionID: 1, ProblemID: 2, Language: language, JudgeRevision: "12345678901234567890123456", SourceObjectKey: "sources/01K5C6Y7N8P9Q0R1S2T3V4W5X6/source." + ext, SourceSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", SourceSizeBytes: 1, JudgeDeadlineAt: time.Now().Add(time.Minute)}
+			body, err := mq.MarshalEnvelope(mq.EnvelopeMetadata{EventID: uuid.NewString(), EventType: mq.EventTypeJudgeTask, EventVersion: mq.EventVersion1, OccurredAt: time.Now()}, task)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err = DecodeTask(body); err != nil {
+				t.Fatalf("DecodeTask() error = %v", err)
+			}
+		})
+	}
+}
+
 func TestHandleAckAfterConfirmedResult(t *testing.T) {
 	engine := &fakeEngine{outcome: biz.Outcome{Completed: &mq.JudgeCompleted{SubmissionID: 1, JudgeRevision: "12345678901234567890123456", Verdict: "AC"}}}
 	reporter := &fakeReporter{}

@@ -34,13 +34,13 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	goRunner, err := language.NewGoRunnerFromConfig(goJudge, config)
+	v, err := language.NewLanguageRunnersFromConfig(goJudge, config)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	text := comparator.NewText()
-	engine := biz.NewEngine(loader, goRunner, text)
+	engine := biz.NewEngineWithRunners(loader, v, text)
 	rabbitReporter, err := message.NewReporterFromConfig(config)
 	if err != nil {
 		cleanup()
@@ -52,8 +52,8 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 		return nil, nil, err
 	}
 	worker := server.NewWorkerWithConsumer(goJudge, engine, consumer)
-	v := newApp(config, worker)
-	return v, func() {
+	v2 := newApp(config, worker)
+	return v2, func() {
 		cleanup()
 	}, nil
 }

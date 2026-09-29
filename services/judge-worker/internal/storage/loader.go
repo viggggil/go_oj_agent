@@ -121,7 +121,7 @@ func validateSourceKey(key, language string) error {
 	if len(key) > 512 || path.IsAbs(key) || strings.Contains(key, "\\") || strings.Contains(key, "..") {
 		return fmt.Errorf("invalid source object key")
 	}
-	exts := map[string]string{"go": "go", "cpp": "cpp", "python": "py", "java": "java"}
+	exts := map[string]string{"c": "c", "go": "go", "cpp": "cpp", "python": "py", "java": "java"}
 	ext, ok := exts[strings.ToLower(strings.TrimSpace(language))]
 	parts := strings.Split(key, "/")
 	if !ok || len(parts) != 3 || parts[0] != "sources" || parts[2] != "source."+ext {

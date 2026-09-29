@@ -15,6 +15,7 @@ const (
 	EventTypeJudgeFailed    = "judge.failed"
 
 	RoutingJudgeTaskCPP    = "judge.task.cpp"
+	RoutingJudgeTaskC      = "judge.task.c"
 	RoutingJudgeTaskGo     = "judge.task.go"
 	RoutingJudgeTaskPython = "judge.task.python"
 	RoutingJudgeTaskJava   = "judge.task.java"
@@ -97,6 +98,8 @@ func JudgeTaskRoutingKey(language string) (string, error) {
 	switch language {
 	case "cpp":
 		return RoutingJudgeTaskCPP, nil
+	case "c":
+		return RoutingJudgeTaskC, nil
 	case "go":
 		return RoutingJudgeTaskGo, nil
 	case "python":
@@ -109,12 +112,12 @@ func JudgeTaskRoutingKey(language string) (string, error) {
 }
 
 func JudgeTaskRoutingKeys() []string {
-	return []string{RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava}
+	return []string{RoutingJudgeTaskC, RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava}
 }
 
 func IsJudgeTaskRoutingKey(route string) bool {
 	switch route {
-	case RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava:
+	case RoutingJudgeTaskC, RoutingJudgeTaskCPP, RoutingJudgeTaskGo, RoutingJudgeTaskPython, RoutingJudgeTaskJava:
 		return true
 	default:
 		return false
@@ -123,7 +126,7 @@ func IsJudgeTaskRoutingKey(route string) bool {
 
 func SupportedLanguage(language string) bool {
 	switch strings.ToLower(strings.TrimSpace(language)) {
-	case "cpp", "go", "python", "java":
+	case "c", "cpp", "go", "python", "java":
 		return true
 	default:
 		return false

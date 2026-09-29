@@ -32,6 +32,7 @@ type RabbitMQ struct {
 	URL            string `json:"url" yaml:"url"`
 	Exchange       string `json:"exchange" yaml:"exchange"`
 	Queue          string `json:"queue" yaml:"queue"`
+	Queues         []string `json:"queues" yaml:"queues"`
 	RetryQueue     string `json:"retry_queue" yaml:"retry_queue"`
 	DLQ            string `json:"dlq" yaml:"dlq"`
 	ConfirmTimeout string `json:"confirm_timeout" yaml:"confirm_timeout"`
@@ -113,8 +114,8 @@ func (c *Bootstrap) Validate() error {
 		if strings.TrimSpace(c.Messaging.RabbitMQ.Exchange) == "" {
 			return fmt.Errorf("rabbitmq exchange is required")
 		}
-		if c.Messaging.RabbitMQ.Queue == "" {
-			c.Messaging.RabbitMQ.Queue = "judge.task.go"
+		if len(c.Messaging.RabbitMQ.Queues) == 0 && c.Messaging.RabbitMQ.Queue == "" {
+			c.Messaging.RabbitMQ.Queues = []string{"judge.task.c", "judge.task.cpp", "judge.task.go", "judge.task.java", "judge.task.python"}
 		}
 		if c.Messaging.RabbitMQ.RetryQueue == "" {
 			c.Messaging.RabbitMQ.RetryQueue = "judge.retry.go"
