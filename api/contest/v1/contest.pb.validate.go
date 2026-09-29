@@ -588,6 +588,279 @@ var _ interface {
 	ErrorName() string
 } = ContestSummaryValidationError{}
 
+// Validate checks the field values on CreateContestRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateContestRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateContestRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CreateContestRequestMultiError, or nil if none found.
+func (m *CreateContestRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateContestRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetContest() == nil {
+		err := CreateContestRequestValidationError{
+			field:  "Contest",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if all {
+		switch v := interface{}(m.GetContest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateContestRequestValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateContestRequestValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetContest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateContestRequestValidationError{
+				field:  "Contest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateContestRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateContestRequestMultiError is an error wrapping multiple validation
+// errors returned by CreateContestRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateContestRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateContestRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateContestRequestMultiError) AllErrors() []error { return m }
+
+// CreateContestRequestValidationError is the validation error returned by
+// CreateContestRequest.Validate if the designated constraints aren't met.
+type CreateContestRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateContestRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateContestRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateContestRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateContestRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateContestRequestValidationError) ErrorName() string {
+	return "CreateContestRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateContestRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateContestRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateContestRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateContestRequestValidationError{}
+
+// Validate checks the field values on CreateContestReply with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateContestReply) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateContestReply with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CreateContestReplyMultiError, or nil if none found.
+func (m *CreateContestReply) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateContestReply) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetContest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateContestReplyValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateContestReplyValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetContest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateContestReplyValidationError{
+				field:  "Contest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateContestReplyMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateContestReplyMultiError is an error wrapping multiple validation errors
+// returned by CreateContestReply.ValidateAll() if the designated constraints
+// aren't met.
+type CreateContestReplyMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateContestReplyMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateContestReplyMultiError) AllErrors() []error { return m }
+
+// CreateContestReplyValidationError is the validation error returned by
+// CreateContestReply.Validate if the designated constraints aren't met.
+type CreateContestReplyValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateContestReplyValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateContestReplyValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateContestReplyValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateContestReplyValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateContestReplyValidationError) ErrorName() string {
+	return "CreateContestReplyValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateContestReplyValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateContestReply.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateContestReplyValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateContestReplyValidationError{}
+
 // Validate checks the field values on LeaderboardEntry with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
@@ -1401,6 +1674,250 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UpdateContestReplyValidationError{}
+
+// Validate checks the field values on ArchiveContestRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ArchiveContestRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ArchiveContestRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ArchiveContestRequestMultiError, or nil if none found.
+func (m *ArchiveContestRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ArchiveContestRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetContestId() <= 0 {
+		err := ArchiveContestRequestValidationError{
+			field:  "ContestId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return ArchiveContestRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ArchiveContestRequestMultiError is an error wrapping multiple validation
+// errors returned by ArchiveContestRequest.ValidateAll() if the designated
+// constraints aren't met.
+type ArchiveContestRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ArchiveContestRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ArchiveContestRequestMultiError) AllErrors() []error { return m }
+
+// ArchiveContestRequestValidationError is the validation error returned by
+// ArchiveContestRequest.Validate if the designated constraints aren't met.
+type ArchiveContestRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ArchiveContestRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ArchiveContestRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ArchiveContestRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ArchiveContestRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ArchiveContestRequestValidationError) ErrorName() string {
+	return "ArchiveContestRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ArchiveContestRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sArchiveContestRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ArchiveContestRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ArchiveContestRequestValidationError{}
+
+// Validate checks the field values on ArchiveContestReply with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ArchiveContestReply) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ArchiveContestReply with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ArchiveContestReplyMultiError, or nil if none found.
+func (m *ArchiveContestReply) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ArchiveContestReply) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetContest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ArchiveContestReplyValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ArchiveContestReplyValidationError{
+					field:  "Contest",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetContest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ArchiveContestReplyValidationError{
+				field:  "Contest",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return ArchiveContestReplyMultiError(errors)
+	}
+
+	return nil
+}
+
+// ArchiveContestReplyMultiError is an error wrapping multiple validation
+// errors returned by ArchiveContestReply.ValidateAll() if the designated
+// constraints aren't met.
+type ArchiveContestReplyMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ArchiveContestReplyMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ArchiveContestReplyMultiError) AllErrors() []error { return m }
+
+// ArchiveContestReplyValidationError is the validation error returned by
+// ArchiveContestReply.Validate if the designated constraints aren't met.
+type ArchiveContestReplyValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ArchiveContestReplyValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ArchiveContestReplyValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ArchiveContestReplyValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ArchiveContestReplyValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ArchiveContestReplyValidationError) ErrorName() string {
+	return "ArchiveContestReplyValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ArchiveContestReplyValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sArchiveContestReply.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ArchiveContestReplyValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ArchiveContestReplyValidationError{}
 
 // Validate checks the field values on ListContestsRequest with the rules
 // defined in the proto definition for this message. If any rules are

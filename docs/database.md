@@ -399,7 +399,7 @@ Contest 为后续阶段。
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `title` | VARCHAR(255) | NOT NULL |
-| `status` | VARCHAR(32) | draft / running / ended |
+| `status` | VARCHAR(32) | draft / running / ended / archived |
 | `start_at` | DATETIME(3) | NOT NULL |
 | `end_at` | DATETIME(3) | NOT NULL |
 | `created_by` | BIGINT | User ID reference |

@@ -4,6 +4,8 @@ server:
   grpc:
     address: ":9005"
     max_receive_message_bytes: 35651584
+data:
+  mysql_dsn: "root:local-root-password@tcp(127.0.0.1:3306)/oj_contest?parseTime=true"
 registry:
   consul:
     enabled: false

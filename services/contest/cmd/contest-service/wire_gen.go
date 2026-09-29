@@ -9,6 +9,7 @@ package main
 import (
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/contest/internal/data"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/server"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/service"
 )
@@ -17,14 +18,21 @@ import (
 
 func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	v := server.NewMiddlewares()
-	contestUsecase := biz.NewContestUsecase()
+	db, cleanup, err := data.NewMySQLDB(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	repository := data.NewRepository(db)
+	contestUsecase := biz.NewContestUsecaseWithRepository(repository)
 	contestService := service.NewContestService(contestUsecase)
 	grpcServer, err := server.NewGRPCServer(config, v, contestService)
 	if err != nil {
+		cleanup()
 		return nil, nil, err
 	}
 	registrar := server.NewRegistrar(config)
 	v2 := newApp(config, grpcServer, registrar)
 	return v2, func() {
+		cleanup()
 	}, nil
 }

@@ -7,8 +7,9 @@ option go_package = "github.com/viggggil/go_oj_agent/services/contest/internal/c
 message Bootstrap {
   ServiceProto service = 1;
   ServerProto server = 2;
-  RegistryProto registry = 3;
-  InternalAuthProto internal_auth = 4;
+  DataProto data = 3;
+  RegistryProto registry = 4;
+  InternalAuthProto internal_auth = 5;
 }
 
 message ServiceProto {
@@ -22,6 +23,10 @@ message ServerProto {
 message GRPCProto {
   string address = 1;
   int32 max_receive_message_bytes = 2;
+}
+
+message DataProto {
+  string mysql_dsn = 1;
 }
 
 message RegistryProto {

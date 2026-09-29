@@ -116,6 +116,35 @@ func (m *Bootstrap) validate(all bool) error {
 	}
 
 	if all {
+		switch v := interface{}(m.GetData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "Data",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, BootstrapValidationError{
+					field:  "Data",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BootstrapValidationError{
+				field:  "Data",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
 		switch v := interface{}(m.GetRegistry()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
@@ -581,6 +610,107 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GRPCProtoValidationError{}
+
+// Validate checks the field values on DataProto with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DataProto) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DataProto with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in DataProtoMultiError, or nil
+// if none found.
+func (m *DataProto) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DataProto) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for MysqlDsn
+
+	if len(errors) > 0 {
+		return DataProtoMultiError(errors)
+	}
+
+	return nil
+}
+
+// DataProtoMultiError is an error wrapping multiple validation errors returned
+// by DataProto.ValidateAll() if the designated constraints aren't met.
+type DataProtoMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DataProtoMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DataProtoMultiError) AllErrors() []error { return m }
+
+// DataProtoValidationError is the validation error returned by
+// DataProto.Validate if the designated constraints aren't met.
+type DataProtoValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DataProtoValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DataProtoValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DataProtoValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DataProtoValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DataProtoValidationError) ErrorName() string { return "DataProtoValidationError" }
+
+// Error satisfies the builtin error interface
+func (e DataProtoValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDataProto.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DataProtoValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DataProtoValidationError{}
 
 // Validate checks the field values on RegistryProto with the rules defined in
 // the proto definition for this message. If any rules are violated, the first

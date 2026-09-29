@@ -1,0 +1,200 @@
+package data
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
+	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func (r *Repository) Create(ctx context.Context, contest biz.Contest) (biz.Contest, error) {
+	if r == nil || r.db == nil {
+		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	result, err := tx.ExecContext(ctx, `INSERT INTO contests (title,status,start_at,end_at,created_by,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`, contest.Title, contest.StartAt, contest.EndAt, contest.CreatedBy)
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	contest.ID, err = result.LastInsertId()
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	if err = replaceProblems(ctx, tx, contest.ID, contest.Problems); err != nil {
+		return biz.Contest{}, err
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT created_at, updated_at FROM contests WHERE id = ?`, contest.ID).Scan(&contest.CreatedAt, &contest.UpdatedAt); err != nil {
+		return biz.Contest{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return biz.Contest{}, err
+	}
+	return contest, nil
+}
+
+func (r *Repository) Get(ctx context.Context, id int64) (biz.Contest, error) {
+	if r == nil || r.db == nil {
+		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	var c biz.Contest
+	var state string
+	err := r.db.QueryRowContext(ctx, `SELECT id,title,status,start_at,end_at,created_by,created_at,updated_at FROM contests WHERE id = ?`, id).Scan(&c.ID, &c.Title, &state, &c.StartAt, &c.EndAt, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return biz.Contest{}, status.Error(codes.NotFound, "contest not found")
+	}
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	c.Status = fromDBStatus(state)
+	if c.Status == contestv1.ContestStatus_CONTEST_STATUS_UNSPECIFIED {
+		return biz.Contest{}, status.Error(codes.Internal, "invalid contest status")
+	}
+	if err := scanProblems(ctx, r.db, &c); err != nil {
+		return biz.Contest{}, err
+	}
+	return c, nil
+}
+
+func (r *Repository) List(ctx context.Context, page, pageSize int32, filter contestv1.ContestStatus) ([]biz.Contest, int64, error) {
+	if r == nil || r.db == nil {
+		return nil, 0, status.Error(codes.Internal, "contest database is not configured")
+	}
+	where, args := "status <> ?", []interface{}{"archived"}
+	if filter != contestv1.ContestStatus_CONTEST_STATUS_UNSPECIFIED {
+		where, args = "status = ?", []interface{}{toDBStatus(filter)}
+	}
+	var total int64
+	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM contests WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	queryArgs := append(append([]interface{}{}, args...), pageSize, (page-1)*pageSize)
+	rows, err := r.db.QueryContext(ctx, "SELECT id,title,status,start_at,end_at,created_by,created_at,updated_at FROM contests WHERE "+where+" ORDER BY start_at DESC,id DESC LIMIT ? OFFSET ?", queryArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := make([]biz.Contest, 0, pageSize)
+	for rows.Next() {
+		var c biz.Contest
+		var state string
+		if err := rows.Scan(&c.ID, &c.Title, &state, &c.StartAt, &c.EndAt, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		c.Status = fromDBStatus(state)
+		if err := scanProblems(ctx, r.db, &c); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, c)
+	}
+	return items, total, rows.Err()
+}
+
+func (r *Repository) Update(ctx context.Context, contest biz.Contest) (biz.Contest, error) {
+	if r == nil || r.db == nil {
+		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	result, err := tx.ExecContext(ctx, `UPDATE contests SET title=?,start_at=?,end_at=?,updated_at=UTC_TIMESTAMP(3) WHERE id=? AND status='draft'`, contest.Title, contest.StartAt, contest.EndAt, contest.ID)
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return biz.Contest{}, status.Error(codes.FailedPrecondition, "contest is not editable")
+	}
+	if err = replaceProblems(ctx, tx, contest.ID, contest.Problems); err != nil {
+		return biz.Contest{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return biz.Contest{}, err
+	}
+	return r.Get(ctx, contest.ID)
+}
+
+func (r *Repository) Archive(ctx context.Context, id int64) (biz.Contest, error) {
+	if r == nil || r.db == nil {
+		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	result, err := r.db.ExecContext(ctx, `UPDATE contests SET status='archived',updated_at=UTC_TIMESTAMP(3) WHERE id=? AND status='draft'`, id)
+	if err != nil {
+		return biz.Contest{}, err
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return biz.Contest{}, status.Error(codes.FailedPrecondition, "contest is not archivable")
+	}
+	return r.Get(ctx, id)
+}
+
+func replaceProblems(ctx context.Context, tx *sql.Tx, contestID int64, problems []biz.ContestProblem) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM contest_problems WHERE contest_id=?`, contestID); err != nil {
+		return err
+	}
+	for _, p := range problems {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO contest_problems (contest_id,problem_id,sort_order,score) VALUES (?,?,?,?)`, contestID, p.ProblemID, p.SortOrder, p.Score); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func scanProblems(ctx context.Context, q interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}, c *biz.Contest) error {
+	rows, err := q.QueryContext(ctx, `SELECT problem_id,sort_order,score FROM contest_problems WHERE contest_id=? ORDER BY sort_order`, c.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p biz.ContestProblem
+		if err := rows.Scan(&p.ProblemID, &p.SortOrder, &p.Score); err != nil {
+			return err
+		}
+		c.Problems = append(c.Problems, p)
+	}
+	return rows.Err()
+}
+func toDBStatus(value contestv1.ContestStatus) string {
+	switch value {
+	case contestv1.ContestStatus_CONTEST_STATUS_RUNNING:
+		return "running"
+	case contestv1.ContestStatus_CONTEST_STATUS_ENDED:
+		return "ended"
+	case contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED:
+		return "archived"
+	default:
+		return "draft"
+	}
+}
+func fromDBStatus(value string) contestv1.ContestStatus {
+	switch value {
+	case "running":
+		return contestv1.ContestStatus_CONTEST_STATUS_RUNNING
+	case "ended":
+		return contestv1.ContestStatus_CONTEST_STATUS_ENDED
+	case "archived":
+		return contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED
+	case "draft":
+		return contestv1.ContestStatus_CONTEST_STATUS_DRAFT
+	default:
+		return contestv1.ContestStatus_CONTEST_STATUS_UNSPECIFIED
+	}
+}
