@@ -198,6 +198,8 @@ func (m *Submission) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for ContestId
+
 	if len(errors) > 0 {
 		return SubmissionMultiError(errors)
 	}
@@ -620,6 +622,17 @@ func (m *CreateSubmissionRequest) validate(all bool) error {
 			field:  "IdempotencyKey",
 			reason: "value must be a valid UUID",
 			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetContestId() < 0 {
+		err := CreateSubmissionRequestValidationError{
+			field:  "ContestId",
+			reason: "value must be greater than or equal to 0",
 		}
 		if !all {
 			return err

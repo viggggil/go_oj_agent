@@ -442,6 +442,9 @@ Judge Service 接收 `source_code` 后获取题目的 active `judge_revision`，
 `judge.requested` Outbox。数据库与 MQ 不保存源码正文。
 如果事务失败，已上传但未被引用的源码对象由 GC 在安全保留期后清理。
 
+普通提交的 `contest_id` 为 `NULL`。比赛提交必须使用 Contest 专用路由，不能由普通
+提交接口伪造比赛上下文。
+
 ### GET `/api/v1/submissions/{submission_id}`
 
 返回提交元数据与当前判题结果。
@@ -510,7 +513,7 @@ data: {"status":"AC","time_ms":32,"memory_kb":4096}
 
 ---
 
-## 3.5 Contest（后续阶段）
+## 3.5 Contest
 
 ### GET `/api/v1/contests`
 
@@ -527,6 +530,14 @@ data: {"status":"AC","time_ms":32,"memory_kb":4096}
 ### POST `/api/v1/contests/{contest_id}/join`
 
 参加比赛。
+
+### POST `/api/v1/contests/{contest_id}/problems/{problem_id}/submissions`
+
+创建比赛提交。Gateway 从认证上下文取得用户身份，Contest Service 校验比赛状态、
+时间窗口、报名关系和题目归属后，调用 Judge Service 创建带 `contest_id` 的
+Submission。比赛提交与普通提交共用 MinIO、Transactional Outbox、RabbitMQ 和
+Judge Worker；其 `judge_revision` 在创建/投递 `judge.requested` 时读取题目的当前
+active revision，提交后保持 immutable。
 
 ### GET `/api/v1/contests/{contest_id}/leaderboard`
 
@@ -833,10 +844,13 @@ service ContestService {
   rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc ArchiveContest(ArchiveContestRequest) returns (ArchiveContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
+  rpc CreateContestSubmission(CreateContestSubmissionRequest)
+      returns (CreateContestSubmissionReply);
 }
 ```
 
-Contest 可以消费 `submission.judged` 更新排行榜视图，避免直接查询 Submission 数据库。
+排行榜暂不属于本阶段；后续由 Contest Service 消费 `submission.judged`，不直接查询
+Submission 数据库。
 
 ---
 

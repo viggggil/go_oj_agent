@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ContestService_CreateContest_FullMethodName  = "/contest.v1.ContestService/CreateContest"
-	ContestService_GetContest_FullMethodName     = "/contest.v1.ContestService/GetContest"
-	ContestService_ListContests_FullMethodName   = "/contest.v1.ContestService/ListContests"
-	ContestService_UpdateContest_FullMethodName  = "/contest.v1.ContestService/UpdateContest"
-	ContestService_ArchiveContest_FullMethodName = "/contest.v1.ContestService/ArchiveContest"
-	ContestService_GetLeaderboard_FullMethodName = "/contest.v1.ContestService/GetLeaderboard"
+	ContestService_CreateContest_FullMethodName           = "/contest.v1.ContestService/CreateContest"
+	ContestService_GetContest_FullMethodName              = "/contest.v1.ContestService/GetContest"
+	ContestService_ListContests_FullMethodName            = "/contest.v1.ContestService/ListContests"
+	ContestService_UpdateContest_FullMethodName           = "/contest.v1.ContestService/UpdateContest"
+	ContestService_ArchiveContest_FullMethodName          = "/contest.v1.ContestService/ArchiveContest"
+	ContestService_GetLeaderboard_FullMethodName          = "/contest.v1.ContestService/GetLeaderboard"
+	ContestService_CreateContestSubmission_FullMethodName = "/contest.v1.ContestService/CreateContestSubmission"
 )
 
 // ContestServiceClient is the client API for ContestService service.
@@ -38,6 +39,7 @@ type ContestServiceClient interface {
 	UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestReply, error)
 	ArchiveContest(ctx context.Context, in *ArchiveContestRequest, opts ...grpc.CallOption) (*ArchiveContestReply, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardReply, error)
+	CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionReply, error)
 }
 
 type contestServiceClient struct {
@@ -108,6 +110,16 @@ func (c *contestServiceClient) GetLeaderboard(ctx context.Context, in *GetLeader
 	return out, nil
 }
 
+func (c *contestServiceClient) CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateContestSubmissionReply)
+	err := c.cc.Invoke(ctx, ContestService_CreateContestSubmission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ContestServiceServer is the server API for ContestService service.
 // All implementations must embed UnimplementedContestServiceServer
 // for forward compatibility.
@@ -119,6 +131,7 @@ type ContestServiceServer interface {
 	UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestReply, error)
 	ArchiveContest(context.Context, *ArchiveContestRequest) (*ArchiveContestReply, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error)
+	CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionReply, error)
 	mustEmbedUnimplementedContestServiceServer()
 }
 
@@ -146,6 +159,9 @@ func (UnimplementedContestServiceServer) ArchiveContest(context.Context, *Archiv
 }
 func (UnimplementedContestServiceServer) GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeaderboard not implemented")
+}
+func (UnimplementedContestServiceServer) CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateContestSubmission not implemented")
 }
 func (UnimplementedContestServiceServer) mustEmbedUnimplementedContestServiceServer() {}
 func (UnimplementedContestServiceServer) testEmbeddedByValue()                        {}
@@ -276,6 +292,24 @@ func _ContestService_GetLeaderboard_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContestService_CreateContestSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateContestSubmissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContestServiceServer).CreateContestSubmission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContestService_CreateContestSubmission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContestServiceServer).CreateContestSubmission(ctx, req.(*CreateContestSubmissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ContestService_ServiceDesc is the grpc.ServiceDesc for ContestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -306,6 +340,10 @@ var ContestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLeaderboard",
 			Handler:    _ContestService_GetLeaderboard_Handler,
+		},
+		{
+			MethodName: "CreateContestSubmission",
+			Handler:    _ContestService_CreateContestSubmission_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

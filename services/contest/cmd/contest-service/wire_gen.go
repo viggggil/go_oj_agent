@@ -23,16 +23,25 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 		return nil, nil, err
 	}
 	repository := data.NewRepository(db)
-	contestUsecase := biz.NewContestUsecaseWithRepository(repository)
+	context := data.NewClientContext()
+	submissionClient, cleanup2, err := data.NewSubmissionClient(context, config)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	submissionServiceClient := data.ProvideSubmissionServiceClient(submissionClient)
+	contestUsecase := biz.NewContestUsecaseWithRepositoryAndSubmission(repository, submissionServiceClient)
 	contestService := service.NewContestService(contestUsecase)
 	grpcServer, err := server.NewGRPCServer(config, v, contestService)
 	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	registrar := server.NewRegistrar(config)
 	v2 := newApp(config, grpcServer, registrar)
 	return v2, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }

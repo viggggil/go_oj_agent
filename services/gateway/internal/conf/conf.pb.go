@@ -420,6 +420,7 @@ type ClientsProto struct {
 	User          *ClientProto           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	Problem       *ClientProto           `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
 	Submission    *ClientProto           `protobuf:"bytes,3,opt,name=submission,proto3" json:"submission,omitempty"`
+	Contest       *ClientProto           `protobuf:"bytes,4,opt,name=contest,proto3" json:"contest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -471,6 +472,13 @@ func (x *ClientsProto) GetProblem() *ClientProto {
 func (x *ClientsProto) GetSubmission() *ClientProto {
 	if x != nil {
 		return x.Submission
+	}
+	return nil
+}
+
+func (x *ClientsProto) GetContest() *ClientProto {
+	if x != nil {
+		return x.Contest
 	}
 	return nil
 }
@@ -696,13 +704,14 @@ const file_services_gateway_internal_conf_conf_proto_rawDesc = "" +
 	"\x12internal_token_ttl\x18\n" +
 	" \x01(\tR\x10internalTokenTtl\x12\x16\n" +
 	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x12\x1a\n" +
-	"\baudience\x18\x03 \x01(\tR\baudience\"\xad\x01\n" +
+	"\baudience\x18\x03 \x01(\tR\baudience\"\xe2\x01\n" +
 	"\fClientsProto\x12-\n" +
 	"\x04user\x18\x01 \x01(\v2\x19.gateway.conf.ClientProtoR\x04user\x123\n" +
 	"\aproblem\x18\x02 \x01(\v2\x19.gateway.conf.ClientProtoR\aproblem\x129\n" +
 	"\n" +
 	"submission\x18\x03 \x01(\v2\x19.gateway.conf.ClientProtoR\n" +
-	"submission\"W\n" +
+	"submission\x123\n" +
+	"\acontest\x18\x04 \x01(\v2\x19.gateway.conf.ClientProtoR\acontest\"W\n" +
 	"\vClientProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12\x18\n" +
@@ -756,12 +765,13 @@ var file_services_gateway_internal_conf_conf_proto_depIdxs = []int32{
 	7,  // 7: gateway.conf.ClientsProto.user:type_name -> gateway.conf.ClientProto
 	7,  // 8: gateway.conf.ClientsProto.problem:type_name -> gateway.conf.ClientProto
 	7,  // 9: gateway.conf.ClientsProto.submission:type_name -> gateway.conf.ClientProto
-	9,  // 10: gateway.conf.RegistryProto.consul:type_name -> gateway.conf.ConsulProto
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	7,  // 10: gateway.conf.ClientsProto.contest:type_name -> gateway.conf.ClientProto
+	9,  // 11: gateway.conf.RegistryProto.consul:type_name -> gateway.conf.ConsulProto
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_services_gateway_internal_conf_conf_proto_init() }

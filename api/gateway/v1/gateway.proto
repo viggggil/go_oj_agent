@@ -72,6 +72,9 @@ service GatewayService {
   rpc GetJudgeResult(GetJudgeResultRequest) returns (GetJudgeResultResponse) { option (google.api.http) = { get: "/api/v1/submissions/{submission_id}/result" }; }
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse) { option (google.api.http) = { get: "/api/v1/submissions" }; }
   rpc RejudgeSubmission(RejudgeSubmissionRequest) returns (RejudgeSubmissionResponse) { option (google.api.http) = { post: "/api/v1/submissions/{submission_id}/rejudge" body: "*" }; }
+  rpc CreateContestSubmission(CreateContestSubmissionRequest) returns (CreateContestSubmissionResponse) {
+    option (google.api.http) = { post: "/api/v1/contests/{contest_id}/problems/{problem_id}/submissions" body: "*" };
+  }
 }
 
 message UserSummary {
@@ -191,3 +194,12 @@ message ListSubmissionsRequest { common.v1.PageRequest page = 1 [(validate.rules
 message ListSubmissionsResponse { repeated submission.v1.Submission items = 1; common.v1.PageResponse page = 2; }
 message RejudgeSubmissionRequest { int64 submission_id = 1 [(validate.rules).int64.gt = 0]; string idempotency_key = 2 [(validate.rules).string.uuid = true]; }
 message RejudgeSubmissionResponse { int64 invalidated_submission_id = 1; submission.v1.Submission submission = 2; }
+
+message CreateContestSubmissionRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+  int64 problem_id = 2 [(validate.rules).int64.gt = 0];
+  string language = 3 [(validate.rules).string = {min_len: 1, max_len: 32, pattern: "^[a-z][a-z0-9_+-]*$"}];
+  string source_code = 4 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  string idempotency_key = 5 [(validate.rules).string.uuid = true];
+}
+message CreateContestSubmissionResponse { int64 submission_id = 1; submission.v1.SubmissionStatus status = 2; }

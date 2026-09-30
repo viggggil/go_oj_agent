@@ -1,6 +1,6 @@
 # Contest Service
 
-Contest Service 当前提供 API contract、运行时初始化和 Contest 基础 CRUD 业务层，
+Contest Service 当前提供 API contract、运行时初始化、Contest 基础 CRUD 和比赛提交校验，
 提供以下内部 gRPC 接口：
 
 ```text
@@ -14,8 +14,9 @@ GetLeaderboard
 
 Contest 和 ContestProblem 使用 `oj_contest` MySQL schema；创建和全量更新在同一事务中
 替换题目集合。管理员只能创建、更新或归档尚未开始的 DRAFT 比赛，状态由开始/结束
-时间计算。排行榜和 `submission.judged` consumer 尚未实现，排行榜请求返回
-`UNIMPLEMENTED`，不会伪造数据。
+时间计算。排行榜和 `submission.judged` consumer 尚未实现；排行榜请求返回
+`UNIMPLEMENTED`，不会伪造数据。比赛提交会在比赛服务完成报名、时间和题目归属校验
+后转发到 judge-service。
 
 ## Local run
 

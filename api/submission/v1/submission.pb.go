@@ -169,8 +169,10 @@ type Submission struct {
 	UpdatedAt         *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	JudgedAt          *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=judged_at,json=judgedAt,proto3" json:"judged_at,omitempty"`
 	InvalidatedAt     *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=invalidated_at,json=invalidatedAt,proto3" json:"invalidated_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// 0 is not persisted; a non-zero value identifies a contest submission.
+	ContestId     int64 `protobuf:"varint,18,opt,name=contest_id,json=contestId,proto3" json:"contest_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Submission) Reset() {
@@ -306,6 +308,13 @@ func (x *Submission) GetInvalidatedAt() *timestamppb.Timestamp {
 		return x.InvalidatedAt
 	}
 	return nil
+}
+
+func (x *Submission) GetContestId() int64 {
+	if x != nil {
+		return x.ContestId
+	}
+	return 0
 }
 
 type SubmissionCaseResult struct {
@@ -506,8 +515,11 @@ type CreateSubmissionRequest struct {
 	Language       string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
 	SourceCode     string                 `protobuf:"bytes,4,opt,name=source_code,json=sourceCode,proto3" json:"source_code,omitempty"`
 	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Set only by the trusted contest-service caller. Public ordinary
+	// submission endpoints must leave this unset.
+	ContestId     int64 `protobuf:"varint,6,opt,name=contest_id,json=contestId,proto3" json:"contest_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateSubmissionRequest) Reset() {
@@ -566,6 +578,13 @@ func (x *CreateSubmissionRequest) GetIdempotencyKey() string {
 		return x.IdempotencyKey
 	}
 	return ""
+}
+
+func (x *CreateSubmissionRequest) GetContestId() int64 {
+	if x != nil {
+		return x.ContestId
+	}
+	return 0
 }
 
 type CreateSubmissionResponse struct {
@@ -1154,7 +1173,7 @@ var File_api_submission_v1_submission_proto protoreflect.FileDescriptor
 
 const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\n" +
-	"\"api/submission/v1/submission.proto\x12\rsubmission.v1\x1a\x1aapi/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17validate/validate.proto\"\xab\x05\n" +
+	"\"api/submission/v1/submission.proto\x12\rsubmission.v1\x1a\x1aapi/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17validate/validate.proto\"\xca\x05\n" +
 	"\n" +
 	"Submission\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x17\n" +
@@ -1175,7 +1194,9 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x127\n" +
 	"\tjudged_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\bjudgedAt\x12A\n" +
-	"\x0einvalidated_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\rinvalidatedAtJ\x04\b\x05\x10\x06J\x04\b\n" +
+	"\x0einvalidated_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\rinvalidatedAt\x12\x1d\n" +
+	"\n" +
+	"contest_id\x18\x12 \x01(\x03R\tcontestIdJ\x04\b\x05\x10\x06J\x04\b\n" +
 	"\x10\vR\vsource_codeR\x10testcase_version\"\xeb\x01\n" +
 	"\x14SubmissionCaseResult\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12#\n" +
@@ -1193,14 +1214,16 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\tmemory_kb\x18\x05 \x01(\x05R\bmemoryKb\x12F\n" +
 	"\fcase_results\x18\x06 \x03(\v2#.submission.v1.SubmissionCaseResultR\vcaseResults\x12%\n" +
 	"\x0ejudge_revision\x18\a \x01(\tR\rjudgeRevision\x12.\n" +
-	"\x13system_error_reason\x18\b \x01(\tR\x11systemErrorReason\"\xed\x01\n" +
+	"\x13system_error_reason\x18\b \x01(\tR\x11systemErrorReason\"\x95\x02\n" +
 	"\x17CreateSubmissionRequest\x12&\n" +
 	"\n" +
 	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12:\n" +
 	"\blanguage\x18\x03 \x01(\tB\x1e\xfaB\x1br\x19\x10\x01\x18 2\x13^[a-z][a-z0-9_+-]*$R\blanguage\x12,\n" +
 	"\vsource_code\x18\x04 \x01(\tB\v\xfaB\br\x06\x10\x01(\x80\x80@R\n" +
 	"sourceCode\x121\n" +
-	"\x0fidempotency_key\x18\x05 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x0eidempotencyKeyJ\x04\b\x01\x10\x02R\acontext\"x\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x0eidempotencyKey\x12&\n" +
+	"\n" +
+	"contest_id\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\tcontestIdJ\x04\b\x01\x10\x02R\acontext\"x\n" +
 	"\x18CreateSubmissionResponse\x12#\n" +
 	"\rsubmission_id\x18\x01 \x01(\x03R\fsubmissionId\x127\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1f.submission.v1.SubmissionStatusR\x06status\"S\n" +

@@ -120,6 +120,24 @@ func (s *ContestService) GetLeaderboard(context.Context, *contestv1.GetLeaderboa
 	return nil, status.Error(codes.Unimplemented, "contest leaderboard is not implemented")
 }
 
+func (s *ContestService) CreateContestSubmission(ctx context.Context, req *contestv1.CreateContestSubmissionRequest) (*contestv1.CreateContestSubmissionReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid contest submission request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	actor, err := requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.uc.CreateSubmission(ctx, actor, req)
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.CreateContestSubmissionReply{SubmissionId: result.GetSubmissionId(), Status: result.GetStatus()}, nil
+}
+
 func requestContext(ctx context.Context) (*commonv1.RequestContext, error) {
 	principal, ok := internalauth.PrincipalFromContext(ctx)
 	if !ok || principal.ActorID <= 0 {

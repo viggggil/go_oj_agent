@@ -42,7 +42,7 @@ func (s *SubmissionService) CreateSubmission(ctx context.Context, req *submissio
 		return nil, err
 	}
 	result, err := s.uc.Create(ctx, biz.CreateSubmissionInput{
-		Actor: actor, ProblemID: req.GetProblemId(), Language: req.GetLanguage(),
+		Actor: actor, ProblemID: req.GetProblemId(), ContestID: req.GetContestId(), Language: req.GetLanguage(),
 		SourceCode: []byte(req.GetSourceCode()), IdempotencyKey: strings.ToLower(req.GetIdempotencyKey()),
 	})
 	if err != nil {
@@ -168,7 +168,7 @@ func actorFromPrincipal(ctx context.Context) (biz.Actor, error) {
 
 func toProtoSubmission(submission biz.Submission) *submissionv1.Submission {
 	result := &submissionv1.Submission{
-		Id: submission.ID, UserId: submission.UserID, ProblemId: submission.ProblemID,
+		Id: submission.ID, UserId: submission.UserID, ProblemId: submission.ProblemID, ContestId: submission.ContestID,
 		Language: submission.Language, Status: submission.Status, Verdict: submission.Verdict,
 		JudgeRevision: submission.JudgeRevision, RetryCount: submission.RetryCount,
 		SystemErrorReason: submission.SystemErrorReason,

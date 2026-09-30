@@ -11,6 +11,24 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func (r *Repository) IsParticipant(ctx context.Context, contestID, userID int64) (bool, error) {
+	if r == nil || r.db == nil {
+		return false, status.Error(codes.Internal, "contest database is not configured")
+	}
+	var exists int
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_participants WHERE contest_id=? AND user_id=?)`, contestID, userID).Scan(&exists)
+	return exists == 1, err
+}
+
+func (r *Repository) HasProblem(ctx context.Context, contestID, problemID int64) (bool, error) {
+	if r == nil || r.db == nil {
+		return false, status.Error(codes.Internal, "contest database is not configured")
+	}
+	var exists int
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_id=?)`, contestID, problemID).Scan(&exists)
+	return exists == 1, err
+}
+
 func (r *Repository) Create(ctx context.Context, contest biz.Contest) (biz.Contest, error) {
 	if r == nil || r.db == nil {
 		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")

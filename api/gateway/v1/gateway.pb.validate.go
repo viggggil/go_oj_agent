@@ -5660,3 +5660,301 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = RejudgeSubmissionResponseValidationError{}
+
+// Validate checks the field values on CreateContestSubmissionRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateContestSubmissionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateContestSubmissionRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// CreateContestSubmissionRequestMultiError, or nil if none found.
+func (m *CreateContestSubmissionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateContestSubmissionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.GetContestId() <= 0 {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "ContestId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetProblemId() <= 0 {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "ProblemId",
+			reason: "value must be greater than 0",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if l := utf8.RuneCountInString(m.GetLanguage()); l < 1 || l > 32 {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "Language",
+			reason: "value length must be between 1 and 32 runes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if !_CreateContestSubmissionRequest_Language_Pattern.MatchString(m.GetLanguage()) {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "Language",
+			reason: "value does not match regex pattern \"^[a-z][a-z0-9_+-]*$\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetSourceCode()) < 1 {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetSourceCode()) > 1048576 {
+		err := CreateContestSubmissionRequestValidationError{
+			field:  "SourceCode",
+			reason: "value length must be at most 1048576 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if err := m._validateUuid(m.GetIdempotencyKey()); err != nil {
+		err = CreateContestSubmissionRequestValidationError{
+			field:  "IdempotencyKey",
+			reason: "value must be a valid UUID",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return CreateContestSubmissionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *CreateContestSubmissionRequest) _validateUuid(uuid string) error {
+	if matched := _gateway_uuidPattern.MatchString(uuid); !matched {
+		return errors.New("invalid uuid format")
+	}
+
+	return nil
+}
+
+// CreateContestSubmissionRequestMultiError is an error wrapping multiple
+// validation errors returned by CreateContestSubmissionRequest.ValidateAll()
+// if the designated constraints aren't met.
+type CreateContestSubmissionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateContestSubmissionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateContestSubmissionRequestMultiError) AllErrors() []error { return m }
+
+// CreateContestSubmissionRequestValidationError is the validation error
+// returned by CreateContestSubmissionRequest.Validate if the designated
+// constraints aren't met.
+type CreateContestSubmissionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateContestSubmissionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateContestSubmissionRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateContestSubmissionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateContestSubmissionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateContestSubmissionRequestValidationError) ErrorName() string {
+	return "CreateContestSubmissionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateContestSubmissionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateContestSubmissionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateContestSubmissionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateContestSubmissionRequestValidationError{}
+
+var _CreateContestSubmissionRequest_Language_Pattern = regexp.MustCompile("^[a-z][a-z0-9_+-]*$")
+
+// Validate checks the field values on CreateContestSubmissionResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateContestSubmissionResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateContestSubmissionResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// CreateContestSubmissionResponseMultiError, or nil if none found.
+func (m *CreateContestSubmissionResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateContestSubmissionResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SubmissionId
+
+	// no validation rules for Status
+
+	if len(errors) > 0 {
+		return CreateContestSubmissionResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateContestSubmissionResponseMultiError is an error wrapping multiple
+// validation errors returned by CreateContestSubmissionResponse.ValidateAll()
+// if the designated constraints aren't met.
+type CreateContestSubmissionResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateContestSubmissionResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateContestSubmissionResponseMultiError) AllErrors() []error { return m }
+
+// CreateContestSubmissionResponseValidationError is the validation error
+// returned by CreateContestSubmissionResponse.Validate if the designated
+// constraints aren't met.
+type CreateContestSubmissionResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateContestSubmissionResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateContestSubmissionResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateContestSubmissionResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateContestSubmissionResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateContestSubmissionResponseValidationError) ErrorName() string {
+	return "CreateContestSubmissionResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateContestSubmissionResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateContestSubmissionResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateContestSubmissionResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateContestSubmissionResponseValidationError{}

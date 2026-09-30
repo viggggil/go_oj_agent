@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
@@ -14,6 +15,7 @@ type GatewayService struct {
 	user       *UserService
 	problem    problemv1.ProblemServiceClient
 	submission submissionv1.SubmissionServiceClient
+	contest    contestv1.ContestServiceClient
 }
 
 func NewGatewayService(auth *AuthService, user *UserService, problems ...problemv1.ProblemServiceClient) *GatewayService {
@@ -39,6 +41,12 @@ func NewGatewayServiceWithProblem(auth *AuthService, user *UserService, problem 
 func NewGatewayServiceWithClients(auth *AuthService, user *UserService, problem problemv1.ProblemServiceClient, submission submissionv1.SubmissionServiceClient) *GatewayService {
 	service := NewGatewayServiceWithProblem(auth, user, problem)
 	service.submission = submission
+	return service
+}
+
+func NewGatewayServiceWithAllClients(auth *AuthService, user *UserService, problem problemv1.ProblemServiceClient, submission submissionv1.SubmissionServiceClient, contest contestv1.ContestServiceClient) *GatewayService {
+	service := NewGatewayServiceWithClients(auth, user, problem, submission)
+	service.contest = contest
 	return service
 }
 

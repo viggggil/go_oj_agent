@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	gatewaymw "github.com/viggggil/go_oj_agent/services/gateway/internal/middleware"
@@ -29,6 +30,26 @@ func (s *GatewayService) CreateSubmission(ctx context.Context, req *gatewayv1.Cr
 		return nil, err
 	}
 	return &gatewayv1.CreateSubmissionResponse{SubmissionId: res.GetSubmissionId(), Status: res.GetStatus()}, nil
+}
+
+func (s *GatewayService) CreateContestSubmission(ctx context.Context, req *gatewayv1.CreateContestSubmissionRequest) (*gatewayv1.CreateContestSubmissionResponse, error) {
+	if _, ok := gatewaymw.RequestContextFromContext(ctx); !ok {
+		return nil, gatewaymw.ErrUnauthenticated("request context is missing")
+	}
+	if req == nil || s == nil || s.contest == nil {
+		return nil, fmt.Errorf("gateway contest service is not configured")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	res, err := s.contest.CreateContestSubmission(ctx, &contestv1.CreateContestSubmissionRequest{
+		ContestId: req.GetContestId(), ProblemId: req.GetProblemId(), Language: req.GetLanguage(),
+		SourceCode: req.GetSourceCode(), IdempotencyKey: req.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &gatewayv1.CreateContestSubmissionResponse{SubmissionId: res.GetSubmissionId(), Status: res.GetStatus()}, nil
 }
 
 func (s *GatewayService) GetSubmission(ctx context.Context, req *gatewayv1.GetSubmissionRequest) (*gatewayv1.GetSubmissionResponse, error) {
