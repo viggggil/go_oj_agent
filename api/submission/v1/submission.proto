@@ -63,6 +63,8 @@ message Submission {
   google.protobuf.Timestamp updated_at = 15;
   google.protobuf.Timestamp judged_at = 16;
   google.protobuf.Timestamp invalidated_at = 17;
+  // 0 is not persisted; a non-zero value identifies a contest submission.
+  int64 contest_id = 18;
 }
 
 message SubmissionCaseResult {
@@ -97,6 +99,9 @@ message CreateSubmissionRequest {
   }];
   string source_code = 4 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
   string idempotency_key = 5 [(validate.rules).string.uuid = true];
+  // Set only by the trusted contest-service caller. Public ordinary
+  // submission endpoints must leave this unset.
+  int64 contest_id = 6 [(validate.rules).int64.gte = 0];
 }
 
 message CreateSubmissionResponse {

@@ -252,6 +252,7 @@ Judge Service 的 Submission 引用。
 | `id` | BIGINT | PK |
 | `user_id` | BIGINT | User ID reference, no cross-DB FK |
 | `problem_id` | BIGINT | Problem ID reference, no cross-DB FK |
+| `contest_id` | BIGINT | Nullable contest ID; NULL means ordinary submission |
 | `language` | VARCHAR(32) | c / cpp / go / python / java |
 | `source_object_key` | VARCHAR(512) | Immutable MinIO key |
 | `source_sha256` | CHAR(64) | NOT NULL |
@@ -434,6 +435,9 @@ PRIMARY KEY(contest_id, problem_id)
 ```text
 PRIMARY KEY(contest_id, user_id)
 ```
+
+Contest Service 的 `JoinContest` 在比赛开始前向该表幂等插入报名记录。`user_id` 由认证
+上下文提供，不能由客户端指定；重复报名返回已有 `joined_at`。
 
 ## 7.4 `contest_scores`
 

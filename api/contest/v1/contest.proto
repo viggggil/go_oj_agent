@@ -5,6 +5,7 @@ package contest.v1;
 option go_package = "github.com/viggggil/go_oj_agent/api/contest/v1;contestv1";
 
 import "api/common/v1/common.proto";
+import "api/submission/v1/submission.proto";
 import "google/protobuf/timestamp.proto";
 import "validate/validate.proto";
 
@@ -16,6 +17,8 @@ service ContestService {
   rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc ArchiveContest(ArchiveContestRequest) returns (ArchiveContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
+  rpc JoinContest(JoinContestRequest) returns (JoinContestReply);
+  rpc CreateContestSubmission(CreateContestSubmissionRequest) returns (CreateContestSubmissionReply);
 }
 
 enum ContestStatus {
@@ -120,4 +123,27 @@ message GetLeaderboardRequest {
 message GetLeaderboardReply {
   repeated LeaderboardEntry items = 1;
   common.v1.PageResponse page = 2;
+}
+
+message JoinContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message JoinContestReply {
+  int64 contest_id = 1;
+  int64 user_id = 2;
+  google.protobuf.Timestamp joined_at = 3;
+}
+
+message CreateContestSubmissionRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+  int64 problem_id = 2 [(validate.rules).int64.gt = 0];
+  string language = 3 [(validate.rules).string = {min_len: 1, max_len: 32, pattern: "^[a-z][a-z0-9_+-]*$"}];
+  string source_code = 4 [(validate.rules).string = {min_len: 1, max_bytes: 1048576}];
+  string idempotency_key = 5 [(validate.rules).string.uuid = true];
+}
+
+message CreateContestSubmissionReply {
+  int64 submission_id = 1;
+  submission.v1.SubmissionStatus status = 2;
 }

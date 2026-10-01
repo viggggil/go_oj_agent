@@ -108,7 +108,7 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 	return nil
 }
 
-const submissionColumns = `id, user_id, problem_id, language, source_object_key,
+const submissionColumns = `id, user_id, problem_id, contest_id, language, source_object_key,
 	source_sha256, source_size_bytes, judge_revision, status, verdict, time_ms,
 	memory_kb, retry_count, system_error_reason, judge_deadline_at, created_at,
 	judged_at, invalidated_at, updated_at`
@@ -392,7 +392,7 @@ func (s *StoreSet) InvalidateAndRequeueWithOutboxAndIdempotency(ctx context.Cont
 	}
 
 	replacement := biz.Submission{
-		UserID: old.UserID, ProblemID: old.ProblemID, Language: old.Language,
+		UserID: old.UserID, ProblemID: old.ProblemID, ContestID: old.ContestID, Language: old.Language,
 		SourceObjectKey: old.SourceObjectKey, SourceSHA256: old.SourceSHA256, SourceSizeBytes: old.SourceSizeBytes,
 		JudgeRevision: command.JudgeRevision, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED,
 		JudgeDeadlineAt: command.JudgeDeadlineAt, CreatedAt: now, UpdatedAt: now,
@@ -532,12 +532,12 @@ func (s *StoreSet) MarkOutboxFailure(ctx context.Context, id int64, owner string
 func insertSubmission(ctx context.Context, tx *sql.Tx, submission biz.Submission) (int64, error) {
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO submissions (
-			user_id, problem_id, language, source_object_key, source_sha256,
+			user_id, problem_id, contest_id, language, source_object_key, source_sha256,
 			source_size_bytes, judge_revision, status, verdict, time_ms, memory_kb,
 			retry_count, system_error_reason, judge_deadline_at, created_at, judged_at,
 			invalidated_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, submission.UserID, submission.ProblemID, submission.Language, submission.SourceObjectKey,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, submission.UserID, submission.ProblemID, nullableContestID(submission.ContestID), submission.Language, submission.SourceObjectKey,
 		submission.SourceSHA256, submission.SourceSizeBytes, submission.JudgeRevision, statusToDB(submission.Status),
 		nullableVerdict(submission.Verdict), nullableInt32Value(submission.TimeMS), nullableInt32Value(submission.MemoryKB),
 		submission.RetryCount, nullableString(submission.SystemErrorReason), submission.JudgeDeadlineAt,
@@ -674,12 +674,13 @@ func scanOutbox(row rowScanner) (biz.OutboxEvent, error) {
 
 func scanSubmission(row rowScanner) (biz.Submission, error) {
 	var submission biz.Submission
+	var contestID sql.NullInt64
 	var status string
 	var verdict, systemReason sql.NullString
 	var timeMS, memoryKB sql.NullInt32
 	var judgedAt, invalidatedAt sql.NullTime
 	err := row.Scan(
-		&submission.ID, &submission.UserID, &submission.ProblemID, &submission.Language,
+		&submission.ID, &submission.UserID, &submission.ProblemID, &contestID, &submission.Language,
 		&submission.SourceObjectKey, &submission.SourceSHA256, &submission.SourceSizeBytes,
 		&submission.JudgeRevision, &status, &verdict, &timeMS, &memoryKB, &submission.RetryCount,
 		&systemReason, &submission.JudgeDeadlineAt, &submission.CreatedAt, &judgedAt,
@@ -687,6 +688,9 @@ func scanSubmission(row rowScanner) (biz.Submission, error) {
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return biz.Submission{}, biz.ErrorSubmissionNotFound()
+	}
+	if contestID.Valid {
+		submission.ContestID = contestID.Int64
 	}
 	if err != nil {
 		return biz.Submission{}, storageError(err)
@@ -756,6 +760,13 @@ func nullableInt32Value(value *int32) any {
 		return nil
 	}
 	return *value
+}
+
+func nullableContestID(value int64) any {
+	if value <= 0 {
+		return nil
+	}
+	return value
 }
 
 func nullableString(value string) any {

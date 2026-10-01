@@ -28,6 +28,10 @@ clients:
     name: judge-service
     endpoint: "${CLIENTS_SUBMISSION_ENDPOINT}"
     timeout: "3s"
+  contest:
+    name: contest-service
+    endpoint: "contest-service:9005"
+    timeout: "3s"
 registry:
   consul:
     enabled: false

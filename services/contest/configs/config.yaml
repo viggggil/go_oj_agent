@@ -22,3 +22,13 @@ internal_auth:
   subject: ""
   max_token_ttl: "30s"
   clock_skew: "5s"
+judge:
+  name: "judge-service"
+  endpoint: "127.0.0.1:9003"
+  timeout: "3s"
+  private_key_file: ""
+  key_id: "contest-internal-2026-09"
+  issuer: "go-oj-contest"
+  audience: "judge-service"
+  subject: "contest-service"
+  token_ttl: "30s"

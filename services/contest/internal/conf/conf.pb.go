@@ -28,6 +28,7 @@ type Bootstrap struct {
 	Data          *DataProto             `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
 	Registry      *RegistryProto         `protobuf:"bytes,4,opt,name=registry,proto3" json:"registry,omitempty"`
 	InternalAuth  *InternalAuthProto     `protobuf:"bytes,5,opt,name=internal_auth,json=internalAuth,proto3" json:"internal_auth,omitempty"`
+	Judge         *ClientProto           `protobuf:"bytes,6,opt,name=judge,proto3" json:"judge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -93,6 +94,13 @@ func (x *Bootstrap) GetRegistry() *RegistryProto {
 func (x *Bootstrap) GetInternalAuth() *InternalAuthProto {
 	if x != nil {
 		return x.InternalAuth
+	}
+	return nil
+}
+
+func (x *Bootstrap) GetJudge() *ClientProto {
+	if x != nil {
+		return x.Judge
 	}
 	return nil
 }
@@ -577,17 +585,126 @@ func (x *InternalCallerProto) GetSubject() string {
 	return ""
 }
 
+type ClientProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Name           string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Endpoint       string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Timeout        string                 `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	PrivateKeyFile string                 `protobuf:"bytes,4,opt,name=private_key_file,json=privateKeyFile,proto3" json:"private_key_file,omitempty"`
+	KeyId          string                 `protobuf:"bytes,5,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Issuer         string                 `protobuf:"bytes,6,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Audience       string                 `protobuf:"bytes,7,opt,name=audience,proto3" json:"audience,omitempty"`
+	Subject        string                 `protobuf:"bytes,8,opt,name=subject,proto3" json:"subject,omitempty"`
+	TokenTtl       string                 `protobuf:"bytes,9,opt,name=token_ttl,json=tokenTtl,proto3" json:"token_ttl,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ClientProto) Reset() {
+	*x = ClientProto{}
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientProto) ProtoMessage() {}
+
+func (x *ClientProto) ProtoReflect() protoreflect.Message {
+	mi := &file_services_contest_internal_conf_conf_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientProto.ProtoReflect.Descriptor instead.
+func (*ClientProto) Descriptor() ([]byte, []int) {
+	return file_services_contest_internal_conf_conf_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ClientProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ClientProto) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *ClientProto) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *ClientProto) GetPrivateKeyFile() string {
+	if x != nil {
+		return x.PrivateKeyFile
+	}
+	return ""
+}
+
+func (x *ClientProto) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *ClientProto) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *ClientProto) GetAudience() string {
+	if x != nil {
+		return x.Audience
+	}
+	return ""
+}
+
+func (x *ClientProto) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *ClientProto) GetTokenTtl() string {
+	if x != nil {
+		return x.TokenTtl
+	}
+	return ""
+}
+
 var File_services_contest_internal_conf_conf_proto protoreflect.FileDescriptor
 
 const file_services_contest_internal_conf_conf_proto_rawDesc = "" +
 	"\n" +
-	")services/contest/internal/conf/conf.proto\x12\fcontest.conf\"\xa0\x02\n" +
+	")services/contest/internal/conf/conf.proto\x12\fcontest.conf\"\xd1\x02\n" +
 	"\tBootstrap\x124\n" +
 	"\aservice\x18\x01 \x01(\v2\x1a.contest.conf.ServiceProtoR\aservice\x121\n" +
 	"\x06server\x18\x02 \x01(\v2\x19.contest.conf.ServerProtoR\x06server\x12+\n" +
 	"\x04data\x18\x03 \x01(\v2\x17.contest.conf.DataProtoR\x04data\x127\n" +
 	"\bregistry\x18\x04 \x01(\v2\x1b.contest.conf.RegistryProtoR\bregistry\x12D\n" +
-	"\rinternal_auth\x18\x05 \x01(\v2\x1f.contest.conf.InternalAuthProtoR\finternalAuth\"\"\n" +
+	"\rinternal_auth\x18\x05 \x01(\v2\x1f.contest.conf.InternalAuthProtoR\finternalAuth\x12/\n" +
+	"\x05judge\x18\x06 \x01(\v2\x19.contest.conf.ClientProtoR\x05judge\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\":\n" +
 	"\vServerProto\x12+\n" +
@@ -623,7 +740,17 @@ const file_services_contest_internal_conf_conf_proto_rawDesc = "" +
 	"\x0fpublic_key_file\x18\x01 \x01(\tR\rpublicKeyFile\x12\x15\n" +
 	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
 	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12\x18\n" +
-	"\asubject\x18\x04 \x01(\tR\asubjectBEZCgithub.com/viggggil/go_oj_agent/services/contest/internal/conf;confb\x06proto3"
+	"\asubject\x18\x04 \x01(\tR\asubject\"\x83\x02\n" +
+	"\vClientProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12\x18\n" +
+	"\atimeout\x18\x03 \x01(\tR\atimeout\x12(\n" +
+	"\x10private_key_file\x18\x04 \x01(\tR\x0eprivateKeyFile\x12\x15\n" +
+	"\x06key_id\x18\x05 \x01(\tR\x05keyId\x12\x16\n" +
+	"\x06issuer\x18\x06 \x01(\tR\x06issuer\x12\x1a\n" +
+	"\baudience\x18\a \x01(\tR\baudience\x12\x18\n" +
+	"\asubject\x18\b \x01(\tR\asubject\x12\x1b\n" +
+	"\ttoken_ttl\x18\t \x01(\tR\btokenTtlBEZCgithub.com/viggggil/go_oj_agent/services/contest/internal/conf;confb\x06proto3"
 
 var (
 	file_services_contest_internal_conf_conf_proto_rawDescOnce sync.Once
@@ -637,7 +764,7 @@ func file_services_contest_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_services_contest_internal_conf_conf_proto_rawDescData
 }
 
-var file_services_contest_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_services_contest_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_services_contest_internal_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: contest.conf.Bootstrap
 	(*ServiceProto)(nil),        // 1: contest.conf.ServiceProto
@@ -648,6 +775,7 @@ var file_services_contest_internal_conf_conf_proto_goTypes = []any{
 	(*ConsulProto)(nil),         // 6: contest.conf.ConsulProto
 	(*InternalAuthProto)(nil),   // 7: contest.conf.InternalAuthProto
 	(*InternalCallerProto)(nil), // 8: contest.conf.InternalCallerProto
+	(*ClientProto)(nil),         // 9: contest.conf.ClientProto
 }
 var file_services_contest_internal_conf_conf_proto_depIdxs = []int32{
 	1, // 0: contest.conf.Bootstrap.service:type_name -> contest.conf.ServiceProto
@@ -655,14 +783,15 @@ var file_services_contest_internal_conf_conf_proto_depIdxs = []int32{
 	4, // 2: contest.conf.Bootstrap.data:type_name -> contest.conf.DataProto
 	5, // 3: contest.conf.Bootstrap.registry:type_name -> contest.conf.RegistryProto
 	7, // 4: contest.conf.Bootstrap.internal_auth:type_name -> contest.conf.InternalAuthProto
-	3, // 5: contest.conf.ServerProto.grpc:type_name -> contest.conf.GRPCProto
-	6, // 6: contest.conf.RegistryProto.consul:type_name -> contest.conf.ConsulProto
-	8, // 7: contest.conf.InternalAuthProto.additional_callers:type_name -> contest.conf.InternalCallerProto
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	9, // 5: contest.conf.Bootstrap.judge:type_name -> contest.conf.ClientProto
+	3, // 6: contest.conf.ServerProto.grpc:type_name -> contest.conf.GRPCProto
+	6, // 7: contest.conf.RegistryProto.consul:type_name -> contest.conf.ConsulProto
+	8, // 8: contest.conf.InternalAuthProto.additional_callers:type_name -> contest.conf.InternalCallerProto
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_services_contest_internal_conf_conf_proto_init() }
@@ -676,7 +805,7 @@ func file_services_contest_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_contest_internal_conf_conf_proto_rawDesc), len(file_services_contest_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

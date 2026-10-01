@@ -30,6 +30,7 @@ services:
       - ../../migrations/submission/000006_align_submissions_with_judge_contract.up.sql:/docker-entrypoint-initdb.d/306_align_submissions_with_judge_contract.sql:ro
       - ../../migrations/submission/000007_add_outbox_leasing.up.sql:/docker-entrypoint-initdb.d/307_add_outbox_leasing.sql:ro
       - ../../migrations/submission/000008_add_outbox_failure_reason.up.sql:/docker-entrypoint-initdb.d/308_add_outbox_failure_reason.sql:ro
+      - ../../migrations/submission/000009_add_contest_id.up.sql:/docker-entrypoint-initdb.d/309_add_contest_id.sql:ro
       - ../../migrations/contest/000001_create_contests.up.sql:/docker-entrypoint-initdb.d/401_create_contests.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -289,8 +290,11 @@ services:
       - "127.0.0.1:${CONTEST_GRPC_PORT:-9005}:9005"
     volumes:
       - ./configs/contest.yaml:/app/config.yaml:ro
+      - auth-keys:/run/auth-keys:ro
     depends_on:
       mysql:
+        condition: service_healthy
+      judge-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9005"]
@@ -358,6 +362,8 @@ services:
       user-service:
         condition: service_healthy
       problem-service:
+        condition: service_healthy
+      contest-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]

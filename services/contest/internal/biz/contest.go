@@ -7,6 +7,8 @@ import (
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
+	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,9 +37,21 @@ type ContestRepository interface {
 	Archive(context.Context, int64) (Contest, error)
 }
 
+type ContestSubmissionRepository interface {
+	ContestRepository
+	IsParticipant(context.Context, int64, int64) (bool, error)
+	HasProblem(context.Context, int64, int64) (bool, error)
+	Join(context.Context, int64, int64) (time.Time, error)
+}
+
+type SubmissionCreator interface {
+	CreateSubmission(context.Context, *submissionv1.CreateSubmissionRequest, ...grpc.CallOption) (*submissionv1.CreateSubmissionResponse, error)
+}
+
 type ContestUsecase struct {
-	repo ContestRepository
-	now  func() time.Time
+	repo       ContestRepository
+	submission SubmissionCreator
+	now        func() time.Time
 }
 
 func NewContestUsecase() *ContestUsecase {
@@ -45,6 +59,77 @@ func NewContestUsecase() *ContestUsecase {
 }
 func NewContestUsecaseWithRepository(repo ContestRepository) *ContestUsecase {
 	return &ContestUsecase{repo: repo, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func NewContestUsecaseWithRepositoryAndSubmission(repo ContestRepository, submission SubmissionCreator) *ContestUsecase {
+	return &ContestUsecase{repo: repo, submission: submission, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.RequestContext, input *contestv1.CreateContestSubmissionRequest) (*submissionv1.CreateSubmissionResponse, error) {
+	if u == nil || u.repo == nil || u.submission == nil {
+		return nil, status.Error(codes.Unimplemented, "contest submission is not implemented")
+	}
+	checker, ok := u.repo.(ContestSubmissionRepository)
+	if !ok {
+		return nil, status.Error(codes.Unimplemented, "contest submission repository is not implemented")
+	}
+	if actor == nil || actor.GetUserId() <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "authenticated actor is required")
+	}
+	if input == nil || input.GetContestId() <= 0 || input.GetProblemId() <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "invalid contest submission")
+	}
+	contest, err := u.repo.Get(ctx, input.GetContestId())
+	if err != nil {
+		return nil, err
+	}
+	now := u.now()
+	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
+		return nil, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
+	}
+	participant, err := checker.IsParticipant(ctx, input.GetContestId(), actor.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if !participant {
+		return nil, status.Error(codes.PermissionDenied, "user is not a contest participant")
+	}
+	problem, err := checker.HasProblem(ctx, input.GetContestId(), input.GetProblemId())
+	if err != nil {
+		return nil, err
+	}
+	if !problem {
+		return nil, status.Error(codes.InvalidArgument, "problem does not belong to contest")
+	}
+	return u.submission.CreateSubmission(ctx, &submissionv1.CreateSubmissionRequest{
+		ProblemId: input.GetProblemId(), ContestId: input.GetContestId(), Language: input.GetLanguage(),
+		SourceCode: input.GetSourceCode(), IdempotencyKey: input.GetIdempotencyKey(),
+	})
+}
+
+func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContext, contestID int64) (time.Time, error) {
+	if u == nil || u.repo == nil {
+		return time.Time{}, status.Error(codes.Unimplemented, "contest data is not implemented")
+	}
+	checker, ok := u.repo.(ContestSubmissionRepository)
+	if !ok {
+		return time.Time{}, status.Error(codes.Unimplemented, "contest participant repository is not implemented")
+	}
+	if actor == nil || actor.GetUserId() <= 0 {
+		return time.Time{}, status.Error(codes.Unauthenticated, "authenticated actor is required")
+	}
+	if contestID <= 0 {
+		return time.Time{}, status.Error(codes.InvalidArgument, "invalid contest id")
+	}
+	contest, err := u.repo.Get(ctx, contestID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	now := u.now()
+	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || !now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
+		return time.Time{}, status.Error(codes.FailedPrecondition, "contest is not accepting registrations")
+	}
+	return checker.Join(ctx, contestID, actor.GetUserId())
 }
 
 func (u *ContestUsecase) Create(ctx context.Context, actor *commonv1.RequestContext, input *contestv1.ContestUpdate) (Contest, error) {

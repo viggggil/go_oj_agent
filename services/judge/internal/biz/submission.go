@@ -35,6 +35,7 @@ type Submission struct {
 	ID                int64
 	UserID            int64
 	ProblemID         int64
+	ContestID         int64
 	Language          string
 	SourceObjectKey   string
 	SourceSHA256      string
@@ -173,6 +174,7 @@ type SubmissionInvalidatedPayload struct {
 type CreateSubmissionInput struct {
 	Actor          Actor
 	ProblemID      int64
+	ContestID      int64
 	Language       string
 	SourceCode     []byte
 	IdempotencyKey string
@@ -227,6 +229,7 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 		Submission: Submission{
 			UserID:          input.Actor.ID,
 			ProblemID:       input.ProblemID,
+			ContestID:       input.ContestID,
 			Language:        language,
 			SourceObjectKey: source.Key,
 			SourceSHA256:    source.SHA256,

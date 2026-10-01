@@ -48,6 +48,7 @@ message ClientsProto {
   ClientProto user = 1;
   ClientProto problem = 2;
   ClientProto submission = 3;
+  ClientProto contest = 4;
 }
 
 message ClientProto {

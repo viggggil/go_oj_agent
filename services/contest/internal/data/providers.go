@@ -11,7 +11,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 )
 
-var ProviderSet = wire.NewSet(NewMySQLDB, NewRepository, wire.Bind(new(biz.ContestRepository), new(*Repository)))
+var ProviderSet = wire.NewSet(NewClientContext, NewMySQLDB, NewRepository, NewSubmissionClient, ProvideSubmissionServiceClient, wire.Bind(new(biz.ContestRepository), new(*Repository)))
 
 func NewMySQLDB(config *conf.Bootstrap) (*sql.DB, func(), error) {
 	if config == nil || config.GetData() == nil || config.GetData().GetMysqlDsn() == "" {

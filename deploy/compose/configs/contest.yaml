@@ -10,10 +10,20 @@ registry:
   consul:
     enabled: false
 internal_auth:
-  public_key_file: ""
-  key_id: "contest-internal-2026-09"
-  issuer: "go-oj-contest"
+  public_key_file: "/run/auth-keys/gateway-public.pem"
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
   audience: "contest-service"
-  subject: ""
-  max_token_ttl: "30s"
+  subject: "gateway-service"
+  max_token_ttl: "60s"
   clock_skew: "5s"
+judge:
+  name: judge-service
+  endpoint: "judge-service:9003"
+  timeout: "3s"
+  private_key_file: "/run/auth-keys/gateway-private.pem"
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
+  audience: "judge-service"
+  subject: "gateway-service"
+  token_ttl: "30s"

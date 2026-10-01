@@ -10,6 +10,7 @@ message Bootstrap {
   DataProto data = 3;
   RegistryProto registry = 4;
   InternalAuthProto internal_auth = 5;
+  ClientProto judge = 6;
 }
 
 message ServiceProto {
@@ -58,4 +59,16 @@ message InternalCallerProto {
   string key_id = 2;
   string issuer = 3;
   string subject = 4;
+}
+
+message ClientProto {
+  string name = 1;
+  string endpoint = 2;
+  string timeout = 3;
+  string private_key_file = 4;
+  string key_id = 5;
+  string issuer = 6;
+  string audience = 7;
+  string subject = 8;
+  string token_ttl = 9;
 }

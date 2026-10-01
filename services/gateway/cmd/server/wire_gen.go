@@ -42,11 +42,20 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 		return nil, nil, err
 	}
 	submissionServiceClient := client.ProvideSubmissionServiceClient(submissionClient)
-	gatewayService := service.NewGatewayServiceWithClients(authService, userService, problemServiceClient, submissionServiceClient)
+	contestClient, cleanup4, err := client.NewContestClient(context, bc)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	contestServiceClient := client.ProvideContestServiceClient(contestClient)
+	gatewayService := service.NewGatewayServiceWithAllClients(authService, userService, problemServiceClient, submissionServiceClient, contestServiceClient)
 	httpServer := server.NewHTTPServer(bc, authMiddleware, gatewayService)
 	registrar := server.NewRegistrar(bc)
 	v := newApp(bc, httpServer, registrar)
 	return v, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()

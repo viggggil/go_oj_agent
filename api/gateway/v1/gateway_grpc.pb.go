@@ -19,27 +19,29 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GatewayService_Health_FullMethodName               = "/gateway.v1.GatewayService/Health"
-	GatewayService_Register_FullMethodName             = "/gateway.v1.GatewayService/Register"
-	GatewayService_Login_FullMethodName                = "/gateway.v1.GatewayService/Login"
-	GatewayService_RefreshToken_FullMethodName         = "/gateway.v1.GatewayService/RefreshToken"
-	GatewayService_Logout_FullMethodName               = "/gateway.v1.GatewayService/Logout"
-	GatewayService_GetCurrentUser_FullMethodName       = "/gateway.v1.GatewayService/GetCurrentUser"
-	GatewayService_GetUser_FullMethodName              = "/gateway.v1.GatewayService/GetUser"
-	GatewayService_CreateProblem_FullMethodName        = "/gateway.v1.GatewayService/CreateProblem"
-	GatewayService_GetProblem_FullMethodName           = "/gateway.v1.GatewayService/GetProblem"
-	GatewayService_ListProblems_FullMethodName         = "/gateway.v1.GatewayService/ListProblems"
-	GatewayService_UpdateProblem_FullMethodName        = "/gateway.v1.GatewayService/UpdateProblem"
-	GatewayService_ArchiveProblem_FullMethodName       = "/gateway.v1.GatewayService/ArchiveProblem"
-	GatewayService_AddTestcase_FullMethodName          = "/gateway.v1.GatewayService/AddTestcase"
-	GatewayService_ListProblemTestcases_FullMethodName = "/gateway.v1.GatewayService/ListProblemTestcases"
-	GatewayService_ArchiveTestcase_FullMethodName      = "/gateway.v1.GatewayService/ArchiveTestcase"
-	GatewayService_CreateSubmission_FullMethodName     = "/gateway.v1.GatewayService/CreateSubmission"
-	GatewayService_GetSubmission_FullMethodName        = "/gateway.v1.GatewayService/GetSubmission"
-	GatewayService_GetSubmissionSource_FullMethodName  = "/gateway.v1.GatewayService/GetSubmissionSource"
-	GatewayService_GetJudgeResult_FullMethodName       = "/gateway.v1.GatewayService/GetJudgeResult"
-	GatewayService_ListSubmissions_FullMethodName      = "/gateway.v1.GatewayService/ListSubmissions"
-	GatewayService_RejudgeSubmission_FullMethodName    = "/gateway.v1.GatewayService/RejudgeSubmission"
+	GatewayService_Health_FullMethodName                  = "/gateway.v1.GatewayService/Health"
+	GatewayService_Register_FullMethodName                = "/gateway.v1.GatewayService/Register"
+	GatewayService_Login_FullMethodName                   = "/gateway.v1.GatewayService/Login"
+	GatewayService_RefreshToken_FullMethodName            = "/gateway.v1.GatewayService/RefreshToken"
+	GatewayService_Logout_FullMethodName                  = "/gateway.v1.GatewayService/Logout"
+	GatewayService_GetCurrentUser_FullMethodName          = "/gateway.v1.GatewayService/GetCurrentUser"
+	GatewayService_GetUser_FullMethodName                 = "/gateway.v1.GatewayService/GetUser"
+	GatewayService_CreateProblem_FullMethodName           = "/gateway.v1.GatewayService/CreateProblem"
+	GatewayService_GetProblem_FullMethodName              = "/gateway.v1.GatewayService/GetProblem"
+	GatewayService_ListProblems_FullMethodName            = "/gateway.v1.GatewayService/ListProblems"
+	GatewayService_UpdateProblem_FullMethodName           = "/gateway.v1.GatewayService/UpdateProblem"
+	GatewayService_ArchiveProblem_FullMethodName          = "/gateway.v1.GatewayService/ArchiveProblem"
+	GatewayService_AddTestcase_FullMethodName             = "/gateway.v1.GatewayService/AddTestcase"
+	GatewayService_ListProblemTestcases_FullMethodName    = "/gateway.v1.GatewayService/ListProblemTestcases"
+	GatewayService_ArchiveTestcase_FullMethodName         = "/gateway.v1.GatewayService/ArchiveTestcase"
+	GatewayService_CreateSubmission_FullMethodName        = "/gateway.v1.GatewayService/CreateSubmission"
+	GatewayService_GetSubmission_FullMethodName           = "/gateway.v1.GatewayService/GetSubmission"
+	GatewayService_GetSubmissionSource_FullMethodName     = "/gateway.v1.GatewayService/GetSubmissionSource"
+	GatewayService_GetJudgeResult_FullMethodName          = "/gateway.v1.GatewayService/GetJudgeResult"
+	GatewayService_ListSubmissions_FullMethodName         = "/gateway.v1.GatewayService/ListSubmissions"
+	GatewayService_RejudgeSubmission_FullMethodName       = "/gateway.v1.GatewayService/RejudgeSubmission"
+	GatewayService_CreateContestSubmission_FullMethodName = "/gateway.v1.GatewayService/CreateContestSubmission"
+	GatewayService_JoinContest_FullMethodName             = "/gateway.v1.GatewayService/JoinContest"
 )
 
 // GatewayServiceClient is the client API for GatewayService service.
@@ -67,6 +69,8 @@ type GatewayServiceClient interface {
 	GetJudgeResult(ctx context.Context, in *GetJudgeResultRequest, opts ...grpc.CallOption) (*GetJudgeResultResponse, error)
 	ListSubmissions(ctx context.Context, in *ListSubmissionsRequest, opts ...grpc.CallOption) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(ctx context.Context, in *RejudgeSubmissionRequest, opts ...grpc.CallOption) (*RejudgeSubmissionResponse, error)
+	CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionResponse, error)
+	JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestResponse, error)
 }
 
 type gatewayServiceClient struct {
@@ -287,6 +291,26 @@ func (c *gatewayServiceClient) RejudgeSubmission(ctx context.Context, in *Rejudg
 	return out, nil
 }
 
+func (c *gatewayServiceClient) CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateContestSubmissionResponse)
+	err := c.cc.Invoke(ctx, GatewayService_CreateContestSubmission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_JoinContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayServiceServer is the server API for GatewayService service.
 // All implementations must embed UnimplementedGatewayServiceServer
 // for forward compatibility.
@@ -312,6 +336,8 @@ type GatewayServiceServer interface {
 	GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error)
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error)
+	CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionResponse, error)
+	JoinContest(context.Context, *JoinContestRequest) (*JoinContestResponse, error)
 	mustEmbedUnimplementedGatewayServiceServer()
 }
 
@@ -384,6 +410,12 @@ func (UnimplementedGatewayServiceServer) ListSubmissions(context.Context, *ListS
 }
 func (UnimplementedGatewayServiceServer) RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RejudgeSubmission not implemented")
+}
+func (UnimplementedGatewayServiceServer) CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateContestSubmission not implemented")
+}
+func (UnimplementedGatewayServiceServer) JoinContest(context.Context, *JoinContestRequest) (*JoinContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinContest not implemented")
 }
 func (UnimplementedGatewayServiceServer) mustEmbedUnimplementedGatewayServiceServer() {}
 func (UnimplementedGatewayServiceServer) testEmbeddedByValue()                        {}
@@ -784,6 +816,42 @@ func _GatewayService_RejudgeSubmission_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_CreateContestSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateContestSubmissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).CreateContestSubmission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_CreateContestSubmission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).CreateContestSubmission(ctx, req.(*CreateContestSubmissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_JoinContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).JoinContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_JoinContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).JoinContest(ctx, req.(*JoinContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GatewayService_ServiceDesc is the grpc.ServiceDesc for GatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -874,6 +942,14 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RejudgeSubmission",
 			Handler:    _GatewayService_RejudgeSubmission_Handler,
+		},
+		{
+			MethodName: "CreateContestSubmission",
+			Handler:    _GatewayService_CreateContestSubmission_Handler,
+		},
+		{
+			MethodName: "JoinContest",
+			Handler:    _GatewayService_JoinContest_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

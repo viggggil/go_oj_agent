@@ -57,7 +57,7 @@ func TestStoreCreateWithOutboxAndIdempotencyCommitsAtomically(t *testing.T) {
 	mock.ExpectBegin()
 	expectIdempotencyReservation(mock, command.Idempotency, now, 1)
 	mock.ExpectExec("INSERT INTO submissions").
-		WithArgs(int64(5), int64(7), "go", "sources/id/source.go", strings.Repeat("a", 64), int64(13), dataTestRevision, "QUEUED", nil, nil, nil, int32(0), nil, now.Add(time.Minute), now, nil, nil, now).
+		WithArgs(int64(5), int64(7), nil, "go", "sources/id/source.go", strings.Repeat("a", 64), int64(13), dataTestRevision, "QUEUED", nil, nil, nil, int32(0), nil, now.Add(time.Minute), now, nil, nil, now).
 		WillReturnResult(sqlmock.NewResult(101, 1))
 	mock.ExpectExec("INSERT INTO outbox_events").
 		WithArgs(requestedEvent, int64(101), biz.EventTypeJudgeRequested, jsonArgument{biz.JudgeRequestedPayload{
@@ -337,7 +337,7 @@ func expectIdempotencyReservation(mock sqlmock.Sqlmock, request biz.IdempotencyR
 
 func storedSubmission(now time.Time, status submissionv1.SubmissionStatus) biz.Submission {
 	return biz.Submission{
-		ID: 44, UserID: 5, ProblemID: 7, Language: "go", SourceObjectKey: "sources/id/source.go",
+		ID: 44, UserID: 5, ProblemID: 7, ContestID: 0, Language: "go", SourceObjectKey: "sources/id/source.go",
 		SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 13, JudgeRevision: dataTestRevision,
 		Status: status, JudgeDeadlineAt: now.Add(time.Minute), CreatedAt: now.Add(-time.Minute), UpdatedAt: now,
 	}
@@ -349,11 +349,11 @@ func submissionRow(submission biz.Submission) *sqlmock.Rows {
 		verdict = verdictToDB(submission.Verdict)
 	}
 	return sqlmock.NewRows([]string{
-		"id", "user_id", "problem_id", "language", "source_object_key", "source_sha256", "source_size_bytes",
+		"id", "user_id", "problem_id", "contest_id", "language", "source_object_key", "source_sha256", "source_size_bytes",
 		"judge_revision", "status", "verdict", "time_ms", "memory_kb", "retry_count", "system_error_reason",
 		"judge_deadline_at", "created_at", "judged_at", "invalidated_at", "updated_at",
 	}).AddRow(
-		submission.ID, submission.UserID, submission.ProblemID, submission.Language, submission.SourceObjectKey,
+		submission.ID, submission.UserID, submission.ProblemID, nullableContestID(submission.ContestID), submission.Language, submission.SourceObjectKey,
 		submission.SourceSHA256, submission.SourceSizeBytes, submission.JudgeRevision, statusToDB(submission.Status), verdict,
 		nil, nil, submission.RetryCount, nil, submission.JudgeDeadlineAt, submission.CreatedAt, nil, nil, submission.UpdatedAt,
 	)
