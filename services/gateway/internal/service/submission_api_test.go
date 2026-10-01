@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
+	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	gatewaymw "github.com/viggggil/go_oj_agent/services/gateway/internal/middleware"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type fakeSubmissionClient struct {
@@ -51,6 +54,41 @@ func TestCreateSubmissionForwardsRequestContextAndFields(t *testing.T) {
 
 func TestSubmissionRequiresRequestContext(t *testing.T) {
 	_, err := (&GatewayService{submission: &fakeSubmissionClient{}}).GetJudgeResult(context.Background(), &gatewayv1.GetJudgeResultRequest{SubmissionId: 1})
+	if err == nil {
+		t.Fatal("expected unauthenticated error")
+	}
+}
+
+type fakeContestClient struct {
+	contestv1.ContestServiceClient
+	join *contestv1.JoinContestRequest
+}
+
+func (f *fakeContestClient) JoinContest(_ context.Context, req *contestv1.JoinContestRequest, _ ...grpc.CallOption) (*contestv1.JoinContestReply, error) {
+	f.join = req
+	return &contestv1.JoinContestReply{
+		ContestId: req.GetContestId(),
+		UserId:    42,
+		JoinedAt:  timestamppb.New(time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)),
+	}, nil
+}
+
+func TestJoinContestForwardsAuthenticatedRequest(t *testing.T) {
+	fake := &fakeContestClient{}
+	service := &GatewayService{contest: fake}
+	ctx := gatewaymw.WithRequestContext(context.Background(), &commonv1.RequestContext{UserId: 42})
+
+	response, err := service.JoinContest(ctx, &gatewayv1.JoinContestRequest{ContestId: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fake.join.GetContestId() != 20 || response.GetContestId() != 20 || response.GetUserId() != 42 || response.GetJoinedAt() == nil {
+		t.Fatalf("response=%+v request=%+v", response, fake.join)
+	}
+}
+
+func TestJoinContestRequiresRequestContext(t *testing.T) {
+	_, err := (&GatewayService{contest: &fakeContestClient{}}).JoinContest(context.Background(), &gatewayv1.JoinContestRequest{ContestId: 20})
 	if err == nil {
 		t.Fatal("expected unauthenticated error")
 	}

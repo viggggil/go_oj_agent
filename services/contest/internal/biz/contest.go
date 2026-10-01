@@ -41,6 +41,7 @@ type ContestSubmissionRepository interface {
 	ContestRepository
 	IsParticipant(context.Context, int64, int64) (bool, error)
 	HasProblem(context.Context, int64, int64) (bool, error)
+	Join(context.Context, int64, int64) (time.Time, error)
 }
 
 type SubmissionCreator interface {
@@ -104,6 +105,31 @@ func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.R
 		ProblemId: input.GetProblemId(), ContestId: input.GetContestId(), Language: input.GetLanguage(),
 		SourceCode: input.GetSourceCode(), IdempotencyKey: input.GetIdempotencyKey(),
 	})
+}
+
+func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContext, contestID int64) (time.Time, error) {
+	if u == nil || u.repo == nil {
+		return time.Time{}, status.Error(codes.Unimplemented, "contest data is not implemented")
+	}
+	checker, ok := u.repo.(ContestSubmissionRepository)
+	if !ok {
+		return time.Time{}, status.Error(codes.Unimplemented, "contest participant repository is not implemented")
+	}
+	if actor == nil || actor.GetUserId() <= 0 {
+		return time.Time{}, status.Error(codes.Unauthenticated, "authenticated actor is required")
+	}
+	if contestID <= 0 {
+		return time.Time{}, status.Error(codes.InvalidArgument, "invalid contest id")
+	}
+	contest, err := u.repo.Get(ctx, contestID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	now := u.now()
+	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || !now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
+		return time.Time{}, status.Error(codes.FailedPrecondition, "contest is not accepting registrations")
+	}
+	return checker.Join(ctx, contestID, actor.GetUserId())
 }
 
 func (u *ContestUsecase) Create(ctx context.Context, actor *commonv1.RequestContext, input *contestv1.ContestUpdate) (Contest, error) {

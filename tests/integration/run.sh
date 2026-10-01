@@ -28,16 +28,28 @@ compose down --volumes --remove-orphans
 
 test_artifacts_dir="$(mktemp -d)"
 
-export MYSQL_PORT="${AUTH_TEST_MYSQL_PORT:-13306}"
-export REDIS_PORT="${AUTH_TEST_REDIS_PORT:-16379}"
-export USER_GRPC_PORT="${AUTH_TEST_USER_GRPC_PORT:-19001}"
-export GATEWAY_HTTP_PORT="${AUTH_TEST_GATEWAY_HTTP_PORT:-18080}"
-export PROBLEM_GRPC_PORT="${PROBLEM_TEST_GRPC_PORT:-19002}"
-export JUDGE_GRPC_PORT="${JUDGE_TEST_GRPC_PORT:-19004}"
-export MINIO_API_PORT="${PROBLEM_TEST_MINIO_PORT:-19000}"
-export MINIO_CONSOLE_PORT="${PROBLEM_TEST_MINIO_CONSOLE_PORT:-19003}"
-export RABBITMQ_AMQP_PORT="${JUDGE_TEST_RABBITMQ_PORT:-15672}"
-export RABBITMQ_MANAGEMENT_PORT="${JUDGE_TEST_RABBITMQ_MANAGEMENT_PORT:-25672}"
+pick_free_port() {
+	local port
+	while true; do
+		port="$(shuf -i 20000-40000 -n 1)"
+		if ! (echo >/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
+			echo "${port}"
+			return 0
+		fi
+	done
+}
+
+export MYSQL_PORT="${AUTH_TEST_MYSQL_PORT:-$(pick_free_port)}"
+export REDIS_PORT="${AUTH_TEST_REDIS_PORT:-$(pick_free_port)}"
+export USER_GRPC_PORT="${AUTH_TEST_USER_GRPC_PORT:-$(pick_free_port)}"
+export GATEWAY_HTTP_PORT="${AUTH_TEST_GATEWAY_HTTP_PORT:-$(pick_free_port)}"
+export PROBLEM_GRPC_PORT="${PROBLEM_TEST_GRPC_PORT:-$(pick_free_port)}"
+export JUDGE_GRPC_PORT="${JUDGE_TEST_GRPC_PORT:-$(pick_free_port)}"
+export MINIO_API_PORT="${PROBLEM_TEST_MINIO_PORT:-$(pick_free_port)}"
+export MINIO_CONSOLE_PORT="${PROBLEM_TEST_MINIO_CONSOLE_PORT:-$(pick_free_port)}"
+export RABBITMQ_AMQP_PORT="${JUDGE_TEST_RABBITMQ_PORT:-$(pick_free_port)}"
+export RABBITMQ_MANAGEMENT_PORT="${JUDGE_TEST_RABBITMQ_MANAGEMENT_PORT:-$(pick_free_port)}"
+export WEB_HTTP_PORT="${WEB_TEST_HTTP_PORT:-$(pick_free_port)}"
 export RABBITMQ_USER="${RABBITMQ_USER:-judge}"
 export RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-judge-password}"
 export ACCESS_TOKEN_TTL="2s"

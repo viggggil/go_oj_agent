@@ -41,6 +41,7 @@ const (
 	GatewayService_ListSubmissions_FullMethodName         = "/gateway.v1.GatewayService/ListSubmissions"
 	GatewayService_RejudgeSubmission_FullMethodName       = "/gateway.v1.GatewayService/RejudgeSubmission"
 	GatewayService_CreateContestSubmission_FullMethodName = "/gateway.v1.GatewayService/CreateContestSubmission"
+	GatewayService_JoinContest_FullMethodName             = "/gateway.v1.GatewayService/JoinContest"
 )
 
 // GatewayServiceClient is the client API for GatewayService service.
@@ -69,6 +70,7 @@ type GatewayServiceClient interface {
 	ListSubmissions(ctx context.Context, in *ListSubmissionsRequest, opts ...grpc.CallOption) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(ctx context.Context, in *RejudgeSubmissionRequest, opts ...grpc.CallOption) (*RejudgeSubmissionResponse, error)
 	CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionResponse, error)
+	JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestResponse, error)
 }
 
 type gatewayServiceClient struct {
@@ -299,6 +301,16 @@ func (c *gatewayServiceClient) CreateContestSubmission(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *gatewayServiceClient) JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_JoinContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayServiceServer is the server API for GatewayService service.
 // All implementations must embed UnimplementedGatewayServiceServer
 // for forward compatibility.
@@ -325,6 +337,7 @@ type GatewayServiceServer interface {
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
 	RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error)
 	CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionResponse, error)
+	JoinContest(context.Context, *JoinContestRequest) (*JoinContestResponse, error)
 	mustEmbedUnimplementedGatewayServiceServer()
 }
 
@@ -400,6 +413,9 @@ func (UnimplementedGatewayServiceServer) RejudgeSubmission(context.Context, *Rej
 }
 func (UnimplementedGatewayServiceServer) CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateContestSubmission not implemented")
+}
+func (UnimplementedGatewayServiceServer) JoinContest(context.Context, *JoinContestRequest) (*JoinContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinContest not implemented")
 }
 func (UnimplementedGatewayServiceServer) mustEmbedUnimplementedGatewayServiceServer() {}
 func (UnimplementedGatewayServiceServer) testEmbeddedByValue()                        {}
@@ -818,6 +834,24 @@ func _GatewayService_CreateContestSubmission_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_JoinContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).JoinContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_JoinContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).JoinContest(ctx, req.(*JoinContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GatewayService_ServiceDesc is the grpc.ServiceDesc for GatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -912,6 +946,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateContestSubmission",
 			Handler:    _GatewayService_CreateContestSubmission_Handler,
+		},
+		{
+			MethodName: "JoinContest",
+			Handler:    _GatewayService_JoinContest_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

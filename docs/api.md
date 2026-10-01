@@ -529,7 +529,9 @@ data: {"status":"AC","time_ms":32,"memory_kb":4096}
 
 ### POST `/api/v1/contests/{contest_id}/join`
 
-参加比赛。
+参加比赛。用户身份来自 JWT/Auth Context，不接受请求体中的 `user_id`。仅允许在比赛
+开始前加入；重复请求保持幂等并返回已有报名时间。比赛开始后、已结束或已归档的比赛
+拒绝报名。
 
 ### POST `/api/v1/contests/{contest_id}/problems/{problem_id}/submissions`
 
@@ -844,6 +846,7 @@ service ContestService {
   rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc ArchiveContest(ArchiveContestRequest) returns (ArchiveContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
+  rpc JoinContest(JoinContestRequest) returns (JoinContestReply);
   rpc CreateContestSubmission(CreateContestSubmissionRequest)
       returns (CreateContestSubmissionReply);
 }

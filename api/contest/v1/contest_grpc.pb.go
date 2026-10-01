@@ -25,6 +25,7 @@ const (
 	ContestService_UpdateContest_FullMethodName           = "/contest.v1.ContestService/UpdateContest"
 	ContestService_ArchiveContest_FullMethodName          = "/contest.v1.ContestService/ArchiveContest"
 	ContestService_GetLeaderboard_FullMethodName          = "/contest.v1.ContestService/GetLeaderboard"
+	ContestService_JoinContest_FullMethodName             = "/contest.v1.ContestService/JoinContest"
 	ContestService_CreateContestSubmission_FullMethodName = "/contest.v1.ContestService/CreateContestSubmission"
 )
 
@@ -39,6 +40,7 @@ type ContestServiceClient interface {
 	UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestReply, error)
 	ArchiveContest(ctx context.Context, in *ArchiveContestRequest, opts ...grpc.CallOption) (*ArchiveContestReply, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardReply, error)
+	JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestReply, error)
 	CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionReply, error)
 }
 
@@ -110,6 +112,16 @@ func (c *contestServiceClient) GetLeaderboard(ctx context.Context, in *GetLeader
 	return out, nil
 }
 
+func (c *contestServiceClient) JoinContest(ctx context.Context, in *JoinContestRequest, opts ...grpc.CallOption) (*JoinContestReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinContestReply)
+	err := c.cc.Invoke(ctx, ContestService_JoinContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *contestServiceClient) CreateContestSubmission(ctx context.Context, in *CreateContestSubmissionRequest, opts ...grpc.CallOption) (*CreateContestSubmissionReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateContestSubmissionReply)
@@ -131,6 +143,7 @@ type ContestServiceServer interface {
 	UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestReply, error)
 	ArchiveContest(context.Context, *ArchiveContestRequest) (*ArchiveContestReply, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error)
+	JoinContest(context.Context, *JoinContestRequest) (*JoinContestReply, error)
 	CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionReply, error)
 	mustEmbedUnimplementedContestServiceServer()
 }
@@ -159,6 +172,9 @@ func (UnimplementedContestServiceServer) ArchiveContest(context.Context, *Archiv
 }
 func (UnimplementedContestServiceServer) GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeaderboard not implemented")
+}
+func (UnimplementedContestServiceServer) JoinContest(context.Context, *JoinContestRequest) (*JoinContestReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinContest not implemented")
 }
 func (UnimplementedContestServiceServer) CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateContestSubmission not implemented")
@@ -292,6 +308,24 @@ func _ContestService_GetLeaderboard_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContestService_JoinContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContestServiceServer).JoinContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContestService_JoinContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContestServiceServer).JoinContest(ctx, req.(*JoinContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ContestService_CreateContestSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateContestSubmissionRequest)
 	if err := dec(in); err != nil {
@@ -340,6 +374,10 @@ var ContestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLeaderboard",
 			Handler:    _ContestService_GetLeaderboard_Handler,
+		},
+		{
+			MethodName: "JoinContest",
+			Handler:    _ContestService_JoinContest_Handler,
 		},
 		{
 			MethodName: "CreateContestSubmission",

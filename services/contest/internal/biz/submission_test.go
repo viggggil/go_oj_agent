@@ -25,6 +25,23 @@ func (r *contestSubmissionRepo) IsParticipant(context.Context, int64, int64) (bo
 func (r *contestSubmissionRepo) HasProblem(context.Context, int64, int64) (bool, error) {
 	return r.problem, nil
 }
+func (r *contestSubmissionRepo) Join(context.Context, int64, int64) (time.Time, error) {
+	return time.Now().UTC(), nil
+}
+
+func TestJoinContestRequiresFutureContestAndIsIdempotent(t *testing.T) {
+	now := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	repo := &contestSubmissionRepo{fakeContestRepo: fakeContestRepo{contest: Contest{ID: 20, StartAt: now.Add(time.Hour), EndAt: now.Add(2 * time.Hour), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT}}}
+	uc := NewContestUsecaseWithRepository(repo)
+	uc.now = func() time.Time { return now }
+	if _, err := uc.Join(context.Background(), &commonRequestUser42, 20); err != nil {
+		t.Fatalf("Join() error = %v", err)
+	}
+	repo.contest.StartAt = now.Add(-time.Minute)
+	if status.Code(func() error { _, err := uc.Join(context.Background(), &commonRequestUser42, 20); return err }()) != codes.FailedPrecondition {
+		t.Fatal("Join() accepted a contest after start")
+	}
+}
 
 type submissionCreatorFake struct {
 	request *submissionv1.CreateSubmissionRequest

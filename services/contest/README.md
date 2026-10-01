@@ -9,6 +9,7 @@ GetContest
 ListContests
 UpdateContest
 ArchiveContest
+JoinContest
 GetLeaderboard
 ```
 
@@ -16,7 +17,8 @@ Contest 和 ContestProblem 使用 `oj_contest` MySQL schema；创建和全量更
 替换题目集合。管理员只能创建、更新或归档尚未开始的 DRAFT 比赛，状态由开始/结束
 时间计算。排行榜和 `submission.judged` consumer 尚未实现；排行榜请求返回
 `UNIMPLEMENTED`，不会伪造数据。比赛提交会在比赛服务完成报名、时间和题目归属校验
-后转发到 judge-service。
+后转发到 judge-service。用户通过 `JoinContest` 或 Gateway 的
+`POST /api/v1/contests/{contest_id}/join` 报名；报名仅允许在比赛开始前，重复报名幂等。
 
 ## Local run
 

@@ -9,6 +9,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ContestService struct {
@@ -118,6 +119,24 @@ func (s *ContestService) ArchiveContest(ctx context.Context, req *contestv1.Arch
 
 func (s *ContestService) GetLeaderboard(context.Context, *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
 	return nil, status.Error(codes.Unimplemented, "contest leaderboard is not implemented")
+}
+
+func (s *ContestService) JoinContest(ctx context.Context, req *contestv1.JoinContestRequest) (*contestv1.JoinContestReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid join contest request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	actor, err := requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	joinedAt, err := s.uc.Join(ctx, actor, req.GetContestId())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.JoinContestReply{ContestId: req.GetContestId(), UserId: actor.GetUserId(), JoinedAt: timestamppb.New(joinedAt)}, nil
 }
 
 func (s *ContestService) CreateContestSubmission(ctx context.Context, req *contestv1.CreateContestSubmissionRequest) (*contestv1.CreateContestSubmissionReply, error) {

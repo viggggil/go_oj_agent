@@ -436,6 +436,9 @@ PRIMARY KEY(contest_id, problem_id)
 PRIMARY KEY(contest_id, user_id)
 ```
 
+Contest Service 的 `JoinContest` 在比赛开始前向该表幂等插入报名记录。`user_id` 由认证
+上下文提供，不能由客户端指定；重复报名返回已有 `joined_at`。
+
 ## 7.4 `contest_scores`
 
 最终结果或快照。

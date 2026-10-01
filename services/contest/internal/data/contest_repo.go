@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
@@ -27,6 +28,20 @@ func (r *Repository) HasProblem(ctx context.Context, contestID, problemID int64)
 	var exists int
 	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_id=?)`, contestID, problemID).Scan(&exists)
 	return exists == 1, err
+}
+
+func (r *Repository) Join(ctx context.Context, contestID, userID int64) (time.Time, error) {
+	if r == nil || r.db == nil {
+		return time.Time{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	if _, err := r.db.ExecContext(ctx, `INSERT IGNORE INTO contest_participants (contest_id,user_id,joined_at) VALUES (?, ?, UTC_TIMESTAMP(3))`, contestID, userID); err != nil {
+		return time.Time{}, err
+	}
+	var joinedAt time.Time
+	if err := r.db.QueryRowContext(ctx, `SELECT joined_at FROM contest_participants WHERE contest_id=? AND user_id=?`, contestID, userID).Scan(&joinedAt); err != nil {
+		return time.Time{}, err
+	}
+	return joinedAt.UTC(), nil
 }
 
 func (r *Repository) Create(ctx context.Context, contest biz.Contest) (biz.Contest, error) {

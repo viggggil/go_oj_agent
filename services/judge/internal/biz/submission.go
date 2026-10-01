@@ -229,6 +229,7 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 		Submission: Submission{
 			UserID:          input.Actor.ID,
 			ProblemID:       input.ProblemID,
+			ContestID:       input.ContestID,
 			Language:        language,
 			SourceObjectKey: source.Key,
 			SourceSHA256:    source.SHA256,

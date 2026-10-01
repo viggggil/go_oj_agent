@@ -52,6 +52,23 @@ func (s *GatewayService) CreateContestSubmission(ctx context.Context, req *gatew
 	return &gatewayv1.CreateContestSubmissionResponse{SubmissionId: res.GetSubmissionId(), Status: res.GetStatus()}, nil
 }
 
+func (s *GatewayService) JoinContest(ctx context.Context, req *gatewayv1.JoinContestRequest) (*gatewayv1.JoinContestResponse, error) {
+	if _, ok := gatewaymw.RequestContextFromContext(ctx); !ok {
+		return nil, gatewaymw.ErrUnauthenticated("request context is missing")
+	}
+	if req == nil || s == nil || s.contest == nil {
+		return nil, fmt.Errorf("gateway contest service is not configured")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	res, err := s.contest.JoinContest(ctx, &contestv1.JoinContestRequest{ContestId: req.GetContestId()})
+	if err != nil {
+		return nil, err
+	}
+	return &gatewayv1.JoinContestResponse{ContestId: res.GetContestId(), UserId: res.GetUserId(), JoinedAt: res.GetJoinedAt()}, nil
+}
+
 func (s *GatewayService) GetSubmission(ctx context.Context, req *gatewayv1.GetSubmissionRequest) (*gatewayv1.GetSubmissionResponse, error) {
 	client, err := s.submissionClient(ctx)
 	if err != nil {

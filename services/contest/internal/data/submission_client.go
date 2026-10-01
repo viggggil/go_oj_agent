@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	kratosgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var _ submissionv1.SubmissionServiceClient = (*submissionClient)(nil)
@@ -53,11 +53,13 @@ func NewSubmissionClient(ctx context.Context, config *conf.Bootstrap) (*submissi
 			return internalauth.Actor{ID: principal.ActorID, Roles: principal.ActorRoles, RequestID: principal.RequestID, TraceID: principal.TraceID}
 		}))
 	}
-	options := []kratosgrpc.ClientOption{kratosgrpc.WithEndpoint(cfg.GetEndpoint()), kratosgrpc.WithTimeout(timeout)}
+	options := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()}
 	if len(interceptors) > 0 {
-		options = append(options, kratosgrpc.WithUnaryInterceptor(interceptors...))
+		options = append(options, grpc.WithChainUnaryInterceptor(interceptors...))
 	}
-	conn, err := kratosgrpc.NewClient(ctx, options...)
+	connectCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	conn, err := grpc.DialContext(connectCtx, cfg.GetEndpoint(), options...)
 	if err != nil {
 		return nil, func() {}, err
 	}

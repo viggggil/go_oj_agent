@@ -17,6 +17,7 @@ service ContestService {
   rpc UpdateContest(UpdateContestRequest) returns (UpdateContestReply);
   rpc ArchiveContest(ArchiveContestRequest) returns (ArchiveContestReply);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
+  rpc JoinContest(JoinContestRequest) returns (JoinContestReply);
   rpc CreateContestSubmission(CreateContestSubmissionRequest) returns (CreateContestSubmissionReply);
 }
 
@@ -122,6 +123,16 @@ message GetLeaderboardRequest {
 message GetLeaderboardReply {
   repeated LeaderboardEntry items = 1;
   common.v1.PageResponse page = 2;
+}
+
+message JoinContestRequest {
+  int64 contest_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message JoinContestReply {
+  int64 contest_id = 1;
+  int64 user_id = 2;
+  google.protobuf.Timestamp joined_at = 3;
 }
 
 message CreateContestSubmissionRequest {
