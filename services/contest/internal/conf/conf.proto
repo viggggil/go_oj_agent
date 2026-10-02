@@ -11,6 +11,15 @@ message Bootstrap {
   RegistryProto registry = 4;
   InternalAuthProto internal_auth = 5;
   ClientProto judge = 6;
+  MessagingProto messaging = 7;
+}
+
+message MessagingProto {
+  string url = 1;
+  string exchange = 2;
+  string queue = 3;
+  string dead_letter_queue = 4;
+  int32 prefetch = 5;
 }
 
 message ServiceProto {

@@ -543,9 +543,8 @@ active revision，提交后保持 immutable。
 
 ### GET `/api/v1/contests/{contest_id}/leaderboard`
 
-获取排行榜。
-
-实时视图可来自 Redis，最终结果以持久化数据为准。
+规划的外部排行榜路由，当前 Gateway 尚未提供该 REST 接口。
+已实现的 `ContestService.GetLeaderboard` gRPC 仅读取 Contest 自有 MySQL 题目结果投影，不使用 Redis。
 
 ---
 
@@ -852,8 +851,12 @@ service ContestService {
 }
 ```
 
-排行榜暂不属于本阶段；后续由 Contest Service 消费 `submission.judged`，不直接查询
-Submission 数据库。
+`GetLeaderboard` 已实现，读取 Contest 自有 `contest_problem_results` 聚合结果。
+按 solved_count DESC、penalty_seconds ASC、user_id ASC 排序，分页参数与比赛列表一致（1 起始，最大 100）。
+保留 `rank=1,user_id=2,score=3,penalty=4,accepted_count=5`；新增 `problems=6,solved_count=7,penalty_seconds=8`。
+ACM 下 score/accepted_count 等于 solved_count，penalty 等于 penalty_seconds（秒）。每道题返回
+`problem_id/solved/wrong_attempts/accepted_at`，未 AC 的 accepted_at 为空。无本地结果的用户不进入榜单。
+当前 Gateway 仅提供比赛报名和提交路由；排行榜通过内部 Contest gRPC 调用，REST 列表为目标接口规划。
 
 ---
 
@@ -1047,6 +1050,12 @@ Outbox、Publisher Confirm、未 ACK 重投和总 deadline 共同恢复或最终
 
 ## 5.6 `submission.judged`
 
+共享 `pkg/mq.SubmissionJudged`，Envelope event_version=1，routing key=`submission.judged`。
+仅 `contest_id != NULL` 的 Submission 发布；最终基础设施失败 verdict=`SYSTEM_ERROR`，不计错误次数。
+Contest 队列 `contest.submission-judged` 使用 durable、manual ACK、bounded prefetch、DLQ。
+成功事务提交后 ACK，协议错误 Reject(false)，存储或本地归属失败 NACK(requeue=true)。
+同 ID 的修正必须提高 judged_at；陈旧/等版本消息不会覆盖最新事实。作废优先且永久生效。
+
 Producer：
 
 ```text
@@ -1066,9 +1075,11 @@ Payload：
 ```json
 {
   "submission_id": 90001,
+  "contest_id": 2001,
   "user_id": 1001,
   "problem_id": 1001,
   "verdict": "AC",
+  "submitted_at": "RFC3339 timestamp",
   "judged_at": "RFC3339 timestamp"
 }
 ```
@@ -1085,12 +1096,16 @@ Payload：
   "user_id": 1001,
   "problem_id": 1001,
   "previous_verdict": "AC",
+  "contest_id": 2001,
+  "submitted_at": "RFC3339 timestamp",
   "invalidated_at": "RFC3339 timestamp"
 }
 ```
 
 Consumer 必须按 `event_id` 幂等；旧提交一经作废，不得再接受 Worker 的迟到
 结果。新 Submission 之后按正常 `submission.judged` 流程进入 Contest。
+比赛事件必须包含 contest_id/submitted_at，普通作废事件仍允许缺省 contest_id=0 并由 Contest 忽略。
+比赛重判的新 Submission 保留原提交时间用于 ACM 计分，保持 ADR-0001 的新 ID 语义。
 
 ---
 

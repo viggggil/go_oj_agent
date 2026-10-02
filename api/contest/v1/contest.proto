@@ -69,6 +69,16 @@ message LeaderboardEntry {
   int32 score = 3;
   int64 penalty = 4;
   int32 accepted_count = 5;
+  repeated LeaderboardProblemResult problems = 6;
+  int32 solved_count = 7;
+  int64 penalty_seconds = 8;
+}
+
+message LeaderboardProblemResult {
+  int64 problem_id = 1;
+  bool solved = 2;
+  int32 wrong_attempts = 3;
+  google.protobuf.Timestamp accepted_at = 4;
 }
 
 message GetContestRequest {

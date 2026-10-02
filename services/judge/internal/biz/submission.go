@@ -163,13 +163,7 @@ type RejudgeSubmissionResult struct {
 
 type JudgeRequestedPayload = mq.JudgeTask
 
-type SubmissionInvalidatedPayload struct {
-	SubmissionID    int64     `json:"submission_id"`
-	UserID          int64     `json:"user_id"`
-	ProblemID       int64     `json:"problem_id"`
-	PreviousVerdict string    `json:"previous_verdict,omitempty"`
-	InvalidatedAt   time.Time `json:"invalidated_at"`
-}
+type SubmissionInvalidatedPayload = mq.SubmissionInvalidated
 
 type CreateSubmissionInput struct {
 	Actor          Actor

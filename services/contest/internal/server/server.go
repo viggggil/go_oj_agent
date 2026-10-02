@@ -8,7 +8,7 @@ import (
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 )
 
-var ProviderSet = wire.NewSet(NewRegistrar, NewGRPCServer, NewMiddlewares)
+var ProviderSet = wire.NewSet(NewRegistrar, NewGRPCServer, NewMiddlewares, NewResultConsumerServer)
 
 func NewRegistrar(config *conf.Bootstrap) registry.Registrar {
 	if config == nil || config.GetRegistry() == nil || config.GetRegistry().GetConsul() == nil || !config.GetRegistry().GetConsul().GetEnabled() {

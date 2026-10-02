@@ -1,5 +1,11 @@
 service:
   name: contest-service
+messaging:
+  url: "amqp://judge:judge-password@rabbitmq:5672/"
+  exchange: oj.events
+  queue: contest.submission-judged
+  dead_letter_queue: contest.results.dlq
+  prefetch: 16
 server:
   grpc:
     address: ":9005"

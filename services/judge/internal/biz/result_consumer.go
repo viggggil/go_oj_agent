@@ -13,16 +13,10 @@ import (
 const (
 	EventTypeJudgeCompleted   = mq.EventTypeJudgeCompleted
 	EventTypeJudgeFailed      = mq.EventTypeJudgeFailed
-	EventTypeSubmissionJudged = "submission.judged"
+	EventTypeSubmissionJudged = mq.EventSubmissionJudged
 )
 
-type SubmissionJudgedPayload struct {
-	SubmissionID int64     `json:"submission_id"`
-	UserID       int64     `json:"user_id"`
-	ProblemID    int64     `json:"problem_id"`
-	Verdict      string    `json:"verdict"`
-	JudgedAt     time.Time `json:"judged_at"`
-}
+type SubmissionJudgedPayload = mq.SubmissionJudged
 
 type JudgeResultEvent struct {
 	EventID       string

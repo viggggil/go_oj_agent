@@ -45,8 +45,10 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		return nil
 	}
 	var userID, problemID int64
+	var contestID sql.NullInt64
+	var submittedAt time.Time
 	var revision, status string
-	if err = tx.QueryRowContext(ctx, `SELECT user_id, problem_id, judge_revision, status FROM submissions WHERE id = ? FOR UPDATE`, event.SubmissionID).Scan(&userID, &problemID, &revision, &status); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT user_id, problem_id, judge_revision, status, contest_id, created_at FROM submissions WHERE id = ? FOR UPDATE`, event.SubmissionID).Scan(&userID, &problemID, &revision, &status, &contestID, &submittedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return biz.ErrorSubmissionNotFound()
 		}
@@ -89,11 +91,18 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		if reason == "" {
 			reason = event.Reason
 		}
-		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), reason, event.OccurredAt, now, event.SubmissionID); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE submissions SET status = ?, verdict = ?, system_error_reason = ?, judged_at = ?, updated_at = ? WHERE id = ?`, statusToDB(submissionv1.SubmissionStatus_SUBMISSION_STATUS_DONE), "SYSTEM_ERROR", reason, event.OccurredAt, now, event.SubmissionID); err != nil {
 			return storageError(err)
 		}
 	}
-	payload := biz.SubmissionJudgedPayload{SubmissionID: event.SubmissionID, UserID: userID, ProblemID: problemID, Verdict: verdictToDB(event.Verdict), JudgedAt: event.OccurredAt}
+	if !contestID.Valid {
+		return storageError(tx.Commit())
+	}
+	verdict := verdictToDB(event.Verdict)
+	if event.EventType == biz.EventTypeJudgeFailed {
+		verdict = "SYSTEM_ERROR"
+	}
+	payload := biz.SubmissionJudgedPayload{SubmissionID: event.SubmissionID, ContestID: contestID.Int64, UserID: userID, ProblemID: problemID, Verdict: verdict, SubmittedAt: submittedAt, JudgedAt: event.OccurredAt}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return biz.ErrorInternal("judge result event cannot be encoded")
@@ -397,6 +406,10 @@ func (s *StoreSet) InvalidateAndRequeueWithOutboxAndIdempotency(ctx context.Cont
 		JudgeRevision: command.JudgeRevision, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED,
 		JudgeDeadlineAt: command.JudgeDeadlineAt, CreatedAt: now, UpdatedAt: now,
 	}
+	if old.ContestID > 0 {
+		// 比赛重判保留原提交时间，避免管理员重判改变罚时或被比赛结束时间拒绝。
+		replacement.CreatedAt = old.CreatedAt
+	}
 	replacement.ID, err = insertSubmission(ctx, tx, replacement)
 	if err != nil {
 		return result, err
@@ -566,6 +579,7 @@ func insertInvalidatedOutbox(ctx context.Context, tx *sql.Tx, eventID string, su
 	payload := biz.SubmissionInvalidatedPayload{
 		SubmissionID: submission.ID, UserID: submission.UserID, ProblemID: submission.ProblemID,
 		PreviousVerdict: verdictToDB(submission.Verdict), InvalidatedAt: now,
+		ContestID: submission.ContestID, SubmittedAt: submission.CreatedAt,
 	}
 	return insertOutbox(ctx, tx, eventID, submission.ID, biz.EventTypeSubmissionInvalidated, payload, now)
 }

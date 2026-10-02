@@ -7,7 +7,13 @@
 - `mysql/`：本地或平台级 schema 初始化。
 - `user/`：`user-service` 拥有的 `oj_user` 表结构。
 - `problem/`：`problem-service` 拥有的 `oj_problem` 表结构。
-- `submission/`：`submission-service` 拥有的 `oj_submission` 表结构。
+- `submission/`：`judge-service` 拥有的 `oj_submission` 表结构。
+- `contest/`：`contest-service` 拥有的 `oj_contest` 表结构。
+
+Contest `000002_create_result_projection` 添加消费幂等、提交事实（含作废记录）和题目结果表，
+时间使用 DATETIME(6) 保留事件版本精度。重建索引为 `(contest_id,user_id,problem_id,submitted_at,submission_id)`。
+外键仅约束本地比赛参与者/题目，不跨服务建外键。回滚依次删除结果、事实和消费记录表。
+Compose 新建数据库自动应用此迁移；已有数据库须显式执行 up SQL，服务启动不会自动迁移。
 
 ## 当前阶段
 
@@ -21,4 +27,3 @@
 - 跨服务字段只保存外部 ID reference。
 - `status` / `verdict` 使用 `VARCHAR`，暂不使用 MySQL ENUM。
 - 测试数据正文、源码产物、编译日志和大文档正文不直接存入业务事件。
-
