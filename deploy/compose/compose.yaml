@@ -32,6 +32,7 @@ services:
       - ../../migrations/submission/000008_add_outbox_failure_reason.up.sql:/docker-entrypoint-initdb.d/308_add_outbox_failure_reason.sql:ro
       - ../../migrations/submission/000009_add_contest_id.up.sql:/docker-entrypoint-initdb.d/309_add_contest_id.sql:ro
       - ../../migrations/contest/000001_create_contests.up.sql:/docker-entrypoint-initdb.d/401_create_contests.sql:ro
+      - ../../migrations/contest/000002_create_result_projection.up.sql:/docker-entrypoint-initdb.d/402_create_result_projection.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
@@ -285,6 +286,7 @@ services:
       KRATOS_SERVER_GRPC_ADDRESS: ":9005"
       KRATOS_SERVER_GRPC_MAX_RECEIVE_MESSAGE_BYTES: "35651584"
       KRATOS_DATA_MYSQL_DSN: "root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(mysql:3306)/oj_contest?parseTime=true"
+      KRATOS_MESSAGING_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
     ports:
       - "127.0.0.1:${CONTEST_GRPC_PORT:-9005}:9005"
@@ -295,6 +297,8 @@ services:
       mysql:
         condition: service_healthy
       judge-service:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9005"]

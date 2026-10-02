@@ -72,3 +72,13 @@ Client
 8. **结果事务。** `processed_events` 去重、Submission 状态与 Case Result 以及 `submission.judged` Outbox 必须在同一事务内更新。
 9. **取消、作废与超时。** Judge Service 是终态所有者。取消、管理员作废或系统超时通过 Submission 条件更新产生终态；Worker 的迟到消息不能改写已终止的 Submission。
 10. **SSE 来源。** MySQL 是事实来源，Redis 只作为实时状态视图。结果事务提交后再更新或失效 Redis；SSE 断线重连必须从 MySQL 恢复状态。
+
+## Issue #127：比赛结果投影
+
+维持作废旧 Submission、生成新 ID 的重判规则。比赛替代 Submission 的 `created_at`
+保留原提交时间，deadline/updated_at 使用重判时刻，使赛后重判仍能按原比赛时间计分。
+同一原始时间的多个替代结果按 Submission ID 决定顺序，旧 ID 的 facts 永久作废。
+普通提交重判继续使用当前 created_at。`submission.invalidated` 的 v1 payload 兼容增加
+contest_id/submitted_at；Contest 可在 judged 之前保存作废记录。`submission.judged` v1
+仅为比赛发布，并包含完整身份、submitted_at 和 judged_at。投影允许严格递增 judged_at
+修正同一 ID 的事实，这用于结果修正/事件重放，不改变管理员重判的 API 或 ID 语义。

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-kratos/kratos/v3/registry"
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
+	"github.com/viggggil/go_oj_agent/services/contest/internal/server"
 )
 
 type App = kratos.App
@@ -52,15 +54,18 @@ func newJSONLogger(output *os.File) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{}))
 }
 
-func newApp(bootstrap *conf.Bootstrap, grpcServer *kgrpc.Server, registrar registry.Registrar) *kratos.App {
+func newApp(bootstrap *conf.Bootstrap, grpcServer *kgrpc.Server, registrar registry.Registrar, consumer *server.ResultConsumerServer) (*kratos.App, error) {
+	if err := consumer.Prepare(context.Background()); err != nil {
+		return nil, err
+	}
 	options := []kratos.Option{
 		kratos.Name(bootstrap.GetService().GetName()),
 		kratos.Version("dev"),
-		kratos.Server(grpcServer),
+		kratos.Server(grpcServer, consumer),
 		kratos.Logger(newJSONLogger(os.Stdout)),
 	}
 	if registrar != nil {
 		options = append(options, kratos.Registrar(registrar))
 	}
-	return kratos.New(options...)
+	return kratos.New(options...), nil
 }

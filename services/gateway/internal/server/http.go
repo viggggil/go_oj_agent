@@ -75,6 +75,7 @@ func NewHTTPServer(
 		gatewayv1.OperationGatewayServiceListSubmissions,
 		gatewayv1.OperationGatewayServiceRejudgeSubmission,
 		gatewayv1.OperationGatewayServiceJoinContest,
+		gatewayv1.OperationGatewayServiceCreateContestSubmission,
 	} {
 		server.Use(operation, authMiddleware.Middleware())
 	}

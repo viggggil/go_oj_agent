@@ -4,6 +4,14 @@ Integration, contract, and e2e test suites live here. The judge e2e flow is in
 `tests/e2e/judge_flow_test.go` and runs through RabbitMQ, judge-worker,
 go-judge, MinIO, judge-service, and the submission API.
 
+比赛 E2E 位于 `tests/e2e/contest_flow_test.go`，通过真实 Gateway -> Contest -> Judge ->
+RabbitMQ -> Worker -> Contest Consumer 验证 WA -> AC、1200 秒罚时和赛后新 ID 重判。
+RabbitMQ/MySQL 组件测试位于 `services/contest/internal/server/result_consumer_integration_test.go`，
+覆盖重复/乱序、陈旧版本、结果修正、SYSTEM_ERROR、先到/后到作废、重启和未 ACK 重投、DLQ 与归属失败回滚。
+这些测试已纳入 `make test-integration`，不提供环境变量时在 `go test ./...` 中跳过。
+手动运行需要 `CONTEST_TEST_MYSQL_DSN`、`JUDGE_TEST_RABBITMQ_URL`，E2E 还需
+`CONTEST_TEST_GRPC_ENDPOINT` 和已有 Gateway/Judge/MinIO/签名密钥测试配置。
+
 ## 认证集成测试
 
 集成测试通过独立 Docker Compose project 启动 MySQL、Redis、MinIO、user-service、problem-service 和 gateway-service：
@@ -22,6 +30,7 @@ AUTH_TEST_REDIS_PORT
 PROBLEM_TEST_GRPC_PORT
 PROBLEM_TEST_MINIO_PORT
 PROBLEM_TEST_MINIO_CONSOLE_PORT
+CONTEST_TEST_GRPC_PORT
 ```
 
 覆盖范围：

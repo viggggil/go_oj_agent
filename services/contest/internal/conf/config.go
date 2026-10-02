@@ -16,6 +16,9 @@ func ValidateConfig(c *Bootstrap) error {
 	if c.GetData() == nil || strings.TrimSpace(c.GetData().GetMysqlDsn()) == "" {
 		return fmt.Errorf("contest mysql dsn is required")
 	}
+	if m := c.GetMessaging(); m == nil || m.GetUrl() == "" || m.GetExchange() == "" || m.GetQueue() == "" || m.GetDeadLetterQueue() == "" || m.GetPrefetch() <= 0 || m.GetPrefetch() > 256 {
+		return fmt.Errorf("invalid contest messaging configuration")
+	}
 	if auth := c.GetInternalAuth(); auth != nil && strings.TrimSpace(auth.GetPublicKeyFile()) != "" {
 		if _, err := time.ParseDuration(auth.GetMaxTokenTtl()); err != nil {
 			return fmt.Errorf("invalid internal auth max token ttl: %w", err)

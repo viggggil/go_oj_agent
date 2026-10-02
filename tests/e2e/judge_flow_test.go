@@ -160,6 +160,10 @@ func TestJudgeSubmissionFlow(t *testing.T) {
 	waitForOutboxEventPublished(t, submissionDB, created.GetSubmissionId(), "judge.requested")
 	waitForJudgeResult(t, client, userContext, created.GetSubmissionId())
 	waitForJudgeResult(t, client, userContext, second.GetSubmissionId())
+	var contestEvents int
+	if err := submissionDB.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM outbox_events WHERE aggregate_id IN (?,?) AND event_type='submission.judged'`, created.GetSubmissionId(), second.GetSubmissionId()).Scan(&contestEvents); err != nil || contestEvents != 0 {
+		t.Fatalf("ordinary contest events=%d err=%v", contestEvents, err)
+	}
 
 	rejudgeKey := uuid.NewString()
 	rejudged, err := client.RejudgeSubmission(adminContext, &submissionv1.RejudgeSubmissionRequest{

@@ -9,8 +9,13 @@ HTTP Client -> gateway-service -> gRPC -> user-service -> MySQL / Redis
 
 MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保存 Refresh Token
 及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
-启动 user-service、problem-service、gateway-service 和 Web，尚不启动
-RabbitMQ、Consul 或未实现的业务服务。
+启动 user-service、problem-service、judge-service、contest-service、judge-worker、go-judge、
+RabbitMQ、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜，Consul 默认关闭。
+
+Contest 消费配置位于 `configs/contest.yaml`：exchange=`oj.events`，queue=`contest.submission-judged`，
+DLQ=`contest.results.dlq`，prefetch=16。RabbitMQ URL 由 `KRATOS_MESSAGING_URL` 注入，使用 Compose 的
+RABBITMQ_USER/RABBITMQ_PASSWORD。MySQL 初始化挂载 Contest `000002_create_result_projection`；
+已有数据卷须先显式执行该迁移，`make infra-up` 不会重新执行数据库初始化文件。
 
 MinIO 和 `mc` 不再直接从 Quay 拉取。Compose 使用固定版本的官方 GitHub
 Release 二进制构建本地镜像，并在 Docker build 阶段校验 SHA-256；这样 CI 不依赖

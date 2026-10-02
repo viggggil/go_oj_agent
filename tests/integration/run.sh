@@ -45,6 +45,7 @@ export USER_GRPC_PORT="${AUTH_TEST_USER_GRPC_PORT:-$(pick_free_port)}"
 export GATEWAY_HTTP_PORT="${AUTH_TEST_GATEWAY_HTTP_PORT:-$(pick_free_port)}"
 export PROBLEM_GRPC_PORT="${PROBLEM_TEST_GRPC_PORT:-$(pick_free_port)}"
 export JUDGE_GRPC_PORT="${JUDGE_TEST_GRPC_PORT:-$(pick_free_port)}"
+export CONTEST_GRPC_PORT="${CONTEST_TEST_GRPC_PORT:-$(pick_free_port)}"
 export MINIO_API_PORT="${PROBLEM_TEST_MINIO_PORT:-$(pick_free_port)}"
 export MINIO_CONSOLE_PORT="${PROBLEM_TEST_MINIO_CONSOLE_PORT:-$(pick_free_port)}"
 export RABBITMQ_AMQP_PORT="${JUDGE_TEST_RABBITMQ_PORT:-$(pick_free_port)}"
@@ -68,9 +69,11 @@ AUTH_INTEGRATION_BASE_URL="http://127.0.0.1:${GATEWAY_HTTP_PORT}" \
 PROBLEM_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_problem?parseTime=true" \
 PROBLEM_TEST_USER_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_user?parseTime=true" \
 SUBMISSION_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_submission?parseTime=true" \
+CONTEST_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_contest?parseTime=true" \
+CONTEST_TEST_GRPC_ENDPOINT="127.0.0.1:${CONTEST_GRPC_PORT}" \
 PROBLEM_TEST_REDIS_ADDR="127.0.0.1:${REDIS_PORT}" \
 PROBLEM_TEST_MINIO_ENDPOINT="127.0.0.1:${MINIO_API_PORT}" \
 JUDGE_TEST_GRPC_ENDPOINT="127.0.0.1:${JUDGE_GRPC_PORT}" \
 JUDGE_TEST_GATEWAY_PRIVATE_KEY_FILE="${test_artifacts_dir}/gateway-private.pem" \
 JUDGE_TEST_RABBITMQ_URL="amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@127.0.0.1:${RABBITMQ_AMQP_PORT}/" \
-  go test -count=1 -v ./tests/integration ./tests/e2e
+  go test -count=1 -v ./tests/integration ./tests/e2e ./services/contest/internal/server ./services/contest/internal/data

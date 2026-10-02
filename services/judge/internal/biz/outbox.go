@@ -212,14 +212,14 @@ func buildPublishedMessage(event OutboxEvent) (PublishedMessage, error) {
 		}
 	case EventTypeSubmissionInvalidated:
 		var value SubmissionInvalidatedPayload
-		if err := json.Unmarshal(event.Payload, &value); err != nil || value.SubmissionID <= 0 || value.UserID <= 0 || value.ProblemID <= 0 || value.InvalidatedAt.IsZero() {
+		if err := json.Unmarshal(event.Payload, &value); err != nil || value.Validate() != nil {
 			return PublishedMessage{}, fmt.Errorf("invalid submission invalidated payload")
 		}
 		payload = value
 		routingKey = EventTypeSubmissionInvalidated
 	case EventTypeSubmissionJudged:
 		var value SubmissionJudgedPayload
-		if err := json.Unmarshal(event.Payload, &value); err != nil || value.SubmissionID <= 0 || value.UserID <= 0 || value.ProblemID <= 0 || value.JudgedAt.IsZero() {
+		if err := json.Unmarshal(event.Payload, &value); err != nil || value.Validate() != nil {
 			return PublishedMessage{}, fmt.Errorf("invalid submission judged payload")
 		}
 		payload = value

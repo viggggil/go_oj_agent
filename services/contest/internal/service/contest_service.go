@@ -117,8 +117,23 @@ func (s *ContestService) ArchiveContest(ctx context.Context, req *contestv1.Arch
 	return &contestv1.ArchiveContestReply{Contest: toProtoContest(contest)}, nil
 }
 
-func (s *ContestService) GetLeaderboard(context.Context, *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
-	return nil, status.Error(codes.Unimplemented, "contest leaderboard is not implemented")
+func (s *ContestService) GetLeaderboard(ctx context.Context, req *contestv1.GetLeaderboardRequest) (*contestv1.GetLeaderboardReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid leaderboard request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	actor, err := requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	page := req.GetPage()
+	items, total, err := s.uc.GetLeaderboard(ctx, actor, req.GetContestId(), page.GetPage(), page.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.GetLeaderboardReply{Items: items, Page: &commonv1.PageResponse{Page: page.GetPage(), PageSize: page.GetPageSize(), Total: total}}, nil
 }
 
 func (s *ContestService) JoinContest(ctx context.Context, req *contestv1.JoinContestRequest) (*contestv1.JoinContestReply, error) {

@@ -459,7 +459,24 @@ PRIMARY KEY(contest_id, user_id)
 INDEX(contest_id, score, penalty)
 ```
 
-实时 Leaderboard 使用 Redis ZSET；MySQL 保存最终事实/快照。
+该表为旧设计预留，本版排行榜不读写 `contest_scores`，不使用 Redis ZSET。
+
+## 7.5 Contest 结果投影
+
+迁移：`migrations/contest/000002_create_result_projection.up.sql`。
+
+| Table | Key / Index | 用途 |
+| --- | --- | --- |
+| `contest_processed_events` | PK `(consumer_name,event_id)` | 事务内消费幂等，UUID 使用 ascii_bin |
+| `contest_submission_results` | PK `submission_id`；索引 `(contest_id,user_id,problem_id,submitted_at,submission_id)` | 唯一提交事实、verdict、submitted_at、judged_at、invalidated、updated_at |
+| `contest_problem_results` | PK `(contest_id,user_id,problem_id)` | solved、wrong_attempts、accepted_submission_id、accepted_at、penalty_seconds、updated_at |
+
+投影时间使用 DATETIME(6)。归属通过 Contest 本地表校验，外键只引用本地 participants/problems。
+事务插入 processed_events 后锁定参与者行（READ COMMITTED），保存最新事实并按 submitted_at/id 重建单题。
+同 ID 的 judged_at 必须严格递增；invalidated 为不可恢复作废记录，先到的作废事件也能阻挡迟到结果。
+排行榜在只读 REPEATABLE READ 事务中聚合题目结果，保证总数、分页和题目明细一致；
+SUM(solved) DESC、SUM(penalty_seconds) ASC、user_id ASC。只统计有本地结果的用户。
+罚时用首次 AC submitted_at 减去比赛 start_at，再加 AC 前有效错误次数乘以 1200 秒。
 
 ---
 
@@ -517,6 +534,8 @@ idempotency:{scope}:{key}
 contest:{contest_id}:leaderboard
 sse:submission:{submission_id}
 ```
+
+`contest:{contest_id}:leaderboard` 仅为未来缓存规划，本版 Contest 排行榜不使用 Redis。
 
 每个 Key 必须定义：
 

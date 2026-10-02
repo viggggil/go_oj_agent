@@ -9,6 +9,7 @@ import (
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
+	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -69,3 +70,5 @@ func NewSubmissionClient(ctx context.Context, config *conf.Bootstrap) (*submissi
 func ProvideSubmissionServiceClient(c *submissionClient) submissionv1.SubmissionServiceClient {
 	return c.SubmissionServiceClient
 }
+
+func ProvideSubmissionCreator(c *submissionClient) biz.SubmissionCreator { return c }
