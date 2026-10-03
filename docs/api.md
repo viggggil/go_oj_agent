@@ -20,7 +20,7 @@ Go Services / Agent Tools
 
 本文件定义 v0 阶段的接口边界。最终字段以 `api/*/v1/*.proto` 和生成的 OpenAPI 为准。
 
-Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。当前阶段先定义认证与用户相关 HTTP DTO，Problem、Submission 等后续模块接入时继续扩展。
+Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。Gateway 当前已接入认证、用户、Problem、Submission/Judge 和 Contest API。
 
 ---
 
@@ -517,15 +517,23 @@ data: {"status":"AC","time_ms":32,"memory_kb":4096}
 
 ### GET `/api/v1/contests`
 
-比赛列表。
+比赛列表。Gateway 透传分页参数 `page`、`page_size` 和状态筛选，Contest Service 负责比赛可见性和归档状态判断。
 
 ### GET `/api/v1/contests/{contest_id}`
 
-比赛详情。
+比赛详情。Gateway 仅转发请求，比赛是否存在以及归档比赛可见性由 Contest Service 判断。
 
 ### POST `/api/v1/contests`
 
-管理员创建比赛。
+管理员创建比赛。Gateway 从认证上下文透传用户身份，管理员权限和比赛字段校验由 Contest Service 执行。
+
+### PUT `/api/v1/contests/{contest_id}`
+
+更新比赛。`contest_id` 以路径参数为准，只有仍处于 DRAFT 状态的比赛允许更新。
+
+### DELETE `/api/v1/contests/{contest_id}`
+
+归档比赛。Gateway 不直接删除数据，归档权限和状态由 Contest Service 执行。
 
 ### POST `/api/v1/contests/{contest_id}/join`
 
@@ -543,8 +551,7 @@ active revision，提交后保持 immutable。
 
 ### GET `/api/v1/contests/{contest_id}/leaderboard`
 
-规划的外部排行榜路由，当前 Gateway 尚未提供该 REST 接口。
-已实现的 `ContestService.GetLeaderboard` gRPC 仅读取 Contest 自有 MySQL 题目结果投影，不使用 Redis。
+比赛排行榜。Gateway 透传分页参数并返回 Contest Service 计算的排名、罚时和每道题结果；不访问 Judge Service、Submission 数据库或 Redis。
 
 ---
 
@@ -856,7 +863,7 @@ service ContestService {
 保留 `rank=1,user_id=2,score=3,penalty=4,accepted_count=5`；新增 `problems=6,solved_count=7,penalty_seconds=8`。
 ACM 下 score/accepted_count 等于 solved_count，penalty 等于 penalty_seconds（秒）。每道题返回
 `problem_id/solved/wrong_attempts/accepted_at`，未 AC 的 accepted_at 为空。无本地结果的用户不进入榜单。
-当前 Gateway 仅提供比赛报名和提交路由；排行榜通过内部 Contest gRPC 调用，REST 列表为目标接口规划。
+Gateway 已提供比赛列表、详情、创建、更新、归档、报名、提交和排行榜路由；业务权限、比赛状态和排行榜计算仍由 Contest Service 负责。
 
 ---
 
