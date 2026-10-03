@@ -2,11 +2,18 @@
   <section class="workspace submission-create">
     <div class="page-head">
       <div>
-        <p class="eyebrow">Submission</p>
+        <p class="eyebrow">{{ contestId ? 'Contest Submission' : 'Submission' }}</p>
         <h1>提交代码</h1>
-        <p>选择题目和语言，提交后可在详情页查看判题进度。</p>
+        <p v-if="contestId">
+          正在参加：{{ contestTitle || `比赛 ${contestId}` }}，提交后可在详情页查看判题进度。
+        </p>
+        <p v-else>选择题目和语言，提交后可在详情页查看判题进度。</p>
       </div>
-      <RouterLink class="button secondary" to="/submissions">提交记录</RouterLink>
+      <RouterLink
+        class="button secondary"
+        :to="contestId ? `/contests/${contestId}` : '/submissions'"
+        >{{ contestId ? '返回比赛' : '提交记录' }}</RouterLink
+      >
     </div>
     <form class="editor submission-form" @submit.prevent="submit">
       <label class="wide"
@@ -46,16 +53,18 @@
 <script setup lang="ts">
   import { computed, onMounted, reactive, ref } from 'vue'
   import { RouterLink, useRoute, useRouter } from 'vue-router'
-  import { apiErrorMessage, problemApi, submissionApi } from '../api'
+  import { apiErrorMessage, contestApi, problemApi, submissionApi } from '../api'
   import type { ProblemSummary } from '../types'
 
   const route = useRoute()
   const router = useRouter()
+  const contestId = Number(route.query.contest_id) || 0
   const problems = ref<ProblemSummary[]>([])
   const fileInput = ref<HTMLInputElement>()
   const submitting = ref(false)
   const message = ref('')
   const messageIsError = ref(false)
+  const contestTitle = ref('')
   const form = reactive({
     problem_id: Number(route.query.problem_id) || 0,
     language: 'go',
@@ -93,7 +102,10 @@
     submitting.value = true
     message.value = ''
     try {
-      const { data } = await submissionApi.create({ ...form, idempotency_key: crypto.randomUUID() })
+      const payload = { ...form, idempotency_key: crypto.randomUUID() }
+      const { data } = contestId
+        ? await contestApi.createSubmission(contestId, payload)
+        : await submissionApi.create(payload)
       await router.push(`/submissions/${data.submission_id}`)
     } catch (cause) {
       messageIsError.value = true
@@ -104,7 +116,19 @@
   }
   onMounted(async () => {
     try {
-      problems.value = (await problemApi.list(1, 100)).data.items || []
+      if (contestId) {
+        const { data } = await contestApi.get(contestId)
+        contestTitle.value = data.contest.title
+        const contestProblemIds = new Set(
+          (data.contest.problems || []).map((item) => item.problem_id),
+        )
+        problems.value = (await problemApi.list(1, 100)).data.items.filter((item) =>
+          contestProblemIds.has(item.id),
+        )
+        if (form.problem_id && !contestProblemIds.has(form.problem_id)) form.problem_id = 0
+      } else {
+        problems.value = (await problemApi.list(1, 100)).data.items || []
+      }
     } catch (cause) {
       messageIsError.value = true
       message.value = apiErrorMessage(cause, '加载题目')

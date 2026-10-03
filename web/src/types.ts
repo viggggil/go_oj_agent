@@ -41,6 +41,41 @@ export interface ProblemInput {
   memory_limit_kb: number
   tags: string[]
 }
+export type ContestStatus = 0 | 1 | 2 | 3 | 4 | string
+export interface ContestProblem {
+  problem_id: number
+  sort_order: number
+  score: number
+}
+export interface ContestSummary {
+  id: number
+  title: string
+  status: ContestStatus
+  start_at: string
+  end_at: string
+}
+export interface Contest extends ContestSummary {
+  created_by: number
+  created_at: string
+  updated_at: string
+  problems: ContestProblem[]
+}
+export interface LeaderboardProblemResult {
+  problem_id: number
+  solved: boolean
+  wrong_attempts: number
+  accepted_at?: string
+}
+export interface LeaderboardEntry {
+  rank: number
+  user_id: number
+  score: number
+  penalty: number
+  accepted_count: number
+  solved_count: number
+  penalty_seconds: number
+  problems: LeaderboardProblemResult[]
+}
 export interface Testcase {
   id: number
   problem_id: number

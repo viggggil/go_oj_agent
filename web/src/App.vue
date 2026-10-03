@@ -5,6 +5,7 @@
       <nav>
         <RouterLink v-if="auth.isAuthenticated" to="/problems">题目</RouterLink
         ><RouterLink v-if="auth.isAuthenticated" to="/submissions">我的提交</RouterLink
+        ><RouterLink v-if="auth.isAuthenticated" to="/contests">比赛</RouterLink
         ><RouterLink v-if="auth.user?.roles.includes('admin')" to="/problems/new"
           >新建题目</RouterLink
         ><RouterLink v-if="auth.isAuthenticated" to="/profile">个人资料</RouterLink

@@ -2,6 +2,9 @@ import axios from 'axios'
 import { reactive } from 'vue'
 import type {
   JudgeResult,
+  Contest,
+  ContestSummary,
+  LeaderboardEntry,
   Problem,
   ProblemInput,
   ProblemSummary,
@@ -97,9 +100,15 @@ export function apiErrorMessage(error: unknown, action: string): string {
   if (status === 400) return detail || '提交内容不符合要求'
   if (status === 401) return '登录状态已失效，请重新登录'
   if (status === 403) return '当前账号没有执行此操作的权限'
-  if (status === 404) return '题目不存在或已归档'
+  if (status === 404)
+    return action.includes('比赛') || action.includes('排行榜')
+      ? '比赛不存在或已归档'
+      : '题目不存在或已归档'
   if (status === 409) return detail || 'Slug 或测试用例序号已经存在'
-  if (status === 412) return detail || '题目当前状态不允许此操作'
+  if (status === 412)
+    return (
+      detail || (action.includes('比赛') ? '比赛当前状态不允许此操作' : '题目当前状态不允许此操作')
+    )
   if (status >= 500) return '服务暂时不可用，请稍后重试'
   return detail || `${action}失败，请稍后重试`
 }
@@ -168,4 +177,31 @@ export const submissionApi = {
       `/api/v1/submissions/${id}/rejudge`,
       { idempotency_key: idempotencyKey },
     ),
+}
+
+export const contestApi = {
+  list: (page = 1, pageSize = 20, status?: string) =>
+    api.get<{ items: ContestSummary[]; page: { page: number; page_size: number; total: number } }>(
+      '/api/v1/contests',
+      { params: { page, page_size: pageSize, ...(status ? { status } : {}) } },
+    ),
+  get: (id: number) => api.get<{ contest: Contest }>(`/api/v1/contests/${id}`),
+  join: (id: number) =>
+    api.post<{ contest_id: number; user_id: number; joined_at: string }>(
+      `/api/v1/contests/${id}/join`,
+      {},
+    ),
+  createSubmission: (
+    contestId: number,
+    payload: { problem_id: number; language: string; source_code: string; idempotency_key: string },
+  ) =>
+    api.post<{ submission_id: number; status: string }>(
+      `/api/v1/contests/${contestId}/problems/${payload.problem_id}/submissions`,
+      payload,
+    ),
+  leaderboard: (id: number, page = 1, pageSize = 20) =>
+    api.get<{
+      items: LeaderboardEntry[]
+      page: { page: number; page_size: number; total: number }
+    }>(`/api/v1/contests/${id}/leaderboard`, { params: { page, page_size: pageSize } }),
 }
