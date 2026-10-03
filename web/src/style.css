@@ -374,6 +374,113 @@ dd {
   border: 1px solid #e1e5ee;
   border-radius: 8px;
 }
+.contest-filter {
+  grid-template-columns: 190px;
+}
+.contest-table,
+.leaderboard-table,
+.contest-problems {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e1e5ee;
+  border-radius: 8px;
+}
+.contest-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 130px minmax(170px, 1fr) minmax(170px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid #edf0f5;
+  color: #172033;
+}
+.contest-row:last-child,
+.contest-problem-row:last-child,
+.leaderboard-row:last-child {
+  border-bottom: 0;
+}
+.contest-row:not(.contest-head):hover {
+  background: #f8f9fc;
+}
+.contest-head,
+.leaderboard-head,
+.contest-problem-head {
+  color: #687188;
+  font-size: 13px;
+  background: #f8f9fc;
+}
+.contest-row small,
+.contest-problem-row small {
+  display: block;
+  margin-top: 3px;
+  color: #8992a5;
+  font-size: 12px;
+}
+.contest-status-draft {
+  color: #2445af;
+}
+.contest-status-running {
+  color: #147454;
+  background: #e5f4ee;
+}
+.contest-status-ended,
+.contest-status-archived {
+  color: #687188;
+}
+.contest-detail {
+  max-width: 1120px;
+}
+.contest-problems {
+  margin-top: 30px;
+}
+.contest-problems .section-head {
+  padding: 22px 22px 14px;
+}
+.contest-problems h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+.contest-problems .section-head p {
+  margin: 0;
+}
+.contest-problem-row {
+  display: grid;
+  grid-template-columns: 64px minmax(180px, 1fr) 100px 120px;
+  gap: 16px;
+  align-items: center;
+  padding: 15px 22px;
+  border-bottom: 1px solid #edf0f5;
+}
+.contest-problem-row .button {
+  padding: 8px 12px;
+  text-align: center;
+}
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 72px 130px 90px 150px minmax(240px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 15px 18px;
+  border-bottom: 1px solid #edf0f5;
+}
+.problem-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.problem-result {
+  min-width: 44px;
+  padding: 5px 7px;
+  color: #687188;
+  background: #eef1f6;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: center;
+}
+.problem-result.solved {
+  color: #147454;
+  background: #e5f4ee;
+}
 .submission-row {
   display: grid;
   grid-template-columns: 64px minmax(150px, 1.3fr) 75px 130px 145px minmax(150px, 1fr);
@@ -597,6 +704,29 @@ dd {
   }
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+  .contest-head,
+  .contest-row > :nth-child(3),
+  .contest-row > :nth-child(4) {
+    display: none;
+  }
+  .contest-row {
+    grid-template-columns: 1fr 100px;
+  }
+  .contest-problem-row {
+    grid-template-columns: 36px minmax(0, 1fr) 80px;
+  }
+  .contest-problem-row .button {
+    grid-column: 2 / -1;
+  }
+  .leaderboard-head {
+    display: none;
+  }
+  .leaderboard-row {
+    grid-template-columns: 52px 1fr 64px 120px;
+  }
+  .leaderboard-row > :nth-child(5) {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 520px) {
