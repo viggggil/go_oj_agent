@@ -24,6 +24,24 @@
 Submission/Judge API 已通过内部 gRPC 转发到 judge-service。判题事件 SSE 第一版采用
 Gateway 短轮询 `GetJudgeResult`，不直接消费 RabbitMQ。
 
+## Contest API
+
+Contest API 已通过内部 gRPC 转发到 contest-service，并统一要求 Bearer Access Token：
+
+```text
+GET    /api/v1/contests
+GET    /api/v1/contests/{contest_id}
+POST   /api/v1/contests
+PUT    /api/v1/contests/{contest_id}
+DELETE /api/v1/contests/{contest_id}
+POST   /api/v1/contests/{contest_id}/join
+POST   /api/v1/contests/{contest_id}/problems/{problem_id}/submissions
+GET    /api/v1/contests/{contest_id}/leaderboard
+```
+
+Gateway 只负责认证上下文、参数映射和错误透传。比赛权限、生命周期、报名、提交校验
+和排行榜计算由 contest-service 执行；Gateway 不直接访问 Contest 数据库。
+
 ## Submission/Judge API
 
 受保护接口均需要 `Authorization: Bearer <access-token>`：

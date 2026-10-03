@@ -18,11 +18,15 @@ var _ = new(context.Context)
 const _ = http.SupportPackageIsVersion3
 
 const OperationGatewayServiceAddTestcase = "/gateway.v1.GatewayService/AddTestcase"
+const OperationGatewayServiceArchiveContest = "/gateway.v1.GatewayService/ArchiveContest"
 const OperationGatewayServiceArchiveProblem = "/gateway.v1.GatewayService/ArchiveProblem"
 const OperationGatewayServiceArchiveTestcase = "/gateway.v1.GatewayService/ArchiveTestcase"
+const OperationGatewayServiceCreateContest = "/gateway.v1.GatewayService/CreateContest"
 const OperationGatewayServiceCreateContestSubmission = "/gateway.v1.GatewayService/CreateContestSubmission"
 const OperationGatewayServiceCreateProblem = "/gateway.v1.GatewayService/CreateProblem"
 const OperationGatewayServiceCreateSubmission = "/gateway.v1.GatewayService/CreateSubmission"
+const OperationGatewayServiceGetContest = "/gateway.v1.GatewayService/GetContest"
+const OperationGatewayServiceGetContestLeaderboard = "/gateway.v1.GatewayService/GetContestLeaderboard"
 const OperationGatewayServiceGetCurrentUser = "/gateway.v1.GatewayService/GetCurrentUser"
 const OperationGatewayServiceGetJudgeResult = "/gateway.v1.GatewayService/GetJudgeResult"
 const OperationGatewayServiceGetProblem = "/gateway.v1.GatewayService/GetProblem"
@@ -31,6 +35,7 @@ const OperationGatewayServiceGetSubmissionSource = "/gateway.v1.GatewayService/G
 const OperationGatewayServiceGetUser = "/gateway.v1.GatewayService/GetUser"
 const OperationGatewayServiceHealth = "/gateway.v1.GatewayService/Health"
 const OperationGatewayServiceJoinContest = "/gateway.v1.GatewayService/JoinContest"
+const OperationGatewayServiceListContests = "/gateway.v1.GatewayService/ListContests"
 const OperationGatewayServiceListProblemTestcases = "/gateway.v1.GatewayService/ListProblemTestcases"
 const OperationGatewayServiceListProblems = "/gateway.v1.GatewayService/ListProblems"
 const OperationGatewayServiceListSubmissions = "/gateway.v1.GatewayService/ListSubmissions"
@@ -39,15 +44,20 @@ const OperationGatewayServiceLogout = "/gateway.v1.GatewayService/Logout"
 const OperationGatewayServiceRefreshToken = "/gateway.v1.GatewayService/RefreshToken"
 const OperationGatewayServiceRegister = "/gateway.v1.GatewayService/Register"
 const OperationGatewayServiceRejudgeSubmission = "/gateway.v1.GatewayService/RejudgeSubmission"
+const OperationGatewayServiceUpdateContest = "/gateway.v1.GatewayService/UpdateContest"
 const OperationGatewayServiceUpdateProblem = "/gateway.v1.GatewayService/UpdateProblem"
 
 type GatewayServiceHTTPServer interface {
 	AddTestcase(context.Context, *AddTestcaseRequest) (*AddTestcaseResponse, error)
+	ArchiveContest(context.Context, *ArchiveContestRequest) (*ArchiveContestResponse, error)
 	ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error)
 	ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error)
+	CreateContest(context.Context, *CreateContestRequest) (*CreateContestResponse, error)
 	CreateContestSubmission(context.Context, *CreateContestSubmissionRequest) (*CreateContestSubmissionResponse, error)
 	CreateProblem(context.Context, *CreateProblemRequest) (*CreateProblemResponse, error)
 	CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error)
+	GetContest(context.Context, *GetContestRequest) (*GetContestResponse, error)
+	GetContestLeaderboard(context.Context, *GetContestLeaderboardRequest) (*GetContestLeaderboardResponse, error)
 	GetCurrentUser(context.Context, *GetCurrentUserRequest) (*GetCurrentUserResponse, error)
 	GetJudgeResult(context.Context, *GetJudgeResultRequest) (*GetJudgeResultResponse, error)
 	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
@@ -56,6 +66,7 @@ type GatewayServiceHTTPServer interface {
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	JoinContest(context.Context, *JoinContestRequest) (*JoinContestResponse, error)
+	ListContests(context.Context, *ListContestsRequest) (*ListContestsResponse, error)
 	ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error)
 	ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error)
 	ListSubmissions(context.Context, *ListSubmissionsRequest) (*ListSubmissionsResponse, error)
@@ -64,6 +75,7 @@ type GatewayServiceHTTPServer interface {
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	RejudgeSubmission(context.Context, *RejudgeSubmissionRequest) (*RejudgeSubmissionResponse, error)
+	UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestResponse, error)
 	UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error)
 }
 
@@ -84,6 +96,12 @@ func RegisterGatewayServiceHTTPServer(s *http.Server, srv GatewayServiceHTTPServ
 	r.Handle("POST", "/api/v1/problems/{problem_id}/testcases", _GatewayService_AddTestcase0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/problems/{problem_id}/testcases", _GatewayService_ListProblemTestcases0_HTTP_Handler(srv))
 	r.Handle("DELETE", "/api/v1/problems/{problem_id}/testcases/{testcase_id}", _GatewayService_ArchiveTestcase0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/contests", _GatewayService_ListContests0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/contests/{contest_id}", _GatewayService_GetContest0_HTTP_Handler(srv))
+	r.Handle("POST", "/api/v1/contests", _GatewayService_CreateContest0_HTTP_Handler(srv))
+	r.Handle("PUT", "/api/v1/contests/{contest_id}", _GatewayService_UpdateContest0_HTTP_Handler(srv))
+	r.Handle("DELETE", "/api/v1/contests/{contest_id}", _GatewayService_ArchiveContest0_HTTP_Handler(srv))
+	r.Handle("GET", "/api/v1/contests/{contest_id}/leaderboard", _GatewayService_GetContestLeaderboard0_HTTP_Handler(srv))
 	r.Handle("POST", "/api/v1/submissions", _GatewayService_CreateSubmission0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/submissions/{submission_id}", _GatewayService_GetSubmission0_HTTP_Handler(srv))
 	r.Handle("GET", "/api/v1/submissions/{submission_id}/source", _GatewayService_GetSubmissionSource0_HTTP_Handler(srv))
@@ -403,6 +421,138 @@ func _GatewayService_ArchiveTestcase0_HTTP_Handler(srv GatewayServiceHTTPServer)
 	}
 }
 
+func _GatewayService_ListContests0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListContestsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceListContests)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListContests(ctx, req.(*ListContestsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ListContestsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_GetContest0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetContestRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceGetContest)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetContest(ctx, req.(*GetContestRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetContestResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_CreateContest0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CreateContestRequest
+		if err := ctx.Bind(&in.Contest); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceCreateContest)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CreateContest(ctx, req.(*CreateContestRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*CreateContestResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_UpdateContest0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateContestRequest
+		if err := ctx.Bind(&in.Contest); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceUpdateContest)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateContest(ctx, req.(*UpdateContestRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateContestResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_ArchiveContest0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ArchiveContestRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceArchiveContest)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ArchiveContest(ctx, req.(*ArchiveContestRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ArchiveContestResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _GatewayService_GetContestLeaderboard0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetContestLeaderboardRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationGatewayServiceGetContestLeaderboard)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetContestLeaderboard(ctx, req.(*GetContestLeaderboardRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetContestLeaderboardResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _GatewayService_CreateSubmission0_HTTP_Handler(srv GatewayServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateSubmissionRequest
@@ -575,11 +725,15 @@ func _GatewayService_JoinContest0_HTTP_Handler(srv GatewayServiceHTTPServer) fun
 
 type GatewayServiceHTTPClient interface {
 	AddTestcase(ctx context.Context, req *AddTestcaseRequest, opts ...http.CallOption) (rsp *AddTestcaseResponse, err error)
+	ArchiveContest(ctx context.Context, req *ArchiveContestRequest, opts ...http.CallOption) (rsp *ArchiveContestResponse, err error)
 	ArchiveProblem(ctx context.Context, req *ArchiveProblemRequest, opts ...http.CallOption) (rsp *ArchiveProblemResponse, err error)
 	ArchiveTestcase(ctx context.Context, req *ArchiveTestcaseRequest, opts ...http.CallOption) (rsp *ArchiveTestcaseResponse, err error)
+	CreateContest(ctx context.Context, req *CreateContestRequest, opts ...http.CallOption) (rsp *CreateContestResponse, err error)
 	CreateContestSubmission(ctx context.Context, req *CreateContestSubmissionRequest, opts ...http.CallOption) (rsp *CreateContestSubmissionResponse, err error)
 	CreateProblem(ctx context.Context, req *CreateProblemRequest, opts ...http.CallOption) (rsp *CreateProblemResponse, err error)
 	CreateSubmission(ctx context.Context, req *CreateSubmissionRequest, opts ...http.CallOption) (rsp *CreateSubmissionResponse, err error)
+	GetContest(ctx context.Context, req *GetContestRequest, opts ...http.CallOption) (rsp *GetContestResponse, err error)
+	GetContestLeaderboard(ctx context.Context, req *GetContestLeaderboardRequest, opts ...http.CallOption) (rsp *GetContestLeaderboardResponse, err error)
 	GetCurrentUser(ctx context.Context, req *GetCurrentUserRequest, opts ...http.CallOption) (rsp *GetCurrentUserResponse, err error)
 	GetJudgeResult(ctx context.Context, req *GetJudgeResultRequest, opts ...http.CallOption) (rsp *GetJudgeResultResponse, err error)
 	GetProblem(ctx context.Context, req *GetProblemRequest, opts ...http.CallOption) (rsp *GetProblemResponse, err error)
@@ -588,6 +742,7 @@ type GatewayServiceHTTPClient interface {
 	GetUser(ctx context.Context, req *GetUserRequest, opts ...http.CallOption) (rsp *GetUserResponse, err error)
 	Health(ctx context.Context, req *HealthRequest, opts ...http.CallOption) (rsp *HealthResponse, err error)
 	JoinContest(ctx context.Context, req *JoinContestRequest, opts ...http.CallOption) (rsp *JoinContestResponse, err error)
+	ListContests(ctx context.Context, req *ListContestsRequest, opts ...http.CallOption) (rsp *ListContestsResponse, err error)
 	ListProblemTestcases(ctx context.Context, req *ListProblemTestcasesRequest, opts ...http.CallOption) (rsp *ListProblemTestcasesResponse, err error)
 	ListProblems(ctx context.Context, req *ListProblemsRequest, opts ...http.CallOption) (rsp *ListProblemsResponse, err error)
 	ListSubmissions(ctx context.Context, req *ListSubmissionsRequest, opts ...http.CallOption) (rsp *ListSubmissionsResponse, err error)
@@ -596,6 +751,7 @@ type GatewayServiceHTTPClient interface {
 	RefreshToken(ctx context.Context, req *RefreshTokenRequest, opts ...http.CallOption) (rsp *RefreshTokenResponse, err error)
 	Register(ctx context.Context, req *RegisterRequest, opts ...http.CallOption) (rsp *RegisterResponse, err error)
 	RejudgeSubmission(ctx context.Context, req *RejudgeSubmissionRequest, opts ...http.CallOption) (rsp *RejudgeSubmissionResponse, err error)
+	UpdateContest(ctx context.Context, req *UpdateContestRequest, opts ...http.CallOption) (rsp *UpdateContestResponse, err error)
 	UpdateProblem(ctx context.Context, req *UpdateProblemRequest, opts ...http.CallOption) (rsp *UpdateProblemResponse, err error)
 }
 
@@ -618,6 +774,22 @@ func (c *GatewayServiceHTTPClientImpl) AddTestcase(ctx context.Context, in *AddT
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) ArchiveContest(ctx context.Context, in *ArchiveContestRequest, opts ...http.CallOption) (*ArchiveContestResponse, error) {
+	var out ArchiveContestResponse
+	pattern := "/api/v1/contests/{contest_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceArchiveContest),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -650,6 +822,23 @@ func (c *GatewayServiceHTTPClientImpl) ArchiveTestcase(ctx context.Context, in *
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) CreateContest(ctx context.Context, in *CreateContestRequest, opts ...http.CallOption) (*CreateContestResponse, error) {
+	var out CreateContestResponse
+	pattern := "/api/v1/contests"
+	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("contest"))
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceCreateContest),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in.Contest, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -701,6 +890,38 @@ func (c *GatewayServiceHTTPClientImpl) CreateSubmission(ctx context.Context, in 
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) GetContest(ctx context.Context, in *GetContestRequest, opts ...http.CallOption) (*GetContestResponse, error) {
+	var out GetContestResponse
+	pattern := "/api/v1/contests/{contest_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceGetContest),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) GetContestLeaderboard(ctx context.Context, in *GetContestLeaderboardRequest, opts ...http.CallOption) (*GetContestLeaderboardResponse, error) {
+	var out GetContestLeaderboardResponse
+	pattern := "/api/v1/contests/{contest_id}/leaderboard"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceGetContestLeaderboard),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -836,6 +1057,22 @@ func (c *GatewayServiceHTTPClientImpl) JoinContest(ctx context.Context, in *Join
 	return &out, nil
 }
 
+func (c *GatewayServiceHTTPClientImpl) ListContests(ctx context.Context, in *ListContestsRequest, opts ...http.CallOption) (*ListContestsResponse, error) {
+	var out ListContestsResponse
+	pattern := "/api/v1/contests"
+	path := http.BuildPath(pattern, in, http.WithQueryParams())
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.Operation(OperationGatewayServiceListContests),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *GatewayServiceHTTPClientImpl) ListProblemTestcases(ctx context.Context, in *ListProblemTestcasesRequest, opts ...http.CallOption) (*ListProblemTestcasesResponse, error) {
 	var out ListProblemTestcasesResponse
 	pattern := "/api/v1/problems/{problem_id}/testcases"
@@ -963,6 +1200,23 @@ func (c *GatewayServiceHTTPClientImpl) RejudgeSubmission(ctx context.Context, in
 		http.PathTemplate(pattern),
 	}, opts...)
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *GatewayServiceHTTPClientImpl) UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...http.CallOption) (*UpdateContestResponse, error) {
+	var out UpdateContestResponse
+	pattern := "/api/v1/contests/{contest_id}"
+	path := http.BuildPath(pattern, in, http.WithQueryParams(), http.WithOmitFields("contest"))
+	opts = append([]http.CallOption{
+		http.Accept("application/protojson"),
+		http.ContentType("application/protojson"),
+		http.Operation(OperationGatewayServiceUpdateContest),
+		http.PathTemplate(pattern),
+	}, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in.Contest, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -34,6 +34,12 @@ const (
 	GatewayService_AddTestcase_FullMethodName             = "/gateway.v1.GatewayService/AddTestcase"
 	GatewayService_ListProblemTestcases_FullMethodName    = "/gateway.v1.GatewayService/ListProblemTestcases"
 	GatewayService_ArchiveTestcase_FullMethodName         = "/gateway.v1.GatewayService/ArchiveTestcase"
+	GatewayService_ListContests_FullMethodName            = "/gateway.v1.GatewayService/ListContests"
+	GatewayService_GetContest_FullMethodName              = "/gateway.v1.GatewayService/GetContest"
+	GatewayService_CreateContest_FullMethodName           = "/gateway.v1.GatewayService/CreateContest"
+	GatewayService_UpdateContest_FullMethodName           = "/gateway.v1.GatewayService/UpdateContest"
+	GatewayService_ArchiveContest_FullMethodName          = "/gateway.v1.GatewayService/ArchiveContest"
+	GatewayService_GetContestLeaderboard_FullMethodName   = "/gateway.v1.GatewayService/GetContestLeaderboard"
 	GatewayService_CreateSubmission_FullMethodName        = "/gateway.v1.GatewayService/CreateSubmission"
 	GatewayService_GetSubmission_FullMethodName           = "/gateway.v1.GatewayService/GetSubmission"
 	GatewayService_GetSubmissionSource_FullMethodName     = "/gateway.v1.GatewayService/GetSubmissionSource"
@@ -63,6 +69,12 @@ type GatewayServiceClient interface {
 	AddTestcase(ctx context.Context, in *AddTestcaseRequest, opts ...grpc.CallOption) (*AddTestcaseResponse, error)
 	ListProblemTestcases(ctx context.Context, in *ListProblemTestcasesRequest, opts ...grpc.CallOption) (*ListProblemTestcasesResponse, error)
 	ArchiveTestcase(ctx context.Context, in *ArchiveTestcaseRequest, opts ...grpc.CallOption) (*ArchiveTestcaseResponse, error)
+	ListContests(ctx context.Context, in *ListContestsRequest, opts ...grpc.CallOption) (*ListContestsResponse, error)
+	GetContest(ctx context.Context, in *GetContestRequest, opts ...grpc.CallOption) (*GetContestResponse, error)
+	CreateContest(ctx context.Context, in *CreateContestRequest, opts ...grpc.CallOption) (*CreateContestResponse, error)
+	UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestResponse, error)
+	ArchiveContest(ctx context.Context, in *ArchiveContestRequest, opts ...grpc.CallOption) (*ArchiveContestResponse, error)
+	GetContestLeaderboard(ctx context.Context, in *GetContestLeaderboardRequest, opts ...grpc.CallOption) (*GetContestLeaderboardResponse, error)
 	CreateSubmission(ctx context.Context, in *CreateSubmissionRequest, opts ...grpc.CallOption) (*CreateSubmissionResponse, error)
 	GetSubmission(ctx context.Context, in *GetSubmissionRequest, opts ...grpc.CallOption) (*GetSubmissionResponse, error)
 	GetSubmissionSource(ctx context.Context, in *GetSubmissionSourceRequest, opts ...grpc.CallOption) (*GetSubmissionSourceResponse, error)
@@ -231,6 +243,66 @@ func (c *gatewayServiceClient) ArchiveTestcase(ctx context.Context, in *ArchiveT
 	return out, nil
 }
 
+func (c *gatewayServiceClient) ListContests(ctx context.Context, in *ListContestsRequest, opts ...grpc.CallOption) (*ListContestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListContestsResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ListContests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) GetContest(ctx context.Context, in *GetContestRequest, opts ...grpc.CallOption) (*GetContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) CreateContest(ctx context.Context, in *CreateContestRequest, opts ...grpc.CallOption) (*CreateContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_CreateContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) UpdateContest(ctx context.Context, in *UpdateContestRequest, opts ...grpc.CallOption) (*UpdateContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_UpdateContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ArchiveContest(ctx context.Context, in *ArchiveContestRequest, opts ...grpc.CallOption) (*ArchiveContestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveContestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ArchiveContest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) GetContestLeaderboard(ctx context.Context, in *GetContestLeaderboardRequest, opts ...grpc.CallOption) (*GetContestLeaderboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetContestLeaderboardResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetContestLeaderboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) CreateSubmission(ctx context.Context, in *CreateSubmissionRequest, opts ...grpc.CallOption) (*CreateSubmissionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateSubmissionResponse)
@@ -330,6 +402,12 @@ type GatewayServiceServer interface {
 	AddTestcase(context.Context, *AddTestcaseRequest) (*AddTestcaseResponse, error)
 	ListProblemTestcases(context.Context, *ListProblemTestcasesRequest) (*ListProblemTestcasesResponse, error)
 	ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error)
+	ListContests(context.Context, *ListContestsRequest) (*ListContestsResponse, error)
+	GetContest(context.Context, *GetContestRequest) (*GetContestResponse, error)
+	CreateContest(context.Context, *CreateContestRequest) (*CreateContestResponse, error)
+	UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestResponse, error)
+	ArchiveContest(context.Context, *ArchiveContestRequest) (*ArchiveContestResponse, error)
+	GetContestLeaderboard(context.Context, *GetContestLeaderboardRequest) (*GetContestLeaderboardResponse, error)
 	CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error)
 	GetSubmission(context.Context, *GetSubmissionRequest) (*GetSubmissionResponse, error)
 	GetSubmissionSource(context.Context, *GetSubmissionSourceRequest) (*GetSubmissionSourceResponse, error)
@@ -392,6 +470,24 @@ func (UnimplementedGatewayServiceServer) ListProblemTestcases(context.Context, *
 }
 func (UnimplementedGatewayServiceServer) ArchiveTestcase(context.Context, *ArchiveTestcaseRequest) (*ArchiveTestcaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ArchiveTestcase not implemented")
+}
+func (UnimplementedGatewayServiceServer) ListContests(context.Context, *ListContestsRequest) (*ListContestsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListContests not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetContest(context.Context, *GetContestRequest) (*GetContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetContest not implemented")
+}
+func (UnimplementedGatewayServiceServer) CreateContest(context.Context, *CreateContestRequest) (*CreateContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateContest not implemented")
+}
+func (UnimplementedGatewayServiceServer) UpdateContest(context.Context, *UpdateContestRequest) (*UpdateContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateContest not implemented")
+}
+func (UnimplementedGatewayServiceServer) ArchiveContest(context.Context, *ArchiveContestRequest) (*ArchiveContestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveContest not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetContestLeaderboard(context.Context, *GetContestLeaderboardRequest) (*GetContestLeaderboardResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetContestLeaderboard not implemented")
 }
 func (UnimplementedGatewayServiceServer) CreateSubmission(context.Context, *CreateSubmissionRequest) (*CreateSubmissionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSubmission not implemented")
@@ -708,6 +804,114 @@ func _GatewayService_ArchiveTestcase_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_ListContests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListContestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ListContests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ListContests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ListContests(ctx, req.(*ListContestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_GetContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetContest(ctx, req.(*GetContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_CreateContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).CreateContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_CreateContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).CreateContest(ctx, req.(*CreateContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_UpdateContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).UpdateContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_UpdateContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).UpdateContest(ctx, req.(*UpdateContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ArchiveContest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveContestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ArchiveContest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ArchiveContest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ArchiveContest(ctx, req.(*ArchiveContestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_GetContestLeaderboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetContestLeaderboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetContestLeaderboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetContestLeaderboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetContestLeaderboard(ctx, req.(*GetContestLeaderboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_CreateSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateSubmissionRequest)
 	if err := dec(in); err != nil {
@@ -918,6 +1122,30 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ArchiveTestcase",
 			Handler:    _GatewayService_ArchiveTestcase_Handler,
+		},
+		{
+			MethodName: "ListContests",
+			Handler:    _GatewayService_ListContests_Handler,
+		},
+		{
+			MethodName: "GetContest",
+			Handler:    _GatewayService_GetContest_Handler,
+		},
+		{
+			MethodName: "CreateContest",
+			Handler:    _GatewayService_CreateContest_Handler,
+		},
+		{
+			MethodName: "UpdateContest",
+			Handler:    _GatewayService_UpdateContest_Handler,
+		},
+		{
+			MethodName: "ArchiveContest",
+			Handler:    _GatewayService_ArchiveContest_Handler,
+		},
+		{
+			MethodName: "GetContestLeaderboard",
+			Handler:    _GatewayService_GetContestLeaderboard_Handler,
 		},
 		{
 			MethodName: "CreateSubmission",
