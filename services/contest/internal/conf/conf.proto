@@ -12,6 +12,7 @@ message Bootstrap {
   InternalAuthProto internal_auth = 5;
   ClientProto judge = 6;
   MessagingProto messaging = 7;
+  ClientProto problem = 8;
 }
 
 message MessagingProto {

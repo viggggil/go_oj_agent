@@ -37,7 +37,7 @@
         <span>{{ item.sort_order }}</span>
         <span>
           <RouterLink class="problem-link" :to="problemLink(item.problem_id)">
-            <strong>{{ problemNames[item.problem_id] || `题目 ${item.problem_id}` }}</strong>
+            <strong>{{ item.title || `题目 ${item.problem_id}` }}</strong>
           </RouterLink>
           <small>题目 {{ item.problem_id }}</small>
         </span>
@@ -56,15 +56,14 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { RouterLink, useRoute } from 'vue-router'
-  import { apiErrorMessage, contestApi, problemApi } from '../api'
+  import { apiErrorMessage, contestApi } from '../api'
   import { formatDate } from '../submission'
   import type { Contest, ContestStatus } from '../types'
 
   const route = useRoute()
   const contest = ref<Contest | null>(null)
-  const problemNames = reactive<Record<number, string>>({})
   const error = ref('')
   const message = ref('')
   const messageIsError = ref(false)
@@ -105,10 +104,7 @@
     try {
       const { data } = await contestApi.get(contestId)
       contest.value = data.contest
-      const ids = new Set((contest.value.problems || []).map((item) => item.problem_id))
-      const { data: problems } = await problemApi.list(1, 100)
-      for (const problem of problems.items || [])
-        if (ids.has(problem.id)) problemNames[problem.id] = problem.title
+      joined.value = Boolean(data.contest.joined)
     } catch (cause) {
       error.value = apiErrorMessage(cause, '加载比赛详情')
     }

@@ -233,3 +233,25 @@ func (s *ProblemService) GetJudgeProfile(ctx context.Context, req *problemv1.Get
 		ActiveJudgeRevision: problem.ActiveJudgeRevision,
 	}}, nil
 }
+
+func (s *ProblemService) BatchGetProblems(ctx context.Context, req *problemv1.BatchGetProblemsRequest) (*problemv1.BatchGetProblemsResponse, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, biz.ErrorInvalidArgument("invalid batch problem request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+	}
+	actor, err := requestContextFromPrincipal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.uc.BatchGet(ctx, actor, req.GetProblemIds())
+	if err != nil {
+		return nil, err
+	}
+	out := &problemv1.BatchGetProblemsResponse{Problems: make([]*problemv1.ProblemSummary, 0, len(items))}
+	for _, p := range items {
+		out.Problems = append(out.Problems, &problemv1.ProblemSummary{Id: p.ID, Title: p.Title, Slug: p.Slug, Difficulty: p.Difficulty, Status: p.Status})
+	}
+	return out, nil
+}

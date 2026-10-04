@@ -42,3 +42,7 @@ go run ./services/problem/cmd/problem-service -conf services/problem/configs/con
 The development Compose stack creates the `oj_problem` schema, applies all
 problem migrations, creates the `problem-data` bucket, and starts this service
 on gRPC port `9002`.
+
+## Batch problem summaries
+
+`BatchGetProblems` accepts 1–100 positive, unique problem IDs and returns available `ProblemSummary` records ordered by ID in one SQL query. Missing IDs are omitted. Normal users see only active problems; admins also see archived problems. The request uses trusted internal actor authentication, matching `ListProblems` permissions. It does not return statements or testcase metadata.

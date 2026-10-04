@@ -23,10 +23,12 @@ type Contest struct {
 	CreatedBy            int64
 	CreatedAt, UpdatedAt time.Time
 	Problems             []ContestProblem
+	Joined               bool
 }
 type ContestProblem struct {
 	ProblemID        int64
 	SortOrder, Score int32
+	Title            string
 }
 
 type ContestRepository interface {
@@ -51,6 +53,7 @@ type SubmissionCreator interface {
 type ContestUsecase struct {
 	repo       ContestRepository
 	submission SubmissionCreator
+	problems   ProblemCatalog
 	now        func() time.Time
 }
 
@@ -289,4 +292,49 @@ func isAdmin(actor *commonv1.RequestContext) bool {
 		}
 	}
 	return false
+}
+
+type ProblemCatalog interface {
+	Titles(context.Context, []int64) (map[int64]string, error)
+}
+
+func NewContestUsecaseWithClients(repo ContestRepository, submission SubmissionCreator, problems ProblemCatalog) *ContestUsecase {
+	u := NewContestUsecaseWithRepositoryAndSubmission(repo, submission)
+	u.problems = problems
+	return u
+}
+func (u *ContestUsecase) GetDetails(ctx context.Context, actor *commonv1.RequestContext, id int64) (Contest, error) {
+	c, err := u.Get(ctx, actor, id)
+	if err != nil {
+		return Contest{}, err
+	}
+	checker, ok := u.repo.(interface {
+		IsParticipant(context.Context, int64, int64) (bool, error)
+	})
+	if !ok {
+		return Contest{}, status.Error(codes.Internal, "participant repository is not configured")
+	}
+	c.Joined, err = checker.IsParticipant(ctx, id, actor.GetUserId())
+	if err != nil {
+		return Contest{}, err
+	}
+
+	if u.problems == nil {
+		return Contest{}, status.Error(codes.Internal, "problem catalog is not configured")
+	}
+	if len(c.Problems) == 0 {
+		return c, nil
+	}
+	ids := make([]int64, 0, len(c.Problems))
+	for _, p := range c.Problems {
+		ids = append(ids, p.ProblemID)
+	}
+	titles, err := u.problems.Titles(ctx, ids)
+	if err != nil {
+		return Contest{}, err
+	}
+	for i := range c.Problems {
+		c.Problems[i].Title = titles[c.Problems[i].ProblemID]
+	}
+	return c, nil
 }

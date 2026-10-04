@@ -33,6 +33,8 @@ message ContestProblem {
   int64 problem_id = 1 [(validate.rules).int64.gt = 0];
   int32 sort_order = 2 [(validate.rules).int32.gt = 0];
   int32 score = 3 [(validate.rules).int32.gte = 0];
+  // Read-only current title. Ignored in ContestUpdate; unavailable problems use an empty title.
+  string title = 4;
 }
 
 message Contest {
@@ -45,6 +47,8 @@ message Contest {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   repeated ContestProblem problems = 9;
+  // Current authenticated user membership, populated by GetContest.
+  bool joined = 10;
 }
 
 message ContestSummary {

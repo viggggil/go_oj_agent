@@ -49,7 +49,7 @@
 <script setup lang="ts">
   import { onMounted, ref } from 'vue'
   import { RouterLink, useRoute } from 'vue-router'
-  import { apiErrorMessage, contestApi, problemApi } from '../api'
+  import { apiErrorMessage, contestApi } from '../api'
   import type { Contest, LeaderboardEntry } from '../types'
 
   const route = useRoute()
@@ -79,9 +79,11 @@
       ])
       if (details) {
         contest.value = details.data.contest
-        const { data } = await problemApi.list(1, 100)
         problemNames.value = Object.fromEntries(
-          (data.items || []).map((item) => [item.id, item.title]),
+          (contest.value.problems || []).map((item) => [
+            item.problem_id,
+            item.title || `题目 ${item.problem_id}`,
+          ]),
         )
       }
       items.value = leaderboard.data.items || []

@@ -52,3 +52,11 @@ make generate
 
 生成文件包括 `api/contest/v1` 下的 Go API、gRPC 和 validation 代码，以及
 `services/contest/internal/conf` 下的配置代码。
+
+## Contest details
+
+`GetContest` returns `contest.joined` for the authenticated actor. Membership is queried from `contest_participants` on each detail request and is independent of contest lifecycle. The default false value may be omitted by the JSON codec; clients should treat an absent value as false.
+
+Each `ContestProblem` includes a read-only `title`. Contest resolves all problem IDs in one `ProblemService.BatchGetProblems` call, preserving the incoming actor ID and roles in internal authentication. Configure the `problem` client alongside `judge` (endpoint, timeout and signing credentials). Titles submitted in create/update requests are ignored. Missing or inaccessible problems have an empty title; clients can show the problem ID. A failed batch call fails the detail request rather than silently presenting incomplete titles.
+
+No schema migration is needed. The deployment must update Problem Service (new RPC), Contest Service (client/config) and Gateway (new response fields) before the web client.

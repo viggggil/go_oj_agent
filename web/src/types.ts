@@ -43,6 +43,7 @@ export interface ProblemInput {
 }
 export type ContestStatus = 0 | 1 | 2 | 3 | 4 | string
 export interface ContestProblem {
+  title?: string
   problem_id: number
   sort_order: number
   score: number
@@ -55,6 +56,7 @@ export interface ContestSummary {
   end_at: TimestampValue
 }
 export interface Contest extends ContestSummary {
+  joined?: boolean
   created_by: number
   created_at: TimestampValue
   updated_at: TimestampValue

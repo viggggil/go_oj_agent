@@ -97,6 +97,8 @@ func (m *ContestProblem) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for Title
+
 	if len(errors) > 0 {
 		return ContestProblemMultiError(errors)
 	}
@@ -353,6 +355,8 @@ func (m *Contest) validate(all bool) error {
 		}
 
 	}
+
+	// no validation rules for Joined
 
 	if len(errors) > 0 {
 		return ContestMultiError(errors)
