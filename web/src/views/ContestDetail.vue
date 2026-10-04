@@ -35,10 +35,12 @@
       </div>
       <div v-for="item in contest.problems" :key="item.problem_id" class="contest-problem-row">
         <span>{{ item.sort_order }}</span>
-        <span
-          ><strong>{{ problemNames[item.problem_id] || `题目 ${item.problem_id}` }}</strong
-          ><small>题目 {{ item.problem_id }}</small></span
-        >
+        <span>
+          <RouterLink class="problem-link" :to="problemLink(item.problem_id)">
+            <strong>{{ problemNames[item.problem_id] || `题目 ${item.problem_id}` }}</strong>
+          </RouterLink>
+          <small>题目 {{ item.problem_id }}</small>
+        </span>
         <span>{{ item.score }} 分</span>
         <RouterLink class="button secondary" :to="submissionLink(item.problem_id)"
           >提交代码</RouterLink
@@ -94,6 +96,9 @@
   }
   function submissionLink(problemId: number) {
     return `/submissions/new?contest_id=${contestId}&problem_id=${problemId}`
+  }
+  function problemLink(problemId: number) {
+    return `/problems/${problemId}`
   }
   async function load() {
     error.value = ''
