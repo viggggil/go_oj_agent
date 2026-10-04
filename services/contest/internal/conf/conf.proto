@@ -13,6 +13,7 @@ message Bootstrap {
   ClientProto judge = 6;
   MessagingProto messaging = 7;
   ClientProto problem = 8;
+  LeaderboardCacheProto leaderboard_cache = 9;
 }
 
 message MessagingProto {
@@ -81,4 +82,13 @@ message ClientProto {
   string audience = 7;
   string subject = 8;
   string token_ttl = 9;
+}
+
+message LeaderboardCacheProto {
+  bool enabled = 1;
+  repeated string addresses = 2;
+  string password = 3;
+  int32 db = 4;
+  string namespace = 5;
+  string timeout = 6;
 }

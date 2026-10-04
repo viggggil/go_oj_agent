@@ -2,6 +2,7 @@ package conf
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -25,6 +26,28 @@ func ValidateConfig(c *Bootstrap) error {
 		}
 		if _, err := time.ParseDuration(auth.GetClockSkew()); err != nil {
 			return fmt.Errorf("invalid internal auth clock skew: %w", err)
+		}
+	}
+	return ValidateLeaderboardCache(c.GetLeaderboardCache())
+}
+
+// ValidateLeaderboardCache also guards direct client construction in tests/tools.
+func ValidateLeaderboardCache(cache *LeaderboardCacheProto) error {
+	if cache != nil && cache.GetEnabled() {
+		if len(cache.GetAddresses()) == 0 || cache.GetDb() < 0 || !regexp.MustCompile(`^[a-zA-Z0-9:_-]+$`).MatchString(cache.GetNamespace()) {
+			return fmt.Errorf("invalid leaderboard Redis addresses, database or namespace")
+		}
+		for _, address := range cache.GetAddresses() {
+			if strings.TrimSpace(address) == "" {
+				return fmt.Errorf("empty leaderboard Redis address")
+			}
+		}
+		timeout, err := time.ParseDuration(cache.GetTimeout())
+		if err != nil || timeout <= 0 || timeout > 3*time.Second {
+			return fmt.Errorf("leaderboard Redis timeout must be positive and <= 3s")
+		}
+		if len(cache.GetAddresses()) > 1 && cache.GetDb() != 0 {
+			return fmt.Errorf("Redis Cluster requires db 0")
 		}
 	}
 	return nil

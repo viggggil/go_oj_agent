@@ -107,3 +107,77 @@ For rollback stop consumers and relays, restore the previous application, then
 apply the down migration. It discards only derived summaries and cache delivery
 state. Re-upgrade requires backfill and cache reconstruction. Never reset an
 individual user version while an older cache generation is active.
+
+## Redis leaderboard writes (issue #134, PR2)
+
+The optional Outbox relay writes complete snapshots using Redis Lua. It does
+not change `GetLeaderboard`: all reads still use MySQL. Both shipped configs
+set `leaderboard_cache.enabled: false`; leave it disabled until PR3 implements
+initialization, consistent cache reads, catch-up and safe generation switching.
+Enabling this intermediate worker against a cold Redis leaves events pending
+with `last_error` instead of publishing an incomplete leaderboard. There is
+intentionally no manual activation command.
+
+```yaml
+leaderboard_cache:
+  enabled: false
+  addresses: ["redis:6379"]
+  password: ""
+  db: 0
+  namespace: "oj:contest"
+  timeout: "2s"
+```
+
+Multiple addresses select the go-redis Cluster client (DB must be 0). Namespace
+accepts letters, digits, colons, underscores and hyphens; braces are rejected so
+the contest's hash tag controls the Redis Cluster slot. Timeout must be positive
+and at most 3 seconds. The client does not Ping at startup; an offline Redis
+cannot prevent result processing. Each operation has a bounded context, and
+transient failures release the event for Outbox backoff/retry. Shutdown cancels
+the worker and leaves interrupted leases recoverable. Existing database
+migration/backfill steps above still apply.
+
+Each contest uses a pointer and generation-specific keys in the same hash slot:
+
+```text
+oj:contest:{20}:lb:active                  # canonical generation UUID
+oj:contest:{20}:lb:<generation>:rank       # ZSET, all scores 0
+oj:contest:{20}:lb:<generation>:entries    # user -> complete snapshot JSON
+oj:contest:{20}:lb:<generation>:versions   # user -> padded decimal version
+oj:contest:{20}:lb:<generation>:members    # user -> current ranking member
+oj:contest:{20}:lb:<generation>:meta       # generation and lifecycle state
+```
+
+Ranking members encode `(100 - solved_count):penalty_seconds:user_id` with widths
+3, 19 and 19. Supported ranges are 0–100 solved problems and nonnegative signed
+64-bit penalty/user IDs (user IDs must be positive). Lexicographic order matches
+MySQL's solved DESC, penalty ASC, user_id ASC even for IDs 2/10 and maximum
+signed 64-bit values. A `~` member sorts after real users; it is a structural
+sentinel, must be excluded from counts/pages by PR3 and represents an allocated
+empty generation. Each user hash also has a `__generation` sentinel.
+
+The Lua update checks the active pointer, key types, generation markers,
+cardinalities, existing user mapping and lifecycle state before writing. Versions
+are positive signed 64-bit integers encoded as 19-character decimal strings;
+Lua compares strings and never converts versions to floating point. Equal or
+older versions succeed without writes. New versions replace the old ranking
+member, JSON, version and member mapping atomically, so rejudge score decreases
+and out-of-order delivery cannot leave duplicate members or restore old scores.
+
+Redis Lua does not roll back commands after an error. The update therefore sets
+metadata to `dirty` before mutations and restores the prior state only after all
+writes succeed; a write error leaves the generation unusable until rebuilt.
+Missing/evicted keys, mismatched markers or a dirty generation fail closed. The
+worker does not recreate these keys from one user's event because doing so would
+lose the version fences for other users. `PrepareGeneration` only allocates an
+unused build target; it does not publish or mark it ready. PR3 will own safe
+initialization/rebuild, stale-data checks, TTL and generation cleanup. No TTL is
+set in this intermediate PR; cache loss requires full reconstruction, not replay
+of only the still-pending events.
+
+Tests run against miniredis by default. To exercise the actual Redis scripts and
+the MySQL -> Outbox -> Redis path, set `CONTEST_TEST_REDIS_ADDR` and
+`CONTEST_TEST_MYSQL_DSN` when testing `./services/contest/internal/data`. The
+MySQL fixture requires permission to create/drop its isolated temporary schema;
+Redis tests use unique namespaces and remove only their own keys. The Docker
+integration runner supplies both variables automatically.
