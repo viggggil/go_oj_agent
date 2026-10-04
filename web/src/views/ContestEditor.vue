@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">Contest</p>
         <h1>创建比赛</h1>
-        <p>设置比赛时间，并按题目编号配置比赛题目。</p>
+        <p>设置比赛时间，并从题库中勾选本场比赛的题目。</p>
       </div>
       <RouterLink class="button secondary" to="/contests">返回比赛</RouterLink>
     </div>
@@ -14,11 +14,21 @@
       /></label>
       <label>开始时间<input v-model="form.start_at" type="datetime-local" required /></label>
       <label>结束时间<input v-model="form.end_at" type="datetime-local" required /></label>
-      <label class="wide">
-        题目配置
-        <input v-model="problemText" required placeholder="题目 ID，逗号分隔，例如 1,2,3" />
-        <small class="muted">题目按输入顺序排列，每题默认 100 分。</small>
-      </label>
+      <fieldset class="wide problem-picker">
+        <legend>比赛题目</legend>
+        <p v-if="loadingProblems" class="muted">正在加载题库…</p>
+        <p v-else-if="!problems.length" class="error">题库中暂无可用题目。</p>
+        <template v-else>
+          <label v-for="problem in problems" :key="problem.id" class="problem-option">
+            <input v-model="selectedProblemIds" type="checkbox" :value="problem.id" />
+            <span
+              ><strong>#{{ problem.id }} {{ problem.title }}</strong
+              ><small>{{ difficulty(problem.difficulty) }}</small></span
+            >
+          </label>
+        </template>
+        <small class="muted">已勾选 {{ selectedProblemIds.length }} 道题，每题默认 100 分。</small>
+      </fieldset>
       <div class="wide actions">
         <button :disabled="saving">{{ saving ? '创建中' : '创建比赛' }}</button>
       </div>
@@ -28,25 +38,28 @@
 </template>
 
 <script setup lang="ts">
-  import { reactive, ref } from 'vue'
+  import { onMounted, reactive, ref } from 'vue'
   import { RouterLink, useRouter } from 'vue-router'
-  import { apiErrorMessage, contestApi } from '../api'
+  import { apiErrorMessage, contestApi, problemApi } from '../api'
+  import type { ProblemSummary } from '../types'
 
   const router = useRouter()
   const saving = ref(false)
   const message = ref('')
   const messageIsError = ref(false)
-  const problemText = ref('')
+  const problems = ref<ProblemSummary[]>([])
+  const selectedProblemIds = ref<number[]>([])
+  const loadingProblems = ref(true)
   const form = reactive({ title: '', start_at: '', end_at: '' })
 
+  const difficulty = (value: number) => ({ 1: '简单', 2: '中等', 3: '困难' })[value] || '未知'
+
   async function save() {
-    const ids = problemText.value
-      .split(',')
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isInteger(value) && value > 0)
-    if (!form.title || ids.length === 0 || new Set(ids).size !== ids.length) {
+    const title = form.title.trim()
+    const ids = selectedProblemIds.value
+    if (!title || ids.length === 0) {
       messageIsError.value = true
-      message.value = '请输入比赛名称和不重复的题目编号'
+      message.value = '请输入比赛名称，并至少勾选一道题目'
       return
     }
     const start = new Date(form.start_at)
@@ -65,7 +78,7 @@
     message.value = ''
     try {
       const { data } = await contestApi.create({
-        title: form.title,
+        title,
         start_at: start.toISOString(),
         end_at: end.toISOString(),
         problems: ids.map((problem_id, index) => ({
@@ -82,4 +95,17 @@
       saving.value = false
     }
   }
+
+  onMounted(async () => {
+    try {
+      problems.value = ((await problemApi.list(1, 100)).data.items || []).filter(
+        (problem) => problem.status !== 2,
+      )
+    } catch (error) {
+      messageIsError.value = true
+      message.value = apiErrorMessage(error, '加载题库')
+    } finally {
+      loadingProblems.value = false
+    }
+  })
 </script>
