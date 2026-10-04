@@ -13,7 +13,7 @@
         <dt>角色</dt>
         <dd>{{ auth.user.roles.join('、') }}</dd>
       </dl>
-      <button @click="auth.logout">退出登录</button></template
+      <button @click="signOut">退出登录</button></template
     >
     <p v-else class="error">无法加载用户信息</p>
   </section>
@@ -35,4 +35,8 @@
       loading.value = false
     }
   })
+  async function signOut() {
+    await auth.logout()
+    router.push('/login')
+  }
 </script>

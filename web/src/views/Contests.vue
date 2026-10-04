@@ -6,6 +6,7 @@
         <h1>比赛</h1>
         <p>浏览比赛、报名并查看比赛结果。</p>
       </div>
+      <RouterLink v-if="isAdmin" class="button" to="/contests/new">创建比赛</RouterLink>
     </div>
 
     <div class="filter-bar contest-filter">
@@ -56,11 +57,12 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { RouterLink } from 'vue-router'
   import { apiErrorMessage, contestApi } from '../api'
   import { formatDate } from '../submission'
   import type { ContestStatus, ContestSummary } from '../types'
+  import { useAuthStore } from '../stores/auth'
 
   const pageSize = 20
   const page = ref(1)
@@ -69,6 +71,8 @@
   const error = ref('')
   const status = ref('')
   const items = ref<ContestSummary[]>([])
+  const auth = useAuthStore()
+  const isAdmin = computed(() => auth.user?.roles.includes('admin'))
 
   function statusKey(value: ContestStatus) {
     const text = String(value)

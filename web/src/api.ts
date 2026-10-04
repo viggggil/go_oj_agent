@@ -186,6 +186,12 @@ export const contestApi = {
       { params: { page, page_size: pageSize, ...(status ? { status } : {}) } },
     ),
   get: (id: number) => api.get<{ contest: Contest }>(`/api/v1/contests/${id}`),
+  create: (contest: {
+    title: string
+    start_at: string
+    end_at: string
+    problems: { problem_id: number; sort_order: number; score: number }[]
+  }) => api.post<{ contest: Contest }>('/api/v1/contests', { contest }),
   join: (id: number) =>
     api.post<{ contest_id: number; user_id: number; joined_at: string }>(
       `/api/v1/contests/${id}/join`,

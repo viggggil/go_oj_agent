@@ -13,6 +13,7 @@ import SubmissionDetail from './views/SubmissionDetail.vue'
 import Contests from './views/Contests.vue'
 import ContestDetail from './views/ContestDetail.vue'
 import ContestLeaderboard from './views/ContestLeaderboard.vue'
+import ContestEditor from './views/ContestEditor.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +30,7 @@ const router = createRouter({
     { path: '/submissions/new', component: SubmissionCreate, meta: { auth: true } },
     { path: '/submissions/:id', component: SubmissionDetail, meta: { auth: true } },
     { path: '/contests', component: Contests, meta: { auth: true } },
+    { path: '/contests/new', component: ContestEditor, meta: { auth: true, admin: true } },
     { path: '/contests/:id', component: ContestDetail, meta: { auth: true } },
     { path: '/contests/:id/leaderboard', component: ContestLeaderboard, meta: { auth: true } },
   ],

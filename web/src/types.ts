@@ -51,15 +51,16 @@ export interface ContestSummary {
   id: number
   title: string
   status: ContestStatus
-  start_at: string
-  end_at: string
+  start_at: TimestampValue
+  end_at: TimestampValue
 }
 export interface Contest extends ContestSummary {
   created_by: number
-  created_at: string
-  updated_at: string
+  created_at: TimestampValue
+  updated_at: TimestampValue
   problems: ContestProblem[]
 }
+export type TimestampValue = string | { seconds?: number | string; nanos?: number }
 export interface LeaderboardProblemResult {
   problem_id: number
   solved: boolean
@@ -123,10 +124,10 @@ export interface Submission {
   judge_revision: string
   retry_count: number
   system_error_reason?: string
-  created_at?: string
-  updated_at?: string
-  judged_at?: string
-  invalidated_at?: string
+  created_at?: TimestampValue
+  updated_at?: TimestampValue
+  judged_at?: TimestampValue
+  invalidated_at?: TimestampValue
 }
 
 export interface SubmissionCaseResult {
