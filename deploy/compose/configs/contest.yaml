@@ -33,3 +33,14 @@ judge:
   audience: "judge-service"
   subject: "gateway-service"
   token_ttl: "30s"
+
+problem:
+  name: problem-service
+  endpoint: "problem-service:9002"
+  timeout: "3s"
+  private_key_file: "/run/auth-keys/gateway-private.pem"
+  key_id: "gateway-internal-2026-09"
+  issuer: "go-oj-gateway"
+  audience: "problem-service"
+  subject: "gateway-service"
+  token_ttl: "30s"

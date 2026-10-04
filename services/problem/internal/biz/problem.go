@@ -322,3 +322,31 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	}
 	return created, nil
 }
+
+type ProblemBatchRepository interface {
+	BatchGet(context.Context, []int64, bool) ([]Problem, error)
+}
+
+func (uc *ProblemUsecase) BatchGet(ctx context.Context, actor *commonv1.RequestContext, ids []int64) ([]Problem, error) {
+	if actor == nil || actor.GetUserId() <= 0 {
+		return nil, ErrorPermissionDenied("authenticated actor is required")
+	}
+	if len(ids) == 0 || len(ids) > 100 {
+		return nil, ErrorInvalidArgument("between 1 and 100 problem IDs required")
+	}
+	seen := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id <= 0 || seen[id] {
+			return nil, ErrorInvalidArgument("problem IDs must be positive and unique")
+		}
+		seen[id] = true
+	}
+	if uc == nil || uc.repo == nil {
+		return nil, ErrorInternal("problem repository is not configured")
+	}
+	repo, ok := uc.repo.(ProblemBatchRepository)
+	if !ok {
+		return nil, ErrorInternal("batch problem repository is not configured")
+	}
+	return repo.BatchGet(ctx, ids, requireAdmin(actor) == nil)
+}

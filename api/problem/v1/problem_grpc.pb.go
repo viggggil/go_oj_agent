@@ -23,6 +23,7 @@ const (
 	ProblemService_UpdateProblem_FullMethodName        = "/problem.v1.ProblemService/UpdateProblem"
 	ProblemService_ArchiveProblem_FullMethodName       = "/problem.v1.ProblemService/ArchiveProblem"
 	ProblemService_GetProblem_FullMethodName           = "/problem.v1.ProblemService/GetProblem"
+	ProblemService_BatchGetProblems_FullMethodName     = "/problem.v1.ProblemService/BatchGetProblems"
 	ProblemService_ListProblems_FullMethodName         = "/problem.v1.ProblemService/ListProblems"
 	ProblemService_AddTestcase_FullMethodName          = "/problem.v1.ProblemService/AddTestcase"
 	ProblemService_ArchiveTestcase_FullMethodName      = "/problem.v1.ProblemService/ArchiveTestcase"
@@ -38,6 +39,7 @@ type ProblemServiceClient interface {
 	UpdateProblem(ctx context.Context, in *UpdateProblemRequest, opts ...grpc.CallOption) (*UpdateProblemResponse, error)
 	ArchiveProblem(ctx context.Context, in *ArchiveProblemRequest, opts ...grpc.CallOption) (*ArchiveProblemResponse, error)
 	GetProblem(ctx context.Context, in *GetProblemRequest, opts ...grpc.CallOption) (*GetProblemResponse, error)
+	BatchGetProblems(ctx context.Context, in *BatchGetProblemsRequest, opts ...grpc.CallOption) (*BatchGetProblemsResponse, error)
 	ListProblems(ctx context.Context, in *ListProblemsRequest, opts ...grpc.CallOption) (*ListProblemsResponse, error)
 	// AddTestcase stores one paired .in/.out testcase and its metadata atomically
 	// from the caller's perspective.
@@ -92,6 +94,16 @@ func (c *problemServiceClient) GetProblem(ctx context.Context, in *GetProblemReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetProblemResponse)
 	err := c.cc.Invoke(ctx, ProblemService_GetProblem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *problemServiceClient) BatchGetProblems(ctx context.Context, in *BatchGetProblemsRequest, opts ...grpc.CallOption) (*BatchGetProblemsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGetProblemsResponse)
+	err := c.cc.Invoke(ctx, ProblemService_BatchGetProblems_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +168,7 @@ type ProblemServiceServer interface {
 	UpdateProblem(context.Context, *UpdateProblemRequest) (*UpdateProblemResponse, error)
 	ArchiveProblem(context.Context, *ArchiveProblemRequest) (*ArchiveProblemResponse, error)
 	GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error)
+	BatchGetProblems(context.Context, *BatchGetProblemsRequest) (*BatchGetProblemsResponse, error)
 	ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error)
 	// AddTestcase stores one paired .in/.out testcase and its metadata atomically
 	// from the caller's perspective.
@@ -187,6 +200,9 @@ func (UnimplementedProblemServiceServer) ArchiveProblem(context.Context, *Archiv
 }
 func (UnimplementedProblemServiceServer) GetProblem(context.Context, *GetProblemRequest) (*GetProblemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProblem not implemented")
+}
+func (UnimplementedProblemServiceServer) BatchGetProblems(context.Context, *BatchGetProblemsRequest) (*BatchGetProblemsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchGetProblems not implemented")
 }
 func (UnimplementedProblemServiceServer) ListProblems(context.Context, *ListProblemsRequest) (*ListProblemsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListProblems not implemented")
@@ -292,6 +308,24 @@ func _ProblemService_GetProblem_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProblemServiceServer).GetProblem(ctx, req.(*GetProblemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProblemService_BatchGetProblems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGetProblemsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProblemServiceServer).BatchGetProblems(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProblemService_BatchGetProblems_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProblemServiceServer).BatchGetProblems(ctx, req.(*BatchGetProblemsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -408,6 +442,10 @@ var ProblemService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProblem",
 			Handler:    _ProblemService_GetProblem_Handler,
+		},
+		{
+			MethodName: "BatchGetProblems",
+			Handler:    _ProblemService_BatchGetProblems_Handler,
 		},
 		{
 			MethodName: "ListProblems",

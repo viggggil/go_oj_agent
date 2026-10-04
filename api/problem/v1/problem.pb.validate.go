@@ -3703,3 +3703,283 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GetJudgeProfileResponseValidationError{}
+
+// Validate checks the field values on BatchGetProblemsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *BatchGetProblemsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BatchGetProblemsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// BatchGetProblemsRequestMultiError, or nil if none found.
+func (m *BatchGetProblemsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BatchGetProblemsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetProblemIds()); l < 1 || l > 100 {
+		err := BatchGetProblemsRequestValidationError{
+			field:  "ProblemIds",
+			reason: "value must contain between 1 and 100 items, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	_BatchGetProblemsRequest_ProblemIds_Unique := make(map[int64]struct{}, len(m.GetProblemIds()))
+
+	for idx, item := range m.GetProblemIds() {
+		_, _ = idx, item
+
+		if _, exists := _BatchGetProblemsRequest_ProblemIds_Unique[item]; exists {
+			err := BatchGetProblemsRequestValidationError{
+				field:  fmt.Sprintf("ProblemIds[%v]", idx),
+				reason: "repeated value must contain unique items",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		} else {
+			_BatchGetProblemsRequest_ProblemIds_Unique[item] = struct{}{}
+		}
+
+		if item <= 0 {
+			err := BatchGetProblemsRequestValidationError{
+				field:  fmt.Sprintf("ProblemIds[%v]", idx),
+				reason: "value must be greater than 0",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return BatchGetProblemsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// BatchGetProblemsRequestMultiError is an error wrapping multiple validation
+// errors returned by BatchGetProblemsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type BatchGetProblemsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BatchGetProblemsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BatchGetProblemsRequestMultiError) AllErrors() []error { return m }
+
+// BatchGetProblemsRequestValidationError is the validation error returned by
+// BatchGetProblemsRequest.Validate if the designated constraints aren't met.
+type BatchGetProblemsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BatchGetProblemsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BatchGetProblemsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BatchGetProblemsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BatchGetProblemsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BatchGetProblemsRequestValidationError) ErrorName() string {
+	return "BatchGetProblemsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BatchGetProblemsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBatchGetProblemsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BatchGetProblemsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BatchGetProblemsRequestValidationError{}
+
+// Validate checks the field values on BatchGetProblemsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *BatchGetProblemsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on BatchGetProblemsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// BatchGetProblemsResponseMultiError, or nil if none found.
+func (m *BatchGetProblemsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *BatchGetProblemsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetProblems() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, BatchGetProblemsResponseValidationError{
+						field:  fmt.Sprintf("Problems[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, BatchGetProblemsResponseValidationError{
+						field:  fmt.Sprintf("Problems[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return BatchGetProblemsResponseValidationError{
+					field:  fmt.Sprintf("Problems[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return BatchGetProblemsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// BatchGetProblemsResponseMultiError is an error wrapping multiple validation
+// errors returned by BatchGetProblemsResponse.ValidateAll() if the designated
+// constraints aren't met.
+type BatchGetProblemsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m BatchGetProblemsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m BatchGetProblemsResponseMultiError) AllErrors() []error { return m }
+
+// BatchGetProblemsResponseValidationError is the validation error returned by
+// BatchGetProblemsResponse.Validate if the designated constraints aren't met.
+type BatchGetProblemsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e BatchGetProblemsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e BatchGetProblemsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e BatchGetProblemsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e BatchGetProblemsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e BatchGetProblemsResponseValidationError) ErrorName() string {
+	return "BatchGetProblemsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e BatchGetProblemsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sBatchGetProblemsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = BatchGetProblemsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = BatchGetProblemsResponseValidationError{}

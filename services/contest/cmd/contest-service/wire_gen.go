@@ -7,7 +7,6 @@
 package main
 
 import (
-	"github.com/go-kratos/kratos/v3"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/data"
@@ -17,7 +16,7 @@ import (
 
 // Injectors from wire.go:
 
-func initApp(config *conf.Bootstrap) (*kratos.App, func(), error) {
+func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	v := server.NewMiddlewares()
 	db, cleanup, err := data.NewMySQLDB(config)
 	if err != nil {
@@ -31,10 +30,18 @@ func initApp(config *conf.Bootstrap) (*kratos.App, func(), error) {
 		return nil, nil, err
 	}
 	submissionCreator := data.ProvideSubmissionCreator(submissionClient)
-	contestUsecase := biz.NewContestUsecaseWithRepositoryAndSubmission(repository, submissionCreator)
+	problemClient, cleanup3, err := data.NewProblemClient(context, config)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	problemCatalog := data.ProvideProblemCatalog(problemClient)
+	contestUsecase := biz.NewContestUsecaseWithClients(repository, submissionCreator, problemCatalog)
 	contestService := service.NewContestService(contestUsecase)
 	grpcServer, err := server.NewGRPCServer(config, v, contestService)
 	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
@@ -42,17 +49,20 @@ func initApp(config *conf.Bootstrap) (*kratos.App, func(), error) {
 	registrar := server.NewRegistrar(config)
 	resultConsumerServer, err := server.NewResultConsumerServer(config, repository)
 	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
-	app, err := newApp(config, grpcServer, registrar, resultConsumerServer)
+	v2, err := newApp(config, grpcServer, registrar, resultConsumerServer)
 	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
-	return app, func() {
+	return v2, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil

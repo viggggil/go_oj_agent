@@ -13,6 +13,7 @@ service ProblemService {
   rpc UpdateProblem(UpdateProblemRequest) returns (UpdateProblemResponse);
   rpc ArchiveProblem(ArchiveProblemRequest) returns (ArchiveProblemResponse);
   rpc GetProblem(GetProblemRequest) returns (GetProblemResponse);
+  rpc BatchGetProblems(BatchGetProblemsRequest) returns (BatchGetProblemsResponse);
   rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
 
   // AddTestcase stores one paired .in/.out testcase and its metadata atomically
@@ -235,4 +236,12 @@ message GetJudgeProfileRequest {
 
 message GetJudgeProfileResponse {
   JudgeProfile profile = 1 [(validate.rules).message.required = true];
+}
+
+// Missing or inaccessible IDs are omitted; results are ordered by ID.
+message BatchGetProblemsRequest {
+  repeated int64 problem_ids = 1 [(validate.rules).repeated = {min_items: 1, max_items: 100, unique: true, items: {int64: {gt: 0}}}];
+}
+message BatchGetProblemsResponse {
+  repeated ProblemSummary problems = 1;
 }

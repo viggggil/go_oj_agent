@@ -1685,6 +1685,95 @@ func (x *GetJudgeProfileResponse) GetProfile() *JudgeProfile {
 	return nil
 }
 
+// Missing or inaccessible IDs are omitted; results are ordered by ID.
+type BatchGetProblemsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProblemIds    []int64                `protobuf:"varint,1,rep,packed,name=problem_ids,json=problemIds,proto3" json:"problem_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetProblemsRequest) Reset() {
+	*x = BatchGetProblemsRequest{}
+	mi := &file_api_problem_v1_problem_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetProblemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetProblemsRequest) ProtoMessage() {}
+
+func (x *BatchGetProblemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_problem_v1_problem_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetProblemsRequest.ProtoReflect.Descriptor instead.
+func (*BatchGetProblemsRequest) Descriptor() ([]byte, []int) {
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *BatchGetProblemsRequest) GetProblemIds() []int64 {
+	if x != nil {
+		return x.ProblemIds
+	}
+	return nil
+}
+
+type BatchGetProblemsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Problems      []*ProblemSummary      `protobuf:"bytes,1,rep,name=problems,proto3" json:"problems,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetProblemsResponse) Reset() {
+	*x = BatchGetProblemsResponse{}
+	mi := &file_api_problem_v1_problem_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetProblemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetProblemsResponse) ProtoMessage() {}
+
+func (x *BatchGetProblemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_problem_v1_problem_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetProblemsResponse.ProtoReflect.Descriptor instead.
+func (*BatchGetProblemsResponse) Descriptor() ([]byte, []int) {
+	return file_api_problem_v1_problem_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *BatchGetProblemsResponse) GetProblems() []*ProblemSummary {
+	if x != nil {
+		return x.Problems
+	}
+	return nil
+}
+
 var File_api_problem_v1_problem_proto protoreflect.FileDescriptor
 
 const file_api_problem_v1_problem_proto_rawDesc = "" +
@@ -1817,7 +1906,12 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"\n" +
 	"problem_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\"W\n" +
 	"\x17GetJudgeProfileResponse\x12<\n" +
-	"\aprofile\x18\x01 \x01(\v2\x18.problem.v1.JudgeProfileB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aprofile*\x90\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2\x18.problem.v1.JudgeProfileB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aprofile\"N\n" +
+	"\x17BatchGetProblemsRequest\x123\n" +
+	"\vproblem_ids\x18\x01 \x03(\x03B\x12\xfaB\x0f\x92\x01\f\b\x01\x10d\x18\x01\"\x04\"\x02 \x00R\n" +
+	"problemIds\"R\n" +
+	"\x18BatchGetProblemsResponse\x126\n" +
+	"\bproblems\x18\x01 \x03(\v2\x1a.problem.v1.ProblemSummaryR\bproblems*\x90\x01\n" +
 	"\x11ProblemDifficulty\x12\"\n" +
 	"\x1ePROBLEM_DIFFICULTY_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17PROBLEM_DIFFICULTY_EASY\x10\x01\x12\x1d\n" +
@@ -1830,13 +1924,14 @@ const file_api_problem_v1_problem_proto_rawDesc = "" +
 	"\x0eTestcaseStatus\x12\x1f\n" +
 	"\x1bTESTCASE_STATUS_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16TESTCASE_STATUS_ACTIVE\x10\x01\x12\x1c\n" +
-	"\x18TESTCASE_STATUS_ARCHIVED\x10\x022\xa8\x06\n" +
+	"\x18TESTCASE_STATUS_ARCHIVED\x10\x022\x87\a\n" +
 	"\x0eProblemService\x12T\n" +
 	"\rCreateProblem\x12 .problem.v1.CreateProblemRequest\x1a!.problem.v1.CreateProblemResponse\x12T\n" +
 	"\rUpdateProblem\x12 .problem.v1.UpdateProblemRequest\x1a!.problem.v1.UpdateProblemResponse\x12W\n" +
 	"\x0eArchiveProblem\x12!.problem.v1.ArchiveProblemRequest\x1a\".problem.v1.ArchiveProblemResponse\x12K\n" +
 	"\n" +
-	"GetProblem\x12\x1d.problem.v1.GetProblemRequest\x1a\x1e.problem.v1.GetProblemResponse\x12Q\n" +
+	"GetProblem\x12\x1d.problem.v1.GetProblemRequest\x1a\x1e.problem.v1.GetProblemResponse\x12]\n" +
+	"\x10BatchGetProblems\x12#.problem.v1.BatchGetProblemsRequest\x1a$.problem.v1.BatchGetProblemsResponse\x12Q\n" +
 	"\fListProblems\x12\x1f.problem.v1.ListProblemsRequest\x1a .problem.v1.ListProblemsResponse\x12N\n" +
 	"\vAddTestcase\x12\x1e.problem.v1.AddTestcaseRequest\x1a\x1f.problem.v1.AddTestcaseResponse\x12Z\n" +
 	"\x0fArchiveTestcase\x12\".problem.v1.ArchiveTestcaseRequest\x1a#.problem.v1.ArchiveTestcaseResponse\x12i\n" +
@@ -1856,7 +1951,7 @@ func file_api_problem_v1_problem_proto_rawDescGZIP() []byte {
 }
 
 var file_api_problem_v1_problem_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_api_problem_v1_problem_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_api_problem_v1_problem_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_api_problem_v1_problem_proto_goTypes = []any{
 	(ProblemDifficulty)(0),               // 0: problem.v1.ProblemDifficulty
 	(ProblemStatus)(0),                   // 1: problem.v1.ProblemStatus
@@ -1886,9 +1981,11 @@ var file_api_problem_v1_problem_proto_goTypes = []any{
 	(*JudgeProfile)(nil),                 // 25: problem.v1.JudgeProfile
 	(*GetJudgeProfileRequest)(nil),       // 26: problem.v1.GetJudgeProfileRequest
 	(*GetJudgeProfileResponse)(nil),      // 27: problem.v1.GetJudgeProfileResponse
-	(*timestamppb.Timestamp)(nil),        // 28: google.protobuf.Timestamp
-	(*v1.PageRequest)(nil),               // 29: common.v1.PageRequest
-	(*v1.PageResponse)(nil),              // 30: common.v1.PageResponse
+	(*BatchGetProblemsRequest)(nil),      // 28: problem.v1.BatchGetProblemsRequest
+	(*BatchGetProblemsResponse)(nil),     // 29: problem.v1.BatchGetProblemsResponse
+	(*timestamppb.Timestamp)(nil),        // 30: google.protobuf.Timestamp
+	(*v1.PageRequest)(nil),               // 31: common.v1.PageRequest
+	(*v1.PageResponse)(nil),              // 32: common.v1.PageResponse
 }
 var file_api_problem_v1_problem_proto_depIdxs = []int32{
 	0,  // 0: problem.v1.ProblemSummary.difficulty:type_name -> problem.v1.ProblemDifficulty
@@ -1896,11 +1993,11 @@ var file_api_problem_v1_problem_proto_depIdxs = []int32{
 	0,  // 2: problem.v1.Problem.difficulty:type_name -> problem.v1.ProblemDifficulty
 	1,  // 3: problem.v1.Problem.status:type_name -> problem.v1.ProblemStatus
 	5,  // 4: problem.v1.Problem.tags:type_name -> problem.v1.Tag
-	28, // 5: problem.v1.Problem.created_at:type_name -> google.protobuf.Timestamp
-	28, // 6: problem.v1.Problem.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 5: problem.v1.Problem.created_at:type_name -> google.protobuf.Timestamp
+	30, // 6: problem.v1.Problem.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 7: problem.v1.TestcaseMetadata.status:type_name -> problem.v1.TestcaseStatus
-	28, // 8: problem.v1.TestcaseMetadata.created_at:type_name -> google.protobuf.Timestamp
-	28, // 9: problem.v1.TestcaseMetadata.archived_at:type_name -> google.protobuf.Timestamp
+	30, // 8: problem.v1.TestcaseMetadata.created_at:type_name -> google.protobuf.Timestamp
+	30, // 9: problem.v1.TestcaseMetadata.archived_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: problem.v1.ProblemInput.difficulty:type_name -> problem.v1.ProblemDifficulty
 	7,  // 11: problem.v1.CreateProblemRequest.problem:type_name -> problem.v1.ProblemInput
 	19, // 12: problem.v1.CreateProblemRequest.testcases:type_name -> problem.v1.TestcaseInput
@@ -1909,37 +2006,40 @@ var file_api_problem_v1_problem_proto_depIdxs = []int32{
 	4,  // 15: problem.v1.UpdateProblemResponse.problem:type_name -> problem.v1.Problem
 	4,  // 16: problem.v1.ArchiveProblemResponse.problem:type_name -> problem.v1.Problem
 	4,  // 17: problem.v1.GetProblemResponse.problem:type_name -> problem.v1.Problem
-	29, // 18: problem.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
+	31, // 18: problem.v1.ListProblemsRequest.page:type_name -> common.v1.PageRequest
 	3,  // 19: problem.v1.ListProblemsResponse.items:type_name -> problem.v1.ProblemSummary
-	30, // 20: problem.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
+	32, // 20: problem.v1.ListProblemsResponse.page:type_name -> common.v1.PageResponse
 	6,  // 21: problem.v1.AddTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
 	6,  // 22: problem.v1.ArchiveTestcaseResponse.testcase:type_name -> problem.v1.TestcaseMetadata
 	6,  // 23: problem.v1.ListProblemTestcasesResponse.items:type_name -> problem.v1.TestcaseMetadata
 	1,  // 24: problem.v1.JudgeProfile.status:type_name -> problem.v1.ProblemStatus
 	25, // 25: problem.v1.GetJudgeProfileResponse.profile:type_name -> problem.v1.JudgeProfile
-	8,  // 26: problem.v1.ProblemService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
-	10, // 27: problem.v1.ProblemService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
-	12, // 28: problem.v1.ProblemService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
-	14, // 29: problem.v1.ProblemService.GetProblem:input_type -> problem.v1.GetProblemRequest
-	16, // 30: problem.v1.ProblemService.ListProblems:input_type -> problem.v1.ListProblemsRequest
-	18, // 31: problem.v1.ProblemService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
-	21, // 32: problem.v1.ProblemService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
-	23, // 33: problem.v1.ProblemService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
-	26, // 34: problem.v1.ProblemService.GetJudgeProfile:input_type -> problem.v1.GetJudgeProfileRequest
-	9,  // 35: problem.v1.ProblemService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
-	11, // 36: problem.v1.ProblemService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
-	13, // 37: problem.v1.ProblemService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
-	15, // 38: problem.v1.ProblemService.GetProblem:output_type -> problem.v1.GetProblemResponse
-	17, // 39: problem.v1.ProblemService.ListProblems:output_type -> problem.v1.ListProblemsResponse
-	20, // 40: problem.v1.ProblemService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
-	22, // 41: problem.v1.ProblemService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
-	24, // 42: problem.v1.ProblemService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
-	27, // 43: problem.v1.ProblemService.GetJudgeProfile:output_type -> problem.v1.GetJudgeProfileResponse
-	35, // [35:44] is the sub-list for method output_type
-	26, // [26:35] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	3,  // 26: problem.v1.BatchGetProblemsResponse.problems:type_name -> problem.v1.ProblemSummary
+	8,  // 27: problem.v1.ProblemService.CreateProblem:input_type -> problem.v1.CreateProblemRequest
+	10, // 28: problem.v1.ProblemService.UpdateProblem:input_type -> problem.v1.UpdateProblemRequest
+	12, // 29: problem.v1.ProblemService.ArchiveProblem:input_type -> problem.v1.ArchiveProblemRequest
+	14, // 30: problem.v1.ProblemService.GetProblem:input_type -> problem.v1.GetProblemRequest
+	28, // 31: problem.v1.ProblemService.BatchGetProblems:input_type -> problem.v1.BatchGetProblemsRequest
+	16, // 32: problem.v1.ProblemService.ListProblems:input_type -> problem.v1.ListProblemsRequest
+	18, // 33: problem.v1.ProblemService.AddTestcase:input_type -> problem.v1.AddTestcaseRequest
+	21, // 34: problem.v1.ProblemService.ArchiveTestcase:input_type -> problem.v1.ArchiveTestcaseRequest
+	23, // 35: problem.v1.ProblemService.ListProblemTestcases:input_type -> problem.v1.ListProblemTestcasesRequest
+	26, // 36: problem.v1.ProblemService.GetJudgeProfile:input_type -> problem.v1.GetJudgeProfileRequest
+	9,  // 37: problem.v1.ProblemService.CreateProblem:output_type -> problem.v1.CreateProblemResponse
+	11, // 38: problem.v1.ProblemService.UpdateProblem:output_type -> problem.v1.UpdateProblemResponse
+	13, // 39: problem.v1.ProblemService.ArchiveProblem:output_type -> problem.v1.ArchiveProblemResponse
+	15, // 40: problem.v1.ProblemService.GetProblem:output_type -> problem.v1.GetProblemResponse
+	29, // 41: problem.v1.ProblemService.BatchGetProblems:output_type -> problem.v1.BatchGetProblemsResponse
+	17, // 42: problem.v1.ProblemService.ListProblems:output_type -> problem.v1.ListProblemsResponse
+	20, // 43: problem.v1.ProblemService.AddTestcase:output_type -> problem.v1.AddTestcaseResponse
+	22, // 44: problem.v1.ProblemService.ArchiveTestcase:output_type -> problem.v1.ArchiveTestcaseResponse
+	24, // 45: problem.v1.ProblemService.ListProblemTestcases:output_type -> problem.v1.ListProblemTestcasesResponse
+	27, // 46: problem.v1.ProblemService.GetJudgeProfile:output_type -> problem.v1.GetJudgeProfileResponse
+	37, // [37:47] is the sub-list for method output_type
+	27, // [27:37] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_api_problem_v1_problem_proto_init() }
@@ -1953,7 +2053,7 @@ func file_api_problem_v1_problem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_problem_v1_problem_proto_rawDesc), len(file_api_problem_v1_problem_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

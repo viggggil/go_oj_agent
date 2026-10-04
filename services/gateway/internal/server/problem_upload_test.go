@@ -116,6 +116,7 @@ func multipartRequest(t *testing.T, caseNo, inputName string, input []byte, outp
 }
 
 type fakeProblemClient struct {
+	problemv1.ProblemServiceClient
 	addRequest    *problemv1.AddTestcaseRequest
 	createRequest *problemv1.CreateProblemRequest
 }

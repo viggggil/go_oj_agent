@@ -38,3 +38,14 @@ judge:
   audience: "judge-service"
   subject: "contest-service"
   token_ttl: "30s"
+
+problem:
+  name: "problem-service"
+  endpoint: "127.0.0.1:9002"
+  timeout: "3s"
+  private_key_file: ""
+  key_id: "contest-internal-2026-09"
+  issuer: "go-oj-contest"
+  audience: "problem-service"
+  subject: "contest-service"
+  token_ttl: "30s"

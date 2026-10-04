@@ -77,10 +77,13 @@ export function verdictClass(value: string | number | undefined) {
   return `verdict verdict-${key}`
 }
 
-export function formatDate(value?: string) {
+export function formatDate(value?: string | { seconds?: number | string; nanos?: number }) {
   if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  const date =
+    typeof value === 'object'
+      ? new Date(Number(value.seconds || 0) * 1000 + Number(value.nanos || 0) / 1e6)
+      : new Date(value)
+  return Number.isNaN(date.valueOf()) ? '—' : date.toLocaleString('zh-CN', { hour12: false })
 }
 
 export function formatBytes(value: number) {

@@ -48,7 +48,7 @@ func (s *ContestService) GetContest(ctx context.Context, req *contestv1.GetConte
 	if err != nil {
 		return nil, err
 	}
-	contest, err := s.uc.Get(ctx, actor, req.GetContestId())
+	contest, err := s.uc.GetDetails(ctx, actor, req.GetContestId())
 	if err != nil {
 		return nil, err
 	}

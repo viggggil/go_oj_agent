@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	mysql "github.com/go-sql-driver/mysql"
 
@@ -260,4 +261,44 @@ func (s *StoreSet) Archive(ctx context.Context, problemID int64) (biz.Problem, e
 		return biz.Problem{}, biz.ErrorNotFound("problem not found")
 	}
 	return s.FindByID(ctx, problemID)
+}
+
+func (s *StoreSet) BatchGet(ctx context.Context, ids []int64, includeArchived bool) ([]biz.Problem, error) {
+	if s == nil || s.db == nil {
+		return nil, biz.ErrorInternal("problem database is not configured")
+	}
+	if len(ids) == 0 {
+		return []biz.Problem{}, nil
+	}
+	args := make([]any, 0, len(ids)+1)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	query := "SELECT id,title,slug,difficulty,status FROM problems WHERE id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",") + ")"
+	if !includeArchived {
+		query += " AND status = ?"
+		args = append(args, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String())
+	}
+	rows, err := s.db.QueryContext(ctx, query+" ORDER BY id", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]biz.Problem, 0, len(ids))
+	for rows.Next() {
+		var p biz.Problem
+		var difficulty, state string
+		if err := rows.Scan(&p.ID, &p.Title, &p.Slug, &difficulty, &state); err != nil {
+			return nil, err
+		}
+		d, ok := problemv1.ProblemDifficulty_value[difficulty]
+		st, valid := problemv1.ProblemStatus_value[state]
+		if !ok || !valid {
+			return nil, biz.ErrorInternal("invalid problem enum in database")
+		}
+		p.Difficulty = problemv1.ProblemDifficulty(d)
+		p.Status = problemv1.ProblemStatus(st)
+		items = append(items, p)
+	}
+	return items, rows.Err()
 }

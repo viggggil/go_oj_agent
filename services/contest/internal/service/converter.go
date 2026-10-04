@@ -7,7 +7,7 @@ import (
 )
 
 func toProtoContest(value biz.Contest) *contestv1.Contest {
-	result := &contestv1.Contest{Id: value.ID, Title: value.Title, Status: value.Status, CreatedBy: value.CreatedBy, Problems: make([]*contestv1.ContestProblem, 0, len(value.Problems))}
+	result := &contestv1.Contest{Id: value.ID, Title: value.Title, Status: value.Status, CreatedBy: value.CreatedBy, Joined: value.Joined, Problems: make([]*contestv1.ContestProblem, 0, len(value.Problems))}
 	if !value.StartAt.IsZero() {
 		result.StartAt = timestamppb.New(value.StartAt)
 	}
@@ -21,7 +21,7 @@ func toProtoContest(value biz.Contest) *contestv1.Contest {
 		result.UpdatedAt = timestamppb.New(value.UpdatedAt)
 	}
 	for _, problem := range value.Problems {
-		result.Problems = append(result.Problems, &contestv1.ContestProblem{ProblemId: problem.ProblemID, SortOrder: problem.SortOrder, Score: problem.Score})
+		result.Problems = append(result.Problems, &contestv1.ContestProblem{ProblemId: problem.ProblemID, SortOrder: problem.SortOrder, Score: problem.Score, Title: problem.Title})
 	}
 	return result
 }
