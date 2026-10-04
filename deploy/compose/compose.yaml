@@ -33,6 +33,7 @@ services:
       - ../../migrations/submission/000009_add_contest_id.up.sql:/docker-entrypoint-initdb.d/309_add_contest_id.sql:ro
       - ../../migrations/contest/000001_create_contests.up.sql:/docker-entrypoint-initdb.d/401_create_contests.sql:ro
       - ../../migrations/contest/000002_create_result_projection.up.sql:/docker-entrypoint-initdb.d/402_create_result_projection.sql:ro
+      - ../../migrations/contest/000003_create_leaderboard_outbox.up.sql:/docker-entrypoint-initdb.d/403_create_leaderboard_outbox.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
