@@ -143,3 +143,56 @@ func TestContestUnchangedUpdateAdvancesToken(t *testing.T) {
 		t.Fatalf("stale update error = %v", err)
 	}
 }
+
+func TestSubmissionAuthorizationWaitsForConcurrentConfigurationCommit(t *testing.T) {
+	db := testContestDatabase(t)
+	repo := NewRepository(db)
+	c := integrationContest(t, repo, time.Now().UTC().Add(time.Hour))
+	if _, err := repo.Join(t.Context(), c.ID, 42); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE contests SET start_at=UTC_TIMESTAMP(3)-INTERVAL 1 SECOND,end_at=UTC_TIMESTAMP(3)+INTERVAL 1 HOUR WHERE id=?`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	// 模拟跨开始边界尚未提交的配置事务；提交必须等待并使用新配置。
+	if _, err := tx.Exec(`UPDATE contests SET start_at=UTC_TIMESTAMP(3)+INTERVAL 1 HOUR,end_at=UTC_TIMESTAMP(3)+INTERVAL 2 HOUR WHERE id=?`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	go func() { _, err := repo.AuthorizeSubmission(ctx, c.ID, 42, 7); done <- err }()
+	var schema string
+	if err := db.QueryRow(`SELECT DATABASE()`).Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		select {
+		case err := <-done:
+			t.Fatalf("authorization bypassed configuration lock: %v", err)
+		default:
+		}
+		var waiting int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID=w.REQUESTING_ENGINE_LOCK_ID AND l.ENGINE=w.ENGINE WHERE l.OBJECT_SCHEMA=? AND l.OBJECT_NAME='contests'`, schema).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatal(ctx.Err())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("authorization used stale start_at: %v", err)
+	}
+}

@@ -960,13 +960,14 @@ Gateway 已提供比赛列表、详情、创建、更新、归档、报名、提
 `UpdateContest` 是完整替换操作。管理员必须把最近一次 `GetContest` 返回的
 `updated_at` 原样放入 `ContestUpdate.expected_updated_at`；服务端在比赛行锁内
 重新检查状态和 UTC 时间，并在令牌过期时返回 `ABORTED`，避免并发管理员静默覆盖。
+生命周期展示与业务预校验读取 Repository 的数据库 UTC 时钟；比赛时间规范化为 DATETIME(3) 的毫秒精度。
 报名、归档和编辑在拿锁后再次读取数据库 UTC 时间；报名只允许 start_at 前。比赛提交采用半开区间 `[start_at,end_at)`，重复报名
 按 `(contest_id,user_id)` 主键保持幂等。Redis 排行榜题目结构由比赛配置签名保护，题目
 集合变化后旧代次不会继续命中。
 
 内部 `CreateSubmissionRequest` 新增 `contest_start_at=7` 和 `contest_end_at=8`；
 普通公开提交端点不能填写比赛字段，Gateway 仅通过 Contest Service 发起比赛提交。
-Contest 校验报名与题目后转发区间；Judge 最终 INSERT 用数据库 `UTC_TIMESTAMP(3)`
+Contest 在兼容的共享比赛行锁内校验报名、题目和数据库时间，再转发稳定区间；Judge 最终 INSERT 用数据库 `UTC_TIMESTAMP(3)`
 作为 `created_at/submitted_at` 并检查 `[start_at,end_at)`。跨 RPC、源码上传和
 幂等锁等待期间越过截止会回滚提交、Outbox 和幂等预留，已成功请求的重放不重复插入。
 部署时先停止比赛写入，再同时更新 Judge 和 Contest，避免旧 Contest 缺少新区间字段；

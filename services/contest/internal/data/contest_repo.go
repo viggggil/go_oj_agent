@@ -12,6 +12,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// 业务预校验和状态展示使用与最终写入相同的数据库时钟。
+func (r *Repository) CurrentTime(ctx context.Context) (time.Time, error) {
+	if r == nil || r.db == nil {
+		return time.Time{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	var now time.Time
+	err := r.db.QueryRowContext(ctx, `SELECT UTC_TIMESTAMP(3)`).Scan(&now)
+	return now.UTC(), err
+}
+
 func (r *Repository) IsParticipant(ctx context.Context, contestID, userID int64) (bool, error) {
 	if r == nil || r.db == nil {
 		return false, status.Error(codes.Internal, "contest database is not configured")
@@ -28,6 +38,44 @@ func (r *Repository) HasProblem(ctx context.Context, contestID, problemID int64)
 	var exists int
 	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_id=?)`, contestID, problemID).Scan(&exists)
 	return exists == 1, err
+}
+
+// 在开始边界上，配置编辑持有排他锁；提交预校验使用兼容的共享锁。
+// 拿到共享锁后配置已稳定且已开始，之后的编辑/归档会因 DB 时钟而拒绝。
+func (r *Repository) AuthorizeSubmission(ctx context.Context, contestID, userID, problemID int64) (biz.Contest, error) {
+	contest := biz.Contest{ID: contestID}
+	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+		var state string
+		err := tx.QueryRowContext(ctx, `SELECT start_at,end_at,status FROM contests WHERE id=? FOR SHARE`, contestID).Scan(&contest.StartAt, &contest.EndAt, &state)
+		if errors.Is(err, sql.ErrNoRows) {
+			return status.Error(codes.NotFound, "contest not found")
+		}
+		if err != nil {
+			return err
+		}
+		var now time.Time
+		if err := tx.QueryRowContext(ctx, `SELECT UTC_TIMESTAMP(3)`).Scan(&now); err != nil {
+			return err
+		}
+		if state == "archived" || now.Before(contest.StartAt) || !now.Before(contest.EndAt) {
+			return status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
+		}
+		var participant, problem int
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_participants WHERE contest_id=? AND user_id=?)`, contestID, userID).Scan(&participant); err != nil {
+			return err
+		}
+		if participant != 1 {
+			return status.Error(codes.PermissionDenied, "user is not a contest participant")
+		}
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_id=?)`, contestID, problemID).Scan(&problem); err != nil {
+			return err
+		}
+		if problem != 1 {
+			return status.Error(codes.InvalidArgument, "problem does not belong to contest")
+		}
+		return nil
+	})
+	return contest, err
 }
 
 func (r *Repository) Join(ctx context.Context, contestID, userID int64) (time.Time, error) {

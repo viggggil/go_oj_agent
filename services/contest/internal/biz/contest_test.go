@@ -84,3 +84,37 @@ func TestContestUpdateRejectsStartedContestAndDuplicateProblems(t *testing.T) {
 		t.Fatalf("duplicate update code=%v", status.Code(err))
 	}
 }
+
+type clockedContestRepo struct {
+	*fakeContestRepo
+	databaseTime time.Time
+}
+
+func (r *clockedContestRepo) CurrentTime(context.Context) (time.Time, error) {
+	return r.databaseTime, nil
+}
+
+func TestContestLifecycleUsesRepositoryClockDespiteHostSkew(t *testing.T) {
+	at := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	repo := &clockedContestRepo{fakeContestRepo: &fakeContestRepo{contest: Contest{ID: 1, StartAt: at, EndAt: at.Add(time.Hour), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT}}, databaseTime: at}
+	uc := NewContestUsecaseWithRepository(repo)
+	uc.now = func() time.Time { return at.Add(24 * time.Hour) }
+	c, err := uc.Get(t.Context(), admin(), 1)
+	if err != nil || c.Status != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
+		t.Fatalf("database start boundary status=%v err=%v", c.Status, err)
+	}
+	repo.databaseTime = at.Add(time.Hour)
+	c, err = uc.Get(t.Context(), admin(), 1)
+	if err != nil || c.Status != contestv1.ContestStatus_CONTEST_STATUS_ENDED {
+		t.Fatalf("database end boundary status=%v err=%v", c.Status, err)
+	}
+}
+
+func TestContestIntervalRejectsPrecisionCollapse(t *testing.T) {
+	at := time.Date(2026, 10, 5, 1, 0, 0, 123000000, time.UTC)
+	input := contestInput(at)
+	input.EndAt = timestamppb.New(at.Add(time.Microsecond))
+	if _, _, _, err := normalizeUpdate(input); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("collapsed interval error=%v", err)
+	}
+}
