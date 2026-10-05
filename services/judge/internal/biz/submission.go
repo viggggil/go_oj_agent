@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,9 +136,10 @@ type IdempotencyRecord struct {
 }
 
 type CreateSubmissionCommand struct {
-	Submission    Submission
-	Idempotency   IdempotencyRequest
-	OutboxEventID string
+	ContestStartAt, ContestEndAt time.Time
+	Submission                   Submission
+	Idempotency                  IdempotencyRequest
+	OutboxEventID                string
 }
 
 type CreateSubmissionResult struct {
@@ -166,12 +168,13 @@ type JudgeRequestedPayload = mq.JudgeTask
 type SubmissionInvalidatedPayload = mq.SubmissionInvalidated
 
 type CreateSubmissionInput struct {
-	Actor          Actor
-	ProblemID      int64
-	ContestID      int64
-	Language       string
-	SourceCode     []byte
-	IdempotencyKey string
+	ContestStartAt, ContestEndAt time.Time
+	Actor                        Actor
+	ProblemID                    int64
+	ContestID                    int64
+	Language                     string
+	SourceCode                   []byte
+	IdempotencyKey               string
 }
 
 type RejudgeSubmissionInput struct {
@@ -187,6 +190,9 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 	if uc == nil || uc.repository == nil || uc.sources == nil || uc.problems == nil {
 		return CreateSubmissionResult{}, ErrorInternal("submission dependencies are not configured")
 	}
+	if input.ContestID > 0 && (input.ContestStartAt.IsZero() || !input.ContestStartAt.Before(input.ContestEndAt)) {
+		return CreateSubmissionResult{}, ErrorInvalidArgument("contest interval is required")
+	}
 	language := strings.ToLower(strings.TrimSpace(input.Language))
 	if input.ProblemID <= 0 || !SupportedLanguage(language) {
 		return CreateSubmissionResult{}, ErrorInvalidArgument("invalid submission problem or language")
@@ -201,6 +207,10 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 		Key:         input.IdempotencyKey,
 		RequestHash: createRequestHash(input.ProblemID, language, input.SourceCode),
 		ExpiresAt:   now.Add(IdempotencyTTL),
+	}
+	if input.ContestID > 0 {
+		digest := sha256.Sum256([]byte(idempotency.RequestHash + ":contest:" + strconv.FormatInt(input.ContestID, 10)))
+		idempotency.RequestHash = hex.EncodeToString(digest[:])
 	}
 	if err := ValidateIdempotency(idempotency, OperationCreateSubmission, now); err != nil {
 		return CreateSubmissionResult{}, err
@@ -220,6 +230,7 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 		return CreateSubmissionResult{}, err
 	}
 	command := CreateSubmissionCommand{
+		ContestStartAt: input.ContestStartAt, ContestEndAt: input.ContestEndAt,
 		Submission: Submission{
 			UserID:          input.Actor.ID,
 			ProblemID:       input.ProblemID,

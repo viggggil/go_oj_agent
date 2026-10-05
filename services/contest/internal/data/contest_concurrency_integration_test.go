@@ -97,3 +97,49 @@ func TestContestJoinAndArchiveAreSerialized(t *testing.T) {
 		t.Fatalf("unexpected participant count=%d", joined)
 	}
 }
+
+// 归档先拿到锁时，等待中的报名必须重新读取提交后的状态。
+func TestContestArchiveWinsBeforeWaitingJoin(t *testing.T) {
+	db := testContestDatabase(t)
+	repo := NewRepository(db)
+	c := integrationContest(t, repo, time.Now().UTC().Add(time.Hour))
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE contests SET status='archived' WHERE id=?`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := repo.Join(t.Context(), c.ID, 42); done <- err }()
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("join error = %v", err)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM contest_participants WHERE contest_id=?`, c.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("archived contest gained %d participants", n)
+	}
+}
+
+func TestContestUnchangedUpdateAdvancesToken(t *testing.T) {
+	db := testContestDatabase(t)
+	repo := NewRepository(db)
+	c := integrationContest(t, repo, time.Now().UTC().Add(time.Hour))
+	updated, err := repo.Update(t.Context(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.UpdatedAt.After(c.UpdatedAt) {
+		t.Fatal("version token did not advance")
+	}
+	if _, err := repo.Update(t.Context(), c); status.Code(err) != codes.Aborted {
+		t.Fatalf("stale update error = %v", err)
+	}
+}

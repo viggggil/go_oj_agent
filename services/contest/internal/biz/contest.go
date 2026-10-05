@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const RoleAdmin = "admin"
@@ -107,6 +108,7 @@ func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.R
 	return u.submission.CreateSubmission(ctx, &submissionv1.CreateSubmissionRequest{
 		ProblemId: input.GetProblemId(), ContestId: input.GetContestId(), Language: input.GetLanguage(),
 		SourceCode: input.GetSourceCode(), IdempotencyKey: input.GetIdempotencyKey(),
+		ContestStartAt: timestamppb.New(contest.StartAt), ContestEndAt: timestamppb.New(contest.EndAt),
 	})
 }
 

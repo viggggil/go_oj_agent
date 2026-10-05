@@ -13,11 +13,18 @@ import (
 )
 
 func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEvent) error {
-	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
+	return withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+		return r.applyProjectionTx(ctx, tx, event)
+	})
+}
+
+func (r *Repository) applyProjectionTx(ctx context.Context, tx *sql.Tx, event biz.ProjectionEvent) error {
+	// 共享比赛锁保护配置；不同用户之间共享锁兼容，不串行化整场结果。
+	f := event.Fact
+	var start, end time.Time
+	if err := tx.QueryRowContext(ctx, `SELECT start_at,end_at FROM contests WHERE id=? FOR SHARE`, f.ContestID).Scan(&start, &end); err != nil {
 		return err
 	}
-	defer tx.Rollback()
 	inserted, err := tx.ExecContext(ctx, `INSERT IGNORE INTO contest_processed_events (consumer_name,event_id,processed_at) VALUES ('contest-result-consumer',?,UTC_TIMESTAMP(6))`, event.EventID)
 	if err != nil {
 		return err
@@ -27,16 +34,11 @@ func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEv
 		return err
 	}
 	if n == 0 {
-		return tx.Commit()
+		return nil
 	}
-	f := event.Fact
 	// 与 DATETIME(6) 的版本精度一致，避免纳秒重放误判为新版本。
 	f.SubmittedAt = f.SubmittedAt.UTC().Truncate(time.Microsecond)
 	f.JudgedAt = f.JudgedAt.UTC().Truncate(time.Microsecond)
-	var start, end time.Time
-	if err := tx.QueryRowContext(ctx, `SELECT start_at,end_at FROM contests WHERE id=?`, f.ContestID).Scan(&start, &end); err != nil {
-		return err
-	}
 	var user int64
 	// 同一参与者串行更新，避免并发首次插入和重算产生丢失更新。
 	if err := tx.QueryRowContext(ctx, `SELECT user_id FROM contest_participants WHERE contest_id=? AND user_id=? FOR UPDATE`, f.ContestID, f.UserID).Scan(&user); err != nil {
@@ -61,7 +63,7 @@ func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEv
 			return fmt.Errorf("submission identity changed")
 		}
 		if oldInvalid || (!f.Invalidated && !f.JudgedAt.After(oldJudged)) {
-			return tx.Commit()
+			return nil
 		}
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO contest_submission_results (submission_id,contest_id,user_id,problem_id,verdict,submitted_at,judged_at,invalidated,updated_at) VALUES (?,?,?,?,?,?,?,?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE verdict=VALUES(verdict),judged_at=VALUES(judged_at),invalidated=VALUES(invalidated),updated_at=VALUES(updated_at)`, f.SubmissionID, f.ContestID, f.UserID, f.ProblemID, f.Verdict, f.SubmittedAt, f.JudgedAt, f.Invalidated)
@@ -103,7 +105,7 @@ func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEv
 	if err := enqueueLeaderboard(ctx, tx, f.ContestID, f.UserID); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (r *Repository) Leaderboard(ctx context.Context, id int64, page, size int32) ([]*contestv1.LeaderboardEntry, int64, error) {

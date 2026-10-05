@@ -299,7 +299,11 @@ func (s *StoreSet) CreateWithOutboxAndIdempotency(ctx context.Context, command b
 	submission.Status = submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED
 	submission.CreatedAt = now
 	submission.UpdatedAt = now
-	submission.ID, err = insertSubmission(ctx, tx, submission)
+	if submission.ContestID > 0 {
+		submission.ID, err = insertContestSubmission(ctx, tx, &submission, command.ContestStartAt, command.ContestEndAt)
+	} else {
+		submission.ID, err = insertSubmission(ctx, tx, submission)
+	}
 	if err != nil {
 		return result, err
 	}
@@ -540,6 +544,37 @@ func (s *StoreSet) MarkOutboxFailure(ctx context.Context, id int64, owner string
 		return biz.ErrorInternal("outbox lease was lost before failure update")
 	}
 	return nil
+}
+
+// 比赛提交时间以最终 INSERT 语句的 MySQL UTC 时间为准。幂等锁等待、
+// 源码上传及 RPC 延迟都不能使用请求开始时间绕过截止；重放已成功请求除外。
+func insertContestSubmission(ctx context.Context, tx *sql.Tx, submission *biz.Submission, start, end time.Time) (int64, error) {
+	if start.IsZero() || !start.Before(end) {
+		return 0, biz.ErrorInvalidArgument("contest interval is required")
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO submissions
+ (user_id,problem_id,contest_id,language,source_object_key,source_sha256,source_size_bytes,judge_revision,status,retry_count,judge_deadline_at,created_at,updated_at)
+ SELECT ?,?,?,?,?,?,?,?,'QUEUED',0,?,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3)
+ WHERE UTC_TIMESTAMP(3)>=? AND UTC_TIMESTAMP(3)<?`, submission.UserID, submission.ProblemID, submission.ContestID, submission.Language, submission.SourceObjectKey, submission.SourceSHA256, submission.SourceSizeBytes, submission.JudgeRevision, submission.JudgeDeadlineAt, start, end)
+	if err != nil {
+		return 0, storageError(err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return 0, storageError(err)
+	}
+	if n != 1 {
+		return 0, biz.ErrorInvalidTransition("contest is not accepting submissions")
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, storageError(err)
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT created_at FROM submissions WHERE id=?`, id).Scan(&submission.CreatedAt); err != nil {
+		return 0, storageError(err)
+	}
+	submission.UpdatedAt = submission.CreatedAt
+	return id, nil
 }
 
 func insertSubmission(ctx context.Context, tx *sql.Tx, submission biz.Submission) (int64, error) {
