@@ -544,40 +544,158 @@ Production-like: nsjail / gVisor
 
 ## 10. Agent 架构
 
+Agent Service 是面向编程学习的通用 Agent，不绑定单一的提交诊断流程。算法解释、题目理解、分级 Hint、提交诊断、历史复盘、题目推荐和学习计划都运行在同一个 Agent Runtime 上，由 Skill 声明目标、可用 Tool、Prompt、输出结构和预算。
+
 ```mermaid
 flowchart TB
     Question["User Question"] --> API["FastAPI / SSE"]
-    API --> Context["Context Resolver"]
-    Context --> Intent{"Intent Router"}
+    API --> Session["Session Resolver"]
+    Session --> Intent["Intent + Entity Parser"]
+    Intent --> Policy["Tool / Skill Policy"]
+    Policy --> Config["Published Prompt / Skill / Tool Config"]
+    Config --> Runtime{"Execution Mode"}
 
-    Intent -->|"debug"| ToolAgent["Tool Agent"]
-    Intent -->|"learn"| ToolAgent
-    Intent -->|"general"| ToolAgent
+    Runtime --> Direct["Direct Answer"]
+    Runtime --> React["ReAct Tool Loop"]
+    Runtime --> Plan["Plan-and-Solve"]
+    React --> Executor["Typed Tool Executor"]
+    Plan --> Executor
+    Executor --> Problem["Problem Tools"]
+    Executor --> Submission["Submission Tools"]
+    Executor --> Knowledge["Knowledge Tools"]
+    Executor --> Profile["Learning Tools"]
 
-    ToolAgent --> Problem["GetProblem"]
-    ToolAgent --> Submission["GetSubmission"]
-    ToolAgent --> Judge["GetJudgeResult"]
-    ToolAgent --> RAG["RetrieveKnowledge"]
-    ToolAgent --> Recommend["RecommendProblem"]
+    Direct --> Verify["Evidence / Safety Check"]
+    React --> Verify
+    Plan --> Verify
+    Verify --> Response["Response Generator"]
 
-    Problem -->|"gRPC"| PS["Problem Service"]
-    Submission -->|"gRPC"| JS["Judge Service"]
-    Judge -->|"gRPC"| JS
-    Recommend -->|"gRPC"| PS
-    RAG --> Vector[("Chroma / Qdrant")]
-
-    ToolAgent --> Response["Response Generator"]
+    Admin["Admin Console"] --> Control["Agent Control Plane"]
+    Control --> Config
+    Control --> Eval["Eval / Observability"]
+    Runtime -. events .-> Eval
 ```
 
 设计原则：
 
-- 第一阶段保持单 Agent + LangGraph Workflow。
-- 不为了展示技术强行拆多 Agent。
-- LLM 不负责最终 Authorization。
-- Tool 使用 typed input / output。
-- Tool 只拿完成任务所需的最少数据。
+- Context Resolver 只解析 submission_id、problem_id、语言和时间范围等实体，不自动预取业务数据。
+- Agent 从当前策略允许的 Tool 集合中选择工具；工具选择和参数必须经过程序校验。
+- 第一阶段保持单 Agent + LangGraph Workflow，不为了展示技术强行拆多 Agent。
+- ReAct 用于有限的动态取证；Plan-and-Solve 用于学习计划、历史复盘等多步骤任务。
+- Reflection 只检查证据、引用、安全和不确定性，不负责授予权限。
+- LLM、Prompt、Skill 和知识库内容都不是授权边界。
+- Tool 使用 typed input / output，Tool Executor 统一处理超时、去重、脱敏和预算。
+- Tool 的实现、RPC 方法、权限校验和安全前缀由代码保护；Prompt、Skill 绑定、预算和知识库内容由 Control Plane 管理。
 
----
+### 10.1 Agent Runtime
+
+运行时状态至少包括：
+
+```text
+user_id / conversation_id / run_id / trace_id
+intent / goal / entities / constraints
+skill_key / allowed_tools / config_snapshot
+plan / observations / evidence / missing_information
+tool_call_count / remaining_tokens / deadline / reflection_count
+answer_draft / final_answer
+```
+
+执行模式包括：
+
+```text
+direct
+react
+plan_execute
+reflection
+```
+
+每次 Agent Run 开始时固定 Prompt、Skill、Tool Catalog、模型和知识库索引的版本快照。一次回答执行期间不得切换已发布配置；草稿不会影响在线请求。
+
+### 10.2 Tool Registry 与策略
+
+代码 Registry 只注册 Tool 实现和不可绕过的安全元数据。第一批只读 Tool 包括：
+
+```text
+get_current_user
+get_problem
+list_problems
+get_submission
+get_submission_source
+get_judge_result
+list_submissions
+retrieve_knowledge
+```
+
+后续增加：
+
+```text
+get_learning_profile
+search_problems
+recommend_problem
+create_submission
+rejudge_submission
+```
+
+每个 Tool 声明 `read_scope`、`allowed_roles`、`side_effect`、`sensitivity`、超时、成本和是否需要确认。管理员可以在 Skill 层调整 Tool allowlist 和启用状态，但不能修改 RPC 方法、目标服务或授权实现。写 Tool 默认关闭。
+
+### 10.3 Agent Control Plane
+
+Control Plane 管理以下可版本化资源：
+
+```text
+Prompt / Prompt Version
+Skill / Skill Version / Skill-Tool Binding
+Tool Catalog Policy
+Knowledge Document / Knowledge Version / Index
+Eval Case / Eval Dataset / Eval Run
+```
+
+资源状态统一使用：
+
+```text
+DRAFT → PUBLISHED → ARCHIVED
+```
+
+发布版本不可变；回滚通过重新发布旧版本完成。Prompt 发布前校验变量白名单、敏感信息、Tool 名称和禁止指令。Skill 只能引用代码已注册的 Tool，不能执行任意 Python。
+
+### 10.4 管理员前端
+
+管理员入口使用 `system_admin` 或明确授权的 `agent_admin` 角色，至少提供：
+
+- Prompt 管理：编辑、版本 Diff、样例 Eval、发布、回滚和审计。
+- Tool Catalog：查看描述、Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计；RPC 方法和授权代码只读展示。
+- Skill 管理：编辑元数据、选择 Tool、绑定 Prompt、设置预算、样例运行、发布和回滚。
+- 知识库管理：文档上传、元数据、标签、切分预览、索引、发布、归档和回滚。
+- Eval 与质量：运行数据集、版本对比、失败样例、工具选择错误、引用错误和拒答错误。
+- 运行观测：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和脱敏后的运行详情。
+
+发布、回滚、归档和启用写 Tool 需要二次确认并写入审计日志；生产环境可以配置双人审批。管理员页面不能修改安全前缀、服务身份或目标 Go Service 的授权规则。
+
+### 10.5 Agent 质量工程
+
+离线 Eval、线上运行事件和人工抽检使用同一套配置版本标识。评估包括：
+
+- 确定性行为：意图、Skill、Tool、参数、权限、状态转换、预算和输出 Schema；
+- 模型质量：事实正确性、相关性、解释完整性、Hint 等级、引用一致性和不确定性标注；
+- 人工抽检：按 Skill、模型和配置版本抽样，失败样例回流数据集。
+
+核心指标包括：
+
+```text
+tool_selection_pass_rate
+tool_argument_pass_rate
+permission_denied_correct_rate
+evidence_grounded_rate
+citation_valid_rate
+answer_relevance_score
+answer_correctness_score
+hint_level_accuracy
+clarification_rate
+unsafe_action_block_rate
+fallback_rate
+```
+
+运行事件至少记录 `run_id`、`conversation_id`、`user_id`、`trace_id`、Skill/Prompt/Tool Catalog 版本、模型、Tool 延迟和状态、Token 使用、答案状态和 Eval 标签。源码、凭据、完整 Prompt 和原始 Tool Result 默认脱敏或只保存摘要。
 
 ## 11. RAG
 
