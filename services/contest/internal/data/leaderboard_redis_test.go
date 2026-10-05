@@ -247,7 +247,7 @@ func exerciseRedisLeaderboard(t *testing.T, cache *LeaderboardRedis) {
 		cache.client.Set(t.Context(), cache.base(20)+"active", uuid.NewString(), 0)
 		s := testSnapshot(42, "1", 1, 10)
 		payload, _ := json.Marshal(s)
-		result, err := applyLeaderboard.Run(t.Context(), cache.client, append([]string{cache.base(20) + "active"}, keys...), generation, "42", fmt.Sprintf("%019d", 1), leaderboardMember(s), string(payload), fmt.Sprintf("%019d", 42)).Int()
+		result, err := relayLeaderboard.Run(t.Context(), cache.client, append(append([]string{cache.base(20) + "active", cache.base(20) + "building", cache.base(20) + "lease"}, keys...), cache.generationKeys(20, "")...), generation, "42", fmt.Sprintf("%019d", 1), leaderboardMember(s), string(payload), fmt.Sprintf("%019d", 42), "").Int()
 		if err != nil || result != -3 || cache.client.ZCard(t.Context(), keys[0]).Val() != 1 {
 			t.Fatalf("generation fence result=%d err=%v", result, err)
 		}

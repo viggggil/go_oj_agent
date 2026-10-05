@@ -198,7 +198,7 @@ func replaceProblems(ctx context.Context, tx *sql.Tx, contestID int64, problems 
 func scanProblems(ctx context.Context, q interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }, c *biz.Contest) error {
-	rows, err := q.QueryContext(ctx, `SELECT problem_id,sort_order,score FROM contest_problems WHERE contest_id=? ORDER BY sort_order`, c.ID)
+	rows, err := q.QueryContext(ctx, `SELECT problem_id,sort_order,score FROM contest_problems WHERE contest_id=? ORDER BY sort_order,problem_id`, c.ID)
 	if err != nil {
 		return err
 	}
