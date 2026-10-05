@@ -34,11 +34,26 @@ func (r *Repository) Join(ctx context.Context, contestID, userID int64) (time.Ti
 	if r == nil || r.db == nil {
 		return time.Time{}, status.Error(codes.Internal, "contest database is not configured")
 	}
-	if _, err := r.db.ExecContext(ctx, `INSERT IGNORE INTO contest_participants (contest_id,user_id,joined_at) VALUES (?, ?, UTC_TIMESTAMP(3))`, contestID, userID); err != nil {
-		return time.Time{}, err
-	}
 	var joinedAt time.Time
-	if err := r.db.QueryRowContext(ctx, `SELECT joined_at FROM contest_participants WHERE contest_id=? AND user_id=?`, contestID, userID).Scan(&joinedAt); err != nil {
+	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+		var startAt, endAt, dbNow time.Time
+		var state string
+		err := tx.QueryRowContext(ctx, `SELECT start_at,end_at,status,UTC_TIMESTAMP(3) FROM contests WHERE id=? FOR UPDATE`, contestID).Scan(&startAt, &endAt, &state, &dbNow)
+		if errors.Is(err, sql.ErrNoRows) {
+			return status.Error(codes.NotFound, "contest not found")
+		}
+		if err != nil {
+			return err
+		}
+		if state == "archived" || !dbNow.Before(startAt) || !dbNow.Before(endAt) || state != "draft" {
+			return status.Error(codes.FailedPrecondition, "contest is not accepting registrations")
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO contest_participants (contest_id,user_id,joined_at) VALUES (?, ?, UTC_TIMESTAMP(3))`, contestID, userID); err != nil {
+			return err
+		}
+		return tx.QueryRowContext(ctx, `SELECT joined_at FROM contest_participants WHERE contest_id=? AND user_id=?`, contestID, userID).Scan(&joinedAt)
+	})
+	if err != nil {
 		return time.Time{}, err
 	}
 	return joinedAt.UTC(), nil
@@ -145,26 +160,35 @@ func (r *Repository) Update(ctx context.Context, contest biz.Contest) (biz.Conte
 	if r == nil || r.db == nil {
 		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return biz.Contest{}, err
+	if contest.UpdatedAt.IsZero() {
+		return biz.Contest{}, status.Error(codes.InvalidArgument, "contest update token is required")
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
+	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+		var currentUpdated, startAt, dbNow time.Time
+		var state string
+		err := tx.QueryRowContext(ctx, `SELECT updated_at,start_at,status,UTC_TIMESTAMP(3) FROM contests WHERE id=? FOR UPDATE`, contest.ID).Scan(&currentUpdated, &startAt, &state, &dbNow)
+		if errors.Is(err, sql.ErrNoRows) {
+			return status.Error(codes.NotFound, "contest not found")
 		}
-	}()
-	result, err := tx.ExecContext(ctx, `UPDATE contests SET title=?,start_at=?,end_at=?,updated_at=UTC_TIMESTAMP(3) WHERE id=? AND status='draft'`, contest.Title, contest.StartAt, contest.EndAt, contest.ID)
+		if err != nil {
+			return err
+		}
+		if state != "draft" || !dbNow.Before(startAt) {
+			return status.Error(codes.FailedPrecondition, "contest is not editable")
+		}
+		if !currentUpdated.Equal(contest.UpdatedAt) {
+			return status.Error(codes.Aborted, "contest was modified; reload and retry")
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE contests SET title=?,start_at=?,end_at=?,updated_at=GREATEST(UTC_TIMESTAMP(3),updated_at + INTERVAL 1 MILLISECOND) WHERE id=? AND status='draft' AND updated_at=?`, contest.Title, contest.StartAt, contest.EndAt, contest.ID, contest.UpdatedAt)
+		if err != nil {
+			return err
+		}
+		if affected, _ := result.RowsAffected(); affected != 1 {
+			return status.Error(codes.Aborted, "contest was modified; reload and retry")
+		}
+		return replaceProblems(ctx, tx, contest.ID, contest.Problems)
+	})
 	if err != nil {
-		return biz.Contest{}, err
-	}
-	if affected, _ := result.RowsAffected(); affected != 1 {
-		return biz.Contest{}, status.Error(codes.FailedPrecondition, "contest is not editable")
-	}
-	if err = replaceProblems(ctx, tx, contest.ID, contest.Problems); err != nil {
-		return biz.Contest{}, err
-	}
-	if err = tx.Commit(); err != nil {
 		return biz.Contest{}, err
 	}
 	return r.Get(ctx, contest.ID)
@@ -174,12 +198,30 @@ func (r *Repository) Archive(ctx context.Context, id int64) (biz.Contest, error)
 	if r == nil || r.db == nil {
 		return biz.Contest{}, status.Error(codes.Internal, "contest database is not configured")
 	}
-	result, err := r.db.ExecContext(ctx, `UPDATE contests SET status='archived',updated_at=UTC_TIMESTAMP(3) WHERE id=? AND status='draft'`, id)
+	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+		var startAt, dbNow time.Time
+		var state string
+		err := tx.QueryRowContext(ctx, `SELECT start_at,status,UTC_TIMESTAMP(3) FROM contests WHERE id=? FOR UPDATE`, id).Scan(&startAt, &state, &dbNow)
+		if errors.Is(err, sql.ErrNoRows) {
+			return status.Error(codes.NotFound, "contest not found")
+		}
+		if err != nil {
+			return err
+		}
+		if state != "draft" || !dbNow.Before(startAt) {
+			return status.Error(codes.FailedPrecondition, "contest is not archivable")
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE contests SET status='archived',updated_at=GREATEST(UTC_TIMESTAMP(3),updated_at + INTERVAL 1 MILLISECOND) WHERE id=? AND status='draft'`, id)
+		if err != nil {
+			return err
+		}
+		if affected, _ := result.RowsAffected(); affected != 1 {
+			return status.Error(codes.FailedPrecondition, "contest is not archivable")
+		}
+		return nil
+	})
 	if err != nil {
 		return biz.Contest{}, err
-	}
-	if affected, _ := result.RowsAffected(); affected != 1 {
-		return biz.Contest{}, status.Error(codes.FailedPrecondition, "contest is not archivable")
 	}
 	return r.Get(ctx, id)
 }

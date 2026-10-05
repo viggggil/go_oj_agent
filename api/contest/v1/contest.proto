@@ -100,6 +100,9 @@ message ContestUpdate {
   google.protobuf.Timestamp start_at = 2 [(validate.rules).timestamp.required = true];
   google.protobuf.Timestamp end_at = 3 [(validate.rules).timestamp.required = true];
   repeated ContestProblem problems = 4 [(validate.rules).repeated = {min_items: 1, max_items: 100}];
+  // Required for updates. It is the updated_at value returned by GetContest;
+  // the server rejects a stale value instead of silently overwriting another edit.
+  google.protobuf.Timestamp expected_updated_at = 5;
 }
 
 message UpdateContestRequest {

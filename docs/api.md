@@ -956,6 +956,13 @@ ACM 下 score/accepted_count 等于 solved_count，penalty 等于 penalty_second
 `problem_id/solved/wrong_attempts/accepted_at`，未 AC 的 accepted_at 为空。无本地结果的用户不进入榜单。
 Gateway 已提供比赛列表、详情、创建、更新、归档、报名、提交和排行榜路由；业务权限、比赛状态和排行榜计算仍由 Contest Service 负责。
 
+`UpdateContest` 是完整替换操作。管理员必须把最近一次 `GetContest` 返回的
+`updated_at` 原样放入 `ContestUpdate.expected_updated_at`；服务端在比赛行锁内
+重新检查状态和 UTC 时间，并在令牌过期时返回 `ABORTED`，避免并发管理员静默覆盖。
+报名、归档和编辑统一使用数据库 UTC 时间与半开区间 `[start_at,end_at)`，重复报名
+按 `(contest_id,user_id)` 主键保持幂等。Redis 排行榜题目结构由比赛配置签名保护，题目
+集合变化后旧代次不会继续命中。
+
 ---
 
 ## 4.5 Judge

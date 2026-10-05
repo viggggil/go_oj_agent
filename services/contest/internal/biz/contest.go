@@ -124,6 +124,8 @@ func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContex
 	if contestID <= 0 {
 		return time.Time{}, status.Error(codes.InvalidArgument, "invalid contest id")
 	}
+	// Keep a fast user-facing check; the repository repeats it under the
+	// contest row lock so this read cannot create a race.
 	contest, err := u.repo.Get(ctx, contestID)
 	if err != nil {
 		return time.Time{}, err
@@ -215,6 +217,13 @@ func (u *ContestUsecase) Update(ctx context.Context, actor *commonv1.RequestCont
 	if !start.After(u.now()) {
 		return Contest{}, status.Error(codes.InvalidArgument, "contest start_at must be in the future")
 	}
+	if input.GetExpectedUpdatedAt() == nil {
+		return Contest{}, status.Error(codes.InvalidArgument, "contest expected_updated_at is required")
+	}
+	if err := input.GetExpectedUpdatedAt().CheckValid(); err != nil {
+		return Contest{}, status.Error(codes.InvalidArgument, "invalid contest expected_updated_at")
+	}
+	current.UpdatedAt = input.GetExpectedUpdatedAt().AsTime().UTC()
 	current.Title, current.StartAt, current.EndAt, current.Problems = strings.TrimSpace(input.GetTitle()), start, end, problems
 	return u.repo.Update(ctx, current)
 }
@@ -226,6 +235,8 @@ func (u *ContestUsecase) Archive(ctx context.Context, actor *commonv1.RequestCon
 	if err := requireAdmin(actor); err != nil {
 		return Contest{}, err
 	}
+	// The repository performs the authoritative check while holding the row
+	// lock; this read only preserves the existing fast validation semantics.
 	current, err := u.repo.Get(ctx, id)
 	if err != nil {
 		return Contest{}, err

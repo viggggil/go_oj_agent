@@ -55,7 +55,9 @@ func TestCreateUpdateArchiveDraftContest(t *testing.T) {
 	if err != nil || created.ID != 1 || created.Status != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		t.Fatalf("create = %+v err=%v", created, err)
 	}
-	updated, err := uc.Update(context.Background(), admin(), created.ID, contestInput(time.Now().Add(2*time.Hour)))
+	updateInput := contestInput(time.Now().Add(2 * time.Hour))
+	updateInput.ExpectedUpdatedAt = timestamppb.New(created.UpdatedAt)
+	updated, err := uc.Update(context.Background(), admin(), created.ID, updateInput)
 	if err != nil || updated.Title != "Spring Contest" {
 		t.Fatalf("update = %+v err=%v", updated, err)
 	}
@@ -68,12 +70,15 @@ func TestCreateUpdateArchiveDraftContest(t *testing.T) {
 func TestContestUpdateRejectsStartedContestAndDuplicateProblems(t *testing.T) {
 	repo := &fakeContestRepo{contest: Contest{ID: 1, StartAt: time.Now().Add(-time.Minute), EndAt: time.Now().Add(time.Hour), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT}}
 	uc := NewContestUsecaseWithRepository(repo)
-	if _, err := uc.Update(context.Background(), admin(), 1, contestInput(time.Now().Add(time.Hour))); status.Code(err) != codes.FailedPrecondition {
+	startedInput := contestInput(time.Now().Add(time.Hour))
+	startedInput.ExpectedUpdatedAt = timestamppb.New(repo.contest.UpdatedAt)
+	if _, err := uc.Update(context.Background(), admin(), 1, startedInput); status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("started update code=%v", status.Code(err))
 	}
 	repo.contest.StartAt = time.Now().Add(time.Hour)
 	repo.contest.EndAt = time.Now().Add(2 * time.Hour)
 	input := contestInput(time.Now().Add(time.Hour))
+	input.ExpectedUpdatedAt = timestamppb.New(repo.contest.UpdatedAt)
 	input.Problems = append(input.Problems, input.Problems[0])
 	if _, err := uc.Update(context.Background(), admin(), 1, input); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("duplicate update code=%v", status.Code(err))
