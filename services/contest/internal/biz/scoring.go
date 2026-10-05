@@ -121,8 +121,14 @@ func (u *ContestUsecase) GetLeaderboard(ctx context.Context, actor *commonv1.Req
 	if page <= 0 || size <= 0 || size > 100 {
 		return nil, 0, status.Error(codes.InvalidArgument, "invalid page")
 	}
-	if _, err := u.Get(ctx, actor, id); err != nil {
+	contest, err := u.Get(ctx, actor, id)
+	if err != nil {
 		return nil, 0, err
+	}
+	if repo, ok := u.repo.(interface {
+		CachedLeaderboard(context.Context, Contest, int32, int32) ([]*contestv1.LeaderboardEntry, int64, error)
+	}); ok {
+		return repo.CachedLeaderboard(ctx, contest, page, size)
 	}
 	repo, ok := u.repo.(LeaderboardRepository)
 	if !ok {

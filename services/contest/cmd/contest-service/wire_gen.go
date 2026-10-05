@@ -22,16 +22,23 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	repository := data.NewRepository(db)
-	context := data.NewClientContext()
-	submissionClient, cleanup2, err := data.NewSubmissionClient(context, config)
+	leaderboardRedis, cleanup2, err := data.NewLeaderboardRedis(config)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	submissionCreator := data.ProvideSubmissionCreator(submissionClient)
-	problemClient, cleanup3, err := data.NewProblemClient(context, config)
+	repository := data.NewCachedRepository(db, leaderboardRedis)
+	context := data.NewClientContext()
+	submissionClient, cleanup3, err := data.NewSubmissionClient(context, config)
 	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	submissionCreator := data.ProvideSubmissionCreator(submissionClient)
+	problemClient, cleanup4, err := data.NewProblemClient(context, config)
+	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
@@ -41,6 +48,7 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	contestService := service.NewContestService(contestUsecase)
 	grpcServer, err := server.NewGRPCServer(config, v, contestService)
 	if err != nil {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()
@@ -49,20 +57,15 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 	registrar := server.NewRegistrar(config)
 	resultConsumerServer, err := server.NewResultConsumerServer(config, repository)
 	if err != nil {
-		cleanup3()
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	leaderboardRedis, cleanup4, err := data.NewLeaderboardRedis(config)
-	if err != nil {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	cacheRelayServer := server.NewCacheRelayServer(repository, leaderboardRedis)
-	v2, err := newApp(config, grpcServer, registrar, resultConsumerServer, cacheRelayServer)
+	cacheMaintenanceServer := server.NewCacheMaintenanceServer(repository)
+	v2, err := newApp(config, grpcServer, registrar, resultConsumerServer, cacheRelayServer, cacheMaintenanceServer)
 	if err != nil {
 		cleanup4()
 		cleanup3()

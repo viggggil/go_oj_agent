@@ -181,3 +181,53 @@ the MySQL -> Outbox -> Redis path, set `CONTEST_TEST_REDIS_ADDR` and
 MySQL fixture requires permission to create/drop its isolated temporary schema;
 Redis tests use unique namespaces and remove only their own keys. The Docker
 integration runner supplies both variables automatically.
+
+## Redis leaderboard reads and rebuilds (issue #134, PR3)
+
+PR3 adds the read path and safe reconstruction around the PR2 write projection.
+The Contest use case checks authentication, contest visibility and archive
+permissions before it calls the cache. A cache hit is one bounded Lua read: the
+active generation, freshness metadata, total count, page members and complete
+user entries are validated together. The response includes the same rank and
+per-problem fields as the SQL implementation. The `~` structural member is
+excluded from totals and pages.
+
+A missing, partial, dirty, stale, generation-mismatched or Redis-failed read
+falls back to MySQL. Concurrent SQL misses for the same contest/page are
+coalesced per instance and briefly cloned for callers; the fallback has a
+bounded semaphore and a five-second request context. A Redis outage opens a
+short circuit cooldown, while result projection and the Outbox continue
+independently. Cache hits do not bypass actor authorization.
+
+Rebuilds use a distributed Redis lease and generation pointer:
+
+1. A builder atomically allocates a generation, records the currently active
+   generation, and publishes `building` and `lease` markers before opening the
+   MySQL `REPEATABLE READ` view.
+2. MySQL rows are streamed in batches of 100 users. Each complete snapshot is
+   loaded into the building generation with the same version fence as normal
+   Outbox delivery. The builder renews its lease while scanning.
+3. Results committed before registration are visible in the SQL snapshot. New
+   results committed after registration are written to both active and building
+   generations by the relay. A snapshot row with an older version cannot replace
+   a newer event.
+4. Activation checks the lease token, the previous active pointer, all key
+   markers/cardinalities and the complete generation. It then switches the
+   pointer atomically. The old generation is retained only by its bounded TTL;
+   an expired builder cannot activate, renew, or delete a newer builder.
+5. After activation, a SQL-derived queue lag is verified in Redis. Reads require
+   a recent freshness check and fall back while the new generation is not yet
+   trusted. Periodic maintenance rechecks requested contests and rebuilds
+   missing, damaged, stale or expired generations. Rebuilds read MySQL directly,
+   so recovery does not depend on already-applied Outbox events.
+
+The active generation uses a ten-minute TTL and a five-minute reconciliation
+age. The read freshness window is 30 seconds plus the measured pending/dead
+Outbox lag. A `dead` event keeps the cache untrusted until a successful rebuild
+and operational correction; it is never silently discarded. The fourth contest
+migration adds an index on `(contest_id,status,created_at)` for this lag check.
+
+Cache maintenance starts as a separate Kratos server from the result consumer.
+Stopping the service cancels Redis and SQL work; an incomplete build leaves the
+previous active generation readable. Cache remains disabled in shipped configs
+until this full read/rebuild path is explicitly enabled and observed.
