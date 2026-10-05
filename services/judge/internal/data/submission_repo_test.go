@@ -365,3 +365,18 @@ func assertExpectations(t *testing.T, mock sqlmock.Sqlmock) {
 		t.Fatal(err)
 	}
 }
+
+func TestContestFinalInsertRejectsExpiredIntervalAndRollsBack(t *testing.T) {
+	store, mock, now := newMockStore(t)
+	cmd := createCommand(now)
+	cmd.Submission.ContestID = 20
+	cmd.ContestStartAt, cmd.ContestEndAt = now.Add(-time.Hour), now
+	mock.ExpectBegin()
+	expectIdempotencyReservation(mock, cmd.Idempotency, now, 1)
+	mock.ExpectExec("INSERT INTO submissions").WithArgs(cmd.Submission.UserID, cmd.Submission.ProblemID, int64(20), cmd.Submission.Language, cmd.Submission.SourceObjectKey, cmd.Submission.SourceSHA256, cmd.Submission.SourceSizeBytes, cmd.Submission.JudgeRevision, cmd.Submission.JudgeDeadlineAt, cmd.ContestStartAt, cmd.ContestEndAt).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
+	if _, err := store.CreateWithOutboxAndIdempotency(t.Context(), cmd); !biz.HasReason(err, biz.ReasonInvalidTransition) {
+		t.Fatalf("error = %v", err)
+	}
+	assertExpectations(t, mock)
+}

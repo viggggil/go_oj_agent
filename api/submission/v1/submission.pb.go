@@ -517,9 +517,12 @@ type CreateSubmissionRequest struct {
 	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	// Set only by the trusted contest-service caller. Public ordinary
 	// submission endpoints must leave this unset.
-	ContestId     int64 `protobuf:"varint,6,opt,name=contest_id,json=contestId,proto3" json:"contest_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ContestId int64 `protobuf:"varint,6,opt,name=contest_id,json=contestId,proto3" json:"contest_id,omitempty"`
+	// 由可信比赛调用方填写；Judge 在最终插入语句中校验接收边界。
+	ContestStartAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=contest_start_at,json=contestStartAt,proto3" json:"contest_start_at,omitempty"`
+	ContestEndAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=contest_end_at,json=contestEndAt,proto3" json:"contest_end_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateSubmissionRequest) Reset() {
@@ -585,6 +588,20 @@ func (x *CreateSubmissionRequest) GetContestId() int64 {
 		return x.ContestId
 	}
 	return 0
+}
+
+func (x *CreateSubmissionRequest) GetContestStartAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ContestStartAt
+	}
+	return nil
+}
+
+func (x *CreateSubmissionRequest) GetContestEndAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ContestEndAt
+	}
+	return nil
 }
 
 type CreateSubmissionResponse struct {
@@ -1214,7 +1231,7 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"\tmemory_kb\x18\x05 \x01(\x05R\bmemoryKb\x12F\n" +
 	"\fcase_results\x18\x06 \x03(\v2#.submission.v1.SubmissionCaseResultR\vcaseResults\x12%\n" +
 	"\x0ejudge_revision\x18\a \x01(\tR\rjudgeRevision\x12.\n" +
-	"\x13system_error_reason\x18\b \x01(\tR\x11systemErrorReason\"\x95\x02\n" +
+	"\x13system_error_reason\x18\b \x01(\tR\x11systemErrorReason\"\x9d\x03\n" +
 	"\x17CreateSubmissionRequest\x12&\n" +
 	"\n" +
 	"problem_id\x18\x02 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tproblemId\x12:\n" +
@@ -1223,7 +1240,9 @@ const file_api_submission_v1_submission_proto_rawDesc = "" +
 	"sourceCode\x121\n" +
 	"\x0fidempotency_key\x18\x05 \x01(\tB\b\xfaB\x05r\x03\xb0\x01\x01R\x0eidempotencyKey\x12&\n" +
 	"\n" +
-	"contest_id\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\tcontestIdJ\x04\b\x01\x10\x02R\acontext\"x\n" +
+	"contest_id\x18\x06 \x01(\x03B\a\xfaB\x04\"\x02(\x00R\tcontestId\x12D\n" +
+	"\x10contest_start_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x0econtestStartAt\x12@\n" +
+	"\x0econtest_end_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\fcontestEndAtJ\x04\b\x01\x10\x02R\acontext\"x\n" +
 	"\x18CreateSubmissionResponse\x12#\n" +
 	"\rsubmission_id\x18\x01 \x01(\x03R\fsubmissionId\x127\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1f.submission.v1.SubmissionStatusR\x06status\"S\n" +
@@ -1338,31 +1357,33 @@ var file_api_submission_v1_submission_proto_depIdxs = []int32{
 	0,  // 7: submission.v1.JudgeResult.status:type_name -> submission.v1.SubmissionStatus
 	1,  // 8: submission.v1.JudgeResult.verdict:type_name -> submission.v1.JudgeVerdict
 	3,  // 9: submission.v1.JudgeResult.case_results:type_name -> submission.v1.SubmissionCaseResult
-	0,  // 10: submission.v1.CreateSubmissionResponse.status:type_name -> submission.v1.SubmissionStatus
-	2,  // 11: submission.v1.GetSubmissionResponse.submission:type_name -> submission.v1.Submission
-	18, // 12: submission.v1.ListSubmissionsRequest.page:type_name -> common.v1.PageRequest
-	0,  // 13: submission.v1.ListSubmissionsRequest.status:type_name -> submission.v1.SubmissionStatus
-	2,  // 14: submission.v1.ListSubmissionsResponse.items:type_name -> submission.v1.Submission
-	19, // 15: submission.v1.ListSubmissionsResponse.page:type_name -> common.v1.PageResponse
-	4,  // 16: submission.v1.GetJudgeResultResponse.result:type_name -> submission.v1.JudgeResult
-	2,  // 17: submission.v1.RejudgeSubmissionResponse.submission:type_name -> submission.v1.Submission
-	5,  // 18: submission.v1.SubmissionService.CreateSubmission:input_type -> submission.v1.CreateSubmissionRequest
-	7,  // 19: submission.v1.SubmissionService.GetSubmission:input_type -> submission.v1.GetSubmissionRequest
-	9,  // 20: submission.v1.SubmissionService.GetSubmissionSource:input_type -> submission.v1.GetSubmissionSourceRequest
-	11, // 21: submission.v1.SubmissionService.ListSubmissions:input_type -> submission.v1.ListSubmissionsRequest
-	13, // 22: submission.v1.SubmissionService.GetJudgeResult:input_type -> submission.v1.GetJudgeResultRequest
-	15, // 23: submission.v1.SubmissionService.RejudgeSubmission:input_type -> submission.v1.RejudgeSubmissionRequest
-	6,  // 24: submission.v1.SubmissionService.CreateSubmission:output_type -> submission.v1.CreateSubmissionResponse
-	8,  // 25: submission.v1.SubmissionService.GetSubmission:output_type -> submission.v1.GetSubmissionResponse
-	10, // 26: submission.v1.SubmissionService.GetSubmissionSource:output_type -> submission.v1.GetSubmissionSourceResponse
-	12, // 27: submission.v1.SubmissionService.ListSubmissions:output_type -> submission.v1.ListSubmissionsResponse
-	14, // 28: submission.v1.SubmissionService.GetJudgeResult:output_type -> submission.v1.GetJudgeResultResponse
-	16, // 29: submission.v1.SubmissionService.RejudgeSubmission:output_type -> submission.v1.RejudgeSubmissionResponse
-	24, // [24:30] is the sub-list for method output_type
-	18, // [18:24] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	17, // 10: submission.v1.CreateSubmissionRequest.contest_start_at:type_name -> google.protobuf.Timestamp
+	17, // 11: submission.v1.CreateSubmissionRequest.contest_end_at:type_name -> google.protobuf.Timestamp
+	0,  // 12: submission.v1.CreateSubmissionResponse.status:type_name -> submission.v1.SubmissionStatus
+	2,  // 13: submission.v1.GetSubmissionResponse.submission:type_name -> submission.v1.Submission
+	18, // 14: submission.v1.ListSubmissionsRequest.page:type_name -> common.v1.PageRequest
+	0,  // 15: submission.v1.ListSubmissionsRequest.status:type_name -> submission.v1.SubmissionStatus
+	2,  // 16: submission.v1.ListSubmissionsResponse.items:type_name -> submission.v1.Submission
+	19, // 17: submission.v1.ListSubmissionsResponse.page:type_name -> common.v1.PageResponse
+	4,  // 18: submission.v1.GetJudgeResultResponse.result:type_name -> submission.v1.JudgeResult
+	2,  // 19: submission.v1.RejudgeSubmissionResponse.submission:type_name -> submission.v1.Submission
+	5,  // 20: submission.v1.SubmissionService.CreateSubmission:input_type -> submission.v1.CreateSubmissionRequest
+	7,  // 21: submission.v1.SubmissionService.GetSubmission:input_type -> submission.v1.GetSubmissionRequest
+	9,  // 22: submission.v1.SubmissionService.GetSubmissionSource:input_type -> submission.v1.GetSubmissionSourceRequest
+	11, // 23: submission.v1.SubmissionService.ListSubmissions:input_type -> submission.v1.ListSubmissionsRequest
+	13, // 24: submission.v1.SubmissionService.GetJudgeResult:input_type -> submission.v1.GetJudgeResultRequest
+	15, // 25: submission.v1.SubmissionService.RejudgeSubmission:input_type -> submission.v1.RejudgeSubmissionRequest
+	6,  // 26: submission.v1.SubmissionService.CreateSubmission:output_type -> submission.v1.CreateSubmissionResponse
+	8,  // 27: submission.v1.SubmissionService.GetSubmission:output_type -> submission.v1.GetSubmissionResponse
+	10, // 28: submission.v1.SubmissionService.GetSubmissionSource:output_type -> submission.v1.GetSubmissionSourceResponse
+	12, // 29: submission.v1.SubmissionService.ListSubmissions:output_type -> submission.v1.ListSubmissionsResponse
+	14, // 30: submission.v1.SubmissionService.GetJudgeResult:output_type -> submission.v1.GetJudgeResultResponse
+	16, // 31: submission.v1.SubmissionService.RejudgeSubmission:output_type -> submission.v1.RejudgeSubmissionResponse
+	26, // [26:32] is the sub-list for method output_type
+	20, // [20:26] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_api_submission_v1_submission_proto_init() }

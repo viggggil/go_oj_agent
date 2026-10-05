@@ -83,7 +83,7 @@ func TestSubmissionUsecaseCreate(t *testing.T) {
 	uc.newEventID = func() string { return "123e4567-e89b-12d3-a456-426614174001" }
 
 	result, err := uc.Create(context.Background(), CreateSubmissionInput{
-		Actor: Actor{ID: 5, Roles: []string{"user"}}, ProblemID: 7, ContestID: 20, Language: " Go ",
+		Actor: Actor{ID: 5, Roles: []string{"user"}}, ProblemID: 7, ContestID: 20, ContestStartAt: now.Add(-time.Hour), ContestEndAt: now.Add(time.Hour), Language: " Go ",
 		SourceCode: []byte("package main\n"), IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
 	})
 	if err != nil || result.SubmissionID != 41 {

@@ -41,9 +41,13 @@ func (s *SubmissionService) CreateSubmission(ctx context.Context, req *submissio
 	if err != nil {
 		return nil, err
 	}
+	if req.GetContestId() > 0 && (req.GetContestStartAt() == nil || req.GetContestEndAt() == nil || req.GetContestStartAt().CheckValid() != nil || req.GetContestEndAt().CheckValid() != nil) {
+		return nil, biz.ErrorInvalidArgument("valid contest interval is required")
+	}
 	result, err := s.uc.Create(ctx, biz.CreateSubmissionInput{
 		Actor: actor, ProblemID: req.GetProblemId(), ContestID: req.GetContestId(), Language: req.GetLanguage(),
 		SourceCode: []byte(req.GetSourceCode()), IdempotencyKey: strings.ToLower(req.GetIdempotencyKey()),
+		ContestStartAt: req.GetContestStartAt().AsTime(), ContestEndAt: req.GetContestEndAt().AsTime(),
 	})
 	if err != nil {
 		return nil, err
