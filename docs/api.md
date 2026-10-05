@@ -599,6 +599,97 @@ Agent API 不接受“绕过授权”的任意资源读取参数。
 
 ---
 
+
+### 管理员 Agent Control Plane API
+
+以下接口由 Agent Service 提供，并由 Gateway 以管理员路由透传。调用者必须具有
+`system_admin` 或明确授权的 `agent_admin` 角色；最终发布、回滚和写 Tool 启用操作
+必须再次确认并写入审计日志。
+
+运行配置采用草稿和不可变发布版本。草稿不会影响在线请求；一次 Agent Run 固定
+Prompt、Skill、Tool Catalog、模型和知识库索引版本快照。
+
+Prompt：
+
+```text
+GET  /api/v1/admin/agent/prompts
+POST /api/v1/admin/agent/prompts/{prompt_key}/draft
+GET  /api/v1/admin/agent/prompts/{prompt_key}/versions
+POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/validate
+POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/publish
+POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/rollback
+```
+
+Prompt 编辑只能修改安全前缀之外的模板内容、变量说明和适用 Skill。服务端必须校验
+变量白名单、敏感信息、Tool 名称和禁止指令；不能通过 Prompt 授予 RPC 权限或删除
+安全前缀。
+
+Tool Catalog：
+
+```text
+GET  /api/v1/admin/agent/tools
+GET  /api/v1/admin/agent/tools/{tool_name}
+GET  /api/v1/admin/agent/tools/{tool_name}/metrics
+```
+
+Tool Catalog 返回描述、输入输出 Schema、来源 RPC、敏感级别、允许角色、side effect、
+超时、调用统计和当前启用策略。RPC 方法、目标服务、Tool 实现和最终授权代码只读展示。
+Tool 是否对某个 Skill 可用，通过 Skill 的 Tool allowlist 管理。
+
+Skill：
+
+```text
+GET  /api/v1/admin/agent/skills
+POST /api/v1/admin/agent/skills
+GET  /api/v1/admin/agent/skills/{skill_key}
+POST /api/v1/admin/agent/skills/{skill_key}/draft
+POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/validate
+POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/publish
+POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/rollback
+```
+
+Skill 版本可以修改描述、Prompt 绑定、Tool allowlist、执行模式、输出 Schema、Tool
+次数、计划步数和模型预算。不能执行任意 Python，也不能引用代码 Registry 中不存在
+的 Tool。
+
+知识库：
+
+```text
+GET  /api/v1/admin/agent/knowledge/documents
+POST /api/v1/admin/agent/knowledge/documents
+GET  /api/v1/admin/agent/knowledge/documents/{document_id}
+PUT  /api/v1/admin/agent/knowledge/documents/{document_id}
+POST /api/v1/admin/agent/knowledge/documents/{document_id}/versions
+POST /api/v1/admin/agent/knowledge/documents/{document_id}/preview-chunks
+POST /api/v1/admin/agent/knowledge/documents/{document_id}/index
+POST /api/v1/admin/agent/knowledge/documents/{document_id}/publish
+POST /api/v1/admin/agent/knowledge/documents/{document_id}/archive
+```
+
+知识库 API 管理文档元数据、版本、切分、索引状态、发布和归档。文档原文存 MinIO，
+向量存 Chroma 或 Qdrant；检索结果必须带文档版本和引用位置。
+
+Eval 与观测：
+
+```text
+GET  /api/v1/admin/agent/evals/datasets
+POST /api/v1/admin/agent/evals/runs
+GET  /api/v1/admin/agent/evals/runs/{run_id}
+GET  /api/v1/admin/agent/evals/runs/{run_id}/results
+GET  /api/v1/admin/agent/metrics
+GET  /api/v1/admin/agent/runs
+GET  /api/v1/admin/agent/runs/{run_id}
+GET  /api/v1/admin/agent/audits
+```
+
+Eval 运行必须记录配置版本快照。运行详情默认返回脱敏的意图、Skill、Tool 调用、
+延迟、Token、证据引用、答案状态和评分；源码、凭据、完整 Prompt 和原始敏感 Tool
+Result 不直接返回浏览器。
+
+所有管理员 API 都必须执行 RBAC、输入校验、乐观并发控制、审计记录和稳定分页。
+实施这些 HTTP 接口时，需要同步补充 Gateway Proto/OpenAPI、Python Client、管理员
+前端和权限负向测试。
+
 ## 4. Internal gRPC API
 
 Proto 目录：

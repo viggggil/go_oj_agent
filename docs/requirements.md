@@ -173,33 +173,46 @@ AC / WA / TLE / MLE / RE / CE
 
 ### 4.6 AI Coding Agent
 
-Agent 不是普通聊天机器人，第一阶段聚焦 Coding Learning 场景。
+Agent 是面向编程学习的通用 Coding Learning Agent，不绑定某道题或某次提交。第一阶段支持：
 
-支持：
-
-- 编译错误分析。
-- WA / TLE / RE 等提交诊断。
-- 分级 Hint。
-- 算法知识解释。
-- RAG 检索。
+- 编译错误、WA / TLE / RE 等提交诊断。
+- 题目理解和分级 Hint。
+- 算法、语言和工程知识解释。
+- RAG 检索和带引用回答。
 - 历史提交复盘。
 - 题目推荐。
+- 基于学习进度的学习计划。
+
+Agent 使用单一 LangGraph Runtime，通过 Skill 声明目标、Prompt、可用 Tool、输出结构和预算。Context Resolver 只解析资源 ID 和约束，不自动读取业务数据；Agent 从策略允许的 Tool 集合中选择需要的 Tool。
 
 Agent 获取业务信息时必须：
 
 ```text
 Agent
   ↓
-Tool
+Tool Executor
   ↓
-gRPC Client
+Python gRPC Client
   ↓
 Owning Go Service
   ↓
 Authorization
 ```
 
-Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据库。
+Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据库。Prompt、Skill、题面、源码、编译输出和 RAG 文档都是不可信内容，不能改变 Tool 权限或系统安全策略。
+
+### 4.7 Agent 管理面和质量工程
+
+系统应提供受 `system_admin` 或 `agent_admin` 保护的管理员页面，使以下运行配置可以有限调整并可审计：
+
+- Prompt 草稿、版本 Diff、发布、回滚和归档。
+- Tool Catalog 查看，包括 Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计。
+- Skill 元数据、Prompt 绑定、Tool allowlist、预算和输出结构。
+- 知识库文档、元数据、版本、切分、索引、发布、归档和回滚。
+- Eval 数据集、样例运行、版本对比、失败样例和人工标注。
+- Agent Run、Tool 调用、Trace、Token、延迟、错误和质量指标。
+
+管理员不能修改 Tool 的 RPC 实现、目标服务、最终授权、安全前缀或任意 Python 代码。生产运行只读取已发布版本，每次 Agent Run 固定 Prompt、Skill、Tool Catalog、模型和知识库索引快照。
 
 ---
 
@@ -254,13 +267,29 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 系统应支持：
 
 - Streaming Response。
-- Tool Calling。
+- Tool Calling 和有界 ReAct。
+- Plan-and-Solve 多步骤任务。
 - Problem / Submission / Judge Result 上下文读取。
-- RAG。
-- Agent Eval。
-- Tool 权限边界。
+- 算法解释、题目 Hint、提交诊断、历史复盘、题目推荐和学习计划。
+- RAG、文档引用和不确定性标注。
+- Prompt、Skill、Tool Catalog 和知识库的版本化运行配置。
+- Agent Eval、人工抽检和线上质量指标。
+- Tool 权限边界、调用预算、超时、取消和失败降级。
 
-### FR-06 Contest（后续）
+### FR-06 Agent 管理面
+
+系统应支持管理员：
+
+- 编辑 Prompt 草稿，查看版本 Diff，执行样例 Eval，发布、回滚和归档。
+- 查看 Tool Catalog 和 Tool 调用统计，在 Skill 层有限启用或禁用 Tool。
+- 编辑 Skill 的描述、Prompt 绑定、Tool allowlist、预算和输出结构。
+- 管理知识库文档、标签、版本、切分、索引、发布和归档。
+- 管理 Eval 数据集，运行评估并查看版本对比和失败样例。
+- 查看脱敏后的 Agent Run、Trace、Tool 调用、Token、延迟和质量指标。
+
+管理员不能修改 Tool 的 RPC 实现、服务身份、最终授权、安全前缀或任意 Python 代码。高风险发布、回滚和写 Tool 启用需要二次确认并写审计日志。
+
+### FR-07 Contest（后续）
 
 系统可扩展：
 
@@ -405,6 +434,14 @@ Pull Request 至少验证：
 - Proto lint / breaking check。
 - 核心 Integration Test。
 
+### AC-06 Agent 配置管理和质量追踪
+
+- 草稿 Prompt 或 Skill 不影响线上回答；发布后每次运行记录不可变配置版本。
+- 管理员只能编辑允许字段，不能修改 Tool RPC、目标服务、授权逻辑或安全前缀。
+- 普通用户不能访问管理 API；发布、回滚和知识库变更会写入审计记录。
+- Eval 能比较配置版本并定位失败样例；线上 Trace 能按运行版本查看脱敏 Tool 调用和质量信号。
+- 用户 A 不能通过 Skill、Prompt 或知识库配置读取用户 B 的私有提交。
+
 ---
 
 ## 9. 版本路线
@@ -441,13 +478,13 @@ Pull Request 至少验证：
 
 ### Phase 3 — AI Coding Agent
 
-- FastAPI
-- LangChain
-- LangGraph
-- gRPC Tools
-- RAG
-- SSE
-- Agent Eval
+- FastAPI、LangChain、LangGraph 和 SSE。
+- Typed gRPC Tools、内部身份和权限测试。
+- 通用 Agent Runtime：direct、ReAct、Plan-and-Solve、Reflection。
+- Prompt、Skill、Tool Catalog、知识库和 Eval Control Plane。
+- 管理员页面：Prompt、Tools、Skills、知识库、Eval 和运行观测。
+- 算法解释、题目 Hint、提交诊断、历史复盘、推荐和学习计划。
+- 离线 Eval、人工抽检、运行 Trace、质量指标和版本回滚。
 
 ### Phase 4 — Engineering Hardening
 
