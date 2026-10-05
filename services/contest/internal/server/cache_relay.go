@@ -15,6 +15,7 @@ import (
 // requires Redis connectivity and cannot stop authoritative result processing.
 type CacheRelayServer struct {
 	enabled bool
+	repo    *data.Repository
 	relay   *biz.CacheRelay
 	mu      sync.Mutex
 	cancel  context.CancelFunc
@@ -22,7 +23,7 @@ type CacheRelayServer struct {
 }
 
 func NewCacheRelayServer(repo *data.Repository, cache *data.LeaderboardRedis) *CacheRelayServer {
-	return &CacheRelayServer{enabled: cache.Enabled(), relay: &biz.CacheRelay{Repository: repo, Sink: cache}}
+	return &CacheRelayServer{enabled: cache.Enabled(), repo: repo, relay: &biz.CacheRelay{Repository: repo, Sink: cache}}
 }
 func (s *CacheRelayServer) Start(ctx context.Context) error {
 	if !s.enabled {
@@ -54,11 +55,17 @@ func (s *CacheRelayServer) Start(ctx context.Context) error {
 					return nil
 				}
 				slog.Warn("leaderboard cache relay retry", "error", err)
+				data.RecordCacheRelayFailure()
 				break
 			}
 			if !claimed {
 				break
 			}
+		}
+		if s.repo != nil {
+			observeCtx, observeCancel := context.WithTimeout(ctx, time.Second)
+			s.repo.ObserveCacheOutbox(observeCtx)
+			observeCancel()
 		}
 		timer := time.NewTimer(time.Second)
 		select {

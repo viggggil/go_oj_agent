@@ -101,6 +101,9 @@ func TestCachedLeaderboardHitDoesNotReadSQL(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
+	if got := CacheMetricsSnapshot()["cache_hits"]; got == 0 {
+		t.Fatal("cache hit was not recorded")
+	}
 }
 func TestCachedLeaderboardDisabled(t *testing.T) {
 	db, mock, err := sqlmock.New()

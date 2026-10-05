@@ -112,6 +112,7 @@ func (r *Repository) RebuildLeaderboard(ctx context.Context, id int64) error {
 	if r.leaderboard == nil {
 		return ErrCacheIncomplete
 	}
+	leaderboardCacheRebuilds.Add(1)
 	cache := r.leaderboard.cache
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()

@@ -45,10 +45,8 @@ problem:
   subject: "gateway-service"
   token_ttl: "30s"
 
-# Write relay only. Leave disabled until PR3 supplies safe cache initialization,
-# reads and rebuilding. Redis connectivity is never required at startup.
 leaderboard_cache:
-  enabled: false
+  enabled: true
   addresses: ["redis:6379"]
   password: ""
   db: 0

@@ -194,24 +194,29 @@ func (c *LeaderboardRedis) Read(ctx context.Context, contest biz.Contest, page, 
 		return nil, 0, fmt.Errorf("invalid leaderboard page")
 	}
 	if !c.Enabled() {
+		recordCacheMiss()
 		return nil, 0, ErrCacheIncomplete
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	generation, _, err := c.pointers(ctx, contest.ID)
 	if err != nil {
+		recordCacheError()
 		return nil, 0, err
 	}
 	if generation == "" {
+		recordCacheMiss()
 		return nil, 0, ErrCacheIncomplete
 	}
 	offset := (int64(page) - 1) * int64(size)
 	keys := append([]string{c.base(contest.ID) + "active"}, c.generationKeys(contest.ID, generation)...)
 	values, err := readLeaderboard.Run(ctx, c.client, keys, generation, contestSignature(contest), offset, size, maxCacheAge.Milliseconds()).Slice()
 	if err != nil {
+		recordCacheError()
 		return nil, 0, err
 	}
 	if len(values) == 0 {
+		recordCacheMiss()
 		return nil, 0, ErrCacheIncomplete
 	}
 	total, ok := values[0].(int64)
@@ -225,6 +230,7 @@ func (c *LeaderboardRedis) Read(ctx context.Context, contest biz.Contest, page, 
 		return nil, 0, ErrGenerationChanged
 	}
 	if total < 0 || (len(values)-1)%3 != 0 {
+		recordCacheMiss()
 		return nil, 0, ErrCacheIncomplete
 	}
 	count := int64(size)
@@ -263,5 +269,6 @@ func (c *LeaderboardRedis) Read(ctx context.Context, contest biz.Contest, page, 
 		}
 		items = append(items, item)
 	}
+	recordCacheHit()
 	return items, total, nil
 }

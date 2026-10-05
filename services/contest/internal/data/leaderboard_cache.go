@@ -98,6 +98,7 @@ func (r *Repository) CachedLeaderboard(ctx context.Context, contest biz.Contest,
 			return nil, 0, ctx.Err()
 		}
 		if !errors.Is(err, ErrCacheIncomplete) && !errors.Is(err, ErrCacheStale) && !errors.Is(err, ErrGenerationChanged) {
+			recordCacheError()
 			c.mu.Lock()
 			c.cooldown = time.Now().Add(5 * time.Second)
 			c.mu.Unlock()
@@ -253,6 +254,7 @@ func (r *Repository) maintainLeaderboard(ctx context.Context, id int64) {
 	} else if errors.Is(err, ErrBuildBusy) {
 		work.rebuildAt = time.Now().Add(5 * time.Second)
 	} else {
+		leaderboardCacheFailures.Add(1)
 		work.failures++
 		delay := time.Second << min(work.failures, 6)
 		work.rebuildAt = time.Now().Add(delay)
