@@ -966,7 +966,7 @@ Gateway 已提供比赛列表、详情、创建、更新、归档、报名、提
 
 内部 `CreateSubmissionRequest` 新增 `contest_start_at=7` 和 `contest_end_at=8`；
 普通公开提交端点不能填写比赛字段，Gateway 仅通过 Contest Service 发起比赛提交。
-Contest 校验报名与题目后转发区间；Judge 最终 INSERT 用数据库 `UTC_TIMESTAMP(3)`
+Contest 在兼容的共享比赛行锁内校验报名、题目和数据库时间，再转发稳定区间；Judge 最终 INSERT 用数据库 `UTC_TIMESTAMP(3)`
 作为 `created_at/submitted_at` 并检查 `[start_at,end_at)`。跨 RPC、源码上传和
 幂等锁等待期间越过截止会回滚提交、Outbox 和幂等预留，已成功请求的重放不重复插入。
 部署时先停止比赛写入，再同时更新 Judge 和 Contest，避免旧 Contest 缺少新区间字段；

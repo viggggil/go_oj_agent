@@ -59,6 +59,11 @@ type ContestSubmissionRepository interface {
 	Join(context.Context, int64, int64) (time.Time, error)
 }
 
+// 比赛提交预校验必须在共享比赛锁内完成，防止跨开始边界的配置事务交错。
+type ContestSubmissionAuthorizer interface {
+	AuthorizeSubmission(context.Context, int64, int64, int64) (Contest, error)
+}
+
 type SubmissionCreator interface {
 	CreateSubmission(context.Context, *submissionv1.CreateSubmissionRequest, ...grpc.CallOption) (*submissionv1.CreateSubmissionResponse, error)
 }
@@ -95,36 +100,47 @@ func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.R
 	if input == nil || input.GetContestId() <= 0 || input.GetProblemId() <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid contest submission")
 	}
-	contest, err := u.repo.Get(ctx, input.GetContestId())
+	contest, err := u.authorizeSubmission(ctx, checker, input.GetContestId(), actor.GetUserId(), input.GetProblemId())
 	if err != nil {
 		return nil, err
-	}
-	now, err := u.currentTime(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
-		return nil, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
-	}
-	participant, err := checker.IsParticipant(ctx, input.GetContestId(), actor.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if !participant {
-		return nil, status.Error(codes.PermissionDenied, "user is not a contest participant")
-	}
-	problem, err := checker.HasProblem(ctx, input.GetContestId(), input.GetProblemId())
-	if err != nil {
-		return nil, err
-	}
-	if !problem {
-		return nil, status.Error(codes.InvalidArgument, "problem does not belong to contest")
 	}
 	return u.submission.CreateSubmission(ctx, &submissionv1.CreateSubmissionRequest{
 		ProblemId: input.GetProblemId(), ContestId: input.GetContestId(), Language: input.GetLanguage(),
 		SourceCode: input.GetSourceCode(), IdempotencyKey: input.GetIdempotencyKey(),
 		ContestStartAt: timestamppb.New(contest.StartAt), ContestEndAt: timestamppb.New(contest.EndAt),
 	})
+}
+
+func (u *ContestUsecase) authorizeSubmission(ctx context.Context, checker ContestSubmissionRepository, contestID, userID, problemID int64) (Contest, error) {
+	if authorizer, ok := checker.(ContestSubmissionAuthorizer); ok {
+		return authorizer.AuthorizeSubmission(ctx, contestID, userID, problemID)
+	}
+	contest, err := u.repo.Get(ctx, contestID)
+	if err != nil {
+		return Contest{}, err
+	}
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
+		return Contest{}, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
+	}
+	participant, err := checker.IsParticipant(ctx, contestID, userID)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !participant {
+		return Contest{}, status.Error(codes.PermissionDenied, "user is not a contest participant")
+	}
+	problem, err := checker.HasProblem(ctx, contestID, problemID)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !problem {
+		return Contest{}, status.Error(codes.InvalidArgument, "problem does not belong to contest")
+	}
+	return contest, nil
 }
 
 func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContext, contestID int64) (time.Time, error) {
