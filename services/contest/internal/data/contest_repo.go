@@ -12,6 +12,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// 业务预校验和状态展示使用与最终写入相同的数据库时钟。
+func (r *Repository) CurrentTime(ctx context.Context) (time.Time, error) {
+	if r == nil || r.db == nil {
+		return time.Time{}, status.Error(codes.Internal, "contest database is not configured")
+	}
+	var now time.Time
+	err := r.db.QueryRowContext(ctx, `SELECT UTC_TIMESTAMP(3)`).Scan(&now)
+	return now.UTC(), err
+}
+
 func (r *Repository) IsParticipant(ctx context.Context, contestID, userID int64) (bool, error) {
 	if r == nil || r.db == nil {
 		return false, status.Error(codes.Internal, "contest database is not configured")

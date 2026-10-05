@@ -959,6 +959,7 @@ Gateway 已提供比赛列表、详情、创建、更新、归档、报名、提
 `UpdateContest` 是完整替换操作。管理员必须把最近一次 `GetContest` 返回的
 `updated_at` 原样放入 `ContestUpdate.expected_updated_at`；服务端在比赛行锁内
 重新检查状态和 UTC 时间，并在令牌过期时返回 `ABORTED`，避免并发管理员静默覆盖。
+生命周期展示与业务预校验读取 Repository 的数据库 UTC 时钟；比赛时间规范化为 DATETIME(3) 的毫秒精度。
 报名、归档和编辑在拿锁后再次读取数据库 UTC 时间；报名只允许 start_at 前。比赛提交采用半开区间 `[start_at,end_at)`，重复报名
 按 `(contest_id,user_id)` 主键保持幂等。Redis 排行榜题目结构由比赛配置签名保护，题目
 集合变化后旧代次不会继续命中。

@@ -40,6 +40,18 @@ type ContestRepository interface {
 	Archive(context.Context, int64) (Contest, error)
 }
 
+// 生产 Repository 提供数据库 UTC 时钟；纯业务测试可继续注入 now。
+type ContestClock interface {
+	CurrentTime(context.Context) (time.Time, error)
+}
+
+func (u *ContestUsecase) currentTime(ctx context.Context) (time.Time, error) {
+	if clock, ok := u.repo.(ContestClock); ok {
+		return clock.CurrentTime(ctx)
+	}
+	return u.now().UTC(), nil
+}
+
 type ContestSubmissionRepository interface {
 	ContestRepository
 	IsParticipant(context.Context, int64, int64) (bool, error)
@@ -87,7 +99,10 @@ func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.R
 	if err != nil {
 		return nil, err
 	}
-	now := u.now()
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
 		return nil, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
 	}
@@ -132,7 +147,10 @@ func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContex
 	if err != nil {
 		return time.Time{}, err
 	}
-	now := u.now()
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
 	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || !now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return time.Time{}, status.Error(codes.FailedPrecondition, "contest is not accepting registrations")
 	}
@@ -150,7 +168,11 @@ func (u *ContestUsecase) Create(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	if !start.After(u.now()) {
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !start.After(now) {
 		return Contest{}, status.Error(codes.InvalidArgument, "contest start_at must be in the future")
 	}
 	return u.repo.Create(ctx, Contest{Title: strings.TrimSpace(input.GetTitle()), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT, StartAt: start, EndAt: end, CreatedBy: actor.GetUserId(), Problems: problems})
@@ -167,7 +189,11 @@ func (u *ContestUsecase) Get(ctx context.Context, actor *commonv1.RequestContext
 	if err != nil {
 		return Contest{}, err
 	}
-	contest.Status = lifecycle(contest.StartAt, contest.EndAt, contest.Status, u.now())
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	contest.Status = lifecycle(contest.StartAt, contest.EndAt, contest.Status, now)
 	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED && !isAdmin(actor) {
 		return Contest{}, status.Error(codes.NotFound, "contest not found")
 	}
@@ -191,8 +217,12 @@ func (u *ContestUsecase) List(ctx context.Context, actor *commonv1.RequestContex
 	if err != nil {
 		return nil, 0, err
 	}
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 	for i := range items {
-		items[i].Status = lifecycle(items[i].StartAt, items[i].EndAt, items[i].Status, u.now())
+		items[i].Status = lifecycle(items[i].StartAt, items[i].EndAt, items[i].Status, now)
 	}
 	return items, total, nil
 }
@@ -208,7 +238,11 @@ func (u *ContestUsecase) Update(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	current.Status = lifecycle(current.StartAt, current.EndAt, current.Status, u.now())
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	current.Status = lifecycle(current.StartAt, current.EndAt, current.Status, now)
 	if current.Status != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return Contest{}, status.Error(codes.FailedPrecondition, "only draft contests can be updated")
 	}
@@ -216,7 +250,7 @@ func (u *ContestUsecase) Update(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	if !start.After(u.now()) {
+	if !start.After(now) {
 		return Contest{}, status.Error(codes.InvalidArgument, "contest start_at must be in the future")
 	}
 	if input.GetExpectedUpdatedAt() == nil {
@@ -243,7 +277,11 @@ func (u *ContestUsecase) Archive(ctx context.Context, actor *commonv1.RequestCon
 	if err != nil {
 		return Contest{}, err
 	}
-	if lifecycle(current.StartAt, current.EndAt, current.Status, u.now()) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if lifecycle(current.StartAt, current.EndAt, current.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return Contest{}, status.Error(codes.FailedPrecondition, "only draft contests can be archived")
 	}
 	return u.repo.Archive(ctx, id)
@@ -253,7 +291,8 @@ func normalizeUpdate(input *contestv1.ContestUpdate) (time.Time, time.Time, []Co
 	if input == nil || strings.TrimSpace(input.GetTitle()) == "" || input.GetStartAt() == nil || input.GetEndAt() == nil {
 		return time.Time{}, time.Time{}, nil, status.Error(codes.InvalidArgument, "complete contest fields are required")
 	}
-	start, end := input.GetStartAt().AsTime(), input.GetEndAt().AsTime()
+	// Contest 的存储精度为 DATETIME(3)，预校验必须使用相同精度。
+	start, end := input.GetStartAt().AsTime().UTC().Truncate(time.Millisecond), input.GetEndAt().AsTime().UTC().Truncate(time.Millisecond)
 	if !start.Before(end) {
 		return time.Time{}, time.Time{}, nil, status.Error(codes.InvalidArgument, "start_at must be before end_at")
 	}
