@@ -30,6 +30,8 @@ message ServiceProto {
 
 message ServerProto {
   GRPCProto grpc = 1;
+  // 仅用于运维抓取。留空可禁用。
+  string metrics_address = 2;
 }
 
 message GRPCProto {

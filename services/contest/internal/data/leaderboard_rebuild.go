@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -108,11 +109,20 @@ func (r *Repository) StreamLeaderboard(ctx context.Context, id int64, emit func(
 	return contest, tx.Commit()
 }
 
-func (r *Repository) RebuildLeaderboard(ctx context.Context, id int64) error {
+func (r *Repository) RebuildLeaderboard(ctx context.Context, id int64) (retErr error) {
 	if r.leaderboard == nil {
 		return ErrCacheIncomplete
 	}
-	leaderboardCacheRebuilds.Add(1)
+	started := time.Now()
+	defer func() {
+		if !errors.Is(retErr, ErrBuildBusy) {
+			leaderboardCacheRebuilds.Add(1)
+			leaderboardRebuildMicros.Add(time.Since(started).Microseconds())
+			if retErr != nil {
+				leaderboardCacheFailures.Add(1)
+			}
+		}
+	}()
 	cache := r.leaderboard.cache
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()

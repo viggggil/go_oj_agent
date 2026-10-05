@@ -949,7 +949,8 @@ service ContestService {
 }
 ```
 
-`GetLeaderboard` 已实现，读取 Contest 自有 `contest_problem_results` 聚合结果。
+`GetLeaderboard` 已实现，校验身份和比赛可见性后优先读取经过结构和新鲜度校验的 Redis 代次；
+缓存缺失、损坏、过旧或 Redis 故障时读取 Contest 自有 `contest_problem_results` 聚合结果。
 按 solved_count DESC、penalty_seconds ASC、user_id ASC 排序，分页参数与比赛列表一致（1 起始，最大 100）。
 保留 `rank=1,user_id=2,score=3,penalty=4,accepted_count=5`；新增 `problems=6,solved_count=7,penalty_seconds=8`。
 ACM 下 score/accepted_count 等于 solved_count，penalty 等于 penalty_seconds（秒）。每道题返回

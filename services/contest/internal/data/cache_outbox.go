@@ -20,9 +20,9 @@ func (r *Repository) ClaimCacheEvent(ctx context.Context, token string, lease ti
 	}
 	defer tx.Rollback()
 	event := &biz.CacheOutboxEvent{}
-	var version int64
-	err = tx.QueryRowContext(ctx, `SELECT id,contest_id,user_id,result_version,payload,retry_count FROM contest_cache_outbox
- WHERE status='pending' AND next_retry_at<=UTC_TIMESTAMP(6) AND (lease_until IS NULL OR lease_until<=UTC_TIMESTAMP(6)) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&event.ID, &event.ContestID, &event.UserID, &version, &event.Payload, &event.Retries)
+	var version, ageMicros int64
+	err = tx.QueryRowContext(ctx, `SELECT id,contest_id,user_id,result_version,payload,retry_count,GREATEST(TIMESTAMPDIFF(MICROSECOND,created_at,UTC_TIMESTAMP(6)),0) FROM contest_cache_outbox
+ WHERE status='pending' AND next_retry_at<=UTC_TIMESTAMP(6) AND (lease_until IS NULL OR lease_until<=UTC_TIMESTAMP(6)) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&event.ID, &event.ContestID, &event.UserID, &version, &event.Payload, &event.Retries, &ageMicros)
 	if err == sql.ErrNoRows {
 		return nil, tx.Commit()
 	}
@@ -30,6 +30,7 @@ func (r *Repository) ClaimCacheEvent(ctx context.Context, token string, lease ti
 		return nil, err
 	}
 	event.Version = strconv.FormatInt(version, 10)
+	event.Age = time.Duration(ageMicros) * time.Microsecond
 	_, err = tx.ExecContext(ctx, `UPDATE contest_cache_outbox SET lease_owner=?,lease_until=TIMESTAMPADD(MICROSECOND,?,UTC_TIMESTAMP(6)) WHERE id=?`, token, lease.Microseconds(), event.ID)
 	if err != nil {
 		return nil, err

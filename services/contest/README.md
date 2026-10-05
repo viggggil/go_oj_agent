@@ -235,21 +235,17 @@ back to MySQL and pending Outbox rows are retried.
 
 Contest registration, editing and archiving lock the contest row before they
 recheck status and the database UTC clock. Registration is idempotent on the
-`(contest_id,user_id)` primary key and uses the half-open interval
-`[start_at,end_at)`. Updates carry the `expected_updated_at` value returned by
+`(contest_id,user_id)` primary key and is allowed only before start_at. Submissions
+use the half-open interval `[start_at,end_at)` and the final Judge INSERT clock. Updates carry the `expected_updated_at` value returned by
 `GetContest`; a stale administrator receives `ABORTED` and must reload before
 retrying. Contest row locks are acquired before participant, problem or result
 rows. Deadlocks and lock wait timeouts retry at most three times and always
 honor request cancellation.
 
-The Redis cache is observable through process `expvar` counters, including
-cache hits, misses, Redis errors, rebuild attempts/failures, Outbox backlog
-and relay failures. If the service exposes the standard `/debug/vars` handler,
-scrape the `contest_leaderboard_*` names. Redis is never authoritative: a
-missing or damaged generation is rebuilt from a repeatable MySQL snapshot.
+运行观测使用独立 `server.metrics_address` 端口，提供 Prometheus 文本 `/metrics`
+和 JSON `/debug/vars`。默认本地地址为 `127.0.0.1:9105`，Compose 仅在内部监听。
+指标覆盖命中/未命中/错误、实际 SQL 回源、Outbox backlog/最老年龄/投递延迟、
+重建次数/耗时/失败、完整事务重试。Redis 继续作为可重建投影。
 
-For an existing installation, apply migrations `000003` and `000004`, pause
-Contest result consumers, run the backfill command above, verify Redis and
-restart Contest Service. New installations run all migrations in order. Do not
-delete Redis keys manually while a rebuild is active; use a service restart or
-wait for maintenance to reconstruct the generation.
+迁移、回填、部署顺序、功能开关、故障处理、测试矩阵和负载记录见
+[排行榜缓存运维文档](../../docs/contest-cache-operations.md)。

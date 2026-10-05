@@ -7,6 +7,7 @@ messaging:
   dead_letter_queue: contest.results.dlq
   prefetch: 16
 server:
+  metrics_address: "127.0.0.1:9105"
   grpc:
     address: ":9005"
     max_receive_message_bytes: 35651584
