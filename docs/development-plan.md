@@ -1242,17 +1242,22 @@ agent/
 
 # 9.3 gRPC Tools
 
-第一批 Tool：
+第一批 Tool 注册表：
 
 ```text
+GetCurrentUser
 GetProblem
+ListProblems
 GetSubmission
+GetSubmissionSource
 ListSubmissions
-SearchProblems
 GetJudgeResult
 RetrieveKnowledge
-RecommendProblem
 ```
+
+Agent 根据已选 Skill 和用户目标选择 Tool，不固定读取提交上下文。`SearchProblems`、
+`GetLearningProfile` 等后端能力尚未完整时，不作为已上线 Tool 暴露；推荐和学习画像
+由对应领域接口就绪后再加入。
 
 调用链：
 
@@ -1274,42 +1279,29 @@ Agent
 
 ---
 
-# 9.4 First Agent Workflow
+# 9.4 通用 Agent Workflow
 
-第一条高价值 Workflow：
+Agent Runtime 不固定某个场景的必经取数链路。Intent / Entity Parser 解析用户目标、
+资源 ID 和约束；策略层依据 Skill、用户权限和已发布 Tool Catalog 提供可选 Tool；
+Agent 只调用当前任务需要的工具。
 
-```text
-User:
-为什么 submission 123 WA？
-
-        ↓
-Context Resolver
-        ↓
-GetSubmission(123)
-        ↓
-GetProblem(...)
-        ↓
-GetJudgeResult(123)
-        ↓
-RetrieveKnowledge(...)
-        ↓
-LLM Analysis
-        ↓
-Answer
-```
-
-然后扩展：
+例如，下面是工具选择的可能路径，不是所有请求都执行的固定顺序：
 
 ```text
-Compile Error Analysis
-TLE Analysis
-RE Analysis
-Progressive Hint
-Problem Recommendation
-Learning Review
+算法解释：RetrieveKnowledge
+
+题目理解 / Hint：GetProblem → 可选 RetrieveKnowledge
+
+提交诊断：GetSubmission → 可选 GetSubmissionSource /
+         GetJudgeResult / GetProblem / RetrieveKnowledge
+
+学习计划：GetLearningProfile / ListSubmissions /
+         SearchProblems / RetrieveKnowledge（接口可用后）
 ```
 
----
+简单知识问题可直接回答或只检索知识；学习计划、历史复盘等多步骤任务使用有限
+Plan-and-Solve；有不确定证据需要补充时使用有界 ReAct。输出前执行一次证据、引用和
+不确定性检查。
 
 # 9.5 Permission Boundary
 
@@ -1446,21 +1438,176 @@ Forbidden access
 
 # 9.9 Phase 4 Acceptance Criteria
 
-- [ ] FastAPI Agent 可独立启动
-- [ ] Python gRPC Client 正常
-- [ ] GetProblem Tool 完成
-- [ ] GetSubmission Tool 完成
-- [ ] GetJudgeResult Tool 完成
-- [ ] RAG Tool 完成
-- [ ] WA Diagnosis Workflow 可运行
-- [ ] SSE Streaming 正常
-- [ ] User A 不能读取 User B Submission
-- [ ] Agent Eval 基线建立
-- [ ] Agent unit/integration tests 通过
+- [ ] FastAPI Agent 可独立启动，SSE 和取消工作正常
+- [ ] Python gRPC Client 和 Agent Service 内部身份完成
+- [ ] Tool Registry、typed schema、权限策略和预算执行完成
+- [ ] Intent Router 能选择通用 Skill 和执行模式
+- [ ] 算法解释、题目 Hint、提交诊断使用同一 Runtime
+- [ ] RAG Tool 可返回可验证的引用
+- [ ] Agent Run 固定 Prompt、Skill、Tool Catalog 和索引版本
+- [ ] 用户 A 不能读取用户 B 的 Submission 或源码
+- [ ] Eval 覆盖 Tool 选择、参数、权限、证据和不确定性
+- [ ] Agent unit / integration tests 通过
+
+Control Plane 和管理员页面按 9.10 分阶段完成，并作为 Agent 功能达到完整验收的必要组成部分。
 
 **Release:** `v0.3.0`
 
 ---
+
+
+# 9.10 Agent Control Plane、管理员页面与质量工程
+
+前面的 Agent 设计以 Tool Calling 和首条诊断流程为主。本阶段补充一个可配置的 Agent
+Control Plane，保证 Prompt、Skill、Tool 策略、知识库和 Eval 不依赖重新编译代码才能
+调整，同时保留代码实现的安全边界。
+
+## 9.10.1 运行时原则
+
+```text
+Request
+  ↓
+Intent + Entity Parser
+  ↓
+Policy Resolver
+  ↓
+Published Prompt / Skill / Tool Catalog Snapshot
+  ↓
+Direct / ReAct / Plan-and-Solve
+  ↓
+Typed Tool Executor
+  ↓
+Evidence / Safety / Quality Check
+  ↓
+SSE + Persistence + Trace
+```
+
+Context Resolver 只解析资源 ID 和约束，不自动预取提交、题目或源码。Agent 从策略
+允许的 Tool 集合中选择工具。一次 Agent Run 固定 Prompt、Skill、Tool Catalog、模型
+和知识库索引版本，草稿不会影响在线运行。
+
+## 9.10.2 Control Plane 范围
+
+需要持久化和版本化的资源：
+
+```text
+Prompt / Prompt Version
+Skill / Skill Version / Skill-Tool Binding
+Tool Catalog Policy
+Knowledge Document / Knowledge Version / Index
+Eval Case / Eval Dataset / Eval Run
+Agent Run / Agent Run Event / Admin Audit
+```
+
+统一状态：
+
+```text
+DRAFT → PUBLISHED → ARCHIVED
+```
+
+发布版本不可变；回滚通过重新发布旧版本完成。管理员可以调整 Prompt 模板、Skill 的
+Tool allowlist、预算、输出结构、知识库元数据和评估配置，但不能修改 RPC 实现、目标
+服务、最终授权、安全前缀或任意 Python 代码。
+
+## 9.10.3 管理员页面
+
+管理员入口使用 `system_admin` 或明确授权的 `agent_admin` 角色，页面拆为：
+
+1. Prompt：编辑、变量校验、版本 Diff、样例运行、发布、回滚和审计。
+2. Tool Catalog：Schema、来源 RPC、敏感级别、允许角色、启用状态、延迟和失败统计。
+3. Skill：描述、执行模式、Prompt 绑定、Tool allowlist、预算、输出结构、发布和回滚。
+4. Knowledge：文档、标签、版本、切分预览、索引、发布、归档和回滚。
+5. Eval：数据集、样例运行、版本对比、失败样例、人工标注和评分维度。
+6. Observability：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和质量指标。
+
+发布、回滚、归档和启用写 Tool 需要二次确认和审计日志，生产环境可配置双人审批。
+
+## 9.10.4 质量评估和观测
+
+Eval 分为三层：
+
+- 确定性：意图、Skill、Tool、参数、权限、状态转换、预算和输出 Schema；
+- 模型质量：事实正确性、相关性、解释完整性、Hint 等级、引用一致性和不确定性标注；
+- 人工抽检：按 Skill、模型和配置版本抽样，严重失败样例回流数据集。
+
+核心指标：
+
+```text
+tool_selection_pass_rate
+tool_argument_pass_rate
+permission_denied_correct_rate
+evidence_grounded_rate
+citation_valid_rate
+answer_relevance_score
+answer_correctness_score
+hint_level_accuracy
+clarification_rate
+unsafe_action_block_rate
+fallback_rate
+```
+
+离线 Eval 和线上运行事件必须使用相同的版本标识，能够比较 Prompt、Skill、模型和
+知识库变更的影响。完整源码、凭据、原始 Prompt 和敏感 Tool Result 默认脱敏。
+
+## 9.10.5 分阶段实施
+
+### A. 合同和数据模型
+
+- 新增 Agent Control Plane ADR。
+- 确定 Prompt、Skill、Knowledge、Eval、Run、Audit 的表和状态机。
+- 定义管理员 API、版本快照、审计字段和权限矩阵。
+- 更新 Gateway/OpenAPI、Python Client 和管理员前端边界。
+
+### B. Agent Runtime 基础
+
+- FastAPI、SSE、会话和运行状态。
+- Tool Registry、Tool Executor、预算和取消。
+- Python gRPC Client、Agent Service 内部身份和权限负向测试。
+- Direct、ReAct、Plan-and-Solve、Reflection 状态图。
+
+### C. 控制面 API
+
+- Prompt 草稿、校验、Diff、发布、回滚。
+- Tool Catalog 查询和 Skill Tool allowlist。
+- Skill 编辑、样例运行、发布、回滚。
+- 知识库文档、切分、索引、发布和归档。
+- Eval 数据集、运行、结果和人工标注。
+
+### D. 管理员前端
+
+- 管理员路由和 RBAC。
+- Prompt、Tool、Skill、Knowledge、Eval、Observability 页面。
+- 发布二次确认、乐观并发控制、失败提示和审计展示。
+- 不向浏览器返回完整源码、凭据、原始敏感 Prompt 或内部 Tool Result。
+
+### E. 场景和质量基线
+
+按以下顺序接入场景：
+
+```text
+算法解释
+→ 题目理解 / 分级 Hint
+→ 提交诊断
+→ 历史复盘
+→ 题目推荐
+→ 学习计划
+```
+
+每个场景都需要 Tool 选择、权限、预算、引用和失败降级 Eval。学习计划上线前需要
+补充学习画像、历史统计和题目筛选能力，不能把有限的提交列表当作完整画像。
+
+## 9.10.6 验收标准
+
+- [ ] 草稿配置不会影响生产 Agent。
+- [ ] 发布版本不可变，Agent Run 可复现配置快照。
+- [ ] 管理员可以编辑 Prompt、Skill 和知识库并回滚。
+- [ ] Tool Catalog 能展示 Schema、来源、权限和调用指标。
+- [ ] 管理员不能通过页面修改 RPC、服务身份或最终授权。
+- [ ] Eval 可以比较两个 Prompt/Skill/模型/知识库版本。
+- [ ] 线上运行可以查询脱敏 Trace、Tool 调用和质量指标。
+- [ ] 用户 A 不能通过 Agent 读取用户 B 的私有提交。
+- [ ] 写 Tool 默认关闭，启用和调用都有确认与审计。
+- [ ] `make agent-eval` 不再是占位命令。
 
 # 10. Phase 5 — Observability and Engineering Hardening
 
@@ -1832,7 +1979,7 @@ Contest Service
 Redis ZSET Realtime Leaderboard
 Qdrant
 Adaptive Recommendation
-Admin Agent
+面向管理员的独立业务 Copilot
 Human-in-the-loop
 Kubernetes
 Horizontal Scaling
