@@ -193,13 +193,16 @@ export const contestApi = {
     end_at: { seconds: number; nanos: number }
     problems: { problem_id: number; sort_order: number; score: number }[]
   }) => api.post<{ contest: Contest }>('/api/v1/contests', contest),
-  update: (id: number, contest: {
-    title: string
-    start_at: TimestampValue
-    end_at: TimestampValue
-    problems: { problem_id: number; sort_order: number; score: number }[]
-    expected_updated_at: TimestampValue
-  }) => api.put<{ contest: Contest }>(`/api/v1/contests/${id}`, contest),
+  update: (
+    id: number,
+    contest: {
+      title: string
+      start_at: TimestampValue
+      end_at: TimestampValue
+      problems: { problem_id: number; sort_order: number; score: number }[]
+      expected_updated_at: TimestampValue
+    },
+  ) => api.put<{ contest: Contest }>(`/api/v1/contests/${id}`, contest),
   join: (id: number) =>
     api.post<{ contest_id: number; user_id: number; joined_at: string }>(
       `/api/v1/contests/${id}/join`,
