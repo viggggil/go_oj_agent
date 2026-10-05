@@ -521,6 +521,68 @@ INDEX(conversation_id, id)
 
 ---
 
+## 8.3 Control Plane 版本实体
+
+Agent 的 Prompt、Skill、Tool 策略和知识库属于 `oj_agent` 自有控制面。它们不能保存
+User、Problem、Submission 或 Contest 的业务镜像。
+
+### `agent_prompts` / `agent_prompt_versions`
+
+`agent_prompts` 保存稳定的 `prompt_key` 和当前发布版本；`agent_prompt_versions`
+保存不可变内容、变量声明、状态、创建者、发布时间和变更说明。版本状态使用
+`DRAFT`、`PUBLISHED`、`ARCHIVED`。发布和回滚不修改旧版本，而是将已有版本重新发布。
+
+### `agent_skills` / `agent_skill_versions`
+
+Skill 主表保存稳定标识、名称和当前发布版本；版本表保存执行模式、Prompt 引用、输出
+Schema、Tool 次数、计划步数、Token 预算、启用状态和版本说明。Skill 版本只能引用
+代码 Registry 已注册的 Tool。
+
+### `agent_skill_tools`
+
+保存 Skill 版本与 Tool 的绑定、排序、是否允许自动调用和参数限制。该表不能覆盖
+Tool Registry 的 `rpc_method`、目标服务、最终授权和敏感级别。
+
+### `agent_knowledge_documents` / `agent_knowledge_versions`
+
+保存文档元数据、MinIO 对象引用、来源、算法、难度、语言、文档类型、版本、索引状态、
+切分配置和发布状态。原始文档不放入 MySQL 大字段；切分结果和 Embedding 由 RAG
+存储管理。索引任务必须可重复执行，并记录失败原因和索引版本。
+
+## 8.4 Eval、运行和审计实体
+
+### `agent_eval_cases`
+
+保存评估问题、期望 Skill、允许 Tool、关键证据、禁止主张、评分维度、数据集和启用
+状态。逐字答案不作为唯一验收条件。
+
+### `agent_eval_runs` / `agent_eval_results`
+
+运行表保存数据集、模型、Prompt/Skill/Tool Catalog/知识库版本快照、开始结束时间和
+整体指标；结果表保存每个 Case 的工具选择、参数、权限、引用、质量评分、失败原因
+和人工标注。
+
+### `agent_runs` / `agent_run_events`
+
+运行表保存用户、会话、Skill、配置快照、模型、状态、Token、延迟和最终状态。事件表
+保存意图、计划步骤、Tool 调用、Tool 结果摘要、Reflection、错误和 SSE 状态。源码、
+凭据、完整 Prompt 和原始敏感 Tool Result 默认只保存脱敏摘要或对象引用。
+
+### `agent_admin_audits`
+
+记录管理员、角色、资源类型、资源标识、动作、旧版本、新版本、请求 ID、Trace ID、
+结果和时间。发布、回滚、归档、启用写 Tool 和知识库发布必须有审计记录。
+
+## 8.5 一致性和发布规则
+
+- 草稿不会被在线 Agent 读取。
+- 发布版本不可变，Agent Run 开始时记录完整配置快照。
+- Prompt、Skill、Tool 策略和知识库索引的发布动作需要乐观并发控制。
+- 发布失败不能切换当前发布指针。
+- 回滚选择旧版本重新发布，不删除历史版本。
+- 缓存必须以发布版本或配置版本为 Key，并在发布后失效。
+- Admin API 只能访问 `oj_agent`，不能跨 Schema SQL Join。
+
 # 9. Redis Key 约定
 
 示例：
