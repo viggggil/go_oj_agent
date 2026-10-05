@@ -84,6 +84,7 @@ Docker runner 使用独立 project 和测试卷、随机端口；测试创建/�
 | 行为 | 验证位置 |
 | --- | --- |
 | 并发编辑冲突、报名/归档顺序、令牌严格递增 | `contest_concurrency_integration_test.go` |
+| 提交授权等待配置事务完成，再依据数据库时钟和已提交配置检查 | `contest_concurrency_integration_test.go` |
 | 精确开始/结束边界，以 MySQL statement clock 验证 | Judge `contest_deadline_integration_test.go` |
 | 同用户结果并发、事务 rollback、旧消息/乱序/失效 | `leaderboard_outbox_integration_test.go`、结果消费者和 E2E 测试 |
 | Redis 写后确认失败、新 relay 接手、重复消费不加版本 | `leaderboard_failure_integration_test.go` |
@@ -104,4 +105,4 @@ CONTEST_TEST_REDIS_ADDR='127.0.0.1:6379' \
 
 测试日志记录 OS/架构、CPU 线程数、参赛人数、题目数、写入速率、刷新 QPS、命中率、SQL 回源、P95/P99、relay 时间、重建与缓存丢失后的恢复耗时。样本为 100 用户、10 题、page_size=20、8 个读 worker 共 400 次请求、4 个写 worker 共 20 个结果。SQL 基线是 100 次单线程 Repository 查询；Redis 样本为混合并发，不能把两者 QPS 比值当成固定加速倍数。它衡量 Repository 路径，尚不包含 Gateway、认证、公网延迟和生产规模容量。
 
-2026-10-05 的本地实验（Linux amd64、Ryzen 7 8845H、16 线程、Docker MySQL 8.4/Redis 7.4）：热读约 1050 QPS、命中率 100%、回源 0、P95 11.46 ms/P99 18.68 ms；SQL 单线程约 20.8 QPS、P95 54.13 ms/P99 67.53 ms；混合窗口结果写入约 52.5 条/秒；初次重建约 134 ms，key 全丢失后的 SQL 重建约 130 ms。生产性能目标需要在实际参赛人数、题目数和刷新负载下再次测量，本实验只提供可重复的基线与正确性验收。
+2026-10-05 的完整集成本地实验（Linux amd64、Ryzen 7 8845H、16 线程、Docker MySQL 8.4/Redis 7.4）：热读约 1124 QPS、命中率 100%、回源 0、P95 9.70 ms/P99 16.99 ms；SQL 单线程约 19.2 QPS、P95 60.11 ms/P99 70.05 ms；混合窗口结果写入约 56.2 条/秒，relay 处理 20 个事件约 436 ms；初次重建约 131 ms，key 全丢失后的 SQL 重建约 132 ms。生产性能目标需要在实际参赛人数、题目数和刷新负载下再次测量，本实验只提供可重复的基线与正确性验收。
