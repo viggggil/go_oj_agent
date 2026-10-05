@@ -60,3 +60,50 @@ make generate
 Each `ContestProblem` includes a read-only `title`. Contest resolves all problem IDs in one `ProblemService.BatchGetProblems` call, preserving the incoming actor ID and roles in internal authentication. Configure the `problem` client alongside `judge` (endpoint, timeout and signing credentials). Titles submitted in create/update requests are ignored. Missing or inaccessible problems have an empty title; clients can show the problem ID. A failed batch call fails the detail request rather than silently presenting incomplete titles.
 
 No schema migration is needed. The deployment must update Problem Service (new RPC), Contest Service (client/config) and Gateway (new response fields) before the web client.
+
+## Leaderboard summaries and cache Outbox (issue #134, PR1)
+
+Migration `000003_create_leaderboard_outbox` adds `contest_user_results` and
+`contest_cache_outbox`. Accepted result facts, per-problem rebuilds, user totals,
+monotonic versions and complete JSON snapshots commit in the same transaction.
+The existing participant row lock serializes changes for one user. Duplicate or
+stale events do not advance the version. An event whose fact changes but leaves
+scores unchanged still publishes a new complete snapshot (e.g. wrong-attempt
+metadata). Snapshots include all contest problems, omit rank and use a decimal
+string for the version to preserve integers beyond JavaScript/Lua's 2^53 limit.
+
+The relay claims one event at a time using `FOR UPDATE SKIP LOCKED`. Each claim
+has a unique token, a 30-second lease and a 3-second sink timeout. Confirmation
+and failure updates require an unexpired matching token. Transient failures
+retry indefinitely with capped exponential backoff (1–60 seconds); malformed
+snapshots enter `dead` with `last_error` for investigation. A cancelled process
+leaves its lease to expire. Confirmation failures safely replay the snapshot.
+PR1 provides the relay contract; it is not started until the Redis sink is added.
+Cache writes and cache reads remain disabled by default.
+
+### Upgrade existing data without dropping volumes
+
+1. Stop all Contest Service result consumers/instances. Leave RabbitMQ running;
+   durable result messages will queue while the consumers are stopped.
+2. Back up the database and apply the new migration. MySQL initialization mounts
+   only run for a new volume; explicitly apply migration 000003 for existing data.
+3. Run the backfill from the repository root, supplying a DSN via the environment:
+
+```bash
+CONTEST_MYSQL_DSN='.../oj_contest?parseTime=true' \
+  go run ./services/contest/cmd/leaderboard-backfill
+```
+
+4. Deploy the new Contest Service and restart consumers. Verify each existing
+   `(contest_id,user_id)` result has a summary and a pending snapshot event.
+
+Backfill processes users in bounded transactions. It creates version 1 only for
+users without a summary; already initialized users are skipped. Interruptions
+are safe to rerun. It never modifies submission facts, per-problem scores or
+participant records. Run with consumers paused so the initial user inventory
+cannot change during the scan. No Redis connection is needed.
+
+For rollback stop consumers and relays, restore the previous application, then
+apply the down migration. It discards only derived summaries and cache delivery
+state. Re-upgrade requires backfill and cache reconstruction. Never reset an
+individual user version while an older cache generation is active.

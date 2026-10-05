@@ -35,7 +35,7 @@ func TestRabbitMySQLProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		for _, table := range []string{"contest_problem_results", "contest_submission_results", "contest_participants", "contest_problems", "contests"} {
+		for _, table := range []string{"contest_cache_outbox", "contest_user_results", "contest_problem_results", "contest_submission_results", "contest_participants", "contest_problems", "contests"} {
 			key := "contest_id"
 			if table == "contests" {
 				key = "id"

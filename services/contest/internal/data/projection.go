@@ -100,6 +100,9 @@ func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEv
 	if err != nil {
 		return err
 	}
+	if err := enqueueLeaderboard(ctx, tx, f.ContestID, f.UserID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
