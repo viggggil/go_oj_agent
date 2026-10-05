@@ -138,6 +138,31 @@ func TestLeaderboardLoadAndRecoveryProfile(t *testing.T) {
 		}
 	}
 	relayDuration := time.Since(relayStarted)
+	var applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM contest_cache_outbox WHERE contest_id=? AND status='applied'`, id).Scan(&applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied != 20 {
+		rows, err := db.Query(`SELECT id,status,retry_count,COALESCE(last_error,''),next_retry_at FROM contest_cache_outbox WHERE contest_id=? AND status!='applied'`, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var eventID int64
+			var state, reason string
+			var retries int
+			var next time.Time
+			if err := rows.Scan(&eventID, &state, &retries, &reason, &next); err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("unapplied event=%d state=%s retries=%d error=%s next=%s", eventID, state, retries, reason, next)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		t.Fatalf("relay applied %d/20 events", applied)
+	}
 	assertSame := func() {
 		t.Helper()
 		for page := int32(1); page <= 5; page++ {
@@ -151,7 +176,7 @@ func TestLeaderboardLoadAndRecoveryProfile(t *testing.T) {
 			}
 			for i := range sqlRows {
 				if !proto.Equal(sqlRows[i], cached[i]) {
-					t.Fatalf("page=%d row=%d mismatch", page, i)
+					t.Fatalf("page=%d row=%d mismatch SQL=%s cache=%s", page, i, sqlRows[i], cached[i])
 				}
 			}
 		}
