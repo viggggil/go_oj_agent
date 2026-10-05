@@ -1,86 +1,19 @@
 package data
 
 import (
-<<<<<<< HEAD
 	"encoding/json"
 	"errors"
-=======
-	"database/sql"
-	"encoding/json"
-	"errors"
-	mysql "github.com/go-sql-driver/mysql"
->>>>>>> origin/main
 	"github.com/google/uuid"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"os"
-<<<<<<< HEAD
-=======
-	"path/filepath"
-	"runtime"
-	"strings"
->>>>>>> origin/main
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestMySQLLeaderboardOutbox(t *testing.T) {
-<<<<<<< HEAD
 	db := testContestDatabase(t)
-=======
-	dsn := os.Getenv("CONTEST_TEST_MYSQL_DSN")
-	if dsn == "" {
-		t.Skip("set CONTEST_TEST_MYSQL_DSN with migration 000003")
-	}
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	adminDB := db
-	// Outbox claims are global: use a separate schema to avoid leasing another
-	// integration test's events when the packages run concurrently.
-	cfg, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	schema := "contest_outbox_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	if _, err := db.Exec("CREATE DATABASE " + schema); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if _, err := adminDB.Exec("DROP DATABASE " + schema); err != nil {
-			t.Error(err)
-		}
-	}()
-	cfg.DBName = schema
-	isolated, err := sql.Open("mysql", cfg.FormatDSN())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer isolated.Close()
-	_, source, _, _ := runtime.Caller(0)
-	files, err := filepath.Glob(filepath.Join(filepath.Dir(source), "../../../../migrations/contest/*.up.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, file := range files {
-		body, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, statement := range strings.Split(strings.ReplaceAll(string(body), "USE oj_contest;", "USE "+schema+";"), ";") {
-			if strings.TrimSpace(statement) == "" {
-				continue
-			}
-			if _, err := isolated.Exec(statement); err != nil {
-				t.Fatalf("migration %s: %v", file, err)
-			}
-		}
-	}
-	db = isolated
->>>>>>> origin/main
 	repo := NewRepository(db)
 	start := time.Now().UTC().Truncate(time.Millisecond).Add(-time.Hour)
 	res, err := db.Exec(`INSERT INTO contests (title,status,start_at,end_at,created_by,created_at,updated_at) VALUES ('outbox integration','draft',?,?,1,?,?)`, start, start.Add(2*time.Hour), start, start)
