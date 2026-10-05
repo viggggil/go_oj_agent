@@ -31,6 +31,7 @@ func TestCachedLeaderboardCoalescesFallback(t *testing.T) {
 	repo := NewCachedRepository(db, cache)
 	contest := biz.Contest{ID: 20}
 	expectSQLPage(mock, 100*time.Millisecond)
+	expectSQLPage(mock, 0)
 	var wg sync.WaitGroup
 	errs := make(chan error, 32)
 	for range 32 {
@@ -53,12 +54,12 @@ func TestCachedLeaderboardCoalescesFallback(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatal("miss storm did not coalesce", err)
-	}
 	items, _, err := repo.CachedLeaderboard(t.Context(), contest, 1, 100)
 	if err != nil || items[0].Problems[0].WrongAttempts != 2 {
 		t.Fatal("caller changed shared cached response", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal("miss storm did not coalesce", err)
 	}
 }
 func TestCachedLeaderboardCancellationDoesNotPoisonOtherWaiters(t *testing.T) {

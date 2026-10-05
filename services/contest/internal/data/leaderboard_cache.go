@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,10 +79,18 @@ func (r *Repository) CachedLeaderboard(ctx context.Context, contest biz.Contest,
 		if err == nil {
 			return items, total, nil
 		}
-		if errors.Is(err, ErrCacheIncomplete) {
+		if errors.Is(err, ErrCacheIncomplete) || errors.Is(err, ErrCacheStale) || errors.Is(err, ErrGenerationChanged) {
 			c.mu.Lock()
-			if w := c.contests[contest.ID]; w != nil {
+			if w := c.contests[contest.ID]; w != nil && errors.Is(err, ErrCacheIncomplete) {
 				w.repair = true
+			}
+			// A SQL page cached before this failed Redis read may reflect an older
+			// generation. Never serve it after detecting cache corruption/staleness.
+			prefix := fmt.Sprintf("%d/", contest.ID)
+			for key := range c.recent {
+				if strings.HasPrefix(key, prefix) {
+					delete(c.recent, key)
+				}
 			}
 			c.mu.Unlock()
 		}
