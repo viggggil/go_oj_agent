@@ -205,4 +205,7 @@ func TestMySQLLeaderboardOutbox(t *testing.T) {
 		t.Fatalf("rerun=%v err=%v", count, err)
 	}
 	assertSummary(1, 1, 3000)
+	if address := os.Getenv("CONTEST_TEST_REDIS_ADDR"); address != "" {
+		testMySQLRedisRelay(t, repo, id, address)
+	}
 }

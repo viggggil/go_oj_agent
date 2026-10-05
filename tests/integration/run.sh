@@ -70,6 +70,7 @@ PROBLEM_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127
 PROBLEM_TEST_USER_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_user?parseTime=true" \
 SUBMISSION_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_submission?parseTime=true" \
 CONTEST_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_contest?parseTime=true" \
+CONTEST_TEST_REDIS_ADDR="127.0.0.1:${REDIS_PORT}" \
 CONTEST_TEST_GRPC_ENDPOINT="127.0.0.1:${CONTEST_GRPC_PORT}" \
 PROBLEM_TEST_REDIS_ADDR="127.0.0.1:${REDIS_PORT}" \
 PROBLEM_TEST_MINIO_ENDPOINT="127.0.0.1:${MINIO_API_PORT}" \

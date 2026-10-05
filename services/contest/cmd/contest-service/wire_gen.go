@@ -54,14 +54,24 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	v2, err := newApp(config, grpcServer, registrar, resultConsumerServer)
+	leaderboardRedis, cleanup4, err := data.NewLeaderboardRedis(config)
 	if err != nil {
 		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
+	cacheRelayServer := server.NewCacheRelayServer(repository, leaderboardRedis)
+	v2, err := newApp(config, grpcServer, registrar, resultConsumerServer, cacheRelayServer)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
 	return v2, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()
