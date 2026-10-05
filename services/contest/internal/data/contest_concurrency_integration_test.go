@@ -196,3 +196,42 @@ func TestSubmissionAuthorizationWaitsForConcurrentConfigurationCommit(t *testing
 		t.Fatalf("authorization used stale start_at: %v", err)
 	}
 }
+
+// 真实仓储授权路径不得因为共享锁校验替换而放宽参赛身份或题目范围。
+func TestSubmissionAuthorizationEnforcesMembershipAndProblem(t *testing.T) {
+	db := testContestDatabase(t)
+	repo := NewRepository(db)
+	c := integrationContest(t, repo, time.Now().UTC().Add(time.Hour))
+	if _, err := repo.Join(t.Context(), c.ID, 42); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE contests SET start_at=UTC_TIMESTAMP(3)-INTERVAL 1 SECOND,end_at=UTC_TIMESTAMP(3)+INTERVAL 1 HOUR WHERE id=?`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name                         string
+		contestID, userID, problemID int64
+		code                         codes.Code
+	}{
+		{"joined user and contest problem", c.ID, 42, 7, codes.OK},
+		{"unjoined user", c.ID, 43, 7, codes.PermissionDenied},
+		{"problem outside contest", c.ID, 42, 8, codes.InvalidArgument},
+		{"missing contest", c.ID + 100, 42, 7, codes.NotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := repo.AuthorizeSubmission(t.Context(), tc.contestID, tc.userID, tc.problemID)
+			if status.Code(err) != tc.code {
+				t.Fatalf("authorization error=%v, want %v", err, tc.code)
+			}
+			if tc.code == codes.OK && (got.ID != c.ID || !got.StartAt.Before(got.EndAt)) {
+				t.Fatalf("invalid authorized interval: %+v", got)
+			}
+		})
+	}
+	if _, err := db.Exec(`UPDATE contests SET status='archived' WHERE id=?`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.AuthorizeSubmission(t.Context(), c.ID, 42, 7); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("archived contest authorization=%v", err)
+	}
+}
