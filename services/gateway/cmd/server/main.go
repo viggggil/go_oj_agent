@@ -40,6 +40,10 @@ func main() {
 		errorLogger.Error("解析配置失败", "error", err)
 		os.Exit(1)
 	}
+	if err := applyAgentEnableOverride(c, &bc); err != nil {
+		errorLogger.Error("解析 Agent 配置失败", "error", err)
+		os.Exit(1)
+	}
 
 	app, cleanup, err := initApp(&bc)
 	if err != nil {

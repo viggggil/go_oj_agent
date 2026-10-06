@@ -9,10 +9,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.api.chat import ChatController
+from app.api.chat import router as chat_router
 from app.api.health import router
+from app.core.auth import DelegationVerifier
 from app.core.database import DatabaseProbe, ReadinessProbe
 from app.core.resources import AppResources
-from app.core.settings import Settings, load_settings
+from app.core.runtime_config import DemoConfigReader
+from app.core.settings import ConfigurationError, Settings, load_settings
+from app.graphs.langgraph_runtime import LangGraphRuntime
+from app.graphs.runtime import FakeModelClient, FakeRuntime
+from app.graphs.service import RunService
+from app.storage.repository import AgentStore
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +34,63 @@ def create_app(
     settings: Settings | None = None,
     *,
     probe_factory: Callable[[Settings], ReadinessProbe] = DatabaseProbe,
+    run_service_factory: Callable[[Settings, ReadinessProbe], RunService] | None = None,
 ) -> FastAPI:
     config = settings if settings is not None else load_settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         database = probe_factory(config)
-        application.state.resources = AppResources(settings=config, database=database)
-        logger.info("Agent service started")
+        controller: ChatController | None = None
         try:
+            if config.chat_enabled:
+                verifier = DelegationVerifier(config)
+                if run_service_factory is not None:
+                    service = run_service_factory(config, database)
+                else:
+                    if not isinstance(database, DatabaseProbe) or database.engine is None:
+                        raise ConfigurationError("Chat requires an Agent database")
+                    runtime = (
+                        LangGraphRuntime(FakeModelClient())
+                        if config.runtime_mode == "langgraph_fake"
+                        else FakeRuntime()
+                    )
+                    service = RunService(
+                        AgentStore(database.engine), runtime, DemoConfigReader(config)
+                    )
+                try:
+                    async with asyncio.timeout(config.preflight_timeout_seconds):
+                        await service.initialize()
+                except Exception as exc:
+                    # Uvicorn 会打印 lifespan 异常，不能让驱动原始异常进入启动日志。
+                    logger.error(
+                        "Agent Chat initialization failed",
+                        extra={
+                            "error_code": "AGENT_STARTUP_FAILED",
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                    raise ConfigurationError("Agent Chat initialization failed") from None
+                controller = ChatController(config, verifier, service)
+            application.state.resources = AppResources(
+                settings=config, database=database, chat=controller
+            )
+            logger.info("Agent service started")
             yield
         finally:
             try:
-                async with asyncio.timeout(config.shutdown_timeout_seconds):
-                    await database.close()
+                try:
+                    if controller is not None:
+                        async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
+                            await controller.close()
+                finally:
+                    database_budget = (
+                        config.shutdown_timeout_seconds / 2
+                        if controller is not None
+                        else config.shutdown_timeout_seconds
+                    )
+                    async with asyncio.timeout(database_budget):
+                        await database.close()
             except Exception as exc:
                 logger.error(
                     "Agent resource shutdown failed",
@@ -49,7 +100,8 @@ def create_app(
                     },
                 )
             finally:
-                del application.state.resources
+                if hasattr(application.state, "resources"):
+                    del application.state.resources
                 logger.info("Agent service stopped")
 
     application = FastAPI(
@@ -73,4 +125,6 @@ def create_app(
         return JSONResponse(status_code=500, content=error.model_dump())
 
     application.include_router(router)
+    if config.chat_enabled:
+        application.include_router(chat_router)
     return application

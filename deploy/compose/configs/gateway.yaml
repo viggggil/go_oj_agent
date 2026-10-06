@@ -16,6 +16,17 @@ auth:
   internal_audience: "${AUTH_INTERNAL_AUDIENCE}"
   internal_token_ttl: "${AUTH_INTERNAL_TOKEN_TTL}"
 clients:
+  agent:
+    enabled: false
+    endpoint: "${CLIENTS_AGENT_ENDPOINT}"
+    connect_timeout: "3s"
+    response_header_timeout: "5s"
+    max_duration: "120s"
+    idle_timeout: "20s"
+    write_timeout: "5s"
+    max_concurrent: 8
+    max_request_bytes: 262144
+    max_frame_bytes: 262144
   user:
     name: user-service
     endpoint: "${CLIENTS_USER_ENDPOINT}"

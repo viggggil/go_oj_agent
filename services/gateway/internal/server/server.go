@@ -11,7 +11,7 @@ import (
 
 var ProviderSet = wire.NewSet(
 	NewRegistrar,
-	NewHTTPServer,
+	NewHTTPServerWithAgent,
 )
 
 // NewRegistrar 创建 Consul 服务注册器，注册和注销由 kratos.App 统一管理。

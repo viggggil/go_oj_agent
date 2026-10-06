@@ -4,7 +4,8 @@
 
 ## 当前状态
 
-当前阶段已完成 Gateway Kratos 项目骨架，并接入 user-service 的认证和用户 HTTP API：
+当前阶段已完成 Gateway Kratos 项目骨架，并接入 user-service 的认证和用户 HTTP API；PR3
+另外接入了 Agent Chat 的内部委托和 SSE 转发：
 
 - `cmd/server`：服务入口和 Wire 注入。
 - `internal/conf`：Gateway 配置契约。
@@ -20,6 +21,8 @@
 - `POST /api/v1/auth/logout`：转发到 `user.v1.UserService/Logout`，按 Refresh Token 注销登录 Session。
 - `GET /api/v1/users/me`：需要 Bearer Token，转发到 `user.v1.UserService/GetCurrentUser`。
 - `GET /api/v1/users/{id}`：需要 Bearer Token，转发到 `user.v1.UserService/GetUser`。
+- `POST /api/v1/agent/chat`：需要外部 Bearer
+  Token；`clients.agent.enabled=false` 时返回 503；Gateway 签发短期内部委托 JWT 后转发到 Agent Service，并校验后端 SSE 帧。
 
 Submission/Judge API 已通过内部 gRPC 转发到 judge-service。判题事件 SSE 第一版采用
 Gateway 短轮询 `GetJudgeResult`，不直接消费 RabbitMQ。
@@ -63,6 +66,40 @@ SSE 接口返回 `text/event-stream`，连接建立后立即发送当前快照�
 `server.sse.poll_interval` 短轮询 judge-service。状态进入 `DONE`、`CANCELLED` 或
 `INVALIDATED` 后发送最终事件并关闭连接；默认轮询间隔为 `500ms`，最大连接时长为
 `2m`，可在配置中调整。
+
+Agent Chat 使用独立的总时长、空闲、响应头和写入预算，不受普通 Kratos 30 秒请求超时
+截断；默认值分别为 120s、20s、5s 和 5s，并限制并发流 8、请求体 256 KiB、单帧
+256 KiB。
+
+## Agent Chat
+
+Agent 配置位于 `clients.agent`，默认 `enabled=false`。开启时必须提供仅供 Gateway
+读取的内部 RSA 私钥和固定 `go-oj-gateway` issuer，Agent 侧配置对应的 Gateway 公钥。
+`endpoint` 只允许无 query、fragment、userinfo 的 `http` 或 `https` URL。Gateway 不跟随
+重定向、不重试 Chat POST，也不把外部身份 Header 转发给 Agent；身份只来自已认证的
+请求上下文并写入短期 RS256 委托 JWT。
+
+可调整字段包括：
+
+```yaml
+clients:
+  agent:
+    enabled: false
+    endpoint: http://agent-service:8000
+    connect_timeout: 3s
+    response_header_timeout: 5s
+    max_duration: 120s
+    idle_timeout: 20s
+    write_timeout: 5s
+    max_concurrent: 8
+    max_request_bytes: 262144
+    max_frame_bytes: 262144
+```
+
+Compose 的 `KRATOS_CLIENTS_AGENT_ENABLED` 通过 `CLIENTS_AGENT_ENABLED` 环境开关覆盖
+typed 配置；这样不会把布尔值 placeholder 当成字符串传入配置扫描。Agent 超时、体积和
+并发配置在启动时严格校验，非法配置会阻止 Gateway 启动。前端请求仍使用
+`POST /api/v1/agent/chat`，详细请求和 SSE envelope 见 [`docs/api.md`](../../docs/api.md)。
 
 ## 目录结构
 
@@ -137,4 +174,4 @@ curl http://127.0.0.1:8080/api/v1/users/1001 \
 - Gateway 使用 Kratos `middleware.Middleware` 和 `server.Use` 按 operation 保护用户接口，不使用原生 `HandleFunc` 或 `khttp.Filter` 实现业务路由和认证。
 - Gateway HTTP Server 全局启用 `recovery.Recovery()` 和 `validate.Validator()`，分别负责 panic 恢复和 Proto 参数校验。
 - Gateway 不复制 user-service 的资源授权规则；用户本人或管理员权限由 user-service 最终判断。
-- Gateway 到内部服务统一走 gRPC。
+- Gateway 到业务服务走 gRPC；Agent Chat 走内部受保护的 HTTP SSE。

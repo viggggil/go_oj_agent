@@ -1,5 +1,6 @@
 """环境配置只承载部署信息，不内置业务 Prompt 或模型。"""
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
@@ -33,6 +34,14 @@ class Settings(BaseSettings):
     max_run_seconds: float = Field(default=30, gt=0, le=300)
     max_output_chars: int = Field(default=8_000, ge=1, le=32_000)
     max_run_events: int = Field(default=1_000, ge=3, le=10_000)
+    chat_enabled: bool = False
+    gateway_public_key_file: Path | None = None
+    gateway_key_id: str = Field(default="gateway-internal-2026-09", min_length=1, max_length=128)
+    max_request_bytes: int = Field(default=262_144, ge=1024, le=1_048_576)
+    max_concurrent_runs: int = Field(default=8, ge=1, le=128)
+    preflight_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    sse_heartbeat_seconds: float = Field(default=5, gt=0, le=30)
+    sse_write_timeout_seconds: float = Field(default=5, gt=0, le=30)
 
     @field_validator("host", mode="before")
     @classmethod
@@ -69,6 +78,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
+        if self.chat_enabled and (
+            self.database_url is None
+            or self.gateway_public_key_file is None
+            or self.runtime_mode == "disabled"
+        ):
+            raise ValueError("Chat requires database, Gateway public key and an enabled runtime")
         if self.environment == "production" and self.database_url is None:
             raise ValueError("Production requires a database URL")
         if self.environment == "production" and self.runtime_mode != "disabled":

@@ -1,0 +1,28 @@
+service:
+  name: gateway-service
+server:
+  http:
+    address: ":8080"
+    timeout: "100ms"
+auth:
+  access_token_public_key_file: "/run/keys/user-public.pem"
+  access_token_key_id: "user-test"
+  issuer: "go-oj-agent"
+  audience: "go-oj-gateway"
+  internal_private_key_file: "/run/keys/gateway-private.pem"
+  internal_key_id: "gateway-internal-2026-09"
+  internal_issuer: "go-oj-gateway"
+  internal_token_ttl: "30s"
+clients:
+  user: {name: user-service, endpoint: "127.0.0.1:9", timeout: "1s"}
+  problem: {name: problem-service, endpoint: "127.0.0.1:9", timeout: "1s"}
+  submission: {name: judge-service, endpoint: "127.0.0.1:9", timeout: "1s"}
+  contest: {name: contest-service, endpoint: "127.0.0.1:9", timeout: "1s"}
+  agent:
+    enabled: true
+    endpoint: "http://agent-service:8000"
+    max_duration: "40s"
+    idle_timeout: "10s"
+registry:
+  consul:
+    enabled: false
