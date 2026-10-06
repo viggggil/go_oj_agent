@@ -557,6 +557,46 @@ active revision，提交后保持 immutable。
 
 ## 3.6 Agent
 
+### PR1 服务健康契约（当前已实现）
+
+Agent Service 当前只提供独立服务的 liveness/readiness 端点，尚未提供 Chat、SSE 或
+管理员 API。它们不经过 Gateway，供容器编排和部署探针使用：
+
+```text
+GET /healthz
+GET /readyz
+```
+
+`/healthz` 始终只检查进程路由，成功响应为：
+
+```json
+{"service":"agent-service","status":"ok"}
+```
+
+`/readyz` 检查 Agent 自有 `oj_agent` MySQL Schema 的连接并执行 `SELECT 1`。成功响应为
+`200`：
+
+```json
+{
+  "service": "agent-service",
+  "status": "ready",
+  "checks": {"database": "ready"}
+}
+```
+
+数据库未配置或不可用时返回 `503`，例如：
+
+```json
+{
+  "service": "agent-service",
+  "status": "not_ready",
+  "checks": {"database": "unavailable"}
+}
+```
+
+当前探针不会创建表，也不会访问其他服务的数据库。Chat 和管理员接口仍按下面的
+目标设计保留，接入 Gateway 前需要另行更新 REST/SSE 与认证契约。
+
 ### POST `/api/v1/agent/chat`
 
 发起 Agent 会话，响应使用 SSE。
