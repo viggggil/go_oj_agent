@@ -219,7 +219,7 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 	if input.ContestID > 0 {
 		legacyHash = createRequestHash(input.ProblemID, language, input.SourceCode)
 	}
-	if result, found, err := uc.findCreateReplay(ctx, idempotency, legacyHash); err != nil || found {
+	if result, found, err := uc.findCreateReplay(ctx, idempotency, legacyHash, input); err != nil || found {
 		return result, err
 	}
 	profile, err := uc.problems.GetJudgeProfile(ctx, input.ProblemID)
@@ -399,7 +399,7 @@ func (uc *SubmissionUsecase) Rejudge(ctx context.Context, input RejudgeSubmissio
 	})
 }
 
-func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest, legacyHash string) (CreateSubmissionResult, bool, error) {
+func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest, legacyHash string, input CreateSubmissionInput) (CreateSubmissionResult, bool, error) {
 	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
 	if err != nil || !found {
 		return CreateSubmissionResult{}, false, err
@@ -413,6 +413,16 @@ func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request Idemp
 	var result CreateSubmissionResult
 	if err := json.Unmarshal(record.Response, &result); err != nil || result.SubmissionID <= 0 || result.Status != submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED {
 		return CreateSubmissionResult{}, true, ErrorInternal("stored idempotency response is invalid")
+	}
+	// 旧哈希没有比赛身份；必须从已落库提交核实，不能跨比赛重放。
+	if record.RequestHash != request.RequestHash {
+		submission, err := uc.repository.FindByID(ctx, result.SubmissionID)
+		if err != nil {
+			return CreateSubmissionResult{}, true, err
+		}
+		if submission.UserID != request.ActorID || submission.ProblemID != input.ProblemID || submission.ContestID != input.ContestID {
+			return CreateSubmissionResult{}, true, ErrorIdempotencyConflict()
+		}
 	}
 	result.Replayed = true
 	return result, true, nil

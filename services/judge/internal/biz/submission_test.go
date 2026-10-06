@@ -140,7 +140,7 @@ func TestSubmissionUsecaseCreateReplaysLegacyContestHash(t *testing.T) {
 		IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
 	}
 	response, _ := json.Marshal(CreateSubmissionResult{SubmissionID: 41, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED})
-	repository := &usecaseRepository{found: true, record: IdempotencyRecord{
+	repository := &usecaseRepository{submission: Submission{ID: 41, UserID: 5, ProblemID: 7, ContestID: 20}, found: true, record: IdempotencyRecord{
 		IdempotencyRequest: IdempotencyRequest{RequestHash: createRequestHash(input.ProblemID, input.Language, input.SourceCode)},
 		Response:           response,
 	}}
@@ -149,6 +149,12 @@ func TestSubmissionUsecaseCreateReplaysLegacyContestHash(t *testing.T) {
 	result, err := uc.Create(context.Background(), input)
 	if err != nil || !result.Replayed || result.SubmissionID != 41 {
 		t.Fatalf("legacy contest replay = %+v, %v", result, err)
+	}
+	for _, contestID := range []int64{0, 21} {
+		repository.submission.ContestID = contestID
+		if _, err := uc.Create(context.Background(), input); !HasReason(err, ReasonIdempotencyConflict) {
+			t.Fatalf("legacy replay from contest %d: %v", contestID, err)
+		}
 	}
 }
 
