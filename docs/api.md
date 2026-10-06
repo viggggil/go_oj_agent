@@ -557,117 +557,120 @@ active revision，提交后保持 immutable。
 
 ## 3.6 Agent
 
-### PR1 服务健康契约（当前已实现）
+### 服务健康探针
 
-Agent Service 当前只提供独立服务的 liveness/readiness 端点，尚未提供 Chat、SSE 或
-管理员 API。它们不经过 Gateway，供容器编排和部署探针使用：
+Agent Service 的探针不经过 Gateway，供容器编排使用：
 
 ```text
 GET /healthz
 GET /readyz
 ```
 
-`/healthz` 始终只检查进程路由，成功响应为：
+`/healthz` 只检查进程路由，成功响应为 `{"service":"agent-service","status":"ok"}`。
+`/readyz` 连接 Agent 自有 `oj_agent` Schema 并执行 `SELECT 1`；成功返回 `200` 和
+`{"service":"agent-service","status":"ready","checks":{"database":"ready"}}`，
+数据库未配置或不可用时返回 `503`，`database` 分别为 `not_configured` 或 `unavailable`。
+探针不会创建表，也不会
+访问其他服务的数据库。
 
-```json
-{"service":"agent-service","status":"ok"}
-```
+### Chat 接入状态（PR3）
 
-`/readyz` 检查 Agent 自有 `oj_agent` MySQL Schema 的连接并执行 `SELECT 1`。成功响应为
-`200`：
+PR3 已接通 `Gateway -> Agent Service` 的受保护 SSE 链路。业务客户端只能访问 Gateway
+的外部地址；开发 Compose 中 Agent 不映射宿主机端口，只挂载 Gateway 的公钥。
+Gateway 始终注册受保护的路由，`clients.agent.enabled=false` 时返回 503；Agent 只有
+在 `AGENT_CHAT_ENABLED=true` 并配置数据库、公钥与运行时后才注册内部 Chat 路由。Agent
+未启用时返回 404，不保留可匿名调用的临时入口。
 
-```json
-{
-  "service": "agent-service",
-  "status": "ready",
-  "checks": {"database": "ready"}
-}
-```
-
-数据库未配置或不可用时返回 `503`，例如：
-
-```json
-{
-  "service": "agent-service",
-  "status": "not_ready",
-  "checks": {"database": "unavailable"}
-}
-```
-
-当前探针不会创建表，也不会访问其他服务的数据库。Chat 和管理员接口仍按下面的
-目标设计保留，接入 Gateway 前需要另行更新 REST/SSE 与认证契约。
-
-### PR2 Runtime 数据模型（尚未开放 HTTP Chat）
-
-PR2 实现 `ChatRequest`、`Principal`、`AgentState`、`StreamEvent` 和会话/Run 存储，
-通过本机 demo 与直接注入的测试 Runtime 验证。`POST /api/v1/agent/chat` 当前仍为 404；
-PR3 完成 Gateway 委托验证后才注册该路由，没有匿名/信任 Header 的临时 Chat 入口。
-
-ChatRequest 的 message 为非空白字符串，长度 1–32,000；conversation_id 必须为 UUID；
-context 只接受正数 submission_id/problem_id 和长度 1–32 的 language。顶层及 context
-均拒绝额外字段，尤其不接受 user_id/role。Principal 的 user_id/roles/request_id 由可信
-调用方创建，不能从 ChatRequest 推导。未知或非 owner 的会话使用相同 not-found 语义。
-
-PR2 事件 JSON 的 envelope 为：
-
-```json
-{
-  "type": "token",
-  "run_id": "b056c290-f5a0-49d0-a7b8-949391e53388",
-  "conversation_id": "363f7d21-b923-41ee-8702-71b2a1280239",
-  "sequence": 2,
-  "data": {"text": "【演示回答】尚未接入真实模型。"}
-}
-```
-
-当前只生成 thinking/token/done/error；thinking 是短状态，不是思维链，Fake 不发出
-业务 tool_call。done 的 data 为空且表示答案与 COMPLETED 已成功持久化；error 的 data
-只含稳定 code，不含 Provider/SQL 异常原文。序号在一个 Run 内递增，无 SSE 续传承诺。
-PR2 demo 输出 JSON 行，SSE UTF-8 分帧、心跳、Gateway 转发与 HTTP 错误码仍在 PR3。
-
-一次接受请求创建新 Run，不做 request_id 幂等；同会话活动 Run 冲突，调用方不能自动
-重试。运行失败/取消不保存 assistant 片段，不发送成功 done；EOF 未见终态不能视为
-成功。普通 Chat（含管理员身份）只访问本人会话，管理员跨 owner 查询尚未提供。
+外部请求先由 Gateway 的现有 Access Token middleware 认证。Gateway 从已认证的请求上下文
+签发短期 RS256 委托 JWT（固定 `iss=go-oj-gateway`、`aud=agent-service`、
+`sub=gateway-service`、`rpc=HTTP POST /api/v1/agent/chat`、`kid`），只把用户 ID、角色、
+请求 ID 和唯一 token ID 转给 Agent。Agent 只信任该 JWT，不信任请求体或伪造的身份 Header；
+委托 token 的有效期不超过 60 秒。直接访问 Agent 时也必须具有合法的内部委托；
+替换 `X-User-ID` 等 Header 或携带外部用户 JWT 都不能建立 Chat Run。
+Gateway 在建流前校验请求 ID 为 1–128 个字符、角色最多 32 项且每项为 1–64 个字符；
+异常身份字段返回 400，不伪装成上游故障。两端均只接受合法 UTF-8 身份文本。
 
 ### POST `/api/v1/agent/chat`
 
-发起 Agent 会话，响应使用 SSE。
-
-Request：
+通过 Gateway 发起一次 Agent 会话，成功响应为 UTF-8 SSE。请求使用
+`Content-Type: application/json`，不接受压缩编码；请求体默认上限 256 KiB，Gateway 和
+Agent 都会检查该限制。请求字段如下：
 
 ```json
 {
-  "conversation_id": "optional",
+  "conversation_id": "363f7d21-b923-41ee-8702-71b2a1280239",
   "message": "为什么我的 submission 90001 一直 WA？",
   "context": {
-    "submission_id": 90001
+    "submission_id": 90001,
+    "problem_id": 42,
+    "language": "cpp"
   }
 }
 ```
 
-### GET `/api/v1/users/{user_id}`
+`message` 必须是 1–32,000 个字符且不能全为空白；新会话可省略 `conversation_id`，
+继续会话时必须提供 UUID；
+`context` 只接受正数 `submission_id`/`problem_id` 和 1–32 个字符的 `language`。顶层和
+`context` 都拒绝额外字段，调用方不能从请求体指定 `user_id`、`role` 或工具权限。
 
-获取指定用户信息。
+Gateway 在建立上游流前可能返回以下稳定错误：
 
-内部对应 `user.v1.UserService/GetUser`。当请求用户不是目标用户本人时，必须携带 `admin` 角色上下文，否则返回权限拒绝。
+| HTTP | reason / code | 语义 |
+| --- | --- | --- |
+| 400 | `GATEWAY_AGENT_INVALID_ARGUMENT` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_INVALID_ARGUMENT` | JSON 或字段校验失败 |
+| 401 | `GATEWAY_UNAUTHENTICATED` | 外部 Access Token 无效 |
+| 404 | `GATEWAY_AGENT_REJECTED` / `AGENT_CONVERSATION_NOT_FOUND` | 会话不存在或不属于当前用户 |
+| 409 | `GATEWAY_AGENT_REJECTED` / `AGENT_ACTIVE_RUN_CONFLICT` | 同一会话已有活动 Run |
+| 413 | `GATEWAY_AGENT_REQUEST_TOO_LARGE` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_REQUEST_TOO_LARGE` | 请求体超过上限 |
+| 415 | `GATEWAY_AGENT_UNSUPPORTED_MEDIA_TYPE` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_UNSUPPORTED_MEDIA_TYPE` | 非 JSON 或使用压缩编码 |
+| 502/504 | `GATEWAY_AGENT_UNAVAILABLE` / `GATEWAY_AGENT_TIMEOUT` | Gateway 无法建立受保护的上游流 |
+| 503 | `GATEWAY_AGENT_DISABLED`、`GATEWAY_AGENT_CAPACITY` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_CAPACITY_EXCEEDED` / `AGENT_UNAVAILABLE` | 功能关闭、并发槽耗尽或 Agent 不可用 |
 
-SSE：
+错误响应只返回稳定 code，不回显请求体、JWT、Prompt、数据库连接串或 Provider 异常。
+外部 Gateway 错误沿用 Kratos 的数值 `code`、字符串 `reason` 和 `message`；表中 `AGENT_*`
+错误是内部 Agent 的字符串 `code`，Gateway 只按允许的 HTTP 状态映射，不透传上游正文。
+上游不在允许映射表中的状态（例如 500、重定向或异常 401）会被 Gateway 统一转成
+`502 GATEWAY_AGENT_INVALID_RESPONSE`。
 
-```text
-event: tool_call
-data: {"tool":"get_submission","arguments":{"submission_id":90001}}
+成功响应包含以下 Header：
 
-event: tool_result
-data: {"tool":"get_submission","ok":true}
-
-event: token
-data: {"text":"从你的判题结果来看..."}
-
-event: done
-data: {"conversation_id":"..."}
+```http
+Content-Type: text/event-stream; charset=utf-8
+Cache-Control: no-cache, no-transform
+X-Accel-Buffering: no
+X-Agent-Run-ID: <canonical UUID>
+X-Agent-Conversation-ID: <canonical UUID>
 ```
 
-Agent API 不接受“绕过授权”的任意资源读取参数。
+每个 SSE 帧的 `event` 与 JSON `type` 一致，`data` 是完整的事件 envelope：
+
+```text
+event: thinking
+data: {"type":"thinking","run_id":"...","conversation_id":"...","sequence":1,"data":{"text":"正在整理信息"}}
+
+event: token
+data: {"type":"token","run_id":"...","conversation_id":"...","sequence":2,"data":{"text":"【演示回答】尚未接入真实模型。"}}
+
+event: done
+data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":{}}
+```
+
+当前运行时只生成 `thinking`、`token`、`done`、`error` 四类事件；`thinking` 是短状态，
+不表示思维链，也不暴露工具内部数据。`error` 的 `data` 只有稳定错误码，`done` 的
+`data` 必须为空，并表示答案及 `COMPLETED` 状态已经持久化。事件序号在一个 Run 内严格
+递增，Gateway 会校验 UTF-8、UUID、事件类型、公开错误码、帧大小和序号后再转发；中间
+帧可能是 SSE 注释形式的 `: heartbeat`。不提供 SSE 续传或 `Last-Event-ID` 语义。
+
+客户端断开、Gateway 总时限/空闲时限、上游 EOF 或写入失败都会取消 Run 或发送稳定的
+`error` 事件；没有收到 `done` 的 EOF 不能视为成功。一次接受请求创建新 Run，不按
+`request_id` 幂等，调用方不能自动重试 Chat POST。普通用户（包括管理员身份）只能访问
+本人会话；跨用户管理查询属于后续控制面。
+
+### 其他用户 API
+
+`GET /api/v1/users/{user_id}` 仍是 User API，与 Agent Chat 无关。内部对应
+`user.v1.UserService/GetUser`；请求用户不是目标用户本人时，必须携带 `admin` 角色上下文，
+否则返回权限拒绝。
 
 ---
 

@@ -7,7 +7,7 @@ services:
       MYSQL_PASSWORD: agent-password
       MYSQL_ROOT_PASSWORD: root-password
     ports:
-      - "${AGENT_TEST_MYSQL_PORT}:3306"
+      - "127.0.0.1:${AGENT_TEST_MYSQL_PORT}:3306"
     volumes:
       - ../../migrations/mysql/000001_create_schemas.up.sql:/docker-entrypoint-initdb.d/001_create_schemas.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
@@ -29,8 +29,33 @@ services:
       AGENT_DATABASE_URL: mysql+asyncmy://agent:agent-password@mysql:3306/oj_agent
       AGENT_READINESS_TIMEOUT_SECONDS: 2
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
+      AGENT_CHAT_ENABLED: true
+      AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem
+      AGENT_SSE_HEARTBEAT_SECONDS: 1
     ports:
-      - "${AGENT_TEST_HTTP_PORT}:8000"
+      - "127.0.0.1:${AGENT_TEST_HTTP_PORT}:8000"
+    volumes:
+      - "${AGENT_TEST_KEY_DIR}/gateway-public.pem:/run/keys/gateway-public.pem:ro"
     depends_on:
       mysql:
         condition: service_healthy
+
+  gateway-service:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "127.0.0.1:${AGENT_TEST_GATEWAY_PORT}:8080"
+    volumes:
+      - ./gateway.yaml:/app/config.yaml:ro
+      - "${AGENT_TEST_KEY_DIR}/gateway-private.pem:/run/keys/gateway-private.pem:ro"
+      - "${AGENT_TEST_KEY_DIR}/user-public.pem:/run/keys/user-public.pem:ro"
+    depends_on:
+      agent-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

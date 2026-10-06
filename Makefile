@@ -126,7 +126,7 @@ infra-up:
 	@$(COMPOSE) -f $(COMPOSE_FILE) up --build --detach --wait
 
 infra-down:
-	@$(COMPOSE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) -f $(COMPOSE_FILE) --profile agent down
 
 dev:
 	@echo "dev workflow is not wired yet"

@@ -589,10 +589,15 @@ flowchart TB
 
 ### 10.1 Agent Runtime
 
-PR2 当前提供 `RunService`、typed State/Event、Fake Runtime、可注入 ModelClient 的最小
-LangGraph `thinking → response` 图和 `oj_agent` 持久化。它尚未提供 HTTP Chat/SSE；
-可信 Principal 由将来的 Gateway 委托认证入口创建。当前可运行入口是显式启用的本地
-demo，生产配置禁止 fake，默认 Runtime disabled。管理员控制面和真实模型后续接入。
+PR2 提供 RunService、typed State/Event、Fake Runtime、最小 LangGraph 和 oj_agent 存储。
+PR3 增加 Gateway → Agent HTTP SSE：Gateway 验证外部 Access JWT，再签发绑定 Agent
+与 HTTP 操作的 RS256 委托；Agent 只从验证后的 actor/roles/request_id 创建 Principal。
+默认 Chat/Runtime disabled，开发明确启用 Fake，生产禁止 Fake；控制面和真实模型后续接入。
+
+身份、输入、owner 和并发在响应头前校验，之后仅输出 SSE。Gateway 按路由设置独立
+Agent 总预算，保留普通预算和父级取消；按有界 UTF-8 SSE 帧增量转发并校验 ID/序号/终态。
+断连、写失败、deadline 与 shutdown 关闭上游和 AcceptedRun。可选 Compose profile
+不映射 Agent 公网端口，Agent 只挂载 Gateway 公钥，使用仅有 oj_agent 数据权限的开发账户。
 
 用户消息和 RUNNING 在事务中接受，完成答案和终态在事务中保存，成功持久化后才
 发 `done`；失败/取消不保存部分 assistant 输出。单实例启动收敛旧 RUNNING 为

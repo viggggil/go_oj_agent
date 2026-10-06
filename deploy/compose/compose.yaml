@@ -36,6 +36,7 @@ services:
       - ../../migrations/contest/000003_create_leaderboard_outbox.up.sql:/docker-entrypoint-initdb.d/403_create_leaderboard_outbox.sql:ro
       - ../../migrations/contest/000004_index_cache_lag.up.sql:/docker-entrypoint-initdb.d/404_index_cache_lag.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
+      - ./agent-user.sql:/docker-entrypoint-initdb.d/502_create_agent_development_user.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 3s
@@ -156,9 +157,12 @@ services:
         test -f /keys/gateway-public.pem || openssl rsa -in /keys/gateway-private.pem -pubout -out /keys/gateway-public.pem >/dev/null 2>&1 &&
         test -f /keys/judge-private.pem || openssl genrsa -out /keys/judge-private.pem 2048 >/dev/null 2>&1 &&
         test -f /keys/judge-public.pem || openssl rsa -in /keys/judge-private.pem -pubout -out /keys/judge-public.pem >/dev/null 2>&1 &&
+        cp /keys/gateway-public.pem /agent-public/gateway-public.pem &&
+        chmod 644 /agent-public/gateway-public.pem &&
         chmod 644 /keys/*.pem
     volumes:
       - auth-keys:/keys
+      - agent-auth-public:/agent-public
     restart: "no"
 
   user-service:
@@ -359,6 +363,8 @@ services:
       KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
       KRATOS_CLIENTS_PROBLEM_ENDPOINT: "problem-service:9002"
       KRATOS_CLIENTS_SUBMISSION_ENDPOINT: "judge-service:9003"
+      KRATOS_CLIENTS_AGENT_ENABLED: "${AGENT_ENABLED:-false}"
+      KRATOS_CLIENTS_AGENT_ENDPOINT: "http://agent-service:8000"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
     ports:
       - "127.0.0.1:${GATEWAY_HTTP_PORT:-8080}:8080"
@@ -380,6 +386,31 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  agent-service:
+    profiles: ["agent"]
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    environment:
+      AGENT_ENVIRONMENT: development
+      AGENT_HOST: 0.0.0.0
+      AGENT_CHAT_ENABLED: true
+      AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
+      AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
+      AGENT_GATEWAY_KEY_ID: gateway-internal-2026-09
+      AGENT_MAX_RUN_SECONDS: 30
+      AGENT_SSE_HEARTBEAT_SECONDS: 5
+      AGENT_MAX_CONCURRENT_RUNS: 8
+    volumes:
+      - agent-auth-public:/run/agent-auth:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-key-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   web:
     build:
       context: ../..
@@ -398,3 +429,4 @@ volumes:
   redis-data:
   minio-data:
   auth-keys:
+  agent-auth-public:

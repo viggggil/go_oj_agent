@@ -1,8 +1,8 @@
 # Agent Service
 
-## 当前已实现：PR1 服务骨架、PR2 最小 Runtime 和存储
+## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE
 
-PR1 提供 FastAPI 服务骨架，PR2 增加可测试的 Fake Runtime、最小 LangGraph 入口、Tool Registry 和 Agent 自有会话/消息/Run 存储。当前 HTTP 服务仍只开放健康检查；Gateway 鉴权与 Chat/SSE 在 PR3 实现。尚无真实模型、业务 Tool、RAG 或管理员控制面，启动和 demo 不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、业务 Tool、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
 
 本阶段提供两个健康端点：
 
@@ -83,9 +83,51 @@ uv run --directory agent --frozen python -m app.demo \
   --user-id 7 --conversation-id <UUID> --message "继续解释"
 ```
 
-Demo 以 JSON 行输出 typed 事件，尚未进行 HTTP SSE 分帧/网关转发。`done` 表示持久化完成；
-`error` 表示运行失败；EOF 且没有终态不能视为成功。PR3 接入时必须将生命周期初始化、
-disconnect/cancellation 和身份验证接入 FastAPI/Gateway，不能从请求体构造 Principal。
+Demo 以 JSON 行输出 typed 事件。`done` 表示答案和终态持久化完成，`error` 表示运行失败；EOF 且没有终态不能视为成功。HTTP 入口按下面的委托验证创建 Principal。
+
+### PR3 HTTP Chat 与流式接入
+
+外部入口为 Gateway 的 `POST /api/v1/agent/chat`，Agent 内部提供同名路由。
+开发 Compose 的 Agent 不映射宿主机端口，只挂载 Gateway 公钥。Gateway 先验证
+外部 Access JWT，再用 `pkg/internalauth` 签发 RS256 HTTP 操作委托；Python 通过
+PyJWT 检查签名、kid、issuer/audience/subject、操作、actor、角色和时间，TTL 最多 60 秒。
+身份与 request_id 只取自验证后的委托，不信任 `X-User-ID` 或请求体身份。
+
+独立 Agent 启用示例：
+
+```text
+AGENT_CHAT_ENABLED=true
+AGENT_RUNTIME_MODE=langgraph_fake
+AGENT_DATABASE_URL=mysql+asyncmy://<agent-user>:<encoded-password>@<host>/oj_agent
+AGENT_GATEWAY_PUBLIC_KEY_FILE=/path/to/gateway-public.pem
+AGENT_GATEWAY_KEY_ID=gateway-internal-2026-09
+```
+
+同时配置 Gateway 的 `clients.agent.enabled=true`、Agent endpoint 和内部签名私钥。
+Gateway 为 Agent 固定使用 `aud=agent-service`，不复用其他业务服务的 audience。
+开发 Compose 可以按 [部署说明](../deploy/compose/README.md) 启用可选 `agent` profile。
+生产禁止 Fake，本阶段仍不能提供生产学习 Agent。
+
+- lifespan 在接受 HTTP 前初始化 RunService，将旧 RUNNING 中断；关闭时取消流并释放连接池。
+- 默认请求体最多 256 KiB、消息最多 32,000 字符、preflight 最多 5 秒，每个服务最多 8 个活动流。
+- SSE 使用 UTF-8 JSON 和空行分帧，心跳为注释，默认 5 秒；等待心跳不会取消 ModelClient。
+  ASGI 发送最多等待 5 秒，断连和写失败关闭 AcceptedRun。
+- Gateway 独立总预算默认为 120 秒，普通路由保留原预算；连接/响应头/空闲/发送分别有界。
+  每帧最多 256 KiB，只读取有界帧并增量 flush，不等待整份回答。
+- Gateway 检查状态码、SSE 类型、UUID、递增序号和终态；异常 EOF、非法帧、超时输出脱敏 error。
+- Chat POST 不自动重试、不跟随 redirect，不提供请求幂等、断线续传或自动恢复。
+  JWT 只在建流时验证，运行预算与 token 有效期分开。
+
+```bash
+curl --no-buffer http://127.0.0.1:8080/api/v1/agent/chat \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"message":"介绍二分查找"}'
+```
+
+事件 envelope 与 `X-Agent-Run-ID`、`X-Agent-Conversation-ID` 使用同一标识；
+用 conversation_id 继续会话。完整的错误码和事件契约见 [API 文档](../docs/api.md)。
+
 
 Agent Service 是面向编程学习场景的 Python 服务。它负责理解用户目标、选择受控 Tool、执行有限的 ReAct 或 Plan-and-Solve 流程、生成带证据的回答，并通过 SSE 向客户端返回进度。
 

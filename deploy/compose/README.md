@@ -11,6 +11,7 @@ MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保�
 及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
 启动 user-service、problem-service、judge-service、contest-service、judge-worker、go-judge、
 RabbitMQ、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜，Consul 默认关闭。
+Agent Service 是可选的 `agent` profile，不会默认启动。
 
 Contest 消费配置位于 `configs/contest.yaml`：exchange=`oj.events`，queue=`contest.submission-judged`，
 DLQ=`contest.results.dlq`，prefetch=16。RabbitMQ URL 由 `KRATOS_MESSAGING_URL` 注入，使用 Compose 的
@@ -65,6 +66,41 @@ docker compose -f deploy/compose/compose.yaml down --volumes
 
 该命令会永久删除此 Compose 项目的本地 MySQL、Redis 和 MinIO 数据。
 
+### 启动 Agent Chat（PR3）
+
+Agent Chat 需要同时启动 Compose profile 和 Gateway 开关。开发 profile 使用显式的
+`oj_agent` 数据库账户、合成 Fake runtime，不调用真实模型：
+
+```bash
+AGENT_ENABLED=true docker compose \
+  --profile agent \
+  -f deploy/compose/compose.yaml \
+  up --build --detach --wait
+```
+
+也可以执行 `AGENT_ENABLED=true COMPOSE_PROFILES=agent make infra-up`，同时启用网关和
+可选服务。Agent 只在 Compose 网络内监听 `8000`，
+不映射宿主机端口；外部客户端始终通过 Gateway `8080` 访问 `POST /api/v1/agent/chat`。
+Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，Gateway 私钥留在 `auth-keys`，
+不会进入 Agent 容器。
+
+首次使用空 MySQL 数据卷时，Compose 会执行 Agent runtime migration 和本地开发账户
+bootstrap。已有数据卷不会重新执行 SQL；部署者应先应用
+`migrations/agent/000001_create_agent_runtime.up.sql`，并按需执行
+`deploy/compose/agent-user.sql` 创建仅有 `oj_agent` 表读写权限的账户。不要为了应用迁移
+删除已有开发数据卷。`AGENT_DATABASE_URL` 可覆盖默认 DSN，但必须仍使用
+`mysql+asyncmy` 和 `oj_agent` Schema。
+
+PR3 的 Fake runtime 只用于开发和集成测试；生产环境禁止 `AGENT_RUNTIME_MODE=fake` 或
+`langgraph_fake`，真实模型 Provider、API Key、Tools、知识库和管理员控制面尚未在本 PR
+交付。停止可选服务时使用：
+
+```bash
+make infra-down
+# 或显式：
+docker compose --profile agent -f deploy/compose/compose.yaml down
+```
+
 ## 配置
 
 Compose 会自动读取仓库根目录或 `--env-file` 指定的环境文件。可用变量记录在 `deploy/compose/.env.example`。所有默认密码和 JWT 密钥仅供本机开发，不能用于共享、测试平台或生产环境。
@@ -99,8 +135,7 @@ Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrat
 
 Agent PR2 将 `oj_agent` Schema 和 `migrations/agent/000001_create_agent_runtime.up.sql`
 加入 MySQL 空数据卷初始化，建立会话、消息和 Run 表。已有数据卷不会重新执行初始化，
-需由部署者显式应用 Agent up SQL。PR2 尚未启动 Agent profile 或 Gateway Chat 路由；
-Agent 容器与流式接入会在 PR3 完成。不要为迁移已有数据库而删除当前开发数据卷。
+需由部署者显式应用 Agent up SQL。PR3 已提供可选 Agent profile、独立公钥卷和 Gateway Chat 路由。不要为迁移已有数据库而删除当前开发数据卷。
 
 ## 排障
 

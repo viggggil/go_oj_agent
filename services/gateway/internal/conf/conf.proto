@@ -49,6 +49,21 @@ message ClientsProto {
   ClientProto problem = 2;
   ClientProto submission = 3;
   ClientProto contest = 4;
+  AgentProto agent = 5;
+}
+
+// Agent 使用 HTTP SSE，预算独立于普通 gRPC Client。
+message AgentProto {
+  bool enabled = 1;
+  string endpoint = 2;
+  string connect_timeout = 3;
+  string response_header_timeout = 4;
+  string max_duration = 5;
+  string idle_timeout = 6;
+  string write_timeout = 7;
+  uint32 max_concurrent = 8;
+  uint32 max_request_bytes = 9;
+  uint32 max_frame_bytes = 10;
 }
 
 message ClientProto {

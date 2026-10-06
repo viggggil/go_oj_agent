@@ -1218,6 +1218,17 @@ Tool Registry/allowlist/Schema/超时执行器和 `oj_agent` 会话/消息/Run m
 demo，无真实业务 Tool、模型、发布配置管理或质量评估。Gateway 委托身份、HTTP SSE、
 断连取消、Compose Agent profile 和跨 Go/Python 测试在 PR3 完成。
 
+### PR3 状态（Gateway 可信委托与 SSE）
+
+Gateway 新增受保护 Chat 路由和 HTTP 流式 Client，签发绑定 Agent audience 与 HTTP
+操作的 RS256 委托；Python 校验后接入 RunService 和有界 SSE。两个服务分别设置
+体积、并发、建流、运行、心跳、空闲和写预算，取消贯穿上游与存储。普通接口保留原 timeout。
+
+开发 Compose 提供可选 agent profile、专用公钥卷和 oj_agent 开发账户。测试覆盖首事件
+提前到达、中文/拆帧、异常 EOF、签名/权限负例、超时/断连、真实 Gateway → Python →
+MySQL 续聊，以及完整业务栈注册/登录后的 Agent 流。无真实模型、业务 Tool、聊天 UI、
+管理员控制面或质量评估。
+
 Agent 必须真正使用 OJ 后端能力，而不是成为独立聊天机器人。
 
 定位：

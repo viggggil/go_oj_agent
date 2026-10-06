@@ -8,6 +8,7 @@ import (
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
+	"github.com/viggggil/go_oj_agent/services/gateway/internal/client"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 	gatewaymw "github.com/viggggil/go_oj_agent/services/gateway/internal/middleware"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/service"
@@ -18,6 +19,10 @@ func NewHTTPServer(
 	authMiddleware *gatewaymw.AuthMiddleware,
 	gatewayService *service.GatewayService,
 ) *khttp.Server {
+	return NewHTTPServerWithAgent(config, authMiddleware, gatewayService, nil)
+}
+
+func NewHTTPServerWithAgent(config *conf.Bootstrap, authMiddleware *gatewaymw.AuthMiddleware, gatewayService *service.GatewayService, agent *client.AgentClient) *khttp.Server {
 	address := ":8080"
 	timeout := 3 * time.Second
 	sseInterval := 500 * time.Millisecond
@@ -41,7 +46,8 @@ func NewHTTPServer(
 
 	server := khttp.NewServer(
 		khttp.Address(address),
-		khttp.Timeout(timeout),
+		khttp.Timeout(0),
+		khttp.Filter(requestBudgetFilter(timeout, agent.Limits().MaxDuration)),
 		khttp.Middleware(
 			gatewaymw.RequestIDMiddleware(),
 			recovery.Recovery(),
@@ -51,6 +57,10 @@ func NewHTTPServer(
 	gatewayv1.RegisterGatewayServiceHTTPServer(server, gatewayService)
 	registerProblemUploadRoute(server, gatewayService)
 	registerSubmissionEventsRoute(server, gatewayService, sseInterval, sseMaxDuration)
+	registerAgentChatRoute(server, agent)
+	server.Use(client.AgentChatOperation, authMiddleware.Middleware())
+	server.ReadHeaderTimeout = 5 * time.Second
+	server.IdleTimeout = time.Minute
 	server.Use(
 		gatewayv1.OperationGatewayServiceGetCurrentUser,
 		authMiddleware.Middleware(),

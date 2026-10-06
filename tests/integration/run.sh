@@ -7,7 +7,7 @@ compose_file="${repository_root}/deploy/compose/compose.yaml"
 project_name="go-oj-auth-integration"
 
 compose() {
-  docker compose --project-name "${project_name}" -f "${compose_file}" "$@"
+  docker compose --project-name "${project_name}" -f "${compose_file}" --profile agent "$@"
 }
 
 cleanup() {
@@ -56,6 +56,7 @@ export RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-judge-password}"
 export ACCESS_TOKEN_TTL="2s"
 export REFRESH_TOKEN_TTL="5m"
 export AUTH_ACCESS_TOKEN_KEY="integration-test-access-token-key"
+export AGENT_ENABLED=true
 
 if ! compose up --build --detach --wait; then
   echo "===== integration compose up failed; dumping service logs ====="
@@ -66,6 +67,8 @@ compose cp gateway-service:/run/auth-keys/gateway-private.pem "${test_artifacts_
 
 cd "${repository_root}"
 AUTH_INTEGRATION_BASE_URL="http://127.0.0.1:${GATEWAY_HTTP_PORT}" \
+AGENT_INTEGRATION_BASE_URL="http://127.0.0.1:${GATEWAY_HTTP_PORT}" \
+AGENT_TEST_MYSQL_DSN="oj_agent:local-agent-password@tcp(127.0.0.1:${MYSQL_PORT})/oj_agent?parseTime=true" \
 PROBLEM_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_problem?parseTime=true" \
 PROBLEM_TEST_USER_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_user?parseTime=true" \
 SUBMISSION_TEST_MYSQL_DSN="root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(127.0.0.1:${MYSQL_PORT})/oj_submission?parseTime=true" \

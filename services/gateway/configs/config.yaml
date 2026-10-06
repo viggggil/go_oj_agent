@@ -19,6 +19,17 @@ auth:
   internal_audience: "problem-service"
   internal_token_ttl: "30s"
 clients:
+  agent:
+    enabled: false
+    endpoint: "http://127.0.0.1:8000"
+    connect_timeout: "3s"
+    response_header_timeout: "5s"
+    max_duration: "120s"
+    idle_timeout: "20s"
+    write_timeout: "5s"
+    max_concurrent: 8
+    max_request_bytes: 262144
+    max_frame_bytes: 262144
   user:
     name: "user-service"
     endpoint: "127.0.0.1:9001"

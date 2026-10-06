@@ -48,10 +48,10 @@ CONTEST_TEST_GRPC_PORT
 
 直接运行 `go test ./...` 时，如果没有设置 `AUTH_INTEGRATION_BASE_URL`，该测试会跳过，以保持单元测试不依赖 Docker。
 
-## Agent Service PR1/PR2 集成测试
+## Agent Service PR1/PR2/PR3 集成测试
 
 Agent 的集成测试使用 `tests/agent/compose.yaml` 启动一套独立的 MySQL 和 Agent
-Service。Compose 构建上下文只包含 `agent/`，数据库使用 `oj_agent` Schema 和合成凭据；
+Service；PR3 另外构建 Gateway（仓库根构建上下文）。数据库使用 `oj_agent` Schema 和合成凭据；
 测试结束会删除本次 project 的容器、网络和数据卷，不会连接开发 Compose 环境。
 
 ```bash
@@ -73,3 +73,18 @@ PR2 使用同一套 Compose 应用真实 Agent migration，增加 owner 隔离�
 10 个并发请求仅接受一个 Run、数据库唯一索引、初始/完成事务回滚、终态保护、重启
 中断、deadline 释放活动关联、Fake Service 会话恢复和空数据库 down/up 验证。down
 测试只运行在本次临时测试库，不能对开发或生产数据库设置测试 DSN。
+
+PR3 的 Agent 专用 Compose 另外启动实际 Gateway 二进制和 Agent Service，临时生成 RSA
+密钥，验证完整的外部 Access Token -> Gateway 内部委托 JWT -> Agent 验证 -> MySQL
+链路。测试覆盖两轮会话、Run 和消息持久化、owner 隔离、直接 Agent 访问/伪造 Header
+拒绝和请求体上限；Go/Python 单元测试另行覆盖 SSE 帧校验、超时和客户端断连取消。
+这些测试不需要真实模型 API Key。
+
+```bash
+make agent-test-integration
+```
+
+该命令会清理临时密钥、容器、网络和数据卷。完整后端集成测试 `make test-integration`
+也会在独立项目中启用 `agent` profile，并通过 `AGENT_INTEGRATION_BASE_URL` 和
+`AGENT_TEST_MYSQL_DSN` 运行 Go 集成用例；清理只作用于本次测试项目，不会删除开发
+Compose 数据卷。

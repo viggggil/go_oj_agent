@@ -51,10 +51,19 @@ func initApp(bc *conf.Bootstrap) (*App, func(), error) {
 	}
 	contestServiceClient := client.ProvideContestServiceClient(contestClient)
 	gatewayService := service.NewGatewayServiceWithAllClients(authService, userService, problemServiceClient, submissionServiceClient, contestServiceClient)
-	httpServer := server.NewHTTPServer(bc, authMiddleware, gatewayService)
+	agentClient, cleanup5, err := client.NewAgentClient(bc)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	httpServer := server.NewHTTPServerWithAgent(bc, authMiddleware, gatewayService, agentClient)
 	registrar := server.NewRegistrar(bc)
 	v := newApp(bc, httpServer, registrar)
 	return v, func() {
+		cleanup5()
 		cleanup4()
 		cleanup3()
 		cleanup2()
