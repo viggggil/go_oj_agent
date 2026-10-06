@@ -36,7 +36,7 @@ oj_agent
 | `oj_problem` | problem-service | Problem、Tag、Testcase Metadata |
 | `oj_submission` | judge-service | Submission、Case Result、Outbox、Dedup |
 | `oj_contest` | contest-service | Contest、Participant、Leaderboard Snapshot |
-| `oj_agent` | agent-service | Conversation、Message |
+| `oj_agent` | agent-service | Conversation、Message、Run |
 
 禁止：
 
@@ -497,7 +497,7 @@ Agent 只能在自己的 Schema 保存会话数据，不能保存“绕过业务
 建议索引：
 
 ```text
-INDEX(user_id, updated_at)
+INDEX(user_id, updated_at, id)
 ```
 
 ## 8.2 `agent_messages`
@@ -506,6 +506,7 @@ INDEX(user_id, updated_at)
 | --- | --- | --- |
 | `id` | BIGINT | PK |
 | `conversation_id` | CHAR(36) | FK within `oj_agent` |
+| `run_id` | CHAR(36) | Nullable FK within `oj_agent` |
 | `role` | VARCHAR(32) | user / assistant / tool |
 | `content` | MEDIUMTEXT | 根据隐私策略保存 |
 | `tool_name` | VARCHAR(128) | Nullable |
@@ -515,9 +516,45 @@ INDEX(user_id, updated_at)
 
 ```text
 INDEX(conversation_id, id)
+INDEX(run_id)
 ```
 
 敏感源码、Prompt、Tool Result 是否持久化应由后续隐私策略明确；默认避免无必要长期保存。
+
+PR2 实际保存用户输入和完成后的 assistant 答案，不写入 tool 消息、源码对象或原始模型
+Prompt。每条消息上限 32,000 字符，查询最近最多 200 条并按 ID 升序返回；Runtime 使用
+最近 100 条且总历史上限 64,000 字符。表结构见
+`migrations/agent/000001_create_agent_runtime.up.sql`；应用不运行自动建表。
+
+### PR2 `agent_runs` 实际字段与一致性
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `id` | CHAR(36) | Run UUID PK |
+| `conversation_id` | CHAR(36) | FK within `oj_agent`，ON DELETE RESTRICT |
+| `user_id` | BIGINT | 逻辑 owner，无跨服务 FK |
+| `request_id` | VARCHAR(128) | 关联请求，不作为幂等键 |
+| `config_source` | VARCHAR(64) | 当前 `demo_environment` |
+| `config_snapshot` | JSON | 版本、Runtime、预算、allowlist，不保存凭据 |
+| `status` | VARCHAR(32) | RUNNING / COMPLETED / FAILED / CANCELLED / INTERRUPTED |
+| `started_at` / `finished_at` | DATETIME(3) | UTC，finished nullable |
+| `deadline_at` | DATETIME(3) | 整体 deadline，UTC |
+| `error_code` | VARCHAR(64) | Nullable，脱敏稳定错误码 |
+| `active_conversation_id` | CHAR(36) | 存储生成列：仅 RUNNING 时为 conversation_id |
+
+索引包含 `(conversation_id,started_at,id)`、`(user_id,started_at,id)` 和 `(status,deadline_at)`。
+`UNIQUE(active_conversation_id)` 利用多个 NULL 可共存，强制同会话最多一个 RUNNING。
+MySQL 不允许这里的生成列基础字段外键使用级联删除，所以 Run → Conversation 使用
+RESTRICT；未来物理清理需按 messages、runs、conversations 顺序，不跨 Schema 删除。
+
+创建必要的会话、用户消息、Run 是一个事务；完成答案与终态更新是另一个事务。运行
+期间不持有事务。状态只允许 RUNNING 转移到终态，重复完成/更改终态返回冲突，不重复写答案。
+并发写按照 conversation → run 的锁顺序。服务仅单实例；初始化将旧 RUNNING 改为
+INTERRUPTED，后续请求按 deadline 清理过期 RUNNING，不重放消息。清理只改变该 Run
+状态，其生成列自动释放，不会清除其他新 Run 的关联。
+
+迁移为增量建表：旧 PR1 可在新 Schema 上继续健康检查；PR2 存储需要先执行 up SQL。
+down SQL 删除三张表及全部历史数据，不应作为保留数据的应用回滚方式。
 
 ---
 
@@ -564,6 +601,7 @@ Tool Registry 的 `rpc_method`、目标服务、最终授权和敏感级别。
 
 ### `agent_runs` / `agent_run_events`
 
+PR2 只实现上面列出的最小运行表，以下 Skill、模型、Token、延迟及事件表仍是后续规划。
 运行表保存用户、会话、Skill、配置快照、模型、状态、Token、延迟和最终状态。事件表
 保存意图、计划步骤、Tool 调用、Tool 结果摘要、Reflection、错误和 SSE 状态。源码、
 凭据、完整 Prompt 和原始敏感 Tool Result 默认只保存脱敏摘要或对象引用。

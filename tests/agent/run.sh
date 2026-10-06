@@ -4,7 +4,7 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose_file="${repository_root}/tests/agent/compose.yaml"
-project_name="oj-agent-pr1-${RANDOM}-$$"
+project_name="oj-agent-integration-${RANDOM}-$$"
 uv_command="${UV:-uv}"
 
 compose() {

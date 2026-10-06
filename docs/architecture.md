@@ -589,6 +589,16 @@ flowchart TB
 
 ### 10.1 Agent Runtime
 
+PR2 当前提供 `RunService`、typed State/Event、Fake Runtime、可注入 ModelClient 的最小
+LangGraph `thinking → response` 图和 `oj_agent` 持久化。它尚未提供 HTTP Chat/SSE；
+可信 Principal 由将来的 Gateway 委托认证入口创建。当前可运行入口是显式启用的本地
+demo，生产配置禁止 fake，默认 Runtime disabled。管理员控制面和真实模型后续接入。
+
+用户消息和 RUNNING 在事务中接受，完成答案和终态在事务中保存，成功持久化后才
+发 `done`；失败/取消不保存部分 assistant 输出。单实例启动收敛旧 RUNNING 为
+INTERRUPTED，同会话并发由数据库生成列唯一索引约束，不依赖内存锁。调用方消费流
+必须使用 `AcceptedRun` 上下文或显式关闭，才能在流开始前/后取消并清理 Run。
+
 运行时状态至少包括：
 
 ```text

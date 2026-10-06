@@ -1,8 +1,8 @@
 # Agent Service
 
-## 当前已实现：PR1 服务骨架
+## 当前已实现：PR1 服务骨架、PR2 最小 Runtime 和存储
 
-当前分支只交付可独立启动、可健康检查和可部署的 FastAPI 服务骨架。它还没有 Agent Runtime、Chat/SSE、Tool、RAG、会话表或真实模型调用；启动服务不需要模型 API Key。后续功能会在独立 PR 中逐步接入，下面第 1 节起的内容是目标设计，不能视为当前已上线能力。
+PR1 提供 FastAPI 服务骨架，PR2 增加可测试的 Fake Runtime、最小 LangGraph 入口、Tool Registry 和 Agent 自有会话/消息/Run 存储。当前 HTTP 服务仍只开放健康检查；Gateway 鉴权与 Chat/SSE 在 PR3 实现。尚无真实模型、业务 Tool、RAG 或管理员控制面，启动和 demo 不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
 
 本阶段提供两个健康端点：
 
@@ -41,6 +41,51 @@ agent/
 ├── pyproject.toml
 └── uv.lock
 ```
+
+### PR2 Runtime 和存储的使用边界
+
+`app/graphs/service.py` 的 `RunService` 接收 typed `ChatRequest` 和由可信入口创建的
+`Principal`。Context 只保存题目/提交 ID 与语言，不自动读取业务数据。Runtime/ModelClient
+是可注入协议，LangGraph 当前只运行 `thinking → response` 两个节点并调用 FakeModelClient；
+它没有实现 ReAct、计划执行或 Reflection。Fake 回答带明确的演示标识，不伪称算法答案。
+
+`ToolRegistry` 当前默认为空，支持重复名称检查和 JSON Schema 导出；`ToolExecutor` 检查
+Run allowlist、启用状态、角色、输入/输出 Schema 和有界超时，取消会传到 handler。写 Tool
+必须保持 disabled 且要求确认。这里没有真实 gRPC/RAG Tool，也没有管理员配置发布 API。
+
+存储只访问 `oj_agent`，正常初始化来源为 `migrations/agent/000001_create_agent_runtime.up.sql`。
+开发 Compose 新数据卷与 Agent 集成 Compose 会自动执行该 SQL；已有数据卷需由有权限的
+部署者显式应用，应用启动不会自动迁移。Down SQL 会删除全部会话、消息与 Run，是有数据
+损失的回滚，不能用于保留历史的线上回退。
+
+`RunService` 的调用方必须先调用一次 `initialize()`，并使用 `async with accepted_run`
+消费/关闭事件流。当前只支持一个 Agent 运行实例：初始化会把旧进程的全部 RUNNING
+改为 INTERRUPTED，不恢复生成。不要让多个服务或 demo 进程共用同一 Schema 同时运行。
+
+- 接受请求时在一个短事务中创建必要的会话、用户消息与 RUNNING 记录。
+- 会话归属查询同时过滤 owner；不存在和无权限使用相同的 not-found 错误。
+- 历史取最近 100 条，再按消息 ID 升序恢复；恢复给 Runtime 的历史总量上限为 64,000 字符。
+- 数据库唯一索引约束同会话最多一个 RUNNING。终态条件检查和答案写入在一个事务中完成。
+- 只有最终答案持久化成功后才输出 `done`。失败和取消不保存 assistant 片段。
+- 终态保存失败只记录脱敏错误码；后续接受请求时按 deadline 清理过期 RUNNING，不自动重试用户消息。
+- 请求不承诺幂等，用户重试会创建新 Run；后续 Gateway 不得自动重试 Chat POST。
+
+本地演示需先准备已应用迁移的 `oj_agent` 数据库，在 `agent/.env` 中配置 DSN，并**显式**
+设置 `AGENT_RUNTIME_MODE=fake` 或 `langgraph_fake`。默认值为 `disabled`；生产配置拒绝 fake。
+预算来自 `AGENT_MAX_RUN_SECONDS`、`AGENT_MAX_OUTPUT_CHARS`、`AGENT_MAX_RUN_EVENTS`，
+Run 保存 `source=demo_environment`、`version=pr2-demo-v1` 的配置快照，不能视为已发布的 Skill/Prompt。
+
+```bash
+uv run --directory agent --frozen python -m app.demo \
+  --user-id 7 --message "介绍二分查找"
+# 用输出中的 conversation_id 继续同一会话；--user-id 只是本机演示参数，不是 HTTP 身份。
+uv run --directory agent --frozen python -m app.demo \
+  --user-id 7 --conversation-id <UUID> --message "继续解释"
+```
+
+Demo 以 JSON 行输出 typed 事件，尚未进行 HTTP SSE 分帧/网关转发。`done` 表示持久化完成；
+`error` 表示运行失败；EOF 且没有终态不能视为成功。PR3 接入时必须将生命周期初始化、
+disconnect/cancellation 和身份验证接入 FastAPI/Gateway，不能从请求体构造 Principal。
 
 Agent Service 是面向编程学习场景的 Python 服务。它负责理解用户目标、选择受控 Tool、执行有限的 ReAct 或 Plan-and-Solve 流程、生成带证据的回答，并通过 SSE 向客户端返回进度。
 

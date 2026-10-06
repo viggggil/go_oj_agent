@@ -48,7 +48,7 @@ CONTEST_TEST_GRPC_PORT
 
 直接运行 `go test ./...` 时，如果没有设置 `AUTH_INTEGRATION_BASE_URL`，该测试会跳过，以保持单元测试不依赖 Docker。
 
-## Agent Service PR1 集成测试
+## Agent Service PR1/PR2 集成测试
 
 Agent 的集成测试使用 `tests/agent/compose.yaml` 启动一套独立的 MySQL 和 Agent
 Service。Compose 构建上下文只包含 `agent/`，数据库使用 `oj_agent` Schema 和合成凭据；
@@ -67,4 +67,9 @@ UV=/path/to/uv AGENT_TEST_MYSQL_PORT=23306 AGENT_TEST_HTTP_PORT=28000 \
 
 测试验证真实 MySQL 连接、错误凭据返回 `unavailable`、连接池释放，以及容器的
 `/healthz` 和 `/readyz` HTTP 契约。PR1 不需要模型 API Key；模型 Provider 和运行时质量
-评估会在后续 Agent Runtime PR 中加入。
+评估会在后续真实模型接入/质量工程 PR 中加入。
+
+PR2 使用同一套 Compose 应用真实 Agent migration，增加 owner 隔离、稳定最近历史、
+10 个并发请求仅接受一个 Run、数据库唯一索引、初始/完成事务回滚、终态保护、重启
+中断、deadline 释放活动关联、Fake Service 会话恢复和空数据库 down/up 验证。down
+测试只运行在本次临时测试库，不能对开发或生产数据库设置测试 DSN。

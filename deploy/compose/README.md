@@ -97,6 +97,11 @@ MySQL 官方镜像仅在数据目录为空时执行 `/docker-entrypoint-initdb.d
 
 Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrations/`。
 
+Agent PR2 将 `oj_agent` Schema 和 `migrations/agent/000001_create_agent_runtime.up.sql`
+加入 MySQL 空数据卷初始化，建立会话、消息和 Run 表。已有数据卷不会重新执行初始化，
+需由部署者显式应用 Agent up SQL。PR2 尚未启动 Agent profile 或 Gateway Chat 路由；
+Agent 容器与流式接入会在 PR3 完成。不要为迁移已有数据库而删除当前开发数据卷。
+
 ## 排障
 
 查看服务日志：

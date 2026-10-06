@@ -597,6 +597,38 @@ GET /readyz
 当前探针不会创建表，也不会访问其他服务的数据库。Chat 和管理员接口仍按下面的
 目标设计保留，接入 Gateway 前需要另行更新 REST/SSE 与认证契约。
 
+### PR2 Runtime 数据模型（尚未开放 HTTP Chat）
+
+PR2 实现 `ChatRequest`、`Principal`、`AgentState`、`StreamEvent` 和会话/Run 存储，
+通过本机 demo 与直接注入的测试 Runtime 验证。`POST /api/v1/agent/chat` 当前仍为 404；
+PR3 完成 Gateway 委托验证后才注册该路由，没有匿名/信任 Header 的临时 Chat 入口。
+
+ChatRequest 的 message 为非空白字符串，长度 1–32,000；conversation_id 必须为 UUID；
+context 只接受正数 submission_id/problem_id 和长度 1–32 的 language。顶层及 context
+均拒绝额外字段，尤其不接受 user_id/role。Principal 的 user_id/roles/request_id 由可信
+调用方创建，不能从 ChatRequest 推导。未知或非 owner 的会话使用相同 not-found 语义。
+
+PR2 事件 JSON 的 envelope 为：
+
+```json
+{
+  "type": "token",
+  "run_id": "b056c290-f5a0-49d0-a7b8-949391e53388",
+  "conversation_id": "363f7d21-b923-41ee-8702-71b2a1280239",
+  "sequence": 2,
+  "data": {"text": "【演示回答】尚未接入真实模型。"}
+}
+```
+
+当前只生成 thinking/token/done/error；thinking 是短状态，不是思维链，Fake 不发出
+业务 tool_call。done 的 data 为空且表示答案与 COMPLETED 已成功持久化；error 的 data
+只含稳定 code，不含 Provider/SQL 异常原文。序号在一个 Run 内递增，无 SSE 续传承诺。
+PR2 demo 输出 JSON 行，SSE UTF-8 分帧、心跳、Gateway 转发与 HTTP 错误码仍在 PR3。
+
+一次接受请求创建新 Run，不做 request_id 幂等；同会话活动 Run 冲突，调用方不能自动
+重试。运行失败/取消不保存 assistant 片段，不发送成功 done；EOF 未见终态不能视为
+成功。普通 Chat（含管理员身份）只访问本人会话，管理员跨 owner 查询尚未提供。
+
 ### POST `/api/v1/agent/chat`
 
 发起 Agent 会话，响应使用 SSE。

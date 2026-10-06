@@ -1209,6 +1209,15 @@ Runtime、管理员控制面、质量评估或真实模型 Provider；这些仍�
 契约。接入真实模型前需要单独完成 Provider 配置、密钥管理、调用超时/重试、Token 预算、
 脱敏 Trace 和离线 Eval 基线，并在实现该 PR 前明确所需 API 凭据。
 
+### PR2 状态（最小 Runtime 和存储）
+
+PR2 新增 typed Chat/Principal/State/Event、Fake Runtime/ModelClient、最小 LangGraph 入口、
+Tool Registry/allowlist/Schema/超时执行器和 `oj_agent` 会话/消息/Run migration。RunService
+在接受请求与完成答案时分别使用事务，并在持久化后输出 done；测试覆盖 owner 隔离、
+同会话并发、事务失败、终态保护、超时/取消和重启/过期收敛。当前只有显式启用的本机
+demo，无真实业务 Tool、模型、发布配置管理或质量评估。Gateway 委托身份、HTTP SSE、
+断连取消、Compose Agent profile 和跨 Go/Python 测试在 PR3 完成。
+
 Agent 必须真正使用 OJ 后端能力，而不是成为独立聊天机器人。
 
 定位：

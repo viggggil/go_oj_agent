@@ -8,6 +8,9 @@ services:
       MYSQL_ROOT_PASSWORD: root-password
     ports:
       - "${AGENT_TEST_MYSQL_PORT}:3306"
+    volumes:
+      - ../../migrations/mysql/000001_create_schemas.up.sql:/docker-entrypoint-initdb.d/001_create_schemas.sql:ro
+      - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s
