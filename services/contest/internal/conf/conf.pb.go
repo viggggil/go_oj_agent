@@ -250,10 +250,12 @@ func (x *ServiceProto) GetName() string {
 }
 
 type ServerProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Grpc          *GRPCProto             `protobuf:"bytes,1,opt,name=grpc,proto3" json:"grpc,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Grpc  *GRPCProto             `protobuf:"bytes,1,opt,name=grpc,proto3" json:"grpc,omitempty"`
+	// 仅用于运维抓取。留空可禁用。
+	MetricsAddress string `protobuf:"bytes,2,opt,name=metrics_address,json=metricsAddress,proto3" json:"metrics_address,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ServerProto) Reset() {
@@ -291,6 +293,13 @@ func (x *ServerProto) GetGrpc() *GRPCProto {
 		return x.Grpc
 	}
 	return nil
+}
+
+func (x *ServerProto) GetMetricsAddress() string {
+	if x != nil {
+		return x.MetricsAddress
+	}
+	return ""
 }
 
 type GRPCProto struct {
@@ -899,9 +908,10 @@ const file_services_contest_internal_conf_conf_proto_rawDesc = "" +
 	"\x11dead_letter_queue\x18\x04 \x01(\tR\x0fdeadLetterQueue\x12\x1a\n" +
 	"\bprefetch\x18\x05 \x01(\x05R\bprefetch\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\":\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"c\n" +
 	"\vServerProto\x12+\n" +
-	"\x04grpc\x18\x01 \x01(\v2\x17.contest.conf.GRPCProtoR\x04grpc\"`\n" +
+	"\x04grpc\x18\x01 \x01(\v2\x17.contest.conf.GRPCProtoR\x04grpc\x12'\n" +
+	"\x0fmetrics_address\x18\x02 \x01(\tR\x0emetricsAddress\"`\n" +
 	"\tGRPCProto\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x129\n" +
 	"\x19max_receive_message_bytes\x18\x02 \x01(\x05R\x16maxReceiveMessageBytes\"(\n" +

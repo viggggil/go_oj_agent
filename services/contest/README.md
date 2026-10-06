@@ -78,8 +78,8 @@ and failure updates require an unexpired matching token. Transient failures
 retry indefinitely with capped exponential backoff (1–60 seconds); malformed
 snapshots enter `dead` with `last_error` for investigation. A cancelled process
 leaves its lease to expire. Confirmation failures safely replay the snapshot.
-PR1 provides the relay contract; it is not started until the Redis sink is added.
-Cache writes and cache reads remain disabled by default.
+PR1 provides the relay contract. With PR2-PR5 enabled, cache writes and reads
+are active by default, while MySQL remains the source of truth.
 
 ### Upgrade existing data without dropping volumes
 
@@ -110,17 +110,15 @@ individual user version while an older cache generation is active.
 
 ## Redis leaderboard writes (issue #134, PR2)
 
-The optional Outbox relay writes complete snapshots using Redis Lua. It does
-not change `GetLeaderboard`: all reads still use MySQL. Both shipped configs
-set `leaderboard_cache.enabled: false`; leave it disabled until PR3 implements
-initialization, consistent cache reads, catch-up and safe generation switching.
-Enabling this intermediate worker against a cold Redis leaves events pending
-with `last_error` instead of publishing an incomplete leaderboard. There is
-intentionally no manual activation command.
+The Outbox relay writes complete snapshots using Redis Lua. `GetLeaderboard`
+reads Redis only after authorization and freshness checks; a cold or failed
+Redis cache falls back to MySQL. A cold Redis leaves events pending until a
+complete generation is rebuilt. There is intentionally no manual activation
+command.
 
 ```yaml
 leaderboard_cache:
-  enabled: false
+  enabled: true
   addresses: ["redis:6379"]
   password: ""
   db: 0
@@ -153,7 +151,7 @@ Ranking members encode `(100 - solved_count):penalty_seconds:user_id` with width
 64-bit penalty/user IDs (user IDs must be positive). Lexicographic order matches
 MySQL's solved DESC, penalty ASC, user_id ASC even for IDs 2/10 and maximum
 signed 64-bit values. A `~` member sorts after real users; it is a structural
-sentinel, must be excluded from counts/pages by PR3 and represents an allocated
+sentinel, must be excluded from counts/pages and represents an allocated
 empty generation. Each user hash also has a `__generation` sentinel.
 
 The Lua update checks the active pointer, key types, generation markers,
@@ -170,7 +168,7 @@ writes succeed; a write error leaves the generation unusable until rebuilt.
 Missing/evicted keys, mismatched markers or a dirty generation fail closed. The
 worker does not recreate these keys from one user's event because doing so would
 lose the version fences for other users. `PrepareGeneration` only allocates an
-unused build target; it does not publish or mark it ready. PR3 will own safe
+unused build target; it does not publish or mark it ready. The read path owns safe
 initialization/rebuild, stale-data checks, TTL and generation cleanup. No TTL is
 set in this intermediate PR; cache loss requires full reconstruction, not replay
 of only the still-pending events.
@@ -184,7 +182,7 @@ integration runner supplies both variables automatically.
 
 ## Redis leaderboard reads and rebuilds (issue #134, PR3)
 
-PR3 adds the read path and safe reconstruction around the PR2 write projection.
+The read path and safe reconstruction build on the PR2 write projection.
 The Contest use case checks authentication, contest visibility and archive
 permissions before it calls the cache. A cache hit is one bounded Lua read: the
 active generation, freshness metadata, total count, page members and complete
@@ -229,5 +227,25 @@ migration adds an index on `(contest_id,status,created_at)` for this lag check.
 
 Cache maintenance starts as a separate Kratos server from the result consumer.
 Stopping the service cancels Redis and SQL work; an incomplete build leaves the
-previous active generation readable. Cache remains disabled in shipped configs
-until this full read/rebuild path is explicitly enabled and observed.
+previous active generation readable. The shipped configurations enable this
+path. The service remains available during a Redis outage because reads fall
+back to MySQL and pending Outbox rows are retried.
+
+## Concurrency and operations (issue #134, PR4-PR5)
+
+Contest registration, editing and archiving lock the contest row before they
+recheck status and the database UTC clock. Registration is idempotent on the
+`(contest_id,user_id)` primary key and is allowed only before start_at. Submissions
+use the half-open interval `[start_at,end_at)` and the final Judge INSERT clock. Updates carry the `expected_updated_at` value returned by
+`GetContest`; a stale administrator receives `ABORTED` and must reload before
+retrying. Contest row locks are acquired before participant, problem or result
+rows. Deadlocks and lock wait timeouts retry at most three times and always
+honor request cancellation.
+
+运行观测使用独立 `server.metrics_address` 端口，提供 Prometheus 文本 `/metrics`
+和 JSON `/debug/vars`。默认本地地址为 `127.0.0.1:9105`，Compose 仅在内部监听。
+指标覆盖命中/未命中/错误、实际 SQL 回源、Outbox backlog/最老年龄/投递延迟、
+重建次数/耗时/失败、完整事务重试。Redis 继续作为可重建投影。
+
+迁移、回填、部署顺序、功能开关、故障处理、测试矩阵和负载记录见
+[排行榜缓存运维文档](../../docs/contest-cache-operations.md)。

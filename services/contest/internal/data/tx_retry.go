@@ -61,6 +61,7 @@ func withContestTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) erro
 }
 
 func waitTransactionRetry(ctx context.Context, attempt int) error {
+	leaderboardTransactionRetries.Add(1)
 	delay := transactionRetryDelay << attempt
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

@@ -61,3 +61,18 @@ func TestCacheRelayReplaysAfterConfirmationFailure(t *testing.T) {
 		t.Fatalf("invalid payload reached sink: calls=%d err=%v", sink.calls, err)
 	}
 }
+
+func TestRelayObservesScheduledSinkFailure(t *testing.T) {
+	s := LeaderboardSnapshot{Schema: 1, ContestID: 20, UserID: 42, Version: "1", Problems: []LeaderboardProblem{{ProblemID: 7}}}
+	payload, _ := json.Marshal(s)
+	store := &relayStore{event: &CacheOutboxEvent{ID: 1, ContestID: s.ContestID, UserID: s.UserID, Version: s.Version, Payload: payload}}
+	sink := &relaySink{err: errors.New("Redis disconnected")}
+	var observed string
+	relay := &CacheRelay{Repository: store, Sink: sink, Observe: func(outcome string, _ time.Duration) { observed = outcome }}
+	if claimed, err := relay.RunOnce(t.Context()); err != nil || !claimed {
+		t.Fatalf("claimed=%v error=%v", claimed, err)
+	}
+	if observed != "retry" || !store.failed {
+		t.Fatalf("outcome=%s failed=%v", observed, store.failed)
+	}
+}

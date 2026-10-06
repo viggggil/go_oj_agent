@@ -15,6 +15,7 @@ import (
 // requires Redis connectivity and cannot stop authoritative result processing.
 type CacheRelayServer struct {
 	enabled bool
+	repo    *data.Repository
 	relay   *biz.CacheRelay
 	mu      sync.Mutex
 	cancel  context.CancelFunc
@@ -22,7 +23,7 @@ type CacheRelayServer struct {
 }
 
 func NewCacheRelayServer(repo *data.Repository, cache *data.LeaderboardRedis) *CacheRelayServer {
-	return &CacheRelayServer{enabled: cache.Enabled(), relay: &biz.CacheRelay{Repository: repo, Sink: cache}}
+	return &CacheRelayServer{enabled: cache.Enabled(), repo: repo, relay: &biz.CacheRelay{Repository: repo, Sink: cache, Observe: data.RecordCacheRelayOutcome}}
 }
 func (s *CacheRelayServer) Start(ctx context.Context) error {
 	if !s.enabled {
@@ -41,6 +42,7 @@ func (s *CacheRelayServer) Start(ctx context.Context) error {
 	s.mu.Unlock()
 	defer close(done)
 	defer cancel()
+	nextObserve := time.Time{}
 	for {
 		// Limit outage/cold-cache work per polling round. Claim only one event at a
 		// time, so leases cannot expire while queued behind slow Redis requests.
@@ -59,6 +61,12 @@ func (s *CacheRelayServer) Start(ctx context.Context) error {
 			if !claimed {
 				break
 			}
+		}
+		if s.repo != nil && !time.Now().Before(nextObserve) {
+			nextObserve = time.Now().Add(15 * time.Second)
+			observeCtx, observeCancel := context.WithTimeout(ctx, time.Second)
+			s.repo.ObserveCacheOutbox(observeCtx)
+			observeCancel()
 		}
 		timer := time.NewTimer(time.Second)
 		select {
