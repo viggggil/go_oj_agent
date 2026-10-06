@@ -215,7 +215,11 @@ func (uc *SubmissionUsecase) Create(ctx context.Context, input CreateSubmissionI
 	if err := ValidateIdempotency(idempotency, OperationCreateSubmission, now); err != nil {
 		return CreateSubmissionResult{}, err
 	}
-	if result, found, err := uc.findCreateReplay(ctx, idempotency); err != nil || found {
+	legacyHash := ""
+	if input.ContestID > 0 {
+		legacyHash = createRequestHash(input.ProblemID, language, input.SourceCode)
+	}
+	if result, found, err := uc.findCreateReplay(ctx, idempotency, legacyHash); err != nil || found {
 		return result, err
 	}
 	profile, err := uc.problems.GetJudgeProfile(ctx, input.ProblemID)
@@ -395,12 +399,12 @@ func (uc *SubmissionUsecase) Rejudge(ctx context.Context, input RejudgeSubmissio
 	})
 }
 
-func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest) (CreateSubmissionResult, bool, error) {
+func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request IdempotencyRequest, legacyHash string) (CreateSubmissionResult, bool, error) {
 	record, found, err := uc.repository.FindIdempotency(ctx, request.ActorID, request.Operation, request.Key)
 	if err != nil || !found {
 		return CreateSubmissionResult{}, false, err
 	}
-	if record.RequestHash != request.RequestHash {
+	if record.RequestHash != request.RequestHash && (legacyHash == "" || record.RequestHash != legacyHash) {
 		return CreateSubmissionResult{}, true, ErrorIdempotencyConflict()
 	}
 	if len(record.Response) == 0 {
