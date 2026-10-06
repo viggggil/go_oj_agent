@@ -28,12 +28,18 @@ class DatabaseProbe:
             self._engine = create_async_engine(
                 settings.database_url.get_secret_value(),
                 echo=False,
+                hide_parameters=True,
                 pool_size=2,
                 max_overflow=0,
                 pool_timeout=self._timeout,
                 pool_pre_ping=True,
                 connect_args={"connect_timeout": math.ceil(self._timeout)},
             )
+
+    @property
+    def engine(self) -> AsyncEngine | None:
+        """复用 lifespan 管理的连接池，存储仓库不会再建立第二个池。"""
+        return self._engine
 
     async def check(self) -> DatabaseStatus:
         if self._engine is None:

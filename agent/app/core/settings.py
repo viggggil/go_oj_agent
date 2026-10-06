@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     readiness_timeout_seconds: float = Field(default=2, gt=0, le=30)
     shutdown_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    runtime_mode: Literal["disabled", "fake", "langgraph_fake"] = "disabled"
+    max_run_seconds: float = Field(default=30, gt=0, le=300)
+    max_output_chars: int = Field(default=8_000, ge=1, le=32_000)
+    max_run_events: int = Field(default=1_000, ge=3, le=10_000)
 
     @field_validator("host", mode="before")
     @classmethod
@@ -67,6 +71,8 @@ class Settings(BaseSettings):
     def validate_production(self) -> "Settings":
         if self.environment == "production" and self.database_url is None:
             raise ValueError("Production requires a database URL")
+        if self.environment == "production" and self.runtime_mode != "disabled":
+            raise ValueError("Production cannot use a demo runtime")
         return self
 
 

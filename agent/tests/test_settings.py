@@ -40,6 +40,10 @@ def test_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path:
         ("AGENT_READINESS_TIMEOUT_SECONDS", "31"),
         ("AGENT_READINESS_TIMEOUT_SECONDS", "nan"),
         ("AGENT_SHUTDOWN_TIMEOUT_SECONDS", "0"),
+        ("AGENT_RUNTIME_MODE", "real_model"),
+        ("AGENT_MAX_RUN_SECONDS", "0"),
+        ("AGENT_MAX_OUTPUT_CHARS", "32001"),
+        ("AGENT_MAX_RUN_EVENTS", "2"),
     ],
 )
 def test_invalid_settings_fail_before_startup(
