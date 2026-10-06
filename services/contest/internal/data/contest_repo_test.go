@@ -16,13 +16,21 @@ func TestRepositoryJoinIsIdempotent(t *testing.T) {
 	defer db.Close()
 
 	joinedAt := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	startAt := time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)
+	endAt := startAt.Add(time.Hour)
 	for range 2 {
+		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT start_at,end_at,status FROM contests WHERE id=\\? FOR UPDATE").
+			WithArgs(int64(20)).
+			WillReturnRows(sqlmock.NewRows([]string{"start_at", "end_at", "status"}).AddRow(startAt, endAt, "draft"))
+		mock.ExpectQuery("SELECT UTC_TIMESTAMP").WillReturnRows(sqlmock.NewRows([]string{"now"}).AddRow(time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)))
 		mock.ExpectExec("INSERT IGNORE INTO contest_participants").
 			WithArgs(int64(20), int64(42)).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectQuery("SELECT joined_at FROM contest_participants").
 			WithArgs(int64(20), int64(42)).
 			WillReturnRows(sqlmock.NewRows([]string{"joined_at"}).AddRow(joinedAt))
+		mock.ExpectCommit()
 	}
 
 	repository := NewRepository(db)

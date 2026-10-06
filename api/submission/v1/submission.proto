@@ -102,6 +102,9 @@ message CreateSubmissionRequest {
   // Set only by the trusted contest-service caller. Public ordinary
   // submission endpoints must leave this unset.
   int64 contest_id = 6 [(validate.rules).int64.gte = 0];
+  // 由可信比赛调用方填写；Judge 在最终插入语句中校验接收边界。
+  google.protobuf.Timestamp contest_start_at = 7;
+  google.protobuf.Timestamp contest_end_at = 8;
 }
 
 message CreateSubmissionResponse {

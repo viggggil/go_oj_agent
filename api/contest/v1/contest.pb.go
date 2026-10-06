@@ -689,13 +689,16 @@ func (x *GetContestReply) GetContest() *Contest {
 // ContestUpdate is intentionally a complete replacement, not a patch. The
 // service rejects updates once the contest has started.
 type ContestUpdate struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
-	StartAt       *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=start_at,json=startAt,proto3" json:"start_at,omitempty"`
-	EndAt         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=end_at,json=endAt,proto3" json:"end_at,omitempty"`
-	Problems      []*ContestProblem      `protobuf:"bytes,4,rep,name=problems,proto3" json:"problems,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Title    string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	StartAt  *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=start_at,json=startAt,proto3" json:"start_at,omitempty"`
+	EndAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=end_at,json=endAt,proto3" json:"end_at,omitempty"`
+	Problems []*ContestProblem      `protobuf:"bytes,4,rep,name=problems,proto3" json:"problems,omitempty"`
+	// Required for updates. It is the updated_at value returned by GetContest;
+	// the server rejects a stale value instead of silently overwriting another edit.
+	ExpectedUpdatedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expected_updated_at,json=expectedUpdatedAt,proto3" json:"expected_updated_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ContestUpdate) Reset() {
@@ -752,6 +755,13 @@ func (x *ContestUpdate) GetEndAt() *timestamppb.Timestamp {
 func (x *ContestUpdate) GetProblems() []*ContestProblem {
 	if x != nil {
 		return x.Problems
+	}
+	return nil
+}
+
+func (x *ContestUpdate) GetExpectedUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpectedUpdatedAt
 	}
 	return nil
 }
@@ -1438,14 +1448,15 @@ const file_api_contest_v1_contest_proto_rawDesc = "" +
 	"\n" +
 	"contest_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tcontestId\"@\n" +
 	"\x0fGetContestReply\x12-\n" +
-	"\acontest\x18\x01 \x01(\v2\x13.contest.v1.ContestR\acontest\"\xf3\x01\n" +
+	"\acontest\x18\x01 \x01(\v2\x13.contest.v1.ContestR\acontest\"\xbf\x02\n" +
 	"\rContestUpdate\x12 \n" +
 	"\x05title\x18\x01 \x01(\tB\n" +
 	"\xfaB\ar\x05\x10\x01\x18\xff\x01R\x05title\x12?\n" +
 	"\bstart_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02\b\x01R\astartAt\x12;\n" +
 	"\x06end_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02\b\x01R\x05endAt\x12B\n" +
 	"\bproblems\x18\x04 \x03(\v2\x1a.contest.v1.ContestProblemB\n" +
-	"\xfaB\a\x92\x01\x04\b\x01\x10dR\bproblems\"}\n" +
+	"\xfaB\a\x92\x01\x04\b\x01\x10dR\bproblems\x12J\n" +
+	"\x13expected_updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x11expectedUpdatedAt\"}\n" +
 	"\x14UpdateContestRequest\x12&\n" +
 	"\n" +
 	"contest_id\x18\x01 \x01(\x03B\a\xfaB\x04\"\x02 \x00R\tcontestId\x12=\n" +
@@ -1568,39 +1579,40 @@ var file_api_contest_v1_contest_proto_depIdxs = []int32{
 	23, // 14: contest.v1.ContestUpdate.start_at:type_name -> google.protobuf.Timestamp
 	23, // 15: contest.v1.ContestUpdate.end_at:type_name -> google.protobuf.Timestamp
 	1,  // 16: contest.v1.ContestUpdate.problems:type_name -> contest.v1.ContestProblem
-	10, // 17: contest.v1.UpdateContestRequest.contest:type_name -> contest.v1.ContestUpdate
-	2,  // 18: contest.v1.UpdateContestReply.contest:type_name -> contest.v1.Contest
-	2,  // 19: contest.v1.ArchiveContestReply.contest:type_name -> contest.v1.Contest
-	24, // 20: contest.v1.ListContestsRequest.page:type_name -> common.v1.PageRequest
-	0,  // 21: contest.v1.ListContestsRequest.status:type_name -> contest.v1.ContestStatus
-	3,  // 22: contest.v1.ListContestsReply.items:type_name -> contest.v1.ContestSummary
-	25, // 23: contest.v1.ListContestsReply.page:type_name -> common.v1.PageResponse
-	24, // 24: contest.v1.GetLeaderboardRequest.page:type_name -> common.v1.PageRequest
-	6,  // 25: contest.v1.GetLeaderboardReply.items:type_name -> contest.v1.LeaderboardEntry
-	25, // 26: contest.v1.GetLeaderboardReply.page:type_name -> common.v1.PageResponse
-	23, // 27: contest.v1.JoinContestReply.joined_at:type_name -> google.protobuf.Timestamp
-	26, // 28: contest.v1.CreateContestSubmissionReply.status:type_name -> submission.v1.SubmissionStatus
-	4,  // 29: contest.v1.ContestService.CreateContest:input_type -> contest.v1.CreateContestRequest
-	8,  // 30: contest.v1.ContestService.GetContest:input_type -> contest.v1.GetContestRequest
-	15, // 31: contest.v1.ContestService.ListContests:input_type -> contest.v1.ListContestsRequest
-	11, // 32: contest.v1.ContestService.UpdateContest:input_type -> contest.v1.UpdateContestRequest
-	13, // 33: contest.v1.ContestService.ArchiveContest:input_type -> contest.v1.ArchiveContestRequest
-	17, // 34: contest.v1.ContestService.GetLeaderboard:input_type -> contest.v1.GetLeaderboardRequest
-	19, // 35: contest.v1.ContestService.JoinContest:input_type -> contest.v1.JoinContestRequest
-	21, // 36: contest.v1.ContestService.CreateContestSubmission:input_type -> contest.v1.CreateContestSubmissionRequest
-	5,  // 37: contest.v1.ContestService.CreateContest:output_type -> contest.v1.CreateContestReply
-	9,  // 38: contest.v1.ContestService.GetContest:output_type -> contest.v1.GetContestReply
-	16, // 39: contest.v1.ContestService.ListContests:output_type -> contest.v1.ListContestsReply
-	12, // 40: contest.v1.ContestService.UpdateContest:output_type -> contest.v1.UpdateContestReply
-	14, // 41: contest.v1.ContestService.ArchiveContest:output_type -> contest.v1.ArchiveContestReply
-	18, // 42: contest.v1.ContestService.GetLeaderboard:output_type -> contest.v1.GetLeaderboardReply
-	20, // 43: contest.v1.ContestService.JoinContest:output_type -> contest.v1.JoinContestReply
-	22, // 44: contest.v1.ContestService.CreateContestSubmission:output_type -> contest.v1.CreateContestSubmissionReply
-	37, // [37:45] is the sub-list for method output_type
-	29, // [29:37] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	23, // 17: contest.v1.ContestUpdate.expected_updated_at:type_name -> google.protobuf.Timestamp
+	10, // 18: contest.v1.UpdateContestRequest.contest:type_name -> contest.v1.ContestUpdate
+	2,  // 19: contest.v1.UpdateContestReply.contest:type_name -> contest.v1.Contest
+	2,  // 20: contest.v1.ArchiveContestReply.contest:type_name -> contest.v1.Contest
+	24, // 21: contest.v1.ListContestsRequest.page:type_name -> common.v1.PageRequest
+	0,  // 22: contest.v1.ListContestsRequest.status:type_name -> contest.v1.ContestStatus
+	3,  // 23: contest.v1.ListContestsReply.items:type_name -> contest.v1.ContestSummary
+	25, // 24: contest.v1.ListContestsReply.page:type_name -> common.v1.PageResponse
+	24, // 25: contest.v1.GetLeaderboardRequest.page:type_name -> common.v1.PageRequest
+	6,  // 26: contest.v1.GetLeaderboardReply.items:type_name -> contest.v1.LeaderboardEntry
+	25, // 27: contest.v1.GetLeaderboardReply.page:type_name -> common.v1.PageResponse
+	23, // 28: contest.v1.JoinContestReply.joined_at:type_name -> google.protobuf.Timestamp
+	26, // 29: contest.v1.CreateContestSubmissionReply.status:type_name -> submission.v1.SubmissionStatus
+	4,  // 30: contest.v1.ContestService.CreateContest:input_type -> contest.v1.CreateContestRequest
+	8,  // 31: contest.v1.ContestService.GetContest:input_type -> contest.v1.GetContestRequest
+	15, // 32: contest.v1.ContestService.ListContests:input_type -> contest.v1.ListContestsRequest
+	11, // 33: contest.v1.ContestService.UpdateContest:input_type -> contest.v1.UpdateContestRequest
+	13, // 34: contest.v1.ContestService.ArchiveContest:input_type -> contest.v1.ArchiveContestRequest
+	17, // 35: contest.v1.ContestService.GetLeaderboard:input_type -> contest.v1.GetLeaderboardRequest
+	19, // 36: contest.v1.ContestService.JoinContest:input_type -> contest.v1.JoinContestRequest
+	21, // 37: contest.v1.ContestService.CreateContestSubmission:input_type -> contest.v1.CreateContestSubmissionRequest
+	5,  // 38: contest.v1.ContestService.CreateContest:output_type -> contest.v1.CreateContestReply
+	9,  // 39: contest.v1.ContestService.GetContest:output_type -> contest.v1.GetContestReply
+	16, // 40: contest.v1.ContestService.ListContests:output_type -> contest.v1.ListContestsReply
+	12, // 41: contest.v1.ContestService.UpdateContest:output_type -> contest.v1.UpdateContestReply
+	14, // 42: contest.v1.ContestService.ArchiveContest:output_type -> contest.v1.ArchiveContestReply
+	18, // 43: contest.v1.ContestService.GetLeaderboard:output_type -> contest.v1.GetLeaderboardReply
+	20, // 44: contest.v1.ContestService.JoinContest:output_type -> contest.v1.JoinContestReply
+	22, // 45: contest.v1.ContestService.CreateContestSubmission:output_type -> contest.v1.CreateContestSubmissionReply
+	38, // [38:46] is the sub-list for method output_type
+	30, // [30:38] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_api_contest_v1_contest_proto_init() }

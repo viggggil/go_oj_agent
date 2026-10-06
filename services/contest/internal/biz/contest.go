@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const RoleAdmin = "admin"
@@ -39,11 +40,28 @@ type ContestRepository interface {
 	Archive(context.Context, int64) (Contest, error)
 }
 
+// 生产 Repository 提供数据库 UTC 时钟；纯业务测试可继续注入 now。
+type ContestClock interface {
+	CurrentTime(context.Context) (time.Time, error)
+}
+
+func (u *ContestUsecase) currentTime(ctx context.Context) (time.Time, error) {
+	if clock, ok := u.repo.(ContestClock); ok {
+		return clock.CurrentTime(ctx)
+	}
+	return u.now().UTC(), nil
+}
+
 type ContestSubmissionRepository interface {
 	ContestRepository
 	IsParticipant(context.Context, int64, int64) (bool, error)
 	HasProblem(context.Context, int64, int64) (bool, error)
 	Join(context.Context, int64, int64) (time.Time, error)
+}
+
+// 比赛提交预校验必须在共享比赛锁内完成，防止跨开始边界的配置事务交错。
+type ContestSubmissionAuthorizer interface {
+	AuthorizeSubmission(context.Context, int64, int64, int64) (Contest, error)
 }
 
 type SubmissionCreator interface {
@@ -82,32 +100,47 @@ func (u *ContestUsecase) CreateSubmission(ctx context.Context, actor *commonv1.R
 	if input == nil || input.GetContestId() <= 0 || input.GetProblemId() <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid contest submission")
 	}
-	contest, err := u.repo.Get(ctx, input.GetContestId())
+	contest, err := u.authorizeSubmission(ctx, checker, input.GetContestId(), actor.GetUserId(), input.GetProblemId())
 	if err != nil {
 		return nil, err
-	}
-	now := u.now()
-	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
-		return nil, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
-	}
-	participant, err := checker.IsParticipant(ctx, input.GetContestId(), actor.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	if !participant {
-		return nil, status.Error(codes.PermissionDenied, "user is not a contest participant")
-	}
-	problem, err := checker.HasProblem(ctx, input.GetContestId(), input.GetProblemId())
-	if err != nil {
-		return nil, err
-	}
-	if !problem {
-		return nil, status.Error(codes.InvalidArgument, "problem does not belong to contest")
 	}
 	return u.submission.CreateSubmission(ctx, &submissionv1.CreateSubmissionRequest{
 		ProblemId: input.GetProblemId(), ContestId: input.GetContestId(), Language: input.GetLanguage(),
 		SourceCode: input.GetSourceCode(), IdempotencyKey: input.GetIdempotencyKey(),
+		ContestStartAt: timestamppb.New(contest.StartAt), ContestEndAt: timestamppb.New(contest.EndAt),
 	})
+}
+
+func (u *ContestUsecase) authorizeSubmission(ctx context.Context, checker ContestSubmissionRepository, contestID, userID, problemID int64) (Contest, error) {
+	if authorizer, ok := checker.(ContestSubmissionAuthorizer); ok {
+		return authorizer.AuthorizeSubmission(ctx, contestID, userID, problemID)
+	}
+	contest, err := u.repo.Get(ctx, contestID)
+	if err != nil {
+		return Contest{}, err
+	}
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
+		return Contest{}, status.Error(codes.FailedPrecondition, "contest is not accepting submissions")
+	}
+	participant, err := checker.IsParticipant(ctx, contestID, userID)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !participant {
+		return Contest{}, status.Error(codes.PermissionDenied, "user is not a contest participant")
+	}
+	problem, err := checker.HasProblem(ctx, contestID, problemID)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !problem {
+		return Contest{}, status.Error(codes.InvalidArgument, "problem does not belong to contest")
+	}
+	return contest, nil
 }
 
 func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContext, contestID int64) (time.Time, error) {
@@ -124,11 +157,16 @@ func (u *ContestUsecase) Join(ctx context.Context, actor *commonv1.RequestContex
 	if contestID <= 0 {
 		return time.Time{}, status.Error(codes.InvalidArgument, "invalid contest id")
 	}
+	// Keep a fast user-facing check; the repository repeats it under the
+	// contest row lock so this read cannot create a race.
 	contest, err := u.repo.Get(ctx, contestID)
 	if err != nil {
 		return time.Time{}, err
 	}
-	now := u.now()
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
 	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED || !now.Before(contest.StartAt) || !now.Before(contest.EndAt) || lifecycle(contest.StartAt, contest.EndAt, contest.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return time.Time{}, status.Error(codes.FailedPrecondition, "contest is not accepting registrations")
 	}
@@ -146,7 +184,11 @@ func (u *ContestUsecase) Create(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	if !start.After(u.now()) {
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if !start.After(now) {
 		return Contest{}, status.Error(codes.InvalidArgument, "contest start_at must be in the future")
 	}
 	return u.repo.Create(ctx, Contest{Title: strings.TrimSpace(input.GetTitle()), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT, StartAt: start, EndAt: end, CreatedBy: actor.GetUserId(), Problems: problems})
@@ -163,7 +205,11 @@ func (u *ContestUsecase) Get(ctx context.Context, actor *commonv1.RequestContext
 	if err != nil {
 		return Contest{}, err
 	}
-	contest.Status = lifecycle(contest.StartAt, contest.EndAt, contest.Status, u.now())
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	contest.Status = lifecycle(contest.StartAt, contest.EndAt, contest.Status, now)
 	if contest.Status == contestv1.ContestStatus_CONTEST_STATUS_ARCHIVED && !isAdmin(actor) {
 		return Contest{}, status.Error(codes.NotFound, "contest not found")
 	}
@@ -187,8 +233,12 @@ func (u *ContestUsecase) List(ctx context.Context, actor *commonv1.RequestContex
 	if err != nil {
 		return nil, 0, err
 	}
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
 	for i := range items {
-		items[i].Status = lifecycle(items[i].StartAt, items[i].EndAt, items[i].Status, u.now())
+		items[i].Status = lifecycle(items[i].StartAt, items[i].EndAt, items[i].Status, now)
 	}
 	return items, total, nil
 }
@@ -204,7 +254,11 @@ func (u *ContestUsecase) Update(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	current.Status = lifecycle(current.StartAt, current.EndAt, current.Status, u.now())
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	current.Status = lifecycle(current.StartAt, current.EndAt, current.Status, now)
 	if current.Status != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return Contest{}, status.Error(codes.FailedPrecondition, "only draft contests can be updated")
 	}
@@ -212,9 +266,16 @@ func (u *ContestUsecase) Update(ctx context.Context, actor *commonv1.RequestCont
 	if err != nil {
 		return Contest{}, err
 	}
-	if !start.After(u.now()) {
+	if !start.After(now) {
 		return Contest{}, status.Error(codes.InvalidArgument, "contest start_at must be in the future")
 	}
+	if input.GetExpectedUpdatedAt() == nil {
+		return Contest{}, status.Error(codes.InvalidArgument, "contest expected_updated_at is required")
+	}
+	if err := input.GetExpectedUpdatedAt().CheckValid(); err != nil {
+		return Contest{}, status.Error(codes.InvalidArgument, "invalid contest expected_updated_at")
+	}
+	current.UpdatedAt = input.GetExpectedUpdatedAt().AsTime().UTC()
 	current.Title, current.StartAt, current.EndAt, current.Problems = strings.TrimSpace(input.GetTitle()), start, end, problems
 	return u.repo.Update(ctx, current)
 }
@@ -226,11 +287,17 @@ func (u *ContestUsecase) Archive(ctx context.Context, actor *commonv1.RequestCon
 	if err := requireAdmin(actor); err != nil {
 		return Contest{}, err
 	}
+	// The repository performs the authoritative check while holding the row
+	// lock; this read only preserves the existing fast validation semantics.
 	current, err := u.repo.Get(ctx, id)
 	if err != nil {
 		return Contest{}, err
 	}
-	if lifecycle(current.StartAt, current.EndAt, current.Status, u.now()) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
+	now, err := u.currentTime(ctx)
+	if err != nil {
+		return Contest{}, err
+	}
+	if lifecycle(current.StartAt, current.EndAt, current.Status, now) != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		return Contest{}, status.Error(codes.FailedPrecondition, "only draft contests can be archived")
 	}
 	return u.repo.Archive(ctx, id)
@@ -240,7 +307,8 @@ func normalizeUpdate(input *contestv1.ContestUpdate) (time.Time, time.Time, []Co
 	if input == nil || strings.TrimSpace(input.GetTitle()) == "" || input.GetStartAt() == nil || input.GetEndAt() == nil {
 		return time.Time{}, time.Time{}, nil, status.Error(codes.InvalidArgument, "complete contest fields are required")
 	}
-	start, end := input.GetStartAt().AsTime(), input.GetEndAt().AsTime()
+	// Contest 的存储精度为 DATETIME(3)，预校验必须使用相同精度。
+	start, end := input.GetStartAt().AsTime().UTC().Truncate(time.Millisecond), input.GetEndAt().AsTime().UTC().Truncate(time.Millisecond)
 	if !start.Before(end) {
 		return time.Time{}, time.Time{}, nil, status.Error(codes.InvalidArgument, "start_at must be before end_at")
 	}

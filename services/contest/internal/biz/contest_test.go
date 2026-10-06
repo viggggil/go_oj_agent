@@ -55,7 +55,9 @@ func TestCreateUpdateArchiveDraftContest(t *testing.T) {
 	if err != nil || created.ID != 1 || created.Status != contestv1.ContestStatus_CONTEST_STATUS_DRAFT {
 		t.Fatalf("create = %+v err=%v", created, err)
 	}
-	updated, err := uc.Update(context.Background(), admin(), created.ID, contestInput(time.Now().Add(2*time.Hour)))
+	updateInput := contestInput(time.Now().Add(2 * time.Hour))
+	updateInput.ExpectedUpdatedAt = timestamppb.New(created.UpdatedAt)
+	updated, err := uc.Update(context.Background(), admin(), created.ID, updateInput)
 	if err != nil || updated.Title != "Spring Contest" {
 		t.Fatalf("update = %+v err=%v", updated, err)
 	}
@@ -68,14 +70,51 @@ func TestCreateUpdateArchiveDraftContest(t *testing.T) {
 func TestContestUpdateRejectsStartedContestAndDuplicateProblems(t *testing.T) {
 	repo := &fakeContestRepo{contest: Contest{ID: 1, StartAt: time.Now().Add(-time.Minute), EndAt: time.Now().Add(time.Hour), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT}}
 	uc := NewContestUsecaseWithRepository(repo)
-	if _, err := uc.Update(context.Background(), admin(), 1, contestInput(time.Now().Add(time.Hour))); status.Code(err) != codes.FailedPrecondition {
+	startedInput := contestInput(time.Now().Add(time.Hour))
+	startedInput.ExpectedUpdatedAt = timestamppb.New(repo.contest.UpdatedAt)
+	if _, err := uc.Update(context.Background(), admin(), 1, startedInput); status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("started update code=%v", status.Code(err))
 	}
 	repo.contest.StartAt = time.Now().Add(time.Hour)
 	repo.contest.EndAt = time.Now().Add(2 * time.Hour)
 	input := contestInput(time.Now().Add(time.Hour))
+	input.ExpectedUpdatedAt = timestamppb.New(repo.contest.UpdatedAt)
 	input.Problems = append(input.Problems, input.Problems[0])
 	if _, err := uc.Update(context.Background(), admin(), 1, input); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("duplicate update code=%v", status.Code(err))
+	}
+}
+
+type clockedContestRepo struct {
+	*fakeContestRepo
+	databaseTime time.Time
+}
+
+func (r *clockedContestRepo) CurrentTime(context.Context) (time.Time, error) {
+	return r.databaseTime, nil
+}
+
+func TestContestLifecycleUsesRepositoryClockDespiteHostSkew(t *testing.T) {
+	at := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	repo := &clockedContestRepo{fakeContestRepo: &fakeContestRepo{contest: Contest{ID: 1, StartAt: at, EndAt: at.Add(time.Hour), Status: contestv1.ContestStatus_CONTEST_STATUS_DRAFT}}, databaseTime: at}
+	uc := NewContestUsecaseWithRepository(repo)
+	uc.now = func() time.Time { return at.Add(24 * time.Hour) }
+	c, err := uc.Get(t.Context(), admin(), 1)
+	if err != nil || c.Status != contestv1.ContestStatus_CONTEST_STATUS_RUNNING {
+		t.Fatalf("database start boundary status=%v err=%v", c.Status, err)
+	}
+	repo.databaseTime = at.Add(time.Hour)
+	c, err = uc.Get(t.Context(), admin(), 1)
+	if err != nil || c.Status != contestv1.ContestStatus_CONTEST_STATUS_ENDED {
+		t.Fatalf("database end boundary status=%v err=%v", c.Status, err)
+	}
+}
+
+func TestContestIntervalRejectsPrecisionCollapse(t *testing.T) {
+	at := time.Date(2026, 10, 5, 1, 0, 0, 123000000, time.UTC)
+	input := contestInput(at)
+	input.EndAt = timestamppb.New(at.Add(time.Microsecond))
+	if _, _, _, err := normalizeUpdate(input); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("collapsed interval error=%v", err)
 	}
 }

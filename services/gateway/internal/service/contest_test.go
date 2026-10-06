@@ -57,12 +57,12 @@ func TestGatewayContestUpdateUsesPathIDAndMapsLeaderboard(t *testing.T) {
 	start := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
 	update, err := service.UpdateContest(gatewayContestContext(), &gatewayv1.UpdateContestRequest{ContestId: 20, Contest: &contestv1.ContestUpdate{
 		Title: "Updated", StartAt: timestamppb.New(start), EndAt: timestamppb.New(start.Add(time.Hour)),
-		Problems: []*contestv1.ContestProblem{{ProblemId: 7, SortOrder: 1}},
+		Problems: []*contestv1.ContestProblem{{ProblemId: 7, SortOrder: 1}}, ExpectedUpdatedAt: timestamppb.New(start.Add(-time.Hour)),
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.updateRequest.GetContestId() != 20 || update.GetContest().GetTitle() != "Updated" {
+	if !client.updateRequest.GetContest().GetExpectedUpdatedAt().AsTime().Equal(start.Add(-time.Hour)) || client.updateRequest.GetContestId() != 20 || update.GetContest().GetTitle() != "Updated" {
 		t.Fatalf("request=%+v response=%+v", client.updateRequest, update)
 	}
 	leaderboard, err := service.GetContestLeaderboard(gatewayContestContext(), &gatewayv1.GetContestLeaderboardRequest{ContestId: 20, Page: 1, PageSize: 20})

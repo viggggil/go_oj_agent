@@ -83,7 +83,7 @@ func TestSubmissionUsecaseCreate(t *testing.T) {
 	uc.newEventID = func() string { return "123e4567-e89b-12d3-a456-426614174001" }
 
 	result, err := uc.Create(context.Background(), CreateSubmissionInput{
-		Actor: Actor{ID: 5, Roles: []string{"user"}}, ProblemID: 7, ContestID: 20, Language: " Go ",
+		Actor: Actor{ID: 5, Roles: []string{"user"}}, ProblemID: 7, ContestID: 20, ContestStartAt: now.Add(-time.Hour), ContestEndAt: now.Add(time.Hour), Language: " Go ",
 		SourceCode: []byte("package main\n"), IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
 	})
 	if err != nil || result.SubmissionID != 41 {
@@ -128,6 +128,27 @@ func TestSubmissionUsecaseCreateIdempotencyShortCircuitsDependencies(t *testing.
 	repository.record.RequestHash = strings.Repeat("f", 64)
 	if _, err = uc.Create(context.Background(), input); !HasReason(err, ReasonIdempotencyConflict) {
 		t.Fatalf("Create() conflict error = %v", err)
+	}
+}
+
+func TestSubmissionUsecaseCreateReplaysLegacyContestHash(t *testing.T) {
+	now := time.Date(2026, 9, 20, 1, 2, 3, 0, time.UTC)
+	input := CreateSubmissionInput{
+		Actor: Actor{ID: 5}, ProblemID: 7, ContestID: 20,
+		ContestStartAt: now.Add(-time.Hour), ContestEndAt: now.Add(time.Hour),
+		Language: "go", SourceCode: []byte("package main\n"),
+		IdempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
+	}
+	response, _ := json.Marshal(CreateSubmissionResult{SubmissionID: 41, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED})
+	repository := &usecaseRepository{found: true, record: IdempotencyRecord{
+		IdempotencyRequest: IdempotencyRequest{RequestHash: createRequestHash(input.ProblemID, input.Language, input.SourceCode)},
+		Response:           response,
+	}}
+	uc := NewSubmissionUsecase(repository, &usecaseSourceStore{}, &usecaseProblemCatalog{})
+	uc.now = func() time.Time { return now }
+	result, err := uc.Create(context.Background(), input)
+	if err != nil || !result.Replayed || result.SubmissionID != 41 {
+		t.Fatalf("legacy contest replay = %+v, %v", result, err)
 	}
 }
 
