@@ -415,7 +415,7 @@ func (uc *SubmissionUsecase) findCreateReplay(ctx context.Context, request Idemp
 		return CreateSubmissionResult{}, true, ErrorInternal("stored idempotency response is invalid")
 	}
 	// 旧哈希没有比赛身份；必须从已落库提交核实，不能跨比赛重放。
-	if record.RequestHash != request.RequestHash {
+	if input.ContestID == 0 || record.RequestHash != request.RequestHash {
 		submission, err := uc.repository.FindByID(ctx, result.SubmissionID)
 		if err != nil {
 			return CreateSubmissionResult{}, true, err
