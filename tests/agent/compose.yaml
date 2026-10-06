@@ -1,0 +1,33 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: oj_agent
+      MYSQL_USER: agent
+      MYSQL_PASSWORD: agent-password
+      MYSQL_ROOT_PASSWORD: root-password
+    ports:
+      - "${AGENT_TEST_MYSQL_PORT}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  agent-service:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    environment:
+      AGENT_ENVIRONMENT: test
+      AGENT_HOST: 0.0.0.0
+      AGENT_PORT: 8000
+      AGENT_LOG_LEVEL: INFO
+      AGENT_DATABASE_URL: mysql+asyncmy://agent:agent-password@mysql:3306/oj_agent
+      AGENT_READINESS_TIMEOUT_SECONDS: 2
+      AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
+    ports:
+      - "${AGENT_TEST_HTTP_PORT}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy

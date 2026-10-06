@@ -18,7 +18,7 @@
 | Target Release | v1.0.0                                              |
 | Main Backend   | Go + Go-Kratos                                      |
 | AI Service     | Python + FastAPI + LangChain + LangGraph            |
-| Last Updated   | 2026-08-30                                          |
+| Last Updated   | 2026-10-06                                          |
 
 ### 1.1 Related Documents
 
@@ -1197,6 +1197,17 @@ GET /submissions/{id}
 # 9. Phase 4 — AI Coding Agent
 
 ## 9.1 Goal
+
+### PR1 状态（已实现服务骨架）
+
+Issue #142 的 PR1 已交付 Agent Service 的 Python/FastAPI 工程骨架、配置校验、结构化
+日志、liveness/readiness、生命周期资源释放、Docker 镜像、单元测试和独立 MySQL
+Compose 集成测试。该阶段不包含 Chat/SSE、会话与迁移、Tool Registry、RAG、Agent
+Runtime、管理员控制面、质量评估或真实模型 Provider；这些仍按下方阶段拆分实现。
+
+本阶段的 `/healthz` 与 `/readyz` 是内部部署契约，不能替代未来 Gateway 的 Agent Chat
+契约。接入真实模型前需要单独完成 Provider 配置、密钥管理、调用超时/重试、Token 预算、
+脱敏 Trace 和离线 Eval 基线，并在实现该 PR 前明确所需 API 凭据。
 
 Agent 必须真正使用 OJ 后端能力，而不是成为独立聊天机器人。
 

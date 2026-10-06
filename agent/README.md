@@ -1,6 +1,50 @@
 # Agent Service
 
+## 当前已实现：PR1 服务骨架
+
+当前分支只交付可独立启动、可健康检查和可部署的 FastAPI 服务骨架。它还没有 Agent Runtime、Chat/SSE、Tool、RAG、会话表或真实模型调用；启动服务不需要模型 API Key。后续功能会在独立 PR 中逐步接入，下面第 1 节起的内容是目标设计，不能视为当前已上线能力。
+
+本阶段提供两个健康端点：
+
+| Endpoint | 成功 | 未就绪 | 作用 |
+| --- | --- | --- | --- |
+| `GET /healthz` | `200 {"service":"agent-service","status":"ok"}` | 不依赖数据库 | liveness，进程仍能处理请求 |
+| `GET /readyz` | `200`，`checks.database=ready` | `503`，状态为 `not_configured` 或 `unavailable` | readiness，检查 Agent 自有 MySQL Schema |
+
+readiness 只执行 `SELECT 1`，不会建表，也不会访问 User、Problem、Submission 或 Contest 的数据库。数据库 URL 必须使用 `mysql+asyncmy` 且 Schema 必须是 `oj_agent`；生产环境必须配置该 URL。配置错误会在启动时以字段名报告，响应和 JSON 日志不会输出 DSN、密码或驱动异常文本。数据库不可用时 liveness 仍保持正常，服务退出时会在有界超时内释放连接池。
+
+本地开发：
+
+```bash
+cp agent/.env.example agent/.env
+make agent-init
+make agent-dev
+```
+
+没有数据库时可以访问 `http://127.0.0.1:8000/healthz`；`/readyz` 会返回 503，这是预期行为。常用检查命令为：
+
+```bash
+make agent-check       # ruff format 检查、ruff lint、mypy
+make agent-test-unit   # 不依赖外部服务的测试
+make agent-test-integration  # 独立 Docker Compose + MySQL + 容器健康检查
+```
+
+Docker 镜像的构建上下文是 `agent/`，运行用户为非 root 的 UID 10001，容器健康检查读取 `AGENT_PORT`（Compose 默认 8000）访问 `/healthz`。集成测试使用独立 Compose project、网络和数据卷，结束后自动清理，不复用开发环境。
+
+PR1 的代码和测试目录如下：
+
+```text
+agent/
+├── app/                 # 配置、结构化日志、数据库探针、健康路由、生命周期
+├── tests/               # 单元测试和真实 MySQL/容器集成测试
+├── Dockerfile
+├── pyproject.toml
+└── uv.lock
+```
+
 Agent Service 是面向编程学习场景的 Python 服务。它负责理解用户目标、选择受控 Tool、执行有限的 ReAct 或 Plan-and-Solve 流程、生成带证据的回答，并通过 SSE 向客户端返回进度。
+
+以下章节描述完整 Agent 的目标设计，随着后续 PR 实现逐项更新状态。
 
 提交诊断、算法解释、题目理解、分级 Hint、历史复盘、题目推荐和学习计划运行在同一个 Agent Runtime 上。它们通过 Skill 声明目标、可用 Tool、Prompt、输出结构和预算。Agent 不直接访问 User、Problem、Submission 或 Contest 数据库，所有业务数据都通过 Python gRPC Client 调用拥有数据的 Go Service，并由目标 Go Service 执行最终授权。
 
