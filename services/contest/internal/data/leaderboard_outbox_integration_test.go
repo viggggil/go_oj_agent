@@ -116,7 +116,9 @@ func TestMySQLLeaderboardOutbox(t *testing.T) {
 	token := uuid.NewString()
 	claimed, err := repo.ClaimCacheEvent(t.Context(), token, 30*time.Second)
 	if err != nil || claimed == nil {
-		t.Fatalf("claim=%v err=%v", claimed, err)
+		var pending, leased int
+		_ = db.QueryRow(`SELECT COUNT(*),COALESCE(SUM(lease_owner IS NOT NULL),0) FROM contest_cache_outbox WHERE status='pending'`).Scan(&pending, &leased)
+		t.Fatalf("claim=%v err=%v pending=%d leased=%d", claimed, err, pending, leased)
 	}
 	token2 := uuid.NewString()
 	other, err := repo.ClaimCacheEvent(t.Context(), token2, 30*time.Second)

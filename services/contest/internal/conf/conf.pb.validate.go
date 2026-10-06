@@ -657,6 +657,8 @@ func (m *ServerProto) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for MetricsAddress
+
 	if len(errors) > 0 {
 		return ServerProtoMultiError(errors)
 	}

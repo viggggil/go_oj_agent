@@ -77,6 +77,7 @@ func (r *Repository) CachedLeaderboard(ctx context.Context, contest biz.Contest,
 	if canRead {
 		items, total, err := c.cache.Read(ctx, contest, page, size)
 		if err == nil {
+			recordCacheHit()
 			return items, total, nil
 		}
 		if errors.Is(err, ErrCacheIncomplete) || errors.Is(err, ErrCacheStale) || errors.Is(err, ErrGenerationChanged) {
@@ -98,11 +99,13 @@ func (r *Repository) CachedLeaderboard(ctx context.Context, contest biz.Contest,
 			return nil, 0, ctx.Err()
 		}
 		if !errors.Is(err, ErrCacheIncomplete) && !errors.Is(err, ErrCacheStale) && !errors.Is(err, ErrGenerationChanged) {
+			recordCacheError()
 			c.mu.Lock()
 			c.cooldown = time.Now().Add(5 * time.Second)
 			c.mu.Unlock()
 		}
 	}
+	recordCacheMiss()
 	// Coalesce simultaneous page misses and briefly reuse immutable SQL pages.
 	// There is no actor in this key: biz checked authorization before reaching us.
 	key := fmt.Sprintf("%d/%d/%d/%s", contest.ID, page, size, contestSignature(contest))
@@ -127,6 +130,7 @@ func (r *Repository) CachedLeaderboard(ctx context.Context, contest biz.Contest,
 		case <-callCtx.Done():
 			return nil, callCtx.Err()
 		}
+		leaderboardSQLFallbacks.Add(1)
 		started := time.Now()
 		items, total, err := r.Leaderboard(callCtx, contest.ID, page, size)
 		if err != nil {

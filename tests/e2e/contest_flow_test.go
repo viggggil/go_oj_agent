@@ -136,10 +136,10 @@ func TestContestLeaderboardFlow(t *testing.T) {
 		newErr := contestDB.QueryRow(`SELECT COUNT(*) FROM contest_submission_results WHERE submission_id=? AND verdict='AC'`, rejudged.GetSubmission().GetId()).Scan(&replacementCount)
 		if oldErr == nil && newErr == nil && invalidated && replacementCount == 1 {
 			reply, err := client.GetLeaderboard(ctx, request)
-			if err != nil || len(reply.Items) != 1 || reply.Items[0].SolvedCount != 1 || reply.Items[0].PenaltySeconds != expected {
-				t.Fatalf("rejudged leaderboard=%v err=%v", reply, err)
+			// MySQL 提交后缓存 relay 仍可能在投递；等待榜单实际收敛。
+			if err == nil && len(reply.Items) == 1 && reply.Items[0].SolvedCount == 1 && reply.Items[0].PenaltySeconds == expected {
+				return
 			}
-			return
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

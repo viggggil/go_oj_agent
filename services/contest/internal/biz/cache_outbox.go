@@ -19,6 +19,7 @@ type CacheOutboxEvent struct {
 	Version   string
 	Payload   []byte
 	Retries   int
+	Age       time.Duration
 }
 type CacheOutboxRepository interface {
 	ClaimCacheEvent(context.Context, string, time.Duration) (*CacheOutboxEvent, error)
@@ -32,6 +33,7 @@ type LeaderboardSink interface {
 type CacheRelay struct {
 	Repository CacheOutboxRepository
 	Sink       LeaderboardSink
+	Observe    func(string, time.Duration)
 }
 
 // Claim only one event at a time. A fresh token fences expired workers even
@@ -40,13 +42,25 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 	if r.Repository == nil || r.Sink == nil {
 		return false, fmt.Errorf("cache relay dependencies are required")
 	}
+	outcome, age := "idle", time.Duration(0)
+	started := time.Now()
+	defer func() {
+		if r.Observe != nil {
+			r.Observe(outcome, age+time.Since(started))
+		}
+	}()
 	token := uuid.NewString()
 	event, err := r.Repository.ClaimCacheEvent(ctx, token, 30*time.Second)
 	if err != nil || event == nil {
+		if err != nil {
+			outcome = "error"
+		}
 		return false, err
 	}
+	age = event.Age
 	var snapshot LeaderboardSnapshot
 	if err := json.Unmarshal(event.Payload, &snapshot); err != nil || snapshot.Validate() != nil || snapshot.ContestID != event.ContestID || snapshot.UserID != event.UserID || snapshot.Version != event.Version {
+		outcome = "dead"
 		return true, r.Repository.FailCacheEvent(ctx, event.ID, token, 0, true, "invalid leaderboard snapshot")
 	}
 	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -68,7 +82,16 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 		if len(reason) > 255 {
 			reason = reason[:255]
 		}
+		outcome = "retry"
+		if dead {
+			outcome = "dead"
+		}
 		return true, r.Repository.FailCacheEvent(ctx, event.ID, token, delay, dead, reason)
 	}
-	return true, r.Repository.CompleteCacheEvent(ctx, event.ID, token)
+	err = r.Repository.CompleteCacheEvent(ctx, event.ID, token)
+	outcome = "applied"
+	if err != nil {
+		outcome = "confirm_error"
+	}
+	return true, err
 }

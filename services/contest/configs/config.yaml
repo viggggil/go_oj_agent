@@ -7,6 +7,7 @@ messaging:
   dead_letter_queue: contest.results.dlq
   prefetch: 16
 server:
+  metrics_address: "127.0.0.1:9105"
   grpc:
     address: ":9005"
     max_receive_message_bytes: 35651584
@@ -50,10 +51,8 @@ problem:
   subject: "contest-service"
   token_ttl: "30s"
 
-# Write relay only. Leave disabled until PR3 supplies safe cache initialization,
-# reads and rebuilding. Redis connectivity is never required at startup.
 leaderboard_cache:
-  enabled: false
+  enabled: true
   addresses: ["127.0.0.1:6379"]
   password: ""
   db: 0
