@@ -1002,6 +1002,39 @@ list_recent_submissions  -> ListSubmissions(page=1, bounded page_size)
 
 Authorization 必须由 Judge Service 执行，而不是 Agent 判断。
 
+### Agent PR4 只读 Tool 与内部身份
+
+PR4 在不改变外部 Chat/SSE 契约的前提下，增加 Agent Service 到 Problem/Judge Service
+的只读 gRPC Client。首批映射如下：
+
+```text
+get_problem            -> /problem.v1.ProblemService/GetProblem
+list_problems          -> /problem.v1.ProblemService/ListProblems
+get_submission         -> /submission.v1.SubmissionService/GetSubmission
+get_submission_source  -> /submission.v1.SubmissionService/GetSubmissionSource
+get_judge_result       -> /submission.v1.SubmissionService/GetJudgeResult
+list_submissions       -> /submission.v1.SubmissionService/ListSubmissions
+```
+
+Tool 按请求和已发布 allowlist 选择，不构成固定的提交预取链路。算法解释、通用知识问答
+和学习计划可以不调用这些 Tool。PR4 不开放 CreateSubmission、RejudgeSubmission、
+测试数据或 Judge Worker 内部 RPC。
+
+Agent 使用独立 RSA 私钥为每次调用签发短期 JWT。Token 的 `iss`、`aud`、`sub`、`actor_id`、
+`actor_roles`、`request_id`、`jti` 和 `rpc` 必须通过校验，其中 `rpc` 是实际 gRPC
+FullMethod。Problem/Judge 的 Agent caller 配置还必须提供只读 RPC allowlist；有效 Agent
+签名也不能调用 allowlist 之外的写方法。Agent 不挂载 Gateway 私钥，业务 owner 和角色
+授权仍由目标 Go Service 执行。
+
+服务配置中的 Agent caller 应设置 `require_method_allowlist: true`；该开关与 issuer、subject
+分离，因此身份名称轮换时仍会对缺少 allowlist 的配置 fail-closed。Gateway、Judge 等历史
+caller 可以保留空 allowlist 以兼容既有调用范围。
+
+Tool 结果拥有输入/输出 Schema、deadline、分页上限和响应体积上限。源码、题面和判题
+结果超过边界时返回明确的截断证据或稳定错误；依赖不可用、权限不足、资源不存在和
+超时映射为脱敏 Tool 错误。判题尚未完成时透传 queued/compiling/running 等实际状态，
+不推断不存在的 Verdict。取消沿 Python gRPC 调用传播，Agent 不自动重试这些读取。
+
 ---
 
 ## 4.4 ContestService

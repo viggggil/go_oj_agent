@@ -32,6 +32,17 @@ internal_auth:
   subject: "gateway-service"
   max_token_ttl: "60s"
   clock_skew: "5s"
+  additional_callers:
+    - public_key_file: "/run/auth-keys/agent-public.pem"
+      key_id: "agent-internal-2026-10"
+      issuer: "go-oj-agent"
+      subject: "agent-service"
+      require_method_allowlist: true
+      allowed_rpcs:
+        - "/submission.v1.SubmissionService/GetSubmission"
+        - "/submission.v1.SubmissionService/GetSubmissionSource"
+        - "/submission.v1.SubmissionService/GetJudgeResult"
+        - "/submission.v1.SubmissionService/ListSubmissions"
 clients:
   problem:
     endpoint: "problem-service:9002"

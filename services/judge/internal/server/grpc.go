@@ -26,10 +26,6 @@ func NewGRPCServer(
 	options := []kgrpc.ServerOption{kgrpc.Address(address)}
 	if config != nil {
 		if auth := config.GetInternalAuth(); auth != nil && auth.GetPublicKeyFile() != "" {
-			key, err := os.ReadFile(auth.GetPublicKeyFile())
-			if err != nil {
-				return nil, err
-			}
 			maxTTL, err := time.ParseDuration(auth.GetMaxTokenTtl())
 			if err != nil {
 				return nil, err
@@ -38,11 +34,28 @@ func NewGRPCServer(
 			if err != nil {
 				return nil, err
 			}
-			verifier, err := internalauth.NewVerifier(map[string][]byte{auth.GetKeyId(): key}, auth.GetIssuer(), auth.GetAudience(), auth.GetSubject(), maxTTL, skew, nil)
+			callers := append([]*conf.InternalCallerProto{{PublicKeyFile: auth.GetPublicKeyFile(), KeyId: auth.GetKeyId(), Issuer: auth.GetIssuer(), Subject: auth.GetSubject()}}, auth.GetAdditionalCallers()...)
+			verifiers := make([]internalauth.TokenVerifier, 0, len(callers))
+			for _, caller := range callers {
+				key, readErr := os.ReadFile(caller.GetPublicKeyFile())
+				if readErr != nil {
+					return nil, readErr
+				}
+				verifier, verifyErr := internalauth.NewVerifier(map[string][]byte{caller.GetKeyId(): key}, caller.GetIssuer(), auth.GetAudience(), caller.GetSubject(), maxTTL, skew, nil)
+				if verifyErr != nil {
+					return nil, verifyErr
+				}
+				restricted, verifyErr := internalauth.NewCallerMethodAllowlistVerifier(verifier, caller.GetRequireMethodAllowlist(), caller.GetAllowedRpcs())
+				if verifyErr != nil {
+					return nil, verifyErr
+				}
+				verifiers = append(verifiers, restricted)
+			}
+			verifierSet, err := internalauth.NewVerifierSet(verifiers...)
 			if err != nil {
 				return nil, err
 			}
-			options = append(options, kgrpc.Options(grpc.ChainUnaryInterceptor(internalauth.UnaryServerInterceptor(verifier))))
+			options = append(options, kgrpc.Options(grpc.ChainUnaryInterceptor(internalauth.UnaryServerInterceptor(verifierSet))))
 		}
 	}
 	if len(middlewares) > 0 {

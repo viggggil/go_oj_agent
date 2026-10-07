@@ -488,6 +488,8 @@ func (m *InternalCallerProto) validate(all bool) error {
 
 	// no validation rules for Subject
 
+	// no validation rules for RequireMethodAllowlist
+
 	if len(errors) > 0 {
 		return InternalCallerProtoMultiError(errors)
 	}

@@ -206,13 +206,15 @@ func (x *InternalAuthProto) GetAdditionalCallers() []*InternalCallerProto {
 }
 
 type InternalCallerProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PublicKeyFile string                 `protobuf:"bytes,1,opt,name=public_key_file,json=publicKeyFile,proto3" json:"public_key_file,omitempty"`
-	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
-	Issuer        string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
-	Subject       string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PublicKeyFile          string                 `protobuf:"bytes,1,opt,name=public_key_file,json=publicKeyFile,proto3" json:"public_key_file,omitempty"`
+	KeyId                  string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Issuer                 string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Subject                string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	AllowedRpcs            []string               `protobuf:"bytes,5,rep,name=allowed_rpcs,json=allowedRpcs,proto3" json:"allowed_rpcs,omitempty"`
+	RequireMethodAllowlist bool                   `protobuf:"varint,6,opt,name=require_method_allowlist,json=requireMethodAllowlist,proto3" json:"require_method_allowlist,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *InternalCallerProto) Reset() {
@@ -271,6 +273,20 @@ func (x *InternalCallerProto) GetSubject() string {
 		return x.Subject
 	}
 	return ""
+}
+
+func (x *InternalCallerProto) GetAllowedRpcs() []string {
+	if x != nil {
+		return x.AllowedRpcs
+	}
+	return nil
+}
+
+func (x *InternalCallerProto) GetRequireMethodAllowlist() bool {
+	if x != nil {
+		return x.RequireMethodAllowlist
+	}
+	return false
 }
 
 type ServiceProto struct {
@@ -758,12 +774,14 @@ const file_services_problem_internal_conf_conf_proto_rawDesc = "" +
 	"\rmax_token_ttl\x18\x06 \x01(\tR\vmaxTokenTtl\x12\x1d\n" +
 	"\n" +
 	"clock_skew\x18\a \x01(\tR\tclockSkew\x12P\n" +
-	"\x12additional_callers\x18\b \x03(\v2!.problem.conf.InternalCallerProtoR\x11additionalCallers\"\x86\x01\n" +
+	"\x12additional_callers\x18\b \x03(\v2!.problem.conf.InternalCallerProtoR\x11additionalCallers\"\xe3\x01\n" +
 	"\x13InternalCallerProto\x12&\n" +
 	"\x0fpublic_key_file\x18\x01 \x01(\tR\rpublicKeyFile\x12\x15\n" +
 	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
 	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12\x18\n" +
-	"\asubject\x18\x04 \x01(\tR\asubject\"\"\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x12!\n" +
+	"\fallowed_rpcs\x18\x05 \x03(\tR\vallowedRpcs\x128\n" +
+	"\x18require_method_allowlist\x18\x06 \x01(\bR\x16requireMethodAllowlist\"\"\n" +
 	"\fServiceProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\":\n" +
 	"\vServerProto\x12+\n" +

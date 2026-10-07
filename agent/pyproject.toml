@@ -8,10 +8,12 @@ dependencies = [
     "asyncmy>=0.2.10,<0.3",
     "cryptography>=43,<47",
     "fastapi>=0.115,<1",
+    "grpcio>=1.81.1,<2",
     "langgraph>=1.0,<2",
     "langsmith>=0.14,<1",
     "pydantic-settings>=2.8,<3",
     "pyjwt[crypto]>=2.10,<3",
+    "protobuf>=6.33.5,<7",
     "sqlalchemy>=2.0,<2.1",
     "uvicorn>=0.34,<1",
 ]
@@ -23,6 +25,7 @@ dev = [
     "pytest>=8.3,<10",
     "pytest-asyncio>=1.0,<2",
     "ruff>=0.11,<1",
+    "grpcio-tools>=1.81.1,<2",
 ]
 
 [build-system]
@@ -39,10 +42,18 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
+[tool.ruff.lint.per-file-ignores]
+"app/grpcgen/**/*.py" = ["E", "F", "I", "UP"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["app.grpcgen.*", "grpc.*", "google.protobuf.*"]
+ignore_errors = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

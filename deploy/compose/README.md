@@ -81,8 +81,11 @@ AGENT_ENABLED=true docker compose \
 也可以执行 `AGENT_ENABLED=true COMPOSE_PROFILES=agent make infra-up`，同时启用网关和
 可选服务。Agent 只在 Compose 网络内监听 `8000`，
 不映射宿主机端口；外部客户端始终通过 Gateway `8080` 访问 `POST /api/v1/agent/chat`。
-Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，Gateway 私钥留在 `auth-keys`，
-不会进入 Agent 容器。
+Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，以及单独复制出的
+`agent-auth-private` Agent 私钥卷；Gateway 私钥留在 `auth-keys`，不会进入 Agent 容器。
+PR4 的业务 Tool 默认关闭。设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 后，Agent 使用该
+独立私钥调用 Problem/Judge 的只读 gRPC RPC；目标服务通过 `agent-public.pem` 和 RPC
+allowlist 验证调用。Agent 不会直接挂载业务数据库。
 
 首次使用空 MySQL 数据卷时，Compose 会执行 Agent runtime migration 和本地开发账户
 bootstrap。已有数据卷不会重新执行 SQL；部署者应先应用
@@ -91,9 +94,9 @@ bootstrap。已有数据卷不会重新执行 SQL；部署者应先应用
 删除已有开发数据卷。`AGENT_DATABASE_URL` 可覆盖默认 DSN，但必须仍使用
 `mysql+asyncmy` 和 `oj_agent` Schema。
 
-PR3 的 Fake runtime 只用于开发和集成测试；生产环境禁止 `AGENT_RUNTIME_MODE=fake` 或
-`langgraph_fake`，真实模型 Provider、API Key、Tools、知识库和管理员控制面尚未在本 PR
-交付。停止可选服务时使用：
+PR3/PR4 的 Fake runtime 只用于开发和集成测试；生产环境禁止 `AGENT_RUNTIME_MODE=fake`
+或 `langgraph_fake`。PR4 的只读 Tools 不需要真实模型 API Key；真实模型 Provider、
+知识库和管理员控制面仍未交付。停止可选服务时使用：
 
 ```bash
 make infra-down

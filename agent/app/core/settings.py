@@ -42,6 +42,19 @@ class Settings(BaseSettings):
     preflight_timeout_seconds: float = Field(default=5, gt=0, le=30)
     sse_heartbeat_seconds: float = Field(default=5, gt=0, le=30)
     sse_write_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    agent_private_key_file: Path | None = None
+    agent_key_id: str = Field(default="agent-internal-2026-10", min_length=1, max_length=128)
+    agent_issuer: str = Field(default="go-oj-agent", min_length=1, max_length=128)
+    agent_subject: str = Field(default="agent-service", min_length=1, max_length=128)
+    agent_token_ttl_seconds: int = Field(default=30, ge=1, le=60)
+    problem_service_endpoint: str = Field(
+        default="problem-service:9002", min_length=1, max_length=255
+    )
+    judge_service_endpoint: str = Field(default="judge-service:9003", min_length=1, max_length=255)
+    tool_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    tool_max_page_size: int = Field(default=50, ge=1, le=100)
+    tool_max_result_bytes: int = Field(default=256_000, ge=1024, le=1_048_576)
+    business_tools_enabled: bool = False
 
     @field_validator("host", mode="before")
     @classmethod
@@ -78,6 +91,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
+        if self.business_tools_enabled and self.agent_private_key_file is None:
+            raise ValueError("Business tools require Agent service identity")
         if self.chat_enabled and (
             self.database_url is None
             or self.gateway_public_key_file is None

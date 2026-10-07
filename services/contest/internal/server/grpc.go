@@ -47,7 +47,11 @@ func NewGRPCServer(config *conf.Bootstrap, middlewares []middleware.Middleware, 
 				if verifyErr != nil {
 					return nil, verifyErr
 				}
-				verifiers = append(verifiers, verifier)
+				restricted, verifyErr := internalauth.NewCallerMethodAllowlistVerifier(verifier, caller.GetRequireMethodAllowlist(), caller.GetAllowedRpcs())
+				if verifyErr != nil {
+					return nil, verifyErr
+				}
+				verifiers = append(verifiers, restricted)
 			}
 			verifierSet, err := internalauth.NewVerifierSet(verifiers...)
 			if err != nil {
