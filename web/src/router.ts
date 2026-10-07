@@ -14,11 +14,12 @@ import Contests from './views/Contests.vue'
 import ContestDetail from './views/ContestDetail.vue'
 import ContestLeaderboard from './views/ContestLeaderboard.vue'
 import ContestEditor from './views/ContestEditor.vue'
+import Home from './views/Home.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/problems' },
+    { path: '/', component: Home },
     { path: '/login', component: Login },
     { path: '/register', component: Register },
     { path: '/profile', component: Profile, meta: { auth: true } },
