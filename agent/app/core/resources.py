@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING, cast
 
 from fastapi import Request
 
+from app.clients.business import BusinessClients
 from app.core.database import ReadinessProbe
 from app.core.settings import Settings
+from app.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
     from app.api.chat import ChatController
@@ -17,6 +19,8 @@ class AppResources:
     settings: Settings
     database: ReadinessProbe
     chat: "ChatController | None" = None
+    business_clients: BusinessClients | None = None
+    tools: ToolRegistry | None = None
 
 
 def get_resources(request: Request) -> AppResources:

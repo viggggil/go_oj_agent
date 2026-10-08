@@ -13,7 +13,7 @@ from pydantic import SecretStr, ValidationError
 from app.core.runtime_config import ConfigSnapshot, DemoConfigReader, RuntimeBudget
 from app.core.settings import Settings
 from app.graphs.langgraph_runtime import LangGraphRuntime
-from app.graphs.runtime import FakeModelClient, FakeRuntime
+from app.graphs.runtime import FakeModelClient, FakeRuntime, parse_demo_tool_request
 from app.graphs.service import RunService, RuntimeFailure
 from app.models.runtime import (
     AgentState,
@@ -60,6 +60,18 @@ def test_chat_rejects_identity_override_and_blank_message() -> None:
         with pytest.raises(ValidationError):
             ChatRequest.model_validate(value)
     assert ChatRequest(message="介绍算法").context.submission_id is None
+
+
+def test_demo_tool_parser_requires_explicit_json_object() -> None:
+    assert parse_demo_tool_request("介绍算法") is None
+    assert parse_demo_tool_request("/tool list_problems {broken") == (
+        "list_problems",
+        {"__invalid_json__": "{broken"},
+    )
+    assert parse_demo_tool_request("/tool list_problems []") == (
+        "list_problems",
+        {"__invalid_arguments__": []},
+    )
 
 
 def test_terminal_run_cannot_transition_again() -> None:

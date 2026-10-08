@@ -40,6 +40,16 @@ class DemoConfigReader:
                 max_output_chars=settings.max_output_chars,
                 max_events=settings.max_run_events,
             ),
+            allowed_tools=(
+                "get_problem",
+                "list_problems",
+                "get_submission",
+                "get_submission_source",
+                "get_judge_result",
+                "list_submissions",
+            )
+            if settings.business_tools_enabled
+            else (),
         )
 
     async def read(self) -> ConfigSnapshot:

@@ -100,3 +100,8 @@ def test_production_cannot_start_without_database(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("AGENT_ENVIRONMENT", "production")
     with pytest.raises(ConfigurationError):
         load_settings()
+
+
+def test_business_tools_cannot_start_without_agent_identity() -> None:
+    with pytest.raises(ValidationError):
+        Settings(business_tools_enabled=True)

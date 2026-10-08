@@ -226,6 +226,10 @@ class RunService:
             raise
         except Exception as exc:
             # 注入的 Runtime 即使误用内部异常类，也不能输出任意错误文本。
+            logger.warning(
+                "Agent runtime failed",
+                extra={"error_type": type(exc).__name__},
+            )
             code = (
                 exc.code
                 if isinstance(exc, RuntimeFailure) and exc.code in _PUBLIC_RUNTIME_ERROR_CODES

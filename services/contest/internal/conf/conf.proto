@@ -72,6 +72,8 @@ message InternalCallerProto {
   string key_id = 2;
   string issuer = 3;
   string subject = 4;
+  repeated string allowed_rpcs = 5;
+  bool require_method_allowlist = 6;
 }
 
 message ClientProto {

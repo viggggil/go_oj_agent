@@ -1,8 +1,8 @@
 # Agent Service
 
-## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE
+## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE、PR4 只读 Tools
 
-PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、业务 Tool、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
 
 本阶段提供两个健康端点：
 
@@ -25,6 +25,7 @@ make agent-dev
 
 ```bash
 make agent-check       # ruff format 检查、ruff lint、mypy
+make agent-proto       # 从 api/*.proto 可重复生成 Python gRPC bindings
 make agent-test-unit   # 不依赖外部服务的测试
 make agent-test-integration  # 独立 Docker Compose + MySQL + 容器健康检查
 ```
@@ -49,9 +50,25 @@ agent/
 是可注入协议，LangGraph 当前只运行 `thinking → response` 两个节点并调用 FakeModelClient；
 它没有实现 ReAct、计划执行或 Reflection。Fake 回答带明确的演示标识，不伪称算法答案。
 
-`ToolRegistry` 当前默认为空，支持重复名称检查和 JSON Schema 导出；`ToolExecutor` 检查
-Run allowlist、启用状态、角色、输入/输出 Schema 和有界超时，取消会传到 handler。写 Tool
-必须保持 disabled 且要求确认。这里没有真实 gRPC/RAG Tool，也没有管理员配置发布 API。
+`ToolRegistry` 支持重复名称检查和 JSON Schema 导出；`ToolExecutor` 检查 Run allowlist、
+启用状态、角色、输入/输出 Schema 和有界超时，取消会传到 handler。PR4 注册六个只读
+业务 Tool：`get_problem`、`list_problems`、`get_submission`、`get_submission_source`、
+`get_judge_result` 和 `list_submissions`。它们通过异步 Python gRPC Client 访问
+Problem/Judge Service，源码、题面和判题结果都有结果大小边界与证据元数据。写 Tool 必须
+保持 disabled 且要求确认；PR4 没有管理员配置发布 API。
+
+PR4 的 Agent 私钥只用于签发按 gRPC FullMethod 绑定的短期 JWT。Problem/Judge Service
+配置 Agent 公钥和 caller read allowlist；目标 Go Service 仍然执行 owner、角色和资源授权。
+Agent 不挂载 Gateway 私钥，Tool 参数也不能覆盖可信 Principal。没有配置
+`AGENT_BUSINESS_TOOLS_ENABLED=true` 时，服务不会初始化业务 Client；启用时必须配置
+`AGENT_AGENT_PRIVATE_KEY_FILE`，否则启动配置校验失败。Go caller 配置应将
+`require_method_allowlist: true` 与显式只读方法列表一起发布；轮换 issuer/subject 也不能
+绕过这一要求。Fake Runtime 目前不会自动伪造工具调用，工具可由测试或后续 Runtime 按
+allowlist 选择。
+
+开发环境可用显式 `/tool <name> <json-arguments>` 命令验证确定性 Tool 链路；自然语言消息
+不会隐式读取提交。该命令只在 Fake Runtime 且业务 Tools 已启用时生效，不能作为生产模型或
+授权边界。
 
 存储只访问 `oj_agent`，正常初始化来源为 `migrations/agent/000001_create_agent_runtime.up.sql`。
 开发 Compose 新数据卷与 Agent 集成 Compose 会自动执行该 SQL；已有数据卷需由有权限的

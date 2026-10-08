@@ -1231,6 +1231,20 @@ MySQL 续聊，以及完整业务栈注册/登录后的 Agent 流。无真实模
 
 Agent 必须真正使用 OJ 后端能力，而不是成为独立聊天机器人。
 
+### PR4 状态（只读业务 Tools 与 Agent 服务身份）
+
+独立 Issue #146，范围不属于 #142，也不与 feat134 混合。PR4 接入六个只读 Tool：
+`get_problem`、`list_problems`、`get_submission`、`get_submission_source`、
+`get_judge_result` 和 `list_submissions`。Python 使用独立 Agent RSA 私钥签发按实际
+gRPC FullMethod 绑定的短期 JWT，Problem/Judge 配置 Agent 公钥和 caller read allowlist；
+目标 Go Service 继续执行资源 owner、角色和管理员授权。响应有 Schema、deadline、分页和
+大小边界，取消传播到 gRPC，依赖错误使用脱敏 Tool 错误码。
+
+PR4 不接入真实模型，不需要 API Key；Fake Runtime 不伪造已经发生的业务 Tool 调用。写
+RPC、User Service、RAG、Prompt/Skill 控制面和管理员页面仍留在后续 Issue。业务 Tool 默认
+关闭，Compose 只有设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 且配置 Agent 私钥时才初始化。
+Python bindings 由 `make agent-proto` 从仓库 Proto 生成，生成文件不手工编辑。
+
 定位：
 
 > **Coding Learning Agent**
@@ -1273,10 +1287,9 @@ agent/
 
 # 9.3 gRPC Tools
 
-第一批 Tool 注册表：
+第一批 Tool 注册表（PR4 已实现前六项）：
 
 ```text
-GetCurrentUser
 GetProblem
 ListProblems
 GetSubmission
@@ -1346,6 +1359,10 @@ service identity
 ```
 
 真正的授权必须由目标 Go Service 完成。
+
+PR4 的服务身份还要求目标 Go Service 对 Agent caller 使用 RPC read allowlist。认证成功
+只证明调用方身份，不能扩大业务授权；Agent 参数里的 user_id、角色和 owner 字段不参与
+授权判断。
 
 例如：
 

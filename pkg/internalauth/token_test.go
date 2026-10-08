@@ -116,3 +116,38 @@ func TestVerifierSetAcceptsDistinctTrustedIssuers(t *testing.T) {
 		})
 	}
 }
+
+func TestMethodAllowlistVerifierRejectsWrites(t *testing.T) {
+	now := time.Now().UTC()
+	priv, pub := keys(t)
+	signer, _ := NewSigner(priv, "agent", "go-oj-agent", "judge-service", "agent-service", time.Minute, func() time.Time { return now })
+	base, _ := NewVerifier(map[string][]byte{"agent": pub}, "go-oj-agent", "judge-service", "agent-service", time.Minute, 0, func() time.Time { return now })
+	restricted, err := NewMethodAllowlistVerifier(base, []string{
+		"/submission.v1.SubmissionService/GetSubmission",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _ := signer.Sign(Claims{RPC: "/submission.v1.SubmissionService/CreateSubmission", TokenID: "write"})
+	if _, err = restricted.Verify(token, "/submission.v1.SubmissionService/CreateSubmission"); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("write RPC accepted: %v", err)
+	}
+	readToken, _ := signer.Sign(Claims{RPC: "/submission.v1.SubmissionService/GetSubmission", TokenID: "read"})
+	if _, err = restricted.Verify(readToken, "/submission.v1.SubmissionService/GetSubmission"); err != nil {
+		t.Fatalf("read RPC rejected: %v", err)
+	}
+}
+
+func TestAgentCallerRequiresMethodAllowlist(t *testing.T) {
+	base := fakeVerifier{}
+	if _, err := NewCallerMethodAllowlistVerifier(base, true, nil); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("missing Agent allowlist accepted: %v", err)
+	}
+	if _, err := NewCallerMethodAllowlistVerifier(base, false, nil); err != nil {
+		t.Fatalf("legacy caller rejected without allowlist: %v", err)
+	}
+}
+
+type fakeVerifier struct{}
+
+func (fakeVerifier) Verify(string, string) (Claims, error) { return Claims{}, nil }

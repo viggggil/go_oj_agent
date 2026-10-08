@@ -127,6 +127,52 @@ type TokenVerifier interface {
 	Verify(string, string) (Claims, error)
 }
 
+// MethodAllowlistVerifier adds a caller-specific RPC boundary on top of token
+// verification. An empty allowlist preserves the legacy "all methods" behavior
+// for existing callers; new restricted callers must provide explicit methods.
+type MethodAllowlistVerifier struct {
+	verifier TokenVerifier
+	methods  map[string]struct{}
+}
+
+func NewMethodAllowlistVerifier(verifier TokenVerifier, methods []string) (TokenVerifier, error) {
+	if verifier == nil {
+		return nil, ErrInvalidToken
+	}
+	if len(methods) == 0 {
+		return verifier, nil
+	}
+	set := make(map[string]struct{}, len(methods))
+	for _, method := range methods {
+		if method == "" || method[0] != '/' || strings.Count(method, "/") < 2 {
+			return nil, ErrInvalidToken
+		}
+		set[method] = struct{}{}
+	}
+	return &MethodAllowlistVerifier{verifier: verifier, methods: set}, nil
+}
+
+// NewCallerMethodAllowlistVerifier keeps legacy callers backward compatible,
+// while allowing a caller configuration to require an explicit method boundary.
+// Agent caller entries should set require=true so a missing allowlist cannot
+// silently turn into a service-wide token, including when identity names rotate.
+func NewCallerMethodAllowlistVerifier(verifier TokenVerifier, require bool, methods []string) (TokenVerifier, error) {
+	if require && len(methods) == 0 {
+		return nil, ErrInvalidToken
+	}
+	return NewMethodAllowlistVerifier(verifier, methods)
+}
+
+func (v *MethodAllowlistVerifier) Verify(token, method string) (Claims, error) {
+	if v == nil || v.verifier == nil {
+		return Claims{}, ErrInvalidToken
+	}
+	if _, ok := v.methods[method]; !ok {
+		return Claims{}, ErrInvalidToken
+	}
+	return v.verifier.Verify(token, method)
+}
+
 type VerifierSet struct {
 	verifiers []TokenVerifier
 }

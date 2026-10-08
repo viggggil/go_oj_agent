@@ -33,3 +33,11 @@ internal_auth:
       key_id: "judge-internal-2026-09"
       issuer: "go-oj-judge"
       subject: "judge-service"
+    - public_key_file: "/run/auth-keys/agent-public.pem"
+      key_id: "agent-internal-2026-10"
+      issuer: "go-oj-agent"
+      subject: "agent-service"
+      require_method_allowlist: true
+      allowed_rpcs:
+        - "/problem.v1.ProblemService/GetProblem"
+        - "/problem.v1.ProblemService/ListProblems"

@@ -1,6 +1,7 @@
 """Tool 元数据注册、输入校验和最小权限执行器。"""
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -9,9 +10,20 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from app.models.runtime import Principal
 
+logger = logging.getLogger(__name__)
+
 ReadScope = Literal["public", "current_user", "admin"]
 SideEffect = Literal["read", "write"]
 Sensitivity = Literal["public", "private", "source", "internal"]
+_STABLE_TOOL_ERRORS = frozenset(
+    {
+        "TOOL_PERMISSION_DENIED",
+        "TOOL_NOT_FOUND",
+        "TOOL_TIMEOUT",
+        "TOOL_INVALID_ARGUMENT",
+        "TOOL_DEPENDENCY_UNAVAILABLE",
+    }
+)
 
 
 class ToolRegistryError(ValueError):
@@ -126,7 +138,14 @@ class ToolExecutor:
             return ToolResult(tool_name=name, ok=False, error_code="TOOL_PERMISSION_DENIED")
         except TimeoutError:
             return ToolResult(tool_name=name, ok=False, error_code="TOOL_TIMEOUT")
-        except Exception:
+        except Exception as error:
+            code = getattr(error, "code", None)
+            if isinstance(code, str) and code in _STABLE_TOOL_ERRORS:
+                return ToolResult(tool_name=name, ok=False, error_code=code)
+            logger.warning(
+                "Tool execution failed",
+                extra={"tool_name": name, "error_type": type(error).__name__},
+            )
             return ToolResult(tool_name=name, ok=False, error_code="TOOL_FAILED")
 
     @staticmethod

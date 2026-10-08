@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.api.chat import ChatController
 from app.api.chat import router as chat_router
 from app.api.health import router
+from app.clients.business import build_business_clients
 from app.core.auth import DelegationVerifier
 from app.core.database import DatabaseProbe, ReadinessProbe
 from app.core.resources import AppResources
@@ -21,6 +22,8 @@ from app.graphs.langgraph_runtime import LangGraphRuntime
 from app.graphs.runtime import FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
 from app.storage.repository import AgentStore
+from app.tools.business import build_business_tool_registry
+from app.tools.registry import ToolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +45,15 @@ def create_app(
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         database = probe_factory(config)
         controller: ChatController | None = None
+        business_clients = None
+        business_tools = None
         try:
+            if config.business_tools_enabled:
+                business_clients = build_business_clients(config)
+                business_tools = build_business_tool_registry(
+                    business_clients, config.tool_max_result_bytes, config.tool_max_page_size
+                )
+            tool_executor = ToolExecutor(business_tools) if business_tools is not None else None
             if config.chat_enabled:
                 verifier = DelegationVerifier(config)
                 if run_service_factory is not None:
@@ -51,9 +62,9 @@ def create_app(
                     if not isinstance(database, DatabaseProbe) or database.engine is None:
                         raise ConfigurationError("Chat requires an Agent database")
                     runtime = (
-                        LangGraphRuntime(FakeModelClient())
+                        LangGraphRuntime(FakeModelClient(tool_executor))
                         if config.runtime_mode == "langgraph_fake"
-                        else FakeRuntime()
+                        else FakeRuntime(tool_executor=tool_executor)
                     )
                     service = RunService(
                         AgentStore(database.engine), runtime, DemoConfigReader(config)
@@ -73,7 +84,11 @@ def create_app(
                     raise ConfigurationError("Agent Chat initialization failed") from None
                 controller = ChatController(config, verifier, service)
             application.state.resources = AppResources(
-                settings=config, database=database, chat=controller
+                settings=config,
+                database=database,
+                chat=controller,
+                business_clients=business_clients,
+                tools=business_tools,
             )
             logger.info("Agent service started")
             yield
@@ -83,6 +98,8 @@ def create_app(
                     if controller is not None:
                         async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                             await controller.close()
+                    if business_clients is not None:
+                        await business_clients.close()
                 finally:
                     database_budget = (
                         config.shutdown_timeout_seconds / 2

@@ -2,6 +2,8 @@ version: v2
 
 modules:
   - path: .
+    excludes:
+      - agent/.venv
 deps:
   - buf.build/envoyproxy/protoc-gen-validate
   - buf.build/googleapis/googleapis

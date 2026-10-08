@@ -858,16 +858,17 @@ func (x *ConsulProto) GetServiceId() string {
 }
 
 type InternalAuthProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PublicKeyFile string                 `protobuf:"bytes,1,opt,name=public_key_file,json=publicKeyFile,proto3" json:"public_key_file,omitempty"`
-	KeyId         string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
-	Issuer        string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
-	Audience      string                 `protobuf:"bytes,4,opt,name=audience,proto3" json:"audience,omitempty"`
-	Subject       string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
-	MaxTokenTtl   string                 `protobuf:"bytes,6,opt,name=max_token_ttl,json=maxTokenTtl,proto3" json:"max_token_ttl,omitempty"`
-	ClockSkew     string                 `protobuf:"bytes,7,opt,name=clock_skew,json=clockSkew,proto3" json:"clock_skew,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	PublicKeyFile     string                 `protobuf:"bytes,1,opt,name=public_key_file,json=publicKeyFile,proto3" json:"public_key_file,omitempty"`
+	KeyId             string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Issuer            string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Audience          string                 `protobuf:"bytes,4,opt,name=audience,proto3" json:"audience,omitempty"`
+	Subject           string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
+	MaxTokenTtl       string                 `protobuf:"bytes,6,opt,name=max_token_ttl,json=maxTokenTtl,proto3" json:"max_token_ttl,omitempty"`
+	ClockSkew         string                 `protobuf:"bytes,7,opt,name=clock_skew,json=clockSkew,proto3" json:"clock_skew,omitempty"`
+	AdditionalCallers []*InternalCallerProto `protobuf:"bytes,8,rep,name=additional_callers,json=additionalCallers,proto3" json:"additional_callers,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InternalAuthProto) Reset() {
@@ -949,6 +950,97 @@ func (x *InternalAuthProto) GetClockSkew() string {
 	return ""
 }
 
+func (x *InternalAuthProto) GetAdditionalCallers() []*InternalCallerProto {
+	if x != nil {
+		return x.AdditionalCallers
+	}
+	return nil
+}
+
+type InternalCallerProto struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PublicKeyFile          string                 `protobuf:"bytes,1,opt,name=public_key_file,json=publicKeyFile,proto3" json:"public_key_file,omitempty"`
+	KeyId                  string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Issuer                 string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Subject                string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	AllowedRpcs            []string               `protobuf:"bytes,5,rep,name=allowed_rpcs,json=allowedRpcs,proto3" json:"allowed_rpcs,omitempty"`
+	RequireMethodAllowlist bool                   `protobuf:"varint,6,opt,name=require_method_allowlist,json=requireMethodAllowlist,proto3" json:"require_method_allowlist,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *InternalCallerProto) Reset() {
+	*x = InternalCallerProto{}
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InternalCallerProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InternalCallerProto) ProtoMessage() {}
+
+func (x *InternalCallerProto) ProtoReflect() protoreflect.Message {
+	mi := &file_services_judge_internal_conf_conf_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InternalCallerProto.ProtoReflect.Descriptor instead.
+func (*InternalCallerProto) Descriptor() ([]byte, []int) {
+	return file_services_judge_internal_conf_conf_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *InternalCallerProto) GetPublicKeyFile() string {
+	if x != nil {
+		return x.PublicKeyFile
+	}
+	return ""
+}
+
+func (x *InternalCallerProto) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *InternalCallerProto) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *InternalCallerProto) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *InternalCallerProto) GetAllowedRpcs() []string {
+	if x != nil {
+		return x.AllowedRpcs
+	}
+	return nil
+}
+
+func (x *InternalCallerProto) GetRequireMethodAllowlist() bool {
+	if x != nil {
+		return x.RequireMethodAllowlist
+	}
+	return false
+}
+
 var File_services_judge_internal_conf_conf_proto protoreflect.FileDescriptor
 
 const file_services_judge_internal_conf_conf_proto_rawDesc = "" +
@@ -1022,7 +1114,7 @@ const file_services_judge_internal_conf_conf_proto_rawDesc = "" +
 	"datacenter\x12\x14\n" +
 	"\x05token\x18\x05 \x01(\tR\x05token\x12\x1d\n" +
 	"\n" +
-	"service_id\x18\x06 \x01(\tR\tserviceId\"\xe3\x01\n" +
+	"service_id\x18\x06 \x01(\tR\tserviceId\"\xb3\x02\n" +
 	"\x11InternalAuthProto\x12&\n" +
 	"\x0fpublic_key_file\x18\x01 \x01(\tR\rpublicKeyFile\x12\x15\n" +
 	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
@@ -1031,7 +1123,15 @@ const file_services_judge_internal_conf_conf_proto_rawDesc = "" +
 	"\asubject\x18\x05 \x01(\tR\asubject\x12\"\n" +
 	"\rmax_token_ttl\x18\x06 \x01(\tR\vmaxTokenTtl\x12\x1d\n" +
 	"\n" +
-	"clock_skew\x18\a \x01(\tR\tclockSkewBCZAgithub.com/viggggil/go_oj_agent/services/judge/internal/conf;confb\x06proto3"
+	"clock_skew\x18\a \x01(\tR\tclockSkew\x12N\n" +
+	"\x12additional_callers\x18\b \x03(\v2\x1f.judge.conf.InternalCallerProtoR\x11additionalCallers\"\xe3\x01\n" +
+	"\x13InternalCallerProto\x12&\n" +
+	"\x0fpublic_key_file\x18\x01 \x01(\tR\rpublicKeyFile\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12\x16\n" +
+	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x12!\n" +
+	"\fallowed_rpcs\x18\x05 \x03(\tR\vallowedRpcs\x128\n" +
+	"\x18require_method_allowlist\x18\x06 \x01(\bR\x16requireMethodAllowlistBCZAgithub.com/viggggil/go_oj_agent/services/judge/internal/conf;confb\x06proto3"
 
 var (
 	file_services_judge_internal_conf_conf_proto_rawDescOnce sync.Once
@@ -1045,22 +1145,23 @@ func file_services_judge_internal_conf_conf_proto_rawDescGZIP() []byte {
 	return file_services_judge_internal_conf_conf_proto_rawDescData
 }
 
-var file_services_judge_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_services_judge_internal_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_services_judge_internal_conf_conf_proto_goTypes = []any{
-	(*Bootstrap)(nil),          // 0: judge.conf.Bootstrap
-	(*ClientsProto)(nil),       // 1: judge.conf.ClientsProto
-	(*ProblemClientProto)(nil), // 2: judge.conf.ProblemClientProto
-	(*ServiceProto)(nil),       // 3: judge.conf.ServiceProto
-	(*ServerProto)(nil),        // 4: judge.conf.ServerProto
-	(*GRPCProto)(nil),          // 5: judge.conf.GRPCProto
-	(*DataProto)(nil),          // 6: judge.conf.DataProto
-	(*StorageProto)(nil),       // 7: judge.conf.StorageProto
-	(*MinIOProto)(nil),         // 8: judge.conf.MinIOProto
-	(*MessagingProto)(nil),     // 9: judge.conf.MessagingProto
-	(*RabbitMQProto)(nil),      // 10: judge.conf.RabbitMQProto
-	(*RegistryProto)(nil),      // 11: judge.conf.RegistryProto
-	(*ConsulProto)(nil),        // 12: judge.conf.ConsulProto
-	(*InternalAuthProto)(nil),  // 13: judge.conf.InternalAuthProto
+	(*Bootstrap)(nil),           // 0: judge.conf.Bootstrap
+	(*ClientsProto)(nil),        // 1: judge.conf.ClientsProto
+	(*ProblemClientProto)(nil),  // 2: judge.conf.ProblemClientProto
+	(*ServiceProto)(nil),        // 3: judge.conf.ServiceProto
+	(*ServerProto)(nil),         // 4: judge.conf.ServerProto
+	(*GRPCProto)(nil),           // 5: judge.conf.GRPCProto
+	(*DataProto)(nil),           // 6: judge.conf.DataProto
+	(*StorageProto)(nil),        // 7: judge.conf.StorageProto
+	(*MinIOProto)(nil),          // 8: judge.conf.MinIOProto
+	(*MessagingProto)(nil),      // 9: judge.conf.MessagingProto
+	(*RabbitMQProto)(nil),       // 10: judge.conf.RabbitMQProto
+	(*RegistryProto)(nil),       // 11: judge.conf.RegistryProto
+	(*ConsulProto)(nil),         // 12: judge.conf.ConsulProto
+	(*InternalAuthProto)(nil),   // 13: judge.conf.InternalAuthProto
+	(*InternalCallerProto)(nil), // 14: judge.conf.InternalCallerProto
 }
 var file_services_judge_internal_conf_conf_proto_depIdxs = []int32{
 	3,  // 0: judge.conf.Bootstrap.service:type_name -> judge.conf.ServiceProto
@@ -1076,11 +1177,12 @@ var file_services_judge_internal_conf_conf_proto_depIdxs = []int32{
 	8,  // 10: judge.conf.StorageProto.minio:type_name -> judge.conf.MinIOProto
 	10, // 11: judge.conf.MessagingProto.rabbitmq:type_name -> judge.conf.RabbitMQProto
 	12, // 12: judge.conf.RegistryProto.consul:type_name -> judge.conf.ConsulProto
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	14, // 13: judge.conf.InternalAuthProto.additional_callers:type_name -> judge.conf.InternalCallerProto
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_services_judge_internal_conf_conf_proto_init() }
@@ -1094,7 +1196,7 @@ func file_services_judge_internal_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_judge_internal_conf_conf_proto_rawDesc), len(file_services_judge_internal_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
