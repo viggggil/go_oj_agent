@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import RowMapping, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
@@ -25,6 +25,7 @@ from app.models.configuration import AgentConfig, ConfigError, ConfigWrite, Prom
 from app.models.runtime import ChatContext, ChatRequest, Principal
 from app.storage.configuration import ConfigurationStore, ConfigVersion
 from app.storage.repository import AgentStore, ConversationAgentConflict, ConversationNotFound
+from app.storage.schema import agent_config_resources
 from app.tools.registry import ToolDefinition, ToolRegistry, ToolSpec
 
 pytestmark = pytest.mark.integration
@@ -190,6 +191,25 @@ async def test_concurrent_state_request_conflict_rolls_back(config_engine: Async
     synchronized: set[str] = set()
 
     class ConcurrentStateStore(ConfigurationStore):
+        async def _lock_resource(
+            self, connection: AsyncConnection, write: ConfigWrite
+        ) -> RowMapping:
+            # 已有资源使用精确行锁，避免 upsert 的索引锁使测试屏障互锁。
+            return (
+                (
+                    await connection.execute(
+                        select(*agent_config_resources.c)
+                        .where(
+                            agent_config_resources.c.kind == write.kind,
+                            agent_config_resources.c.config_key == write.key,
+                        )
+                        .with_for_update()
+                    )
+                )
+                .mappings()
+                .one()
+            )
+
         async def _replay(
             self, connection: AsyncConnection, write: ConfigWrite, fingerprint: str
         ) -> ConfigVersion | None:
