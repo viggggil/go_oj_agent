@@ -1,8 +1,14 @@
 # Agent Service
 
-## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE、PR4 只读 Tools
+## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE、PR4 只读 Tools、PR5 多 Agent 配置基础
 
-PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份，PR5 增加 Prompt、Skill、Model Profile、Agent 的不可变配置编号、归档与事务替换基础。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+
+### PR5 配置语义
+
+PR5 不采用草稿/发布状态机。每个配置同时有稳定 `key` 和每次创建生成的 UUID；修改会在一次数据库事务内创建新 UUID、归档旧版本、切换当前指针并写入审计。归档记录永久保留，恢复通过复制旧内容创建新 UUID。Prompt、Skill、Agent、Model Profile 之间引用具体 UUID，修改 Prompt 不会自动改变其他引用。
+
+Agent 请求可以携带 `agent_key` 和 `skill_key`。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。当前 PR5 的 Model Profile 只允许 `fake/fake`，知识库绑定明确为空，真实模型和知识库放到后续 PR。
 
 本阶段提供两个健康端点：
 

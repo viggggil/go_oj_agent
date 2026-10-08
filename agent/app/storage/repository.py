@@ -39,6 +39,7 @@ class ConversationRecord:
     id: str
     user_id: int
     title: str | None
+    agent_key: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -84,9 +85,9 @@ class AgentStore:
         self._clock = clock
 
     async def create_conversation(
-        self, user_id: int, title: str | None = None
+        self, user_id: int, title: str | None = None, *, agent_key: str | None = "demo"
     ) -> ConversationRecord:
-        if user_id <= 0 or (title is not None and len(title) > 255):
+        if user_id <= 0 or (title is not None and len(title) > 255) or (agent_key is not None and not agent_key):
             raise ValueError("Invalid conversation owner or title")
         conversation_id = str(uuid4())
         now = self._clock()
@@ -95,12 +96,12 @@ class AgentStore:
                 insert(agent_conversations).values(
                     id=conversation_id,
                     user_id=user_id,
-                    title=title,
+                    title=title, agent_key=agent_key,
                     created_at=now,
                     updated_at=now,
                 )
             )
-        return ConversationRecord(conversation_id, user_id, title, now, now)
+        return ConversationRecord(conversation_id, user_id, title, agent_key, now, now)
 
     async def get_conversation(
         self, user_id: int, conversation_id: str | UUID
@@ -147,6 +148,7 @@ class AgentStore:
         conversation_id: str | UUID | None,
         request_id: str,
         content: str,
+        agent_key: str | None = "demo",
         config_source: str,
         config_snapshot: dict[str, Any],
         deadline_at: datetime,
@@ -159,6 +161,7 @@ class AgentStore:
             or len(content) > 32_000
             or not 1 <= len(request_id) <= 128
             or not 1 <= len(config_source) <= 64
+            or (agent_key is not None and not 1 <= len(agent_key) <= 64)
             or deadline_at <= now
         ):
             raise ValueError("Invalid run input")
@@ -167,11 +170,17 @@ class AgentStore:
                 conversation_id = str(uuid4())
                 await connection.execute(
                     insert(agent_conversations).values(
-                        id=conversation_id, user_id=user_id, created_at=now, updated_at=now
+                        id=conversation_id, user_id=user_id, agent_key=agent_key,
+                        created_at=now, updated_at=now
                     )
                 )
             else:
                 await self._lock_owned_conversation(connection, user_id, conversation_id)
+                conversation_row = (await connection.execute(
+                    select(agent_conversations.c.agent_key).where(agent_conversations.c.id == str(conversation_id))
+                )).first()
+                if conversation_row is not None and conversation_row[0] != agent_key:
+                    raise ConversationNotFound("Conversation not found for this Agent")
             active = (
                 await connection.execute(
                     select(agent_runs.c.id).where(

@@ -44,6 +44,7 @@ class RuntimeStore(Protocol):
         content: str,
         config_source: str,
         config_snapshot: dict[str, Any],
+        agent_key: str | None = "demo",
         deadline_at: datetime,
     ) -> RunRecord: ...
 
@@ -116,7 +117,13 @@ class RunService:
         return await self._store.interrupt_running_runs()
 
     async def accept(self, request: ChatRequest, principal: Principal) -> AcceptedRun:
-        snapshot = await self._reader.read()
+        try:
+            snapshot = await self._reader.read(request.agent_key or "demo", request.skill_key)
+        except TypeError:
+            # 保持 PR2/PR3 自定义 Reader 的无参兼容；数据库 Reader 后续接入时使用新签名。
+            snapshot = await self._reader.read()  # type: ignore[call-arg]
+        except (ValueError, RuntimeError) as exc:
+            raise RuntimeFailure("AGENT_CONFIGURATION_NOT_FOUND") from exc
         # 上次终态持久化失败的 Run 会在 deadline 之后释放活动关联。
         await self._store.expire_running_runs()
         now = utc_now()
@@ -127,6 +134,7 @@ class RunService:
             content=request.message,
             config_source=snapshot.source,
             config_snapshot=snapshot.model_dump(mode="json"),
+            agent_key=request.agent_key or "demo",
             deadline_at=now + timedelta(seconds=snapshot.budget.max_run_seconds),
         )
         state = AgentState(
@@ -135,6 +143,8 @@ class RunService:
             conversation_id=UUID(record.conversation_id),
             run_id=UUID(record.id),
             user_message=request.message,
+            agent_key=request.agent_key or "demo",
+            skill_key=request.skill_key or "demo",
             context=request.context,
             allowed_tools=snapshot.allowed_tools,
             config_snapshot=snapshot.model_dump(mode="json"),

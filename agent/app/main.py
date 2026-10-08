@@ -66,9 +66,9 @@ def create_app(
                         if config.runtime_mode == "langgraph_fake"
                         else FakeRuntime(tool_executor=tool_executor)
                     )
-                    service = RunService(
-                        AgentStore(database.engine), runtime, DemoConfigReader(config)
-                    )
+                    store = AgentStore(database.engine)
+                    config_reader = DemoConfigReader(config)
+                    service = RunService(store, runtime, config_reader)
                 try:
                     async with asyncio.timeout(config.preflight_timeout_seconds):
                         await service.initialize()

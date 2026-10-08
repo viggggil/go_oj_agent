@@ -18,15 +18,23 @@ class RuntimeBudget(BaseModel):
 class ConfigSnapshot(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    source: Literal["demo_environment"] = "demo_environment"
+    source: Literal["demo_environment", "database"] = "demo_environment"
     version: str = "pr2-demo-v1"
     runtime: Literal["fake", "langgraph_fake"]
     budget: RuntimeBudget
     allowed_tools: tuple[str, ...] = ()
+    agent_key: str = "demo"
+    skill_key: str = "demo"
+    prompt_id: str | None = None
+    skill_id: str | None = None
+    model_profile_id: str | None = None
+    prompt_text: str | None = None
+    skill_prompt_id: str | None = None
+    skill_prompt_text: str | None = None
 
 
 class ConfigSnapshotReader(Protocol):
-    async def read(self) -> ConfigSnapshot: ...
+    async def read(self, agent_key: str = "demo", skill_key: str | None = None) -> ConfigSnapshot: ...
 
 
 class DemoConfigReader:
@@ -52,5 +60,7 @@ class DemoConfigReader:
             else (),
         )
 
-    async def read(self) -> ConfigSnapshot:
+    async def read(self, agent_key: str = "demo", skill_key: str | None = None) -> ConfigSnapshot:
+        if agent_key != "demo" or (skill_key is not None and skill_key != "demo"):
+            raise ValueError("Unknown demo Agent")
         return self._snapshot.model_copy(deep=True)
