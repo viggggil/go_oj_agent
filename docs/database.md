@@ -568,22 +568,26 @@ SELECT/INSERT/UPDATE/DELETE，应用不持有跨业务库权限。该文件不�
 Agent 的 Prompt、Skill、Tool 策略和知识库属于 `oj_agent` 自有控制面。它们不能保存
 User、Problem、Submission 或 Contest 的业务镜像。
 
-### `agent_prompts` / `agent_prompt_versions`
+### PR5 `agent_config_resources` / `agent_config_versions`
 
-`agent_prompts` 保存稳定的 `prompt_key` 和当前发布版本；`agent_prompt_versions`
-保存不可变内容、变量声明、状态、创建者、发布时间和变更说明。版本状态使用
-`DRAFT`、`PUBLISHED`、`ARCHIVED`。发布和回滚不修改旧版本，而是将已有版本重新发布。
+PR5 将 Prompt、Skill、Model Profile 和 Agent 统一存储在 `agent_config_resources` 与
+`agent_config_versions`。资源以 `(kind, config_key)` 稳定标识，当前版本由 `current_id`
+指向；每次创建生成新的 UUID，正文不可原地修改，旧版本填充 `archived_at` 后永久保留。
+删除只是归档，恢复通过复制历史正文创建新 UUID。配置正文由 Python 严格 Schema 校验，
+Prompt 变量、Skill 工具、Agent 绑定、模型类型和预算都在切换当前指针前检查。
 
-### `agent_skills` / `agent_skill_versions`
+`agent_config_links` 保存版本到具体版本 UUID 的引用，`agent_config_audits` 保存操作、
+操作者、预期当前版本、请求编号和正文指纹。替换在一个本地事务内完成，并使用
+`expected_id` 做乐观并发检查；相同请求编号和指纹重试返回原版本，不会读取后来替换的当前版本。
+共享 Prompt 或 Skill 更新不会自动修改其他 Agent；已有配置按 links 中的历史 UUID 继续读取。
+新配置不能引用归档或停用版本，依赖停用后新的 Agent Run 会被拒绝。
 
-Skill 主表保存稳定标识、名称和当前发布版本；版本表保存执行模式、Prompt 引用、输出
-Schema、Tool 次数、计划步数、Token 预算、启用状态和版本说明。Skill 版本只能引用
-代码 Registry 已注册的 Tool。
+PR5 的 Model Profile 只允许 `fake/fake`，不保存 API Key；知识库范围必须为空，RAG 配置留给后续迁移。
 
-### `agent_skill_tools`
+### `agent_config_links`
 
-保存 Skill 版本与 Tool 的绑定、排序、是否允许自动调用和参数限制。该表不能覆盖
-Tool Registry 的 `rpc_method`、目标服务、最终授权和敏感级别。
+保存 Agent → Prompt/Skill/Model、Skill → Prompt 的具体版本绑定；该表不能覆盖 Tool Registry 的
+`rpc_method`、目标服务、最终授权和敏感级别。工具 allowlist 只允许 Registry 中已注册且启用的只读 Tool。
 
 ### `agent_knowledge_documents` / `agent_knowledge_versions`
 
@@ -613,17 +617,18 @@ PR2 只实现上面列出的最小运行表，以下 Skill、模型、Token、�
 
 ### `agent_admin_audits`
 
-记录管理员、角色、资源类型、资源标识、动作、旧版本、新版本、请求 ID、Trace ID、
-结果和时间。发布、回滚、归档、启用写 Tool 和知识库发布必须有审计记录。
+后续管理员 HTTP 控制面使用该表记录角色、资源类型、资源标识、动作、旧版本、新版本、
+请求 ID、Trace ID、结果和时间。PR5 的本机 `app.config_cli` 已通过 `agent_config_audits`
+记录配置创建、替换、归档、停用和恢复。
 
 ## 8.5 一致性和发布规则
 
-- 草稿不会被在线 Agent 读取。
-- 发布版本不可变，Agent Run 开始时记录完整配置快照。
-- Prompt、Skill、Tool 策略和知识库索引的发布动作需要乐观并发控制。
-- 发布失败不能切换当前发布指针。
-- 回滚选择旧版本重新发布，不删除历史版本。
-- 缓存必须以发布版本或配置版本为 Key，并在发布后失效。
+- PR5 不采用草稿/发布状态机；校验成功的创建在事务提交后立即影响新 Run。
+- 配置版本不可变，Agent Run 开始时记录完整配置快照和哈希。
+- Prompt、Skill、Agent 和 Model 的替换使用 `expected_id` 做乐观并发控制。
+- 替换失败不能切换当前指针，重试不会生成重复版本。
+- 恢复基于历史正文创建新 UUID，不修改历史版本；已有 Agent 的历史引用继续可解析。
+- 后续缓存必须以具体配置 UUID 为 Key，并在当前指针替换或停用后失效。
 - Admin API 只能访问 `oj_agent`，不能跨 Schema SQL Join。
 
 # 9. Redis Key 约定

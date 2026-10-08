@@ -98,6 +98,18 @@ async def test_gateway_signed_actor_persistence_and_conversation_restore() -> No
                 (7001, "cross-language-test", "COMPLETED"),
                 (7001, "cross-language-test", "COMPLETED"),
             ]
+            snapshot = (
+                await connection.execute(
+                    text(
+                        "SELECT config_source,config_snapshot FROM agent_runs "
+                        "WHERE conversation_id=:id LIMIT 1"
+                    ),
+                    {"id": conversation},
+                )
+            ).one()
+            assert snapshot.config_source == "database"
+            config = json.loads(snapshot.config_snapshot)
+            assert config["agent_key"] == "learning_assistant" and config["config_hash"]
             rows = (
                 await connection.execute(
                     text(

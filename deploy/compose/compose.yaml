@@ -36,7 +36,7 @@ services:
       - ../../migrations/contest/000003_create_leaderboard_outbox.up.sql:/docker-entrypoint-initdb.d/403_create_leaderboard_outbox.sql:ro
       - ../../migrations/contest/000004_index_cache_lag.up.sql:/docker-entrypoint-initdb.d/404_index_cache_lag.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
-      - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/502_create_agent_configuration.sql:ro
+      - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/503_create_agent_configuration.sql:ro
       - ./agent-user.sql:/docker-entrypoint-initdb.d/502_create_agent_development_user.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -404,6 +404,8 @@ services:
       AGENT_HOST: 0.0.0.0
       AGENT_CHAT_ENABLED: true
       AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_CONFIG_MODE: "${AGENT_CONFIG_MODE:-demo}"
+      AGENT_DEFAULT_AGENT_KEY: "${AGENT_DEFAULT_AGENT_KEY:-learning_assistant}"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
       AGENT_GATEWAY_KEY_ID: gateway-internal-2026-09

@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import datetime
 from string import Formatter
-from typing import Annotated, Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -58,7 +58,6 @@ class PromptConfig(ImmutableConfig):
 class SkillConfig(ImmutableConfig):
     name: str = Field(min_length=1, max_length=128)
     prompt_id: UUID
-    prompt_key: ConfigKey | None = None
     execution_mode: Literal["direct", "react"] = "direct"
     allowed_tools: tuple[ToolName, ...] = Field(default=(), max_length=32)
     budget: RuntimeBudget = Field(default_factory=RuntimeBudget)
@@ -78,12 +77,9 @@ class ModelProfileConfig(ImmutableConfig):
 class AgentConfig(ImmutableConfig):
     name: str = Field(min_length=1, max_length=128)
     prompt_id: UUID
-    prompt_key: ConfigKey | None = None
     skill_ids: tuple[UUID, ...] = Field(min_length=1, max_length=16)
     default_skill_id: UUID
-    default_skill_key: ConfigKey | None = None
     model_profile_id: UUID
-    model_profile_key: ConfigKey | None = None
     allowed_tools: tuple[ToolName, ...] = Field(default=(), max_length=32)
     budget: RuntimeBudget = Field(default_factory=RuntimeBudget)
     visibility: Literal["user", "admin"] = "user"
@@ -108,7 +104,7 @@ class AgentConfig(ImmutableConfig):
         return self
 
 
-ConfigBody: TypeAlias = PromptConfig | SkillConfig | ModelProfileConfig | AgentConfig
+type ConfigBody = PromptConfig | SkillConfig | ModelProfileConfig | AgentConfig
 CONFIG_MODELS: dict[ConfigKind, type[ConfigBody]] = {
     "prompt": PromptConfig,
     "skill": SkillConfig,
@@ -123,6 +119,7 @@ class ConfigWrite(ImmutableConfig):
     actor_id: int = Field(gt=0, le=2**63 - 1, strict=True)
     request_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9._:-]+$")
     expected_id: UUID | None = None
+    source_id: UUID | None = None
 
 
 def parse_config(kind: ConfigKind, content: Any) -> ConfigBody:
@@ -133,6 +130,9 @@ def config_references(body: ConfigBody) -> dict[str, ConfigKind]:
     if isinstance(body, SkillConfig):
         return {str(body.prompt_id): "prompt"}
     if isinstance(body, AgentConfig):
+        identifiers = [body.prompt_id, body.model_profile_id, *body.skill_ids]
+        if len(set(identifiers)) != len(identifiers):
+            raise ConfigError("AGENT_CONFIGURATION_REFERENCE_INVALID")
         return {
             str(body.prompt_id): "prompt",
             str(body.model_profile_id): "model",

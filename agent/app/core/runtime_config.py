@@ -2,17 +2,20 @@
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.core.settings import Settings
-
-
-class RuntimeBudget(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    max_run_seconds: float = Field(default=30, gt=0, le=300)
-    max_output_chars: int = Field(default=8_000, ge=1, le=32_000)
-    max_events: int = Field(default=1_000, ge=3, le=10_000)
+from app.models.configuration import (
+    AgentConfig,
+    ConfigError,
+    PromptConfig,
+    SkillConfig,
+    config_hash,
+)
+from app.models.configuration import RuntimeBudget as RuntimeBudget
+from app.models.runtime import ChatRequest, Principal
+from app.storage.configuration import ConfigurationStore
+from app.tools.registry import ToolRegistry
 
 
 class ConfigSnapshot(BaseModel):
@@ -31,10 +34,14 @@ class ConfigSnapshot(BaseModel):
     prompt_text: str | None = None
     skill_prompt_id: str | None = None
     skill_prompt_text: str | None = None
+    config_hash: str | None = None
+    configurations: dict[str, dict[str, object]] = {}
+    is_test: bool = False
+    execution_mode: str = "direct"
 
 
 class ConfigSnapshotReader(Protocol):
-    async def read(self, agent_key: str = "demo", skill_key: str | None = None) -> ConfigSnapshot: ...
+    async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot: ...
 
 
 class DemoConfigReader:
@@ -60,7 +67,107 @@ class DemoConfigReader:
             else (),
         )
 
-    async def read(self, agent_key: str = "demo", skill_key: str | None = None) -> ConfigSnapshot:
-        if agent_key != "demo" or (skill_key is not None and skill_key != "demo"):
-            raise ValueError("Unknown demo Agent")
+    async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot:
+        if request.agent_key not in (None, "demo") or request.skill_key not in (None, "demo"):
+            raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
         return self._snapshot.model_copy(deep=True)
+
+
+class DatabaseConfigReader:
+    def __init__(
+        self, store: ConfigurationStore, settings: Settings, registry: ToolRegistry
+    ) -> None:
+        if settings.runtime_mode == "disabled" or settings.environment == "production":
+            raise ValueError("Database Fake runtime requires explicit non-production activation")
+        self._store = store
+        self._settings = settings
+        self._registry = registry
+
+    async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot:
+        from datetime import UTC, datetime
+
+        agent_key = request.agent_key or self._settings.default_agent_key
+        root, graph = await self._store.load_graph(agent_key)
+        agent = root.content
+        if not isinstance(agent, AgentConfig):
+            raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+        if agent.visibility == "admin" and not principal.roles.intersection(
+            {"system_admin", "agent_admin"}
+        ):
+            raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+        if agent.test_expires_at is not None and agent.test_expires_at <= datetime.now(UTC):
+            raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+        skill_id = str(agent.default_skill_id)
+        if request.skill_key is not None:
+            matches = [
+                str(value)
+                for value in agent.skill_ids
+                if graph[str(value)].key == request.skill_key
+            ]
+            if len(matches) != 1:
+                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+            skill_id = matches[0]
+        skill_version = graph[skill_id]
+        skill = skill_version.content
+        if not isinstance(skill, SkillConfig):
+            raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+        prompt_version = graph[str(agent.prompt_id)]
+        skill_prompt_version = graph[str(skill.prompt_id)]
+        if not isinstance(prompt_version.content, PromptConfig) or not isinstance(
+            skill_prompt_version.content, PromptConfig
+        ):
+            raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+
+        def render(prompt: PromptConfig) -> str:
+            values = request.context.model_dump()
+            if any(values[name] is None for name in prompt.variables):
+                raise ConfigError("AGENT_PROMPT_CONTEXT_REQUIRED")
+            return prompt.text.format(**values)
+
+        system_budget = RuntimeBudget(
+            max_run_seconds=self._settings.max_run_seconds,
+            max_output_chars=self._settings.max_output_chars,
+            max_events=self._settings.max_run_events,
+        )
+        budgets = [agent.budget.model_dump(), skill.budget.model_dump(), system_budget.model_dump()]
+        budget = RuntimeBudget.model_validate(
+            {name: min(item[name] for item in budgets) for name in budgets[0]}
+        )
+        system_tools = {
+            name
+            for name in self._registry.names()
+            if self._registry.get(name).spec.enabled
+            and self._registry.get(name).spec.side_effect == "read"
+        }
+        tools = tuple(sorted(system_tools & set(agent.allowed_tools) & set(skill.allowed_tools)))
+        configurations: dict[str, dict[str, object]] = {
+            version.id: {
+                "kind": version.kind,
+                "key": version.key,
+                "content": version.content.model_dump(mode="json"),
+            }
+            for version in graph.values()
+        }
+        if self._settings.runtime_mode == "disabled":
+            raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+        snapshot = ConfigSnapshot(
+            source="database",
+            version=root.id,
+            runtime=self._settings.runtime_mode,
+            agent_key=agent_key,
+            skill_key=skill_version.key,
+            prompt_id=prompt_version.id,
+            prompt_text=render(prompt_version.content),
+            skill_prompt_id=skill_prompt_version.id,
+            skill_prompt_text=render(skill_prompt_version.content),
+            skill_id=skill_id,
+            model_profile_id=str(agent.model_profile_id),
+            allowed_tools=tools,
+            budget=budget,
+            configurations=configurations,
+            is_test=agent.is_test,
+            execution_mode=skill.execution_mode,
+        )
+        return snapshot.model_copy(
+            update={"config_hash": config_hash(snapshot.model_dump(mode="json"))}
+        )

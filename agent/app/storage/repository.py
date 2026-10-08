@@ -26,6 +26,10 @@ class ActiveRunConflict(StoreError):
     """同一会话已有活动运行。"""
 
 
+class ConversationAgentConflict(StoreError):
+    """会话不能在不同 Agent 之间复用。"""
+
+
 class RunNotFound(StoreError):
     """运行不存在或不属于当前用户。"""
 
@@ -87,7 +91,11 @@ class AgentStore:
     async def create_conversation(
         self, user_id: int, title: str | None = None, *, agent_key: str | None = "demo"
     ) -> ConversationRecord:
-        if user_id <= 0 or (title is not None and len(title) > 255) or (agent_key is not None and not agent_key):
+        if (
+            user_id <= 0
+            or (title is not None and len(title) > 255)
+            or (agent_key is not None and not agent_key)
+        ):
             raise ValueError("Invalid conversation owner or title")
         conversation_id = str(uuid4())
         now = self._clock()
@@ -96,7 +104,8 @@ class AgentStore:
                 insert(agent_conversations).values(
                     id=conversation_id,
                     user_id=user_id,
-                    title=title, agent_key=agent_key,
+                    title=title,
+                    agent_key=agent_key,
                     created_at=now,
                     updated_at=now,
                 )
@@ -170,17 +179,24 @@ class AgentStore:
                 conversation_id = str(uuid4())
                 await connection.execute(
                     insert(agent_conversations).values(
-                        id=conversation_id, user_id=user_id, agent_key=agent_key,
-                        created_at=now, updated_at=now
+                        id=conversation_id,
+                        user_id=user_id,
+                        agent_key=agent_key,
+                        created_at=now,
+                        updated_at=now,
                     )
                 )
             else:
                 await self._lock_owned_conversation(connection, user_id, conversation_id)
-                conversation_row = (await connection.execute(
-                    select(agent_conversations.c.agent_key).where(agent_conversations.c.id == str(conversation_id))
-                )).first()
-                if conversation_row is not None and conversation_row[0] != agent_key:
-                    raise ConversationNotFound("Conversation not found for this Agent")
+                conversation_row = (
+                    await connection.execute(
+                        select(agent_conversations.c.agent_key).where(
+                            agent_conversations.c.id == str(conversation_id)
+                        )
+                    )
+                ).first()
+                if conversation_row is not None and (conversation_row[0] or "demo") != agent_key:
+                    raise ConversationAgentConflict("Conversation is bound to another Agent")
             active = (
                 await connection.execute(
                     select(agent_runs.c.id).where(

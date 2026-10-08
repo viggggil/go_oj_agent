@@ -32,6 +32,7 @@ services:
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
       AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_CONFIG_MODE: database
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem
       AGENT_SSE_HEARTBEAT_SECONDS: 1
     ports:

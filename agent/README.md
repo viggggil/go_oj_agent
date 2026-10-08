@@ -2,13 +2,51 @@
 
 ## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE、PR4 只读 Tools、PR5 多 Agent 配置基础
 
-PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份，PR5 增加 Prompt、Skill、Model Profile、Agent 的不可变配置编号、归档与事务替换基础。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员控制面或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份，PR5 增加 Prompt、Skill、Model Profile、Agent 的不可变配置编号、归档、事务替换、本机管理命令与数据库配置运行链路。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员 HTTP API/前端或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
 
 ### PR5 配置语义
 
 PR5 不采用草稿/发布状态机。每个配置同时有稳定 `key` 和每次创建生成的 UUID；修改会在一次数据库事务内创建新 UUID、归档旧版本、切换当前指针并写入审计。归档记录永久保留，恢复通过复制旧内容创建新 UUID。Prompt、Skill、Agent、Model Profile 之间引用具体 UUID，修改 Prompt 不会自动改变其他引用。
 
 Agent 请求可以携带 `agent_key` 和 `skill_key`。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。当前 PR5 的 Model Profile 只允许 `fake/fake`，知识库绑定明确为空，真实模型和知识库放到后续 PR。
+
+配置模型在 `app/models/configuration.py`，MySQL 仓储在 `app/storage/configuration.py`。
+资源表保存 `(kind, key)` 和当前编号，版本表保存不可变 JSON，正文由 Prompt/Skill/Model/Agent
+四种严格 Schema 校验，引用表以外键保留具体版本，审计表按全局请求编号保证修改可重试。
+替换必须提供 `expected_id`；请求指纹包括操作、资源、操作者、预期编号和正文，重放返回
+原编号及原正文。归档不能被新绑定使用；已有绑定仍读取归档版本，依赖停用则拒绝新 Run。
+复制旧配置恢复时使用 `restore`，允许保留该历史配置已有的归档引用，但不能引用停用资源。
+
+数据库模式通过 `AGENT_CONFIG_MODE=database` 明确启用，省略 Agent 时使用
+`AGENT_DEFAULT_AGENT_KEY=learning_assistant`；配置缺失返回错误，不回退 Demo。
+`demo` 模式只接受省略选择字段或 `demo`，保留 PR2/PR4 演示流程。两种模式均禁止生产 Fake。
+Conversation 绑定 Agent key，跨 Agent 续聊返回 409；测试 Agent 使用独立会话。
+
+先应用 `000001` 和 `000002` 迁移，再用外置示例创建初始配置：
+
+```bash
+uv run --directory agent --frozen python -m app.config_cli bootstrap \
+  --file agent/examples/learning-assistant.json --actor-id 7 --request-id bootstrap-v1
+```
+
+本机命令还提供 `get`、`list`、`put --file`、`archive`、`disable`、`enable`、
+`restore --source-id` 和 `clone-test --source-key --expires-at [--prompt-id]`。
+写操作必须提供操作者和请求编号；替换、归档、停用和恢复需要 `--expected-id`。
+`get` 明确输出配置正文便于受信任部署人员编辑；写操作/错误只输出标识或稳定错误码。
+`bootstrap` 逐个创建依赖，最后创建 Agent，每一步均校验、记录审计并可重试；中间失败可能
+留下未绑定的依赖，继续使用同一请求编号重试即可，不能覆盖已存在的其他配置。
+命令的信任边界是本机数据库凭据，`--actor-id` 用于审计，不能代替管理员 HTTP 鉴权。
+
+```bash
+uv run --directory agent --frozen python -m app.config_cli clone-test \
+  --source-key learning_assistant --key prompt_test --expires-at 2027-01-01T00:00:00Z \
+  --actor-id 7 --request-id prompt-test-v1
+```
+
+真实模型编排、Token 计量和自动 Skill 路由仍未实现。Fake 只消费运行时长、字符、事件和
+显式工具禁用预算，模型调用/Token 预算保存在快照，供下一阶段 Provider 实际执行。
+工具权限为 Registry 已启用只读集合、Agent 和选中 Skill 的交集；预算取系统、Agent、Skill
+各字段最小值。分级提示可创建多个独立 Agent，本阶段没有检索和可靠的内容级提示限制。
 
 本阶段提供两个健康端点：
 
@@ -96,7 +134,7 @@ allowlist 选择。
 本地演示需先准备已应用迁移的 `oj_agent` 数据库，在 `agent/.env` 中配置 DSN，并**显式**
 设置 `AGENT_RUNTIME_MODE=fake` 或 `langgraph_fake`。默认值为 `disabled`；生产配置拒绝 fake。
 预算来自 `AGENT_MAX_RUN_SECONDS`、`AGENT_MAX_OUTPUT_CHARS`、`AGENT_MAX_RUN_EVENTS`，
-Run 保存 `source=demo_environment`、`version=pr2-demo-v1` 的配置快照，不能视为已发布的 Skill/Prompt。
+Demo Run 保存 `source=demo_environment`、`version=pr2-demo-v1`；database Run 保存具体 Agent/Prompt/Skill/Model UUID 和 `config_hash`。
 
 ```bash
 uv run --directory agent --frozen python -m app.demo \
@@ -176,7 +214,7 @@ HTTP / SSE
   → Session Resolver
   → Intent + Entity Parser
   → Policy Resolver
-  → Published Prompt / Skill / Tool Config
+  → Immutable Agent / Prompt / Skill Config
   → Agent Runtime
        ├─ Direct Answer
        ├─ ReAct Tool Loop
@@ -189,7 +227,7 @@ HTTP / SSE
 
 Context Resolver 只提取 submission_id、problem_id、语言、时间范围等实体，不因识别到实体就自动读取资源。是否调用 get_submission 或 get_problem 由 Agent 在允许的 Tool 集合中决定。
 
-运行时分为 API Layer、Agent Runtime、Tool Executor 和 Control Plane。Control Plane 管理已发布的 Prompt、Skill、Tool 策略、知识库和 Eval 配置。
+运行时分为 API Layer、Agent Runtime、Tool Executor 和 Control Plane。Control Plane 管理不可变 Agent、Prompt、Skill、Tool 策略、知识库和 Eval 配置。
 
 ## 3. 目录结构
 
@@ -218,7 +256,7 @@ agent/
 │   ├── tools/             # Registry、Executor、各业务 Tool
 │   ├── clients/           # User / Problem / Judge gRPC Client
 │   ├── rag/               # 摄取、检索、引用和可见性过滤
-│   ├── control_plane/     # 配置版本、发布、校验、审计
+│   ├── control_plane/     # 配置版本、替换、校验、审计
 │   ├── evals/             # 数据集、Runner、Graders
 │   ├── models/            # State、Event、Persistence
 │   └── core/              # Config、Budget、Trace、脱敏
@@ -226,7 +264,7 @@ agent/
 └── tests/
 ~~~
 
-代码中的 Registry 只注册 Tool 实现和不可绕过的安全元数据。Prompt 文本、Skill 的 Tool 绑定、模型参数、预算和知识库内容从已发布配置读取。
+代码中的 Registry 只注册 Tool 实现和不可绕过的安全元数据。Prompt 文本、Skill 的 Tool 绑定、模型参数、预算和知识库范围从 Agent 的具体配置编号读取。
 
 ## 4. Tool 设计
 
@@ -301,9 +339,9 @@ requires_confirmation: false
 ~~~text
 请求上下文
 → 可用 Skill
-→ Skill 已发布版本
-→ Tool Catalog 已发布策略
-→ Prompt 已发布版本
+→ Agent 绑定的具体 Skill 编号
+→ Registry 与 Agent/Skill 工具交集
+→ 具体 Prompt 编号
 → 模型和预算配置
 ~~~
 
@@ -329,14 +367,14 @@ Prompt 由不可编辑的安全前缀和可管理模板组成：
 ~~~text
 安全前缀（代码固定）
 → 身份、权限和不可信数据说明
-→ 已发布 Skill Prompt
+→ Agent Prompt 和具体 Skill Prompt
 → 用户问题
 → Tool Observation 和证据
 ~~~
 
-管理员可以创建草稿、编辑变量和内容、查看 Diff、运行样例 Eval、发布、回滚、归档和查看审计。不能通过 Prompt 授予新 RPC 权限、绕过业务授权、开启写 Tool、删除安全前缀或注入系统命令。
+管理员可以创建/替换配置、编辑变量和内容、查看 Diff、创建测试 Agent、复制旧配置恢复、归档和查看审计。不能通过 Prompt 授予新 RPC 权限、绕过业务授权、开启写 Tool、删除安全前缀或注入系统命令。
 
-发布前检查变量白名单、长度、敏感信息、Tool 名称和禁止指令。生产运行只读取 published 版本，草稿不影响在线请求。
+创建时检查变量白名单、模板表达式、长度、引用种类、工具和预算；每次修改生成新编号，校验失败不影响当前配置。Prompt 文本本身不能保证安全，授权由代码和目标服务执行。
 
 ## 7. RAG 和知识库
 
@@ -394,14 +432,14 @@ fallback_rate
 
 管理员入口使用 system_admin 或明确授权的 agent_admin 角色，页面包括：
 
-1. Prompt 管理：列表、版本、编辑、Diff、样例运行、发布、回滚和审计。
+1. Prompt 管理：列表、版本、编辑、Diff、样例运行、替换、归档、恢复和审计。
 2. Tool Catalog：查看描述、输入输出 Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计。RPC 方法和最终授权代码只读展示。
-3. Skill 管理：编辑元数据、选择允许的 Tool、绑定 Prompt、设置预算、样例运行、发布和回滚。
+3. Agent/Skill 管理：编辑元数据、绑定 Prompt/Skill/模型、选择 Tool/知识范围、设置预算、测试、替换、归档和复制旧版恢复。
 4. 知识库管理：文档上传、编辑、标签、版本、切分预览、索引、发布和归档。
 5. Eval 与质量：运行数据集、查看通过率、工具选择错误、引用错误、拒答错误、版本对比和失败样例。
 6. 运行观测：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和脱敏运行详情。
 
-管理页面只能修改控制面允许的字段。发布、回滚、归档和启用写 Tool 需要二次确认并写审计日志，生产环境可以配置双人审批。
+管理页面只能修改控制面允许的字段。替换、恢复、归档和启用写 Tool 需要二次确认并写审计日志，生产环境可以配置双人审批。
 
 ## 11. 数据和版本
 
@@ -425,7 +463,7 @@ agent_run_events
 agent_admin_audits
 ~~~
 
-所有可编辑配置使用草稿和发布版本，发布版本不可变。一次 Agent Run 固定配置快照，回滚通过重新发布旧版本实现，不原地修改历史版本。
+PR5 的 Agent、Prompt、Skill、Model 使用 `agent_config_resources`、`agent_config_versions`、`agent_config_links`、`agent_config_audits` 四张表，替代上面目标列表中的 Prompt/Skill 单独版本表。配置正文不可变，修改生成新 UUID 并归档旧版；Run 固定快照。知识库和 Eval 表仍是后续目标。
 
 ## 12. 开发顺序
 
@@ -434,7 +472,7 @@ agent_admin_audits
 3. 接入只读 gRPC Tool 和 Agent Service 内部身份；
 4. 实现 ReAct、Plan-and-Solve、Reflection 和预算控制；
 5. 实现 Prompt、Skill、Tool Catalog、知识库和 Eval 管理 API；
-6. 开发管理员页面、审计、发布和回滚；
+6. 开发管理员页面、配置替换、测试 Agent 和复制旧版恢复；
 7. 先上线算法解释、题目 Hint、提交诊断，再实现复盘、推荐和学习计划；
 8. 接入离线 Eval、人工抽检、Trace、指标和告警；
 9. 最后评估需要确认的写 Tool，普通学习流程默认不启用。
@@ -444,7 +482,7 @@ agent_admin_audits
 - Agent、Prompt、Skill 和知识库不能替代目标 Go Service 的授权。
 - 管理员页面不能修改 RPC 实现、服务身份或安全前缀。
 - Prompt、题面、源码、编译输出和检索内容都是不可信输入。
-- 运行时只使用已发布配置，草稿不会影响生产请求。
-- 配置发布必须可审计、可回滚、可复现。
+- 每次修改生成新编号；Run 不在中途重新解析当前指针，测试 Agent 对普通用户不可见。
+- 配置替换和归档必须可审计，历史配置可以复制恢复，运行快照可复现。
 - 写 Tool 默认关闭，启用需要角色、确认和审计。
 - Tool 次数、计划步数、Token 和时间必须有上限。

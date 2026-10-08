@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -16,7 +17,7 @@ def test_prompt_variables_are_declared_exactly_and_expressions_are_rejected() ->
 
 
 def test_test_agent_requires_admin_visibility_and_expiration() -> None:
-    values = dict(
+    values: dict[str, Any] = dict(
         name="Prompt test",
         prompt_id=uuid4(),
         skill_ids=(uuid4(),),

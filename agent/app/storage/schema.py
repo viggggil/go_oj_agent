@@ -1,6 +1,16 @@
 """与 migrations/agent 一致的 SQLAlchemy Core 表定义。"""
 
-from sqlalchemy import CHAR, JSON, BigInteger, Boolean, Computed, ForeignKey, MetaData, String, Table
+from sqlalchemy import (
+    CHAR,
+    JSON,
+    BigInteger,
+    Boolean,
+    Computed,
+    ForeignKey,
+    MetaData,
+    String,
+    Table,
+)
 from sqlalchemy.dialects.mysql import DATETIME, MEDIUMTEXT
 from sqlalchemy.sql.schema import Column
 
@@ -61,7 +71,8 @@ agent_messages = Table(
 )
 
 agent_config_resources = Table(
-    "agent_config_resources", metadata,
+    "agent_config_resources",
+    metadata,
     Column("id", CHAR(36), primary_key=True),
     Column("kind", String(16), nullable=False),
     Column("config_key", String(64, collation="utf8mb4_bin"), nullable=False),
@@ -71,9 +82,15 @@ agent_config_resources = Table(
 )
 
 agent_config_versions = Table(
-    "agent_config_versions", metadata,
+    "agent_config_versions",
+    metadata,
     Column("id", CHAR(36), primary_key=True),
-    Column("resource_id", CHAR(36), ForeignKey("agent_config_resources.id", ondelete="RESTRICT"), nullable=False),
+    Column(
+        "resource_id",
+        CHAR(36),
+        ForeignKey("agent_config_resources.id", ondelete="RESTRICT"),
+        nullable=False,
+    ),
     Column("previous_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT")),
     Column("content", JSON, nullable=False),
     Column("created_by", BigInteger, nullable=False),
@@ -83,17 +100,34 @@ agent_config_versions = Table(
 )
 
 agent_config_links = Table(
-    "agent_config_links", metadata,
-    Column("version_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT"), primary_key=True),
-    Column("target_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT"), primary_key=True),
+    "agent_config_links",
+    metadata,
+    Column(
+        "version_id",
+        CHAR(36),
+        ForeignKey("agent_config_versions.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+    Column(
+        "target_id",
+        CHAR(36),
+        ForeignKey("agent_config_versions.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
 )
 
 agent_config_audits = Table(
-    "agent_config_audits", metadata,
+    "agent_config_audits",
+    metadata,
     Column("request_id", String(128, collation="utf8mb4_bin"), primary_key=True),
     Column("actor_id", BigInteger, nullable=False),
     Column("action", String(16), nullable=False),
-    Column("resource_id", CHAR(36), ForeignKey("agent_config_resources.id", ondelete="RESTRICT"), nullable=False),
+    Column(
+        "resource_id",
+        CHAR(36),
+        ForeignKey("agent_config_resources.id", ondelete="RESTRICT"),
+        nullable=False,
+    ),
     Column("old_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT")),
     Column("new_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT")),
     Column("fingerprint", String(64), nullable=False),

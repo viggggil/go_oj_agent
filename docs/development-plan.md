@@ -1326,7 +1326,7 @@ Agent
 # 9.4 通用 Agent Workflow
 
 Agent Runtime 不固定某个场景的必经取数链路。Intent / Entity Parser 解析用户目标、
-资源 ID 和约束；策略层依据 Skill、用户权限和已发布 Tool Catalog 提供可选 Tool；
+资源 ID 和约束；策略层依据 Agent/Skill 配置、用户权限和 Registry Tool Catalog 提供可选 Tool；
 Agent 只调用当前任务需要的工具。
 
 例如，下面是工具选择的可能路径，不是所有请求都执行的固定顺序：
@@ -1519,7 +1519,7 @@ Intent + Entity Parser
   ↓
 Policy Resolver
   ↓
-Published Prompt / Skill / Tool Catalog Snapshot
+Immutable Agent / Prompt / Skill / Tool Catalog Snapshot
   ↓
 Direct / ReAct / Plan-and-Solve
   ↓
@@ -1532,7 +1532,7 @@ SSE + Persistence + Trace
 
 Context Resolver 只解析资源 ID 和约束，不自动预取提交、题目或源码。Agent 从策略
 允许的 Tool 集合中选择工具。一次 Agent Run 固定 Prompt、Skill、Tool Catalog、模型
-和知识库索引版本，草稿不会影响在线运行。
+和知识库索引版本；配置替换生成新 UUID，不影响已经开始的 Run。
 
 ## 9.10.2 Control Plane 范围
 
@@ -1547,13 +1547,13 @@ Eval Case / Eval Dataset / Eval Run
 Agent Run / Agent Run Event / Admin Audit
 ```
 
-统一状态：
+PR5 的 Agent、Prompt、Skill、Model Profile 不采用草稿状态：
 
 ```text
-DRAFT → PUBLISHED → ARCHIVED
+CREATED → CURRENT → ARCHIVED
 ```
 
-发布版本不可变；回滚通过重新发布旧版本完成。管理员可以调整 Prompt 模板、Skill 的
+配置版本不可变；恢复通过复制旧版本创建新 UUID。管理员可以调整 Prompt 模板、Skill 的
 Tool allowlist、预算、输出结构、知识库元数据和评估配置，但不能修改 RPC 实现、目标
 服务、最终授权、安全前缀或任意 Python 代码。
 
@@ -1561,14 +1561,14 @@ Tool allowlist、预算、输出结构、知识库元数据和评估配置，但
 
 管理员入口使用 `system_admin` 或明确授权的 `agent_admin` 角色，页面拆为：
 
-1. Prompt：编辑、变量校验、版本 Diff、样例运行、发布、回滚和审计。
+1. Prompt：编辑、变量校验、版本 Diff、样例运行、替换、归档、恢复和审计。
 2. Tool Catalog：Schema、来源 RPC、敏感级别、允许角色、启用状态、延迟和失败统计。
-3. Skill：描述、执行模式、Prompt 绑定、Tool allowlist、预算、输出结构、发布和回滚。
+3. Skill：描述、执行模式、Prompt 绑定、Tool allowlist、预算、输出结构、替换、归档和复制旧版恢复。
 4. Knowledge：文档、标签、版本、切分预览、索引、发布、归档和回滚。
 5. Eval：数据集、样例运行、版本对比、失败样例、人工标注和评分维度。
 6. Observability：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和质量指标。
 
-发布、回滚、归档和启用写 Tool 需要二次确认和审计日志，生产环境可配置双人审批。
+替换、恢复、归档和启用写 Tool 需要二次确认和审计日志，生产环境可配置双人审批。
 
 ## 9.10.4 质量评估和观测
 
@@ -1615,9 +1615,9 @@ fallback_rate
 
 ### C. 控制面 API
 
-- Prompt 草稿、校验、Diff、发布、回滚。
+- Prompt 创建、校验、Diff、替换、归档和恢复。
 - Tool Catalog 查询和 Skill Tool allowlist。
-- Skill 编辑、样例运行、发布、回滚。
+- Skill 编辑、样例运行、替换、归档、恢复。
 - 知识库文档、切分、索引、发布和归档。
 - Eval 数据集、运行、结果和人工标注。
 
@@ -1625,7 +1625,7 @@ fallback_rate
 
 - 管理员路由和 RBAC。
 - Prompt、Tool、Skill、Knowledge、Eval、Observability 页面。
-- 发布二次确认、乐观并发控制、失败提示和审计展示。
+- 配置替换、恢复、归档与知识库发布的二次确认、乐观并发控制、失败提示和审计展示。
 - 不向浏览器返回完整源码、凭据、原始敏感 Prompt 或内部 Tool Result。
 
 ### E. 场景和质量基线
@@ -1646,9 +1646,9 @@ fallback_rate
 
 ## 9.10.6 验收标准
 
-- [ ] 草稿配置不会影响生产 Agent。
-- [ ] 发布版本不可变，Agent Run 可复现配置快照。
-- [ ] 管理员可以编辑 Prompt、Skill 和知识库并回滚。
+- [ ] 配置替换生成新 UUID，当前 Run 不切换配置。
+- [ ] 配置版本不可变，Agent Run 可复现完整快照。
+- [ ] 管理员可以替换、归档 Prompt/Skill 并复制旧版恢复；知识库支持编辑和版本回退。
 - [ ] Tool Catalog 能展示 Schema、来源、权限和调用指标。
 - [ ] 管理员不能通过页面修改 RPC、服务身份或最终授权。
 - [ ] Eval 可以比较两个 Prompt/Skill/模型/知识库版本。
