@@ -36,6 +36,8 @@ uv run --directory agent --frozen python -m app.config_cli bootstrap \
 `bootstrap` 逐个创建依赖，最后创建 Agent，每一步均校验、记录审计并可重试；中间失败可能
 留下未绑定的依赖，继续使用同一请求编号重试即可，不能覆盖已存在的其他配置。
 命令的信任边界是本机数据库凭据，`--actor-id` 用于审计，不能代替管理员 HTTP 鉴权。
+`clone-test` 创建新绑定，源 Agent 直接引用的 Prompt/Skill/Model 必须未归档且未停用。
+它按 `--source-key` 读取当前内容；相同请求编号重试时源配置必须保持不变，内容变化返回请求冲突。
 
 ```bash
 uv run --directory agent --frozen python -m app.config_cli clone-test \

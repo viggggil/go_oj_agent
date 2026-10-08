@@ -398,29 +398,37 @@ class ConfigurationStore:
 
     async def change_state(self, write: ConfigWrite, action: ConfigAction) -> ConfigVersion:
         fingerprint = config_hash({**write.model_dump(mode="json"), "action": action})
-        async with self._engine.begin() as connection:
-            resource = await self._lock_resource(connection, write)
-            replay = await self._replay(connection, write, fingerprint)
-            if replay is not None:
-                return replay
-            old_id = resource["current_id"]
-            if not old_id:
-                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
-            if str(write.expected_id) != old_id:
-                raise ConfigError("AGENT_CONFIGURATION_STALE", 409)
-            if action == "archive":
-                await connection.execute(
-                    update(versions)
-                    .where(and_(versions.c.id == old_id, versions.c.archived_at.is_(None)))
-                    .values(archived_by=write.actor_id, archived_at=self._clock())
+        try:
+            async with self._engine.begin() as connection:
+                resource = await self._lock_resource(connection, write)
+                replay = await self._replay(connection, write, fingerprint)
+                if replay is not None:
+                    return replay
+                old_id = resource["current_id"]
+                if not old_id:
+                    raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+                if str(write.expected_id) != old_id:
+                    raise ConfigError("AGENT_CONFIGURATION_STALE", 409)
+                if action == "archive":
+                    await connection.execute(
+                        update(versions)
+                        .where(and_(versions.c.id == old_id, versions.c.archived_at.is_(None)))
+                        .values(archived_by=write.actor_id, archived_at=self._clock())
+                    )
+                else:
+                    await connection.execute(
+                        update(resources)
+                        .where(resources.c.id == resource["id"])
+                        .values(disabled=action == "disable")
+                    )
+                await self._audit(
+                    connection, write, fingerprint, str(resource["id"]), action, old_id, None
                 )
-            else:
-                await connection.execute(
-                    update(resources)
-                    .where(resources.c.id == resource["id"])
-                    .values(disabled=action == "disable")
-                )
-            await self._audit(
-                connection, write, fingerprint, str(resource["id"]), action, old_id, None
-            )
-            return await self._by_id(connection, str(old_id))
+                return await self._by_id(connection, str(old_id))
+        except IntegrityError:
+            # 回滚后重新读取审计，把跨资源的并发请求编号冲突转换为稳定错误。
+            async with self._engine.connect() as connection:
+                replay = await self._replay(connection, write, fingerprint)
+                if replay is not None:
+                    return replay
+            raise

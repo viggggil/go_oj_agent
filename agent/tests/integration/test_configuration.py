@@ -15,7 +15,7 @@ import pytest
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from app.core.runtime_config import DatabaseConfigReader
 from app.core.settings import Settings
@@ -178,6 +178,57 @@ async def test_archived_bindings_and_dependency_disable(config_engine: AsyncEngi
     restored = await store.create_or_replace(restored_write, agent.content.model_dump(mode="json"))
     assert restored.id not in (agent.id, changed.id)
     assert (await store.load_graph(agent.key))[0].id == restored.id
+
+
+async def test_concurrent_state_request_conflict_rolls_back(config_engine: AsyncEngine) -> None:
+    store = ConfigurationStore(config_engine, registry())
+    prefix = "test_" + uuid4().hex
+    first = await store.create_or_replace(write("prompt", prefix + "_a"), {"text": "first"})
+    second = await store.create_or_replace(write("prompt", prefix + "_b"), {"text": "second"})
+    request_id = str(uuid4())
+    barrier = asyncio.Barrier(2)
+    synchronized: set[str] = set()
+
+    class ConcurrentStateStore(ConfigurationStore):
+        async def _replay(
+            self, connection: AsyncConnection, write: ConfigWrite, fingerprint: str
+        ) -> ConfigVersion | None:
+            result = await super()._replay(connection, write, fingerprint)
+            # 两笔事务都先确认请求未提交，再争用同一个审计主键。
+            if write.request_id == request_id and result is None and write.key not in synchronized:
+                synchronized.add(write.key)
+                await asyncio.wait_for(barrier.wait(), timeout=5)
+            return result
+
+    concurrent = ConcurrentStateStore(config_engine, registry())
+    writes = [write("prompt", item.key, item.id, request_id) for item in (first, second)]
+    results = await asyncio.wait_for(
+        asyncio.gather(
+            *(concurrent.change_state(item, "disable") for item in writes),
+            return_exceptions=True,
+        ),
+        timeout=10,
+    )
+    assert sum(isinstance(result, ConfigVersion) for result in results) == 1, results
+    assert (
+        sum(
+            isinstance(result, ConfigError)
+            and result.code == "AGENT_CONFIGURATION_REQUEST_CONFLICT"
+            and result.status == 409
+            for result in results
+        )
+        == 1
+    ), results
+    for item, mutation, result in zip((first, second), writes, results, strict=True):
+        current = await store.resolve("prompt", item.key)
+        assert current.id == item.id
+        assert current.disabled == isinstance(result, ConfigVersion)
+        assert len(await store.list_versions("prompt", item.key)) == 1
+        if isinstance(result, ConfigVersion):
+            assert (await store.change_state(mutation, "disable")).id == result.id
+        else:
+            with pytest.raises(ConfigError, match="REQUEST_CONFLICT"):
+                await store.change_state(mutation, "disable")
 
 
 async def test_failed_transaction_and_invalid_tool_or_reference(config_engine: AsyncEngine) -> None:
