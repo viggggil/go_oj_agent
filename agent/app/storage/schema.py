@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     Computed,
     ForeignKey,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -41,6 +42,7 @@ agent_runs = Table(
     Column("request_id", String(128), nullable=False),
     Column("config_source", String(64), nullable=False),
     Column("config_snapshot", JSON, nullable=False),
+    Column("model_summary", JSON),
     Column("status", String(32), nullable=False),
     Column("started_at", DATETIME(fsp=3), nullable=False),
     Column("finished_at", DATETIME(fsp=3)),
@@ -132,4 +134,36 @@ agent_config_audits = Table(
     Column("new_id", CHAR(36), ForeignKey("agent_config_versions.id", ondelete="RESTRICT")),
     Column("fingerprint", String(64), nullable=False),
     Column("created_at", DATETIME(fsp=3), nullable=False),
+)
+
+agent_credentials = Table(
+    "agent_credentials",
+    metadata,
+    Column("id", CHAR(36), primary_key=True),
+    Column("name", String(128), nullable=False),
+    Column("encrypted_secret", LargeBinary(8192), nullable=False),
+    Column("nonce", LargeBinary(12), nullable=False),
+    Column("key_version", String(64), nullable=False),
+    Column("created_by", BigInteger, nullable=False),
+    Column("created_at", DATETIME(fsp=3), nullable=False),
+    Column("revoked_by", BigInteger),
+    Column("revoked_at", DATETIME(fsp=3)),
+)
+
+agent_credential_audits = Table(
+    "agent_credential_audits",
+    metadata,
+    Column("request_id", String(128, collation="utf8mb4_bin"), primary_key=True),
+    Column("credential_id", CHAR(36), ForeignKey("agent_credentials.id"), nullable=False),
+    Column("actor_id", BigInteger, nullable=False),
+    Column("action", String(16), nullable=False),
+    Column("fingerprint", String(64), nullable=False),
+    Column("created_at", DATETIME(fsp=3), nullable=False),
+)
+
+agent_provider_credentials = Table(
+    "agent_provider_credentials",
+    metadata,
+    Column("version_id", CHAR(36), ForeignKey("agent_config_versions.id"), primary_key=True),
+    Column("credential_id", CHAR(36), ForeignKey("agent_credentials.id"), nullable=False),
 )

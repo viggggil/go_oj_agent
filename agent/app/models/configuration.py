@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-ConfigKind = Literal["prompt", "skill", "model", "agent"]
+ConfigKind = Literal["prompt", "skill", "model", "agent", "provider"]
 ConfigKey = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")]
 ToolName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,127}$")]
 PromptVariable = Literal["language", "problem_id", "submission_id"]
@@ -70,8 +70,38 @@ class SkillConfig(ImmutableConfig):
 
 
 class ModelProfileConfig(ImmutableConfig):
-    provider: Literal["fake"] = "fake"
-    model: Literal["fake"] = "fake"
+    provider: Literal["fake", "responses"] = "fake"
+    model: str = Field(
+        default="fake", min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_./:@+-]*$"
+    )
+    provider_id: UUID | None = None
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    verbosity: Literal["low", "medium", "high"] | None = None
+    max_output_tokens: int = Field(default=4096, ge=1, le=32_000, strict=True)
+    context_window_tokens: int = Field(default=32_000, ge=2, le=256_000, strict=True)
+
+    @model_validator(mode="after")
+    def validate_provider(self) -> "ModelProfileConfig":
+        if self.provider == "fake":
+            if self.model != "fake" or self.provider_id is not None or self.temperature is not None:
+                raise ValueError("Fake profiles cannot contain real model settings")
+        elif self.provider_id is None:
+            raise ValueError("Real profiles require a Provider version")
+        if self.max_output_tokens >= self.context_window_tokens:
+            raise ValueError("Output must leave room for input")
+        return self
+
+
+class ProviderConfig(ImmutableConfig):
+    name: str = Field(min_length=1, max_length=128)
+    adapter: Literal["responses"] = "responses"
+    base_url: str = Field(min_length=1, max_length=512)
+    credential_id: UUID
+    connect_timeout_seconds: float = Field(default=5, gt=0, le=30)
+    first_token_timeout_seconds: float = Field(default=20, gt=0, le=120)
+    idle_timeout_seconds: float = Field(default=15, gt=0, le=60)
+    request_timeout_seconds: float = Field(default=30, gt=0, le=300)
+    max_retries: int = Field(default=0, ge=0, le=2, strict=True)
 
 
 class AgentConfig(ImmutableConfig):
@@ -104,12 +134,13 @@ class AgentConfig(ImmutableConfig):
         return self
 
 
-type ConfigBody = PromptConfig | SkillConfig | ModelProfileConfig | AgentConfig
+type ConfigBody = PromptConfig | SkillConfig | ModelProfileConfig | AgentConfig | ProviderConfig
 CONFIG_MODELS: dict[ConfigKind, type[ConfigBody]] = {
     "prompt": PromptConfig,
     "skill": SkillConfig,
     "model": ModelProfileConfig,
     "agent": AgentConfig,
+    "provider": ProviderConfig,
 }
 
 
@@ -127,6 +158,8 @@ def parse_config(kind: ConfigKind, content: Any) -> ConfigBody:
 
 
 def config_references(body: ConfigBody) -> dict[str, ConfigKind]:
+    if isinstance(body, ModelProfileConfig) and body.provider_id is not None:
+        return {str(body.provider_id): "provider"}
     if isinstance(body, SkillConfig):
         return {str(body.prompt_id): "prompt"}
     if isinstance(body, AgentConfig):

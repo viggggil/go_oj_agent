@@ -136,13 +136,18 @@ class MemoryStore:
         status: RunStatus,
         answer: str | None = None,
         error_code: str | None = None,
+        model_summary: dict[str, Any] | None = None,
     ) -> RunRecord:
         assert self.record is not None
         if status == "COMPLETED" and self.fail_completion:
             raise RuntimeError("private-db-password")
         assert self.record.status == "RUNNING"
         self.record = replace(
-            self.record, status=status, finished_at=utc_now(), error_code=error_code
+            self.record,
+            status=status,
+            finished_at=utc_now(),
+            error_code=error_code,
+            model_summary=model_summary,
         )
         if answer:
             self.answers.append(answer)

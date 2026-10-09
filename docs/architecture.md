@@ -626,6 +626,16 @@ reflection
 
 每次 Agent Run 开始时固定 Agent、Prompt、Skill、Tool Catalog、模型和知识库索引的具体配置 UUID 快照。一次回答执行期间不得切换配置；PR5 的替换会创建新 UUID，已开始的 Run 继续使用原快照。
 
+### PR6 模型边界
+
+真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的 `deepseek-v4-flash` 请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
+
+凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；CLI 与未来管理 API 共用底层仓储，但目前没有管理员 HTTP/前端。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
+
+Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
+
+真实模型暂不使用已存历史、不调用业务 Tools，只使用安全前缀、已解析配置 Prompt 与当前消息；多轮上下文、ReAct 和完整 Eval/观测后续交付。运行摘要和人工 smoke 样例只是最小验证基础。
+
 ### 10.2 Tool Registry 与策略
 
 代码 Registry 只注册 Tool 实现和不可绕过的安全元数据。第一批只读 Tool 包括：

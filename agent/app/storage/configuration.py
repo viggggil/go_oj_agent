@@ -11,12 +11,14 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from app.core.provider_policy import ProviderPolicy
 from app.models.configuration import (
     AgentConfig,
     ConfigBody,
     ConfigError,
     ConfigKind,
     ConfigWrite,
+    ProviderConfig,
     SkillConfig,
     config_hash,
     config_references,
@@ -35,6 +37,7 @@ from app.storage.schema import (
 from app.storage.schema import (
     agent_config_versions as versions,
 )
+from app.storage.schema import agent_credentials, agent_provider_credentials
 from app.tools.registry import ToolNotFound, ToolRegistry
 
 type ConfigAction = Literal["archive", "disable", "enable"]
@@ -80,14 +83,20 @@ class ConfigurationStore:
         registry: ToolRegistry,
         *,
         clock: Callable[[], datetime] = utc_now,
+        provider_policy: ProviderPolicy | None = None,
     ) -> None:
         if engine.url.database != "oj_agent" or engine.url.drivername != "mysql+asyncmy":
             raise ValueError("Configuration store requires its own oj_agent MySQL schema")
         self._engine = engine
         self._registry = registry
         self._clock = clock
+        self._provider_policy = provider_policy
 
     def _validate_tools(self, body: ConfigBody) -> None:
+        if isinstance(body, ProviderConfig):
+            if self._provider_policy is None:
+                raise ConfigError("AGENT_MODEL_ENDPOINT_DENIED")
+            self._provider_policy.validate(body)
         if not isinstance(body, (AgentConfig, SkillConfig)):
             return
         for name in body.allowed_tools:
@@ -192,6 +201,7 @@ class ConfigurationStore:
             queue = [root]
             while queue:
                 item = queue.pop()
+                await self._check_credential(connection, item.content)
                 for version_id, kind in config_references(item.content).items():
                     reference = graph.get(version_id)
                     if reference is None:
@@ -201,6 +211,20 @@ class ConfigurationStore:
                     if reference.kind != kind or reference.disabled:
                         raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
             return root, graph
+
+    async def _check_credential(
+        self, connection: AsyncConnection, body: ConfigBody, *, lock: bool = False
+    ) -> None:
+        if not isinstance(body, ProviderConfig):
+            return
+        query = select(agent_credentials.c.id, agent_credentials.c.revoked_at).where(
+            agent_credentials.c.id == str(body.credential_id)
+        )
+        if lock:
+            query = query.with_for_update()
+        row = (await connection.execute(query)).first()
+        if row is None or row.revoked_at is not None:
+            raise ConfigError("AGENT_CREDENTIAL_UNAVAILABLE", 503)
 
     async def _replay(
         self,
@@ -280,6 +304,7 @@ class ConfigurationStore:
         preserved_ids: tuple[str, ...],
     ) -> None:
         old_links: set[str] = set()
+        await self._check_credential(connection, body, lock=True)
         for old_id in preserved_ids:
             old_links.update(
                 (
@@ -312,6 +337,7 @@ class ConfigurationStore:
                 continue
             visited.add(reference.id)
             self._validate_tools(reference.content)
+            await self._check_credential(connection, reference.content, lock=True)
             for version_id, kind in config_references(reference.content).items():
                 child = await self._by_id(connection, version_id)
                 if child.kind != kind or child.disabled:
@@ -364,6 +390,12 @@ class ConfigurationStore:
                 for reference_id in config_references(body):
                     await connection.execute(
                         insert(links).values(version_id=version_id, target_id=reference_id)
+                    )
+                if isinstance(body, ProviderConfig):
+                    await connection.execute(
+                        insert(agent_provider_credentials).values(
+                            version_id=version_id, credential_id=str(body.credential_id)
+                        )
                     )
                 if old_id:
                     await connection.execute(

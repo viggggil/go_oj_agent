@@ -10,6 +10,7 @@ from uuid import UUID
 
 from app.core.runtime_config import ConfigSnapshotReader
 from app.graphs.runtime import AgentRuntime
+from app.models.provider import MODEL_ERROR_CODES, ModelFailure
 from app.models.runtime import (
     AgentState,
     ChatRequest,
@@ -56,6 +57,7 @@ class RuntimeStore(Protocol):
         status: RunStatus,
         answer: str | None = None,
         error_code: str | None = None,
+        model_summary: dict[str, Any] | None = None,
     ) -> RunRecord: ...
 
     async def interrupt_running_runs(self) -> int: ...
@@ -180,8 +182,9 @@ class RunService:
         answer = ""
         sequence = 0
         terminal = False
+        runtime_state = state.model_copy(deep=True)
         try:
-            iterator = self._runtime.run(state.model_copy(deep=True))
+            iterator = self._runtime.run(runtime_state)
             while True:
                 remaining = end - monotonic()
                 if remaining <= 0:
@@ -216,19 +219,33 @@ class RunService:
                             run_id=state.run_id,
                             status="COMPLETED",
                             answer=answer,
+                            model_summary=(
+                                runtime_state.model_summary.model_dump(mode="json")
+                                if runtime_state.model_summary is not None
+                                else None
+                            ),
                         ),
                         timeout=max(0, end - monotonic()),
                     )
                     terminal = True
                     state.status = "COMPLETED"
+                    logger.info(
+                        "Agent run completed",
+                        extra={
+                            "run_id": str(state.run_id),
+                            "request_id": state.principal.request_id,
+                        },
+                    )
                     yield StreamEvent.done(state, sequence)
                     return
                 yield event.model_copy(update={"sequence": sequence})
         except (asyncio.CancelledError, GeneratorExit):
+            state.model_summary = runtime_state.model_summary
             await self._terminate(state, "CANCELLED", "AGENT_CANCELLED")
             terminal = True
             raise
         except Exception as exc:
+            state.model_summary = runtime_state.model_summary
             # 注入的 Runtime 即使误用内部异常类，也不能输出任意错误文本。
             logger.warning(
                 "Agent runtime failed",
@@ -239,6 +256,8 @@ class RunService:
                 if isinstance(exc, RuntimeFailure) and exc.code in _PUBLIC_RUNTIME_ERROR_CODES
                 else "AGENT_RUN_FAILED"
             )
+            if isinstance(exc, ModelFailure) and exc.code in MODEL_ERROR_CODES:
+                code = exc.code
             await self._terminate(state, "FAILED", code)
             terminal = True
             yield StreamEvent.error(state, code, sequence + 1)
@@ -258,12 +277,22 @@ class RunService:
     async def _terminate(self, state: AgentState, status: RunStatus, code: str) -> None:
         if state.status != "RUNNING":
             return
+        if state.model_summary is not None:
+            for attempt in state.model_summary.attempts:
+                if attempt.finish_reason is None:
+                    attempt.finish_reason = "cancelled" if status == "CANCELLED" else "failed"
+                    attempt.error_code = code
         task = asyncio.create_task(
             self._store.finish_run(
                 user_id=state.user_id,
                 run_id=state.run_id,
                 status=status,
                 error_code=code,
+                model_summary=(
+                    state.model_summary.model_dump(mode="json")
+                    if state.model_summary is not None
+                    else None
+                ),
             )
         )
         try:

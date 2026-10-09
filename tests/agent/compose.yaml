@@ -12,6 +12,7 @@ services:
       - ../../migrations/mysql/000001_create_schemas.up.sql:/docker-entrypoint-initdb.d/001_create_schemas.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
       - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/502_create_agent_configuration.sql:ro
+      - ../../migrations/agent/000003_create_model_provider.up.sql:/docker-entrypoint-initdb.d/503_create_model_provider.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s
@@ -31,17 +32,38 @@ services:
       AGENT_READINESS_TIMEOUT_SECONDS: 2
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
-      AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_RUNTIME_MODE: "${AGENT_TEST_RUNTIME_MODE:-langgraph_fake}"
       AGENT_CONFIG_MODE: database
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem
       AGENT_SSE_HEARTBEAT_SECONDS: 1
+      AGENT_CREDENTIAL_KEYRING_FILE: /run/keys/model-keyring.json
+      AGENT_PROVIDER_ALLOWED_ORIGINS: '["http://mock-provider:8001"]'
+      AGENT_PROVIDER_ALLOW_PRIVATE_NETWORK: true
     ports:
       - "127.0.0.1:${AGENT_TEST_HTTP_PORT}:8000"
     volumes:
       - "${AGENT_TEST_KEY_DIR}/gateway-public.pem:/run/keys/gateway-public.pem:ro"
+      - "${AGENT_TEST_KEY_DIR}/model-keyring.json:/run/keys/model-keyring.json:ro"
     depends_on:
       mysql:
         condition: service_healthy
+
+  mock-provider:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "uvicorn", "mock_provider:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      PYTHONPATH: /mock
+    volumes:
+      - ./mock_provider.py:/mock/mock_provider.py:ro
+    ports:
+      - "127.0.0.1:${AGENT_TEST_MOCK_PORT}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/healthz', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   gateway-service:
     build:

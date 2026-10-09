@@ -674,6 +674,16 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 `request_id` 幂等，调用方不能自动重试 Chat POST。普通用户（包括管理员身份）只能访问
 本人会话；跨用户管理查询属于后续控制面。
 
+### PR6 真实 Responses 模型
+
+外部 Chat 请求和 SSE envelope 不变，Gateway 仍验证 Access JWT、签发可信委托并校验/转发有界 SSE。新增模型错误只使用已有 error 事件的稳定 code：`AGENT_MODEL_AUTH_FAILED`、`AGENT_MODEL_QUOTA`、`AGENT_MODEL_RATE_LIMIT`、`AGENT_MODEL_UNAVAILABLE`、`AGENT_MODEL_TIMEOUT`、`AGENT_MODEL_INVALID_RESPONSE`、`AGENT_MODEL_REJECTED`、`AGENT_MODEL_INPUT_LIMIT`、`AGENT_MODEL_OUTPUT_LIMIT`、`AGENT_MODEL_CALL_LIMIT`、`AGENT_MODEL_BLOCKED`、`AGENT_MODEL_UNSUPPORTED_OUTPUT`、`AGENT_MODEL_ENDPOINT_DENIED`、`AGENT_CREDENTIAL_UNAVAILABLE`。不透传 Provider HTTP 错误正文。
+
+模型配置与选定 Skill 不兼容时，建流前返回 409 `AGENT_CONFIGURATION_UNSUPPORTED`；凭据引用不存在或撤销时返回 503。Gateway 使用已有状态映射，不透传内部错误正文。建流后的模型失败由 SSE error 表示，即使已有部分 token，也不能当成成功答案；done 仍表示最终持久化成功。
+
+内部 Provider 接口第一版使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`，包含本轮 instructions/input，不带历史、previous_response_id 或 tools。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
+
+本阶段没有公开凭据读写 API。`app.credential_cli` 仅提供本机 create/get/list/revoke 和 init-keyring，读取 Key 使用 600 文件或 stdin；查询不会返回原始 Key。`app.config_cli` 扩展 provider kind 和可选的 bootstrap credential-id；仍不能把 actor-id 当作可信管理员角色。
+
 ### 其他用户 API
 
 `GET /api/v1/users/{user_id}` 仍是 User API，与 Agent Chat 无关。内部对应

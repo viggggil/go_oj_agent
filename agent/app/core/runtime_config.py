@@ -1,6 +1,6 @@
 """运行配置快照接口；PR2 的 demo 配置不代表已发布控制面。"""
 
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -8,7 +8,9 @@ from app.core.settings import Settings
 from app.models.configuration import (
     AgentConfig,
     ConfigError,
+    ModelProfileConfig,
     PromptConfig,
+    ProviderConfig,
     SkillConfig,
     config_hash,
 )
@@ -23,7 +25,7 @@ class ConfigSnapshot(BaseModel):
 
     source: Literal["demo_environment", "database"] = "demo_environment"
     version: str = "pr2-demo-v1"
-    runtime: Literal["fake", "langgraph_fake"]
+    runtime: Literal["fake", "langgraph_fake", "model"]
     budget: RuntimeBudget
     allowed_tools: tuple[str, ...] = ()
     agent_key: str = "demo"
@@ -38,6 +40,9 @@ class ConfigSnapshot(BaseModel):
     configurations: dict[str, dict[str, object]] = {}
     is_test: bool = False
     execution_mode: str = "direct"
+    provider_id: str | None = None
+    model_profile: dict[str, object] | None = None
+    provider_config: dict[str, object] | None = None
 
 
 class ConfigSnapshotReader(Protocol):
@@ -46,10 +51,13 @@ class ConfigSnapshotReader(Protocol):
 
 class DemoConfigReader:
     def __init__(self, settings: Settings) -> None:
-        if settings.runtime_mode == "disabled" or settings.environment == "production":
+        if (
+            settings.runtime_mode not in {"fake", "langgraph_fake"}
+            or settings.environment == "production"
+        ):
             raise ValueError("Demo runtime must be explicitly enabled outside production")
         self._snapshot = ConfigSnapshot(
-            runtime=settings.runtime_mode,
+            runtime=cast(Literal["fake", "langgraph_fake"], settings.runtime_mode),
             budget=RuntimeBudget(
                 max_run_seconds=settings.max_run_seconds,
                 max_output_chars=settings.max_output_chars,
@@ -77,8 +85,8 @@ class DatabaseConfigReader:
     def __init__(
         self, store: ConfigurationStore, settings: Settings, registry: ToolRegistry
     ) -> None:
-        if settings.runtime_mode == "disabled" or settings.environment == "production":
-            raise ValueError("Database Fake runtime requires explicit non-production activation")
+        if settings.runtime_mode == "disabled":
+            raise ValueError("Database runtime requires explicit activation")
         self._store = store
         self._settings = settings
         self._registry = registry
@@ -111,6 +119,18 @@ class DatabaseConfigReader:
         skill = skill_version.content
         if not isinstance(skill, SkillConfig):
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+        model_version = graph[str(agent.model_profile_id)]
+        profile = model_version.content
+        if not isinstance(profile, ModelProfileConfig):
+            raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+        real = self._settings.runtime_mode == "model"
+        if real != (profile.provider == "responses") or (real and skill.execution_mode != "direct"):
+            raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
+        provider_version = graph[str(profile.provider_id)] if real else None
+        if provider_version is not None and not isinstance(
+            provider_version.content, ProviderConfig
+        ):
+            raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
         prompt_version = graph[str(agent.prompt_id)]
         skill_prompt_version = graph[str(skill.prompt_id)]
         if not isinstance(prompt_version.content, PromptConfig) or not isinstance(
@@ -128,6 +148,9 @@ class DatabaseConfigReader:
             max_run_seconds=self._settings.max_run_seconds,
             max_output_chars=self._settings.max_output_chars,
             max_events=self._settings.max_run_events,
+            max_model_calls=self._settings.max_model_calls,
+            max_input_tokens=self._settings.max_input_tokens,
+            max_output_tokens=self._settings.max_output_tokens,
         )
         budgets = [agent.budget.model_dump(), skill.budget.model_dump(), system_budget.model_dump()]
         budget = RuntimeBudget.model_validate(
@@ -167,6 +190,11 @@ class DatabaseConfigReader:
             configurations=configurations,
             is_test=agent.is_test,
             execution_mode=skill.execution_mode,
+            provider_id=provider_version.id if provider_version is not None else None,
+            model_profile=profile.model_dump(mode="json") if real else None,
+            provider_config=provider_version.content.model_dump(mode="json")
+            if provider_version is not None
+            else None,
         )
         return snapshot.model_copy(
             update={"config_hash": config_hash(snapshot.model_dump(mode="json"))}

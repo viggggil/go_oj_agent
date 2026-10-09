@@ -23,3 +23,9 @@ for name in ("user", "gateway"):
     )
 for path in directory.glob("*.pem"):
     path.chmod(0o644)
+
+# 临时 mock 凭据的测试 keyring；真实部署不得使用这些测试材料。
+from app.credential_cli import init_keyring
+
+init_keyring(directory / "model-keyring.json")
+(directory / "model-keyring.json").chmod(0o644)

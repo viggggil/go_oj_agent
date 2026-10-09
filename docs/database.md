@@ -582,12 +582,24 @@ Prompt 变量、Skill 工具、Agent 绑定、模型类型和预算都在切换�
 共享 Prompt 或 Skill 更新不会自动修改其他 Agent；已有配置按 links 中的历史 UUID 继续读取。
 新配置不能引用归档或停用版本，依赖停用后新的 Agent Run 会被拒绝。
 
-PR5 的 Model Profile 只允许 `fake/fake`，不保存 API Key；知识库范围必须为空，RAG 配置留给后续迁移。
+PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Model Profile 与 Provider，API Key 独立加密保存。知识库范围仍必须为空。
 
 ### `agent_config_links`
 
 保存 Agent → Prompt/Skill/Model、Skill → Prompt 的具体版本绑定；该表不能覆盖 Tool Registry 的
 `rpc_method`、目标服务、最终授权和敏感级别。工具 allowlist 只允许 Registry 中已注册且启用的只读 Tool。
+
+### PR6 Provider、Credential 与模型调用摘要
+
+`000003_create_model_provider` 是 expand 迁移：配置 kind 增加 `provider`，新增 `agent_credentials`、`agent_credential_audits`、`agent_provider_credentials`，Run 增加可空 JSON `model_summary`，不回填历史凭据或业务消息。所有表归 `oj_agent`，没有跨 Schema 引用、Redis/MQ 或 Outbox。
+
+Provider 的不可变 JSON 保存协议、base URL、Credential ID、超时和有限重试；Model Profile 引用具体 Provider UUID。`agent_provider_credentials` 对版本/凭据有同 Schema 外键，避免悬空引用。配置替换继续使用 current UUID 的乐观并发检查和事务审计；主版本变化不自动改变历史引用。
+
+`agent_credentials` 保存 UUID、名称、AES-GCM 密文/nonce、主密钥版本、创建/撤销人和时间。主密钥在部署 keyring 文件，Credential UUID 是认证附加数据，密文不能互换。Key 不进入版本 JSON、配置快照或审计；审计幂等比较请求元数据并在创建重放时常量时间比较解密后的 Key，不存明文 Key 哈希。创建/撤销与审计同事务，request_id 唯一。查询按 created_at、id 稳定降序分页；revoked_at 不为空后禁止后续模型调用。
+
+`model_summary` 与 Run 终态/最终答案同事务保存。有界 attempts 记录 Provider/Model Profile ID、模型名、usage 来源、Token、延迟、完成原因和稳定错误；不包含凭据密文、推理或原始响应。历史 Run 的 NULL 表示当时未记录模型摘要，不推断为 0 Token。
+
+上线先迁移再部署/启用 model Runtime。旧 Fake Profile 正文仍可解析；旧应用不能使用新增 Provider kind，因此恢复旧应用前先停用真实模型。Down 迁移首先以原子 CHECK 变更拒绝仍有 Provider 配置的库；需要人工处理新配置及引用后才能回滚。Down 会删除加密凭据、凭据审计和模型摘要，不删除 Conversation/Message/Run；需要保留真实凭据/运行证据时应继续保留 expand Schema。主密钥/加密数据库备份分别保管，丢失 keyring 无法靠数据库恢复 Key。
 
 ### `agent_knowledge_documents` / `agent_knowledge_versions`
 

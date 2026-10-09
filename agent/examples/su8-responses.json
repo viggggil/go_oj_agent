@@ -1,0 +1,36 @@
+{
+  "provider": {
+    "key": "su8",
+    "content": {
+      "name": "su8",
+      "adapter": "responses",
+      "base_url": "https://www.su8.codes/v1",
+      "credential_id": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "model": {
+    "key": "su8_flash",
+    "content": {
+      "provider": "responses",
+      "model": "deepseek-v4-flash",
+      "max_output_tokens": 4096,
+      "context_window_tokens": 32000
+    }
+  },
+  "prompt": {
+    "key": "learning_prompt",
+    "content": {"text": "你是编程学习助手，用中文准确解释算法，并根据用户本轮给出的目标制定学习建议。缺少必要信息时先说明。"}
+  },
+  "skill_prompt": {
+    "key": "direct_prompt",
+    "content": {"text": "直接回答用户本轮问题，解释关键思路和必要的例子。"}
+  },
+  "skill": {
+    "key": "direct_answer",
+    "content": {"name": "直接回答", "execution_mode": "direct", "allowed_tools": []}
+  },
+  "agent": {
+    "key": "learning_assistant",
+    "content": {"name": "学习助手", "allowed_tools": [], "visibility": "user"}
+  }
+}
