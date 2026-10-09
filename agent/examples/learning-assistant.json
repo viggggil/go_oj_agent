@@ -1,0 +1,22 @@
+{
+  "prompt": {
+    "key": "learning_identity",
+    "content": {"text": "你是编程学习助手，按用户目标提供帮助。"}
+  },
+  "skill_prompt": {
+    "key": "algorithm_explanation",
+    "content": {"text": "解释算法的适用条件、核心思路、复杂度和边界情况。"}
+  },
+  "model": {
+    "key": "fake_model",
+    "content": {"provider": "fake", "model": "fake"}
+  },
+  "skill": {
+    "key": "algorithm_explain",
+    "content": {"name": "算法讲解", "execution_mode": "direct", "allowed_tools": []}
+  },
+  "agent": {
+    "key": "learning_assistant",
+    "content": {"name": "学习助手", "visibility": "user", "allowed_tools": []}
+  }
+}

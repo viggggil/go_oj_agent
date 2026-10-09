@@ -58,6 +58,8 @@ async def execute_demo_tool(state: AgentState, executor: ToolExecutor | None) ->
     request = parse_demo_tool_request(state.user_message)
     if request is None or executor is None:
         return None
+    if state.config_snapshot.get("budget", {}).get("max_tool_calls", 8) == 0:
+        return "【演示工具失败】TOOL_PERMISSION_DENIED"
     name, arguments = request
     deadline = state.deadline_at
     if deadline.tzinfo is None:

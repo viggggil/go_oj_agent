@@ -552,7 +552,7 @@ flowchart TB
     API --> Session["Session Resolver"]
     Session --> Intent["Intent + Entity Parser"]
     Intent --> Policy["Tool / Skill Policy"]
-    Policy --> Config["Published Prompt / Skill / Tool Config"]
+    Policy --> Config["Immutable Agent / Prompt / Skill Config"]
     Config --> Runtime{"Execution Mode"}
 
     Runtime --> Direct["Direct Answer"]
@@ -624,7 +624,7 @@ plan_execute
 reflection
 ```
 
-每次 Agent Run 开始时固定 Prompt、Skill、Tool Catalog、模型和知识库索引的版本快照。一次回答执行期间不得切换已发布配置；草稿不会影响在线请求。
+每次 Agent Run 开始时固定 Agent、Prompt、Skill、Tool Catalog、模型和知识库索引的具体配置 UUID 快照。一次回答执行期间不得切换配置；PR5 的替换会创建新 UUID，已开始的 Run 继续使用原快照。
 
 ### 10.2 Tool Registry 与策略
 
@@ -665,26 +665,26 @@ Knowledge Document / Knowledge Version / Index
 Eval Case / Eval Dataset / Eval Run
 ```
 
-资源状态统一使用：
+PR5 的 Prompt、Skill、Model Profile 和 Agent 不使用草稿状态：
 
 ```text
-DRAFT → PUBLISHED → ARCHIVED
+CREATED → CURRENT → ARCHIVED
 ```
 
-发布版本不可变；回滚通过重新发布旧版本完成。Prompt 发布前校验变量白名单、敏感信息、Tool 名称和禁止指令。Skill 只能引用代码已注册的 Tool，不能执行任意 Python。
+配置版本不可变；修改生成新 UUID，恢复通过复制旧正文创建新 UUID。Prompt 创建时校验变量白名单、敏感信息、Tool 名称和禁止指令。Skill 只能引用代码已注册的 Tool，不能执行任意 Python。
 
 ### 10.4 管理员前端
 
 管理员入口使用 `system_admin` 或明确授权的 `agent_admin` 角色，至少提供：
 
-- Prompt 管理：编辑、版本 Diff、样例 Eval、发布、回滚和审计。
+- Prompt 管理：编辑、版本 Diff、样例 Eval、替换、归档、恢复和审计。
 - Tool Catalog：查看描述、Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计；RPC 方法和授权代码只读展示。
-- Skill 管理：编辑元数据、选择 Tool、绑定 Prompt、设置预算、样例运行、发布和回滚。
+- Skill 管理：编辑元数据、选择 Tool、绑定 Prompt、设置预算、样例运行、替换、归档和复制旧版恢复。
 - 知识库管理：文档上传、元数据、标签、切分预览、索引、发布、归档和回滚。
 - Eval 与质量：运行数据集、版本对比、失败样例、工具选择错误、引用错误和拒答错误。
 - 运行观测：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和脱敏后的运行详情。
 
-发布、回滚、归档和启用写 Tool 需要二次确认并写入审计日志；生产环境可以配置双人审批。管理员页面不能修改安全前缀、服务身份或目标 Go Service 的授权规则。
+替换、恢复、归档和启用写 Tool 需要二次确认并写入审计日志；生产环境可以配置双人审批。管理员页面不能修改安全前缀、服务身份或目标 Go Service 的授权规则。
 
 ### 10.5 Agent 质量工程
 

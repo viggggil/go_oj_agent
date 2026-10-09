@@ -245,8 +245,13 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
     engine: AsyncEngine,
 ) -> None:
     async with engine.begin() as connection:
-        for direction in ("down", "up"):
-            sql = (MIGRATION_ROOT / f"000001_create_agent_runtime.{direction}.sql").read_text()
+        for name, direction in (
+            ("000002_create_agent_configuration", "down"),
+            ("000001_create_agent_runtime", "down"),
+            ("000001_create_agent_runtime", "up"),
+            ("000002_create_agent_configuration", "up"),
+        ):
+            sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):
                 if statement.strip():
                     await connection.execute(text(statement))

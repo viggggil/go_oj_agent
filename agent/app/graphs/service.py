@@ -44,6 +44,7 @@ class RuntimeStore(Protocol):
         content: str,
         config_source: str,
         config_snapshot: dict[str, Any],
+        agent_key: str | None = "demo",
         deadline_at: datetime,
     ) -> RunRecord: ...
 
@@ -116,7 +117,7 @@ class RunService:
         return await self._store.interrupt_running_runs()
 
     async def accept(self, request: ChatRequest, principal: Principal) -> AcceptedRun:
-        snapshot = await self._reader.read()
+        snapshot = await self._reader.read(request, principal)
         # 上次终态持久化失败的 Run 会在 deadline 之后释放活动关联。
         await self._store.expire_running_runs()
         now = utc_now()
@@ -127,6 +128,7 @@ class RunService:
             content=request.message,
             config_source=snapshot.source,
             config_snapshot=snapshot.model_dump(mode="json"),
+            agent_key=snapshot.agent_key,
             deadline_at=now + timedelta(seconds=snapshot.budget.max_run_seconds),
         )
         state = AgentState(
@@ -135,6 +137,8 @@ class RunService:
             conversation_id=UUID(record.conversation_id),
             run_id=UUID(record.id),
             user_message=request.message,
+            agent_key=snapshot.agent_key,
+            skill_key=snapshot.skill_key,
             context=request.context,
             allowed_tools=snapshot.allowed_tools,
             config_snapshot=snapshot.model_dump(mode="json"),

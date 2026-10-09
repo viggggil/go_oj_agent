@@ -105,6 +105,7 @@ class MemoryStore:
         conversation_id: str | UUID | None,
         request_id: str,
         content: str,
+        agent_key: str | None = "demo",
         config_source: str,
         config_snapshot: dict[str, Any],
         deadline_at: object,
@@ -163,7 +164,7 @@ class Reader:
     def __init__(self, budget: RuntimeBudget | None = None) -> None:
         self.snapshot = ConfigSnapshot(runtime="fake", budget=budget or RuntimeBudget())
 
-    async def read(self) -> ConfigSnapshot:
+    async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot:
         return self.snapshot.model_copy(deep=True)
 
 

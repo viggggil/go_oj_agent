@@ -33,6 +33,8 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     conversation_id: UUID | None = None
+    agent_key: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    skill_key: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]{1,63}$")
     message: str = Field(min_length=1, max_length=32_000)
     context: ChatContext = Field(default_factory=ChatContext)
 
@@ -61,6 +63,7 @@ class AgentState(BaseModel):
     principal: Principal
     status: RunStatus = "RUNNING"
     skill_key: str = Field(default="demo", min_length=1, max_length=128)
+    agent_key: str = Field(default="demo", min_length=1, max_length=128)
     allowed_tools: tuple[str, ...] = ()
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     context: ChatContext = Field(default_factory=ChatContext)

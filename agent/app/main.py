@@ -16,14 +16,15 @@ from app.clients.business import build_business_clients
 from app.core.auth import DelegationVerifier
 from app.core.database import DatabaseProbe, ReadinessProbe
 from app.core.resources import AppResources
-from app.core.runtime_config import DemoConfigReader
+from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
 from app.graphs.langgraph_runtime import LangGraphRuntime
 from app.graphs.runtime import FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
+from app.storage.configuration import ConfigurationStore
 from app.storage.repository import AgentStore
 from app.tools.business import build_business_tool_registry
-from app.tools.registry import ToolExecutor
+from app.tools.registry import ToolExecutor, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,16 @@ def create_app(
                         if config.runtime_mode == "langgraph_fake"
                         else FakeRuntime(tool_executor=tool_executor)
                     )
-                    service = RunService(
-                        AgentStore(database.engine), runtime, DemoConfigReader(config)
+                    store = AgentStore(database.engine)
+                    registry = business_tools or ToolRegistry()
+                    config_reader: ConfigSnapshotReader = (
+                        DatabaseConfigReader(
+                            ConfigurationStore(database.engine, registry), config, registry
+                        )
+                        if config.config_mode == "database"
+                        else DemoConfigReader(config)
                     )
+                    service = RunService(store, runtime, config_reader)
                 try:
                     async with asyncio.timeout(config.preflight_timeout_seconds):
                         await service.initialize()

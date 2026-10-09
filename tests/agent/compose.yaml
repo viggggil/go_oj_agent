@@ -11,6 +11,7 @@ services:
     volumes:
       - ../../migrations/mysql/000001_create_schemas.up.sql:/docker-entrypoint-initdb.d/001_create_schemas.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
+      - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/502_create_agent_configuration.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s
@@ -31,6 +32,7 @@ services:
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
       AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_CONFIG_MODE: database
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem
       AGENT_SSE_HEARTBEAT_SECONDS: 1
     ports:

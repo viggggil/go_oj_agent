@@ -13,8 +13,13 @@ from app.core.auth import DelegationVerifier, InvalidDelegation
 from app.core.resources import AppResources, get_resources
 from app.core.settings import Settings
 from app.graphs.service import AcceptedRun, RunService
+from app.models.configuration import ConfigError
 from app.models.runtime import ChatRequest, StreamEvent
-from app.storage.repository import ActiveRunConflict, ConversationNotFound
+from app.storage.repository import (
+    ActiveRunConflict,
+    ConversationAgentConflict,
+    ConversationNotFound,
+)
 
 router = APIRouter()
 
@@ -199,6 +204,10 @@ async def chat(
         return JSONResponse(status_code=404, content={"code": "AGENT_CONVERSATION_NOT_FOUND"})
     except ActiveRunConflict:
         return JSONResponse(status_code=409, content={"code": "AGENT_ACTIVE_RUN_CONFLICT"})
+    except ConversationAgentConflict:
+        return JSONResponse(status_code=409, content={"code": "AGENT_CONVERSATION_AGENT_CONFLICT"})
+    except ConfigError as exc:
+        return JSONResponse(status_code=exc.status, content={"code": exc.code})
     except ChatRejected as exc:
         return JSONResponse(status_code=exc.status, content={"code": exc.code})
     except (SQLAlchemyError, TimeoutError):

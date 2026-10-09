@@ -48,6 +48,11 @@ export AGENT_TEST_GATEWAY_PORT="${AGENT_TEST_GATEWAY_PORT:-$(pick_free_port)}"
 compose down --volumes --remove-orphans
 compose up --build --detach --wait
 
+AGENT_DATABASE_URL="mysql+asyncmy://agent:agent-password@127.0.0.1:${AGENT_TEST_MYSQL_PORT}/oj_agent" \
+  "${uv_command}" run --directory "${repository_root}/agent" --frozen \
+  python -m app.config_cli bootstrap --file "${repository_root}/agent/examples/learning-assistant.json" \
+  --actor-id 7 --request-id integration-bootstrap
+
 cd "${repository_root}"
 AGENT_TEST_DATABASE_URL="mysql+asyncmy://agent:agent-password@127.0.0.1:${AGENT_TEST_MYSQL_PORT}/oj_agent" \
 AGENT_TEST_BAD_DATABASE_URL="mysql+asyncmy://agent:wrong-password@127.0.0.1:${AGENT_TEST_MYSQL_PORT}/oj_agent" \

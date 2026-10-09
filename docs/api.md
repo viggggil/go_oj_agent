@@ -599,6 +599,8 @@ Agent 都会检查该限制。请求字段如下：
 ```json
 {
   "conversation_id": "363f7d21-b923-41ee-8702-71b2a1280239",
+  "agent_key": "learning_assistant",
+  "skill_key": "algorithm_explain",
   "message": "为什么我的 submission 90001 一直 WA？",
   "context": {
     "submission_id": 90001,
@@ -610,6 +612,12 @@ Agent 都会检查该限制。请求字段如下：
 
 `message` 必须是 1–32,000 个字符且不能全为空白；新会话可省略 `conversation_id`，
 继续会话时必须提供 UUID；
+PR5 新增可选 `agent_key`、`skill_key`，格式为 `[a-z][a-z0-9_]{1,63}`。数据库模式省略
+Agent 时使用部署默认 key，省略 Skill 使用 Agent 绑定的默认版本；显式 Skill 只能选择绑定
+集合中的 key，绑定始终解析具体 UUID。Demo 模式只接受省略或 `demo`。
+管理员/test Agent 仅允许可信角色 `system_admin` 或 `agent_admin`，不可访问、归档、停用、
+依赖停用、测试到期与不存在统一返回 404。不同 Agent 不可共享会话，返回 409。
+Prompt 所需 Context 变量缺失返回 400 `AGENT_PROMPT_CONTEXT_REQUIRED`，不固定预取业务数据。
 `context` 只接受正数 `submission_id`/`problem_id` 和 1–32 个字符的 `language`。顶层和
 `context` 都拒绝额外字段，调用方不能从请求体指定 `user_id`、`role` 或工具权限。
 
@@ -619,8 +627,8 @@ Gateway 在建立上游流前可能返回以下稳定错误：
 | --- | --- | --- |
 | 400 | `GATEWAY_AGENT_INVALID_ARGUMENT` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_INVALID_ARGUMENT` | JSON 或字段校验失败 |
 | 401 | `GATEWAY_UNAUTHENTICATED` | 外部 Access Token 无效 |
-| 404 | `GATEWAY_AGENT_REJECTED` / `AGENT_CONVERSATION_NOT_FOUND` | 会话不存在或不属于当前用户 |
-| 409 | `GATEWAY_AGENT_REJECTED` / `AGENT_ACTIVE_RUN_CONFLICT` | 同一会话已有活动 Run |
+| 404 | `GATEWAY_AGENT_REJECTED` / `AGENT_CONVERSATION_NOT_FOUND`、`AGENT_CONFIGURATION_NOT_FOUND` | 会话无权限或 Agent 配置不可用 |
+| 409 | `GATEWAY_AGENT_REJECTED` / `AGENT_ACTIVE_RUN_CONFLICT`、`AGENT_CONVERSATION_AGENT_CONFLICT` | 同会话有活动 Run 或跨 Agent 续聊 |
 | 413 | `GATEWAY_AGENT_REQUEST_TOO_LARGE` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_REQUEST_TOO_LARGE` | 请求体超过上限 |
 | 415 | `GATEWAY_AGENT_UNSUPPORTED_MEDIA_TYPE` 或 `GATEWAY_AGENT_REJECTED`；内部 `AGENT_UNSUPPORTED_MEDIA_TYPE` | 非 JSON 或使用压缩编码 |
 | 502/504 | `GATEWAY_AGENT_UNAVAILABLE` / `GATEWAY_AGENT_TIMEOUT` | Gateway 无法建立受保护的上游流 |
@@ -677,22 +685,23 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 ### 管理员 Agent Control Plane API
 
-以下接口由 Agent Service 提供，并由 Gateway 以管理员路由透传。调用者必须具有
-`system_admin` 或明确授权的 `agent_admin` 角色；最终发布、回滚和写 Tool 启用操作
-必须再次确认并写入审计日志。
+以下为后续接口设计，PR5 尚无管理员 HTTP 写接口/前端。管理入口由 Agent Service 提供，
+Gateway 以绑定操作的管理员委托转发，必须校验 `system_admin` 或 `agent_admin`。
+PR5 仅提供凭数据库凭据授权的本机 `app.config_cli`；操作者参数是审计字段。
 
-运行配置采用草稿和不可变发布版本。草稿不会影响在线请求；一次 Agent Run 固定
-Prompt、Skill、Tool Catalog、模型和知识库索引版本快照。
+Agent/Prompt/Skill/模型配置不采用草稿发布；创建完整校验后立即生效，修改生成新 UUID，
+原记录归档，删除只归档。替换携带预期当前编号及请求编号，实现并发检查和幂等重放。
+旧配置恢复通过复制生成新编号；共享 Prompt 替换不自动修改已有 Skill/Agent。
 
 Prompt：
 
 ```text
 GET  /api/v1/admin/agent/prompts
-POST /api/v1/admin/agent/prompts/{prompt_key}/draft
+POST /api/v1/admin/agent/prompts
+PUT  /api/v1/admin/agent/prompts/{prompt_key}
 GET  /api/v1/admin/agent/prompts/{prompt_key}/versions
-POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/validate
-POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/publish
-POST /api/v1/admin/agent/prompts/{prompt_key}/versions/{version}/rollback
+POST /api/v1/admin/agent/prompts/{prompt_key}/archive
+POST /api/v1/admin/agent/prompts/{prompt_key}/restore
 ```
 
 Prompt 编辑只能修改安全前缀之外的模板内容、变量说明和适用 Skill。服务端必须校验
@@ -717,10 +726,9 @@ Skill：
 GET  /api/v1/admin/agent/skills
 POST /api/v1/admin/agent/skills
 GET  /api/v1/admin/agent/skills/{skill_key}
-POST /api/v1/admin/agent/skills/{skill_key}/draft
-POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/validate
-POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/publish
-POST /api/v1/admin/agent/skills/{skill_key}/versions/{version}/rollback
+PUT  /api/v1/admin/agent/skills/{skill_key}
+POST /api/v1/admin/agent/skills/{skill_key}/archive
+POST /api/v1/admin/agent/skills/{skill_key}/restore
 ```
 
 Skill 版本可以修改描述、Prompt 绑定、Tool allowlist、执行模式、输出 Schema、Tool
