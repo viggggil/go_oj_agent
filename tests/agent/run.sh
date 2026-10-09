@@ -69,7 +69,7 @@ export AGENT_PROVIDER_ALLOWED_ORIGINS='["http://mock-provider:8001"]'
 export AGENT_PROVIDER_ALLOW_PRIVATE_NETWORK=true
 printf '%s' 'integration-model-key' > "${test_key_dir}/model.key"
 chmod 600 "${test_key_dir}/model.key"
-"${uv_command}" run --directory agent --frozen python -m app.credential_cli create \
+AGENT_ENVIRONMENT=test "${uv_command}" run --directory agent --frozen python -m app.credential_cli create \
   --key-file "${test_key_dir}/model.key" --name mock-provider --actor-id 7 \
   --request-id model-integration-credential > "${test_key_dir}/credential.json"
 "${uv_command}" run --directory agent --frozen python - "${test_key_dir}" "${repository_root}/agent/examples/su8-responses.json" <<'PY_CONFIG'

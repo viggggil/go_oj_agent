@@ -339,6 +339,19 @@ def test_authenticated_encryption_and_key_version_fail_closed() -> None:
             cipher.decrypt(identifier, key_version, nonce, value)
 
 
+def test_keyring_file_requires_restricted_permissions_outside_test(tmp_path: Any) -> None:
+    keyring = tmp_path / "keyring.json"
+    keyring.write_text(
+        '{"active":"v1","keys":{"v1":"' + __import__("base64").b64encode(b"k" * 32).decode() + '"}}'
+    )
+    keyring.chmod(0o644)
+    with pytest.raises(ConfigError, match="KEYRING_INVALID"):
+        CredentialCipher.from_file(keyring)
+    assert CredentialCipher.from_file(keyring, allow_insecure_test_file=True)
+    keyring.chmod(0o600)
+    assert CredentialCipher.from_file(keyring)
+
+
 @pytest.mark.parametrize(
     "address",
     [

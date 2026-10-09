@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import re
+import stat
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -27,9 +28,13 @@ class CredentialCipher:
         self._keys = keys
 
     @classmethod
-    def from_file(cls, path: Path | None) -> "CredentialCipher":
+    def from_file(
+        cls, path: Path | None, *, allow_insecure_test_file: bool = False
+    ) -> "CredentialCipher":
         try:
             if path is None or path.stat().st_size > 16_384:
+                raise ValueError
+            if not allow_insecure_test_file and stat.S_IMODE(path.stat().st_mode) & 0o077:
                 raise ValueError
             content = json.loads(path.read_text())
             keys = {

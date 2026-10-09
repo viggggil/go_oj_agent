@@ -27,7 +27,10 @@ def init_keyring(path: Path) -> None:
 
 
 async def run(settings: Settings, args: argparse.Namespace) -> object:
-    cipher = CredentialCipher.from_file(settings.credential_keyring_file)
+    cipher = CredentialCipher.from_file(
+        settings.credential_keyring_file,
+        allow_insecure_test_file=settings.environment == "test",
+    )
     database = DatabaseProbe(settings)
     try:
         if database.engine is None:

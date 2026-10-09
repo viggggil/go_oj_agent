@@ -71,7 +71,10 @@ def create_app(
                     runtime: AgentRuntime
                     policy = ProviderPolicy(config)
                     if config.runtime_mode == "model":
-                        cipher = CredentialCipher.from_file(config.credential_keyring_file)
+                        cipher = CredentialCipher.from_file(
+                            config.credential_keyring_file,
+                            allow_insecure_test_file=config.environment == "test",
+                        )
                         model_client = ResponsesClient(policy)
                         runtime = ModelRuntime(
                             model_client, CredentialStore(database.engine, cipher)
