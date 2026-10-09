@@ -1,14 +1,69 @@
 # Agent Service
 
-## 当前已实现：PR1 服务骨架、PR2 Runtime/存储、PR3 Gateway SSE、PR4 只读 Tools、PR5 多 Agent 配置基础
+## 当前已实现：PR1–PR5 基础设施与 PR6 真实模型单轮回答
 
-PR1 提供 FastAPI 骨架，PR2 增加 Fake Runtime、最小 LangGraph、Tool Registry 和会话/消息/Run 存储，PR3 接入 Gateway 可信委托和 HTTP SSE，PR4 增加首批只读业务 Tools 与 Agent → Go 服务的独立身份，PR5 增加 Prompt、Skill、Model Profile、Agent 的不可变配置编号、归档、事务替换、本机管理命令与数据库配置运行链路。Chat 默认关闭；明确启用时仍只使用带演示标识的 Fake。尚无真实模型、RAG、管理员 HTTP API/前端或质量评估平台，不需要模型 API Key。下面第 1 节起仍是完整 Agent 的目标设计。
+PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
+
+会话和消息已经持久化，但本阶段真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。多轮历史上下文、记忆、真实模型调用工具、RAG、管理 API/前端和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+
+### PR6 配置与安全导入
+
+配置关系是 `Agent UUID → Model Profile UUID → Provider UUID → Credential ID`。Provider 存协议、地址、超时与同一 Provider 的有限重试；Model Profile 存模型名、可选生成参数和上下文/输出上限；Key 只存独立凭据表的 AES-GCM 密文。替换 Provider/Model/Agent 生成新 UUID 并归档原版本；既有引用不自动升级。每个 Run 固定解析结果，不重新选择当前 Provider。
+
+部署主密钥文件格式为 `{"active":"v1","keys":{"v1":"<32 字节随机密钥的 base64>"}}`，只挂载到 Agent/本机管理程序，不存数据库。以下示例中的路径和 ID 需要替换成自己的值；不要提交 Key 或 keyring。CLI 仅凭本机数据库/密钥权限执行，`actor-id` 是审计字段，不代表 HTTP 管理员鉴权。
+
+```bash
+# 生成 keyring，默认权限 600，禁止覆盖已有文件。
+uv run --directory agent --frozen python -m app.credential_cli init-keyring \
+  --keyring-file /secure/agent/keyring.json
+
+# 管理命令读取部署环境 AGENT_DATABASE_URL。
+export AGENT_CREDENTIAL_KEYRING_FILE=/secure/agent/keyring.json
+export AGENT_PROVIDER_ALLOWED_ORIGINS='["https://www.su8.codes"]'
+
+# api.key 只放纯 Key，权限 600。只输出凭据 ID/名称/时间/状态。
+uv run --directory agent --frozen python -m app.credential_cli create \
+  --key-file /secure/agent/api.key --name su8 --actor-id 7 --request-id su8-key-v1
+
+# 将上一步 ID 传给外置示例；示例不包含真实 Key。
+uv run --directory agent --frozen python -m app.config_cli bootstrap \
+  --file agent/examples/su8-responses.json --credential-id <credential-uuid> \
+  --actor-id 7 --request-id su8-bootstrap-v1
+```
+
+启用配置：`AGENT_CONFIG_MODE=database`、`AGENT_RUNTIME_MODE=model`、`AGENT_CHAT_ENABLED=true`，并配置 `AGENT_DATABASE_URL`、Gateway 公钥及 `AGENT_CREDENTIAL_KEYRING_FILE`。`AGENT_PROVIDER_ALLOWED_ORIGINS` 是部署侧精确协议/主机/端口 allowlist，不能由 Chat 请求或模型修改。开发 mock 需要显式 `AGENT_PROVIDER_ALLOW_PRIVATE_NETWORK=true`；生产禁止该开关。HTTP Client 不读取环境代理、不自动跟随重定向，不在地址中接受内嵌凭据；部署还应限制网络出口，防止可信域名的 DNS/网络配置变化访问内部资源。
+
+Docker 中密钥文件必须对 Agent 的 UID/GID 10001 可读，可使用归属 10001 的 600 文件，或受控组的 640 文件。开发 Compose 挂载 `AGENT_MODEL_KEY_DIR`（默认 `deploy/compose/model-keys`）至 `/run/model-keys`，其中 `keyring.json` 需提前生成。该目录不要存进仓库。
+
+更换 Key：新建凭据 → 新建引用它的 Provider 版本 → 新建 Model/Agent 引用版本 → 独立撤销旧凭据。配置归档保留历史引用，凭据撤销阻止后续调用/重试；已发出的请求无法保证撤回。`credential_cli get/list` 不提供解密接口，`revoke --id <uuid> --actor-id ... --request-id ...` 可撤销。创建与撤销有请求幂等和并发冲突检查。主密钥轮换时保留旧版本用于解密历史凭据，新凭据使用 active 版本；丢失旧主密钥无法从数据库恢复 Key，需要重新导入，并替换依赖配置。
+
+`verbosity`/`temperature` 可选，未设置时不发送；su8 当前 `deepseek-v4-flash` 拒绝 `text.verbosity=high`（400），所以示例省略 verbosity。Codex 客户端中的 `model_verbosity` 不能直接当作所有模型都支持的 API 参数。
+
+### PR6 运行与验证边界
+
+文本增量沿 `Provider → Agent → Gateway → 客户端` 传递，沿用 `thinking/token/done/error` 契约；`thinking` 只是状态。推理内容、工具事件和上游错误正文不透传。成功完成事件的最终文本必须与已输出文本一致；异常 EOF、拒绝、工具输出和上限截断会使 Run 失败。答案和 COMPLETED 在本地事务中成功保存后才发 done；半途失败/取消不保存成功的 assistant 消息。断连、超时、关闭会关闭上游 HTTP stream。
+
+真实 Runtime 只支持 `direct`；绑定 Fake Profile 或未实现的执行模式明确拒绝。不同 Runtime 不静默降级。默认没有重试；设置 `max_retries` 后仅对输出前的 429/部分 5xx 在同一 Provider 有限重试，所有尝试受调用次数、输入预算和 Run deadline 限制。401/403、余额不足、配置错误、网络结果不确定及输出后的失败均不自动重试。外部模型调用可能重复计费，不承诺 exactly-once；Chat POST 本身不幂等。
+
+输入使用 `utf8_bytes_upper_bound_v1` 保守预检并保留协议开销；输出有本地字节上界、字符/事件限额及 Provider `max_output_tokens`。预算可比真实 tokenizer 更严格；Provider 返回 usage 时记录精确报告值，否则明确标为 estimated。Run 的 `model_summary` 保存有界尝试列表、配置 ID、请求/返回模型、usage 来源、延迟、完成原因和公开错误码，不保存凭据、原始 HTTP 响应或推理。
+
+```bash
+make agent-check
+make agent-test-unit
+make agent-test-integration  # MySQL + Gateway + 两阶段 Fake/Responses mock，无外网模型调用
+# opt-in：通过已配置的 Gateway 验证；Access JWT 从本地 600 文件读取。
+uv run --directory agent --frozen python -m app.model_smoke \
+  --gateway-url http://127.0.0.1:8080 --access-token-file /secure/access.jwt \
+  --message '解释二分查找的适用条件和复杂度'
+```
+
+人工验收样例见 `examples/model-smoke-cases.json`。CI 不使用真实 Key 或付费 API；真实验证需独立记录 Provider/Model 版本和结果。只做最小运行摘要与人工样例，不代表已实现质量评估平台。
 
 ### PR5 配置语义
 
 PR5 不采用草稿/发布状态机。每个配置同时有稳定 `key` 和每次创建生成的 UUID；修改会在一次数据库事务内创建新 UUID、归档旧版本、切换当前指针并写入审计。归档记录永久保留，恢复通过复制旧内容创建新 UUID。Prompt、Skill、Agent、Model Profile 之间引用具体 UUID，修改 Prompt 不会自动改变其他引用。
 
-Agent 请求可以携带 `agent_key` 和 `skill_key`。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。当前 PR5 的 Model Profile 只允许 `fake/fake`，知识库绑定明确为空，真实模型和知识库放到后续 PR。
+Agent 请求可以携带 `agent_key` 和 `skill_key`。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Profile，知识库绑定仍必须为空。
 
 配置模型在 `app/models/configuration.py`，MySQL 仓储在 `app/storage/configuration.py`。
 资源表保存 `(kind, key)` 和当前编号，版本表保存不可变 JSON，正文由 Prompt/Skill/Model/Agent
@@ -45,8 +100,8 @@ uv run --directory agent --frozen python -m app.config_cli clone-test \
   --actor-id 7 --request-id prompt-test-v1
 ```
 
-真实模型编排、Token 计量和自动 Skill 路由仍未实现。Fake 只消费运行时长、字符、事件和
-显式工具禁用预算，模型调用/Token 预算保存在快照，供下一阶段 Provider 实际执行。
+PR6 真实 Direct Answer 执行模型调用/Token 上限；Fake 仍只消费运行时长、字符、事件和
+显式工具禁用预算。自动 Skill 路由和真实工具编排后续实现。
 工具权限为 Registry 已启用只读集合、Agent 和选中 Skill 的交集；预算取系统、Agent、Skill
 各字段最小值。分级提示可创建多个独立 Agent，本阶段没有检索和可靠的内容级提示限制。
 

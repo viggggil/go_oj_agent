@@ -13,15 +13,20 @@ from app.api.chat import ChatController
 from app.api.chat import router as chat_router
 from app.api.health import router
 from app.clients.business import build_business_clients
+from app.clients.model import ResponsesClient
 from app.core.auth import DelegationVerifier
+from app.core.credentials import CredentialCipher
 from app.core.database import DatabaseProbe, ReadinessProbe
+from app.core.provider_policy import ProviderPolicy
 from app.core.resources import AppResources
 from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
 from app.graphs.langgraph_runtime import LangGraphRuntime
-from app.graphs.runtime import FakeModelClient, FakeRuntime
+from app.graphs.model_runtime import ModelRuntime
+from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
 from app.storage.configuration import ConfigurationStore
+from app.storage.credentials import CredentialStore
 from app.storage.repository import AgentStore
 from app.tools.business import build_business_tool_registry
 from app.tools.registry import ToolExecutor, ToolRegistry
@@ -48,6 +53,7 @@ def create_app(
         controller: ChatController | None = None
         business_clients = None
         business_tools = None
+        model_client = None
         try:
             if config.business_tools_enabled:
                 business_clients = build_business_clients(config)
@@ -62,16 +68,28 @@ def create_app(
                 else:
                     if not isinstance(database, DatabaseProbe) or database.engine is None:
                         raise ConfigurationError("Chat requires an Agent database")
-                    runtime = (
-                        LangGraphRuntime(FakeModelClient(tool_executor))
-                        if config.runtime_mode == "langgraph_fake"
-                        else FakeRuntime(tool_executor=tool_executor)
-                    )
+                    runtime: AgentRuntime
+                    policy = ProviderPolicy(config)
+                    if config.runtime_mode == "model":
+                        cipher = CredentialCipher.from_file(
+                            config.credential_keyring_file,
+                            allow_insecure_test_file=config.environment == "test",
+                        )
+                        model_client = ResponsesClient(policy)
+                        runtime = ModelRuntime(
+                            model_client, CredentialStore(database.engine, cipher)
+                        )
+                    elif config.runtime_mode == "langgraph_fake":
+                        runtime = LangGraphRuntime(FakeModelClient(tool_executor))
+                    else:
+                        runtime = FakeRuntime(tool_executor=tool_executor)
                     store = AgentStore(database.engine)
                     registry = business_tools or ToolRegistry()
                     config_reader: ConfigSnapshotReader = (
                         DatabaseConfigReader(
-                            ConfigurationStore(database.engine, registry), config, registry
+                            ConfigurationStore(database.engine, registry, provider_policy=policy),
+                            config,
+                            registry,
                         )
                         if config.config_mode == "database"
                         else DemoConfigReader(config)
@@ -103,11 +121,17 @@ def create_app(
         finally:
             try:
                 try:
-                    if controller is not None:
-                        async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
-                            await controller.close()
-                    if business_clients is not None:
-                        await business_clients.close()
+                    try:
+                        if controller is not None:
+                            async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
+                                await controller.close()
+                    finally:
+                        try:
+                            if business_clients is not None:
+                                await business_clients.close()
+                        finally:
+                            if model_client is not None:
+                                await model_client.close()
                 finally:
                     database_budget = (
                         config.shutdown_timeout_seconds / 2

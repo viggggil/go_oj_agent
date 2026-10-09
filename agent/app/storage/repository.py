@@ -72,6 +72,7 @@ class RunRecord:
     finished_at: datetime | None
     deadline_at: datetime
     error_code: str | None
+    model_summary: dict[str, Any] | None = None
 
 
 _RUN_COLUMNS = tuple(column for column in agent_runs.c if column.name != "active_conversation_id")
@@ -260,6 +261,7 @@ class AgentStore:
         status: RunStatus,
         answer: str | None = None,
         error_code: str | None = None,
+        model_summary: dict[str, Any] | None = None,
     ) -> RunRecord:
         if status == "RUNNING":
             raise RunStateConflict("RUNNING is not a terminal status")
@@ -305,7 +307,12 @@ class AgentStore:
             await connection.execute(
                 update(agent_runs)
                 .where(agent_runs.c.id == str(run_id))
-                .values(status=status, finished_at=now, error_code=error_code)
+                .values(
+                    status=status,
+                    finished_at=now,
+                    error_code=error_code,
+                    model_summary=model_summary,
+                )
             )
             if status == "COMPLETED":
                 await connection.execute(
@@ -323,7 +330,9 @@ class AgentStore:
                 .values(updated_at=now)
             )
             values = dict(row)
-            values.update(status=status, finished_at=now, error_code=error_code)
+            values.update(
+                status=status, finished_at=now, error_code=error_code, model_summary=model_summary
+            )
             return RunRecord(**values)
 
     async def get_run(self, user_id: int, run_id: str | UUID) -> RunRecord:

@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from app.clients.business import build_business_clients
 from app.core.database import DatabaseProbe
+from app.core.provider_policy import ProviderPolicy
 from app.core.settings import ConfigurationError, Settings, load_settings
 from app.models.configuration import AgentConfig, ConfigError, ConfigKind, ConfigWrite
 from app.storage.configuration import ConfigAction, ConfigurationStore, ConfigVersion
@@ -55,7 +56,7 @@ async def run_command(settings: Settings, args: argparse.Namespace) -> Any:
             registry = build_business_tool_registry(
                 clients, settings.tool_max_result_bytes, settings.tool_max_page_size
             )
-        store = ConfigurationStore(probe.engine, registry)
+        store = ConfigurationStore(probe.engine, registry, provider_policy=ProviderPolicy(settings))
         if args.command == "get":
             version = (
                 await store.get_version(str(args.id))
@@ -90,15 +91,22 @@ async def run_command(settings: Settings, args: argparse.Namespace) -> Any:
         elif args.command == "bootstrap":
             document = _read_json(args.file)
             identifiers: dict[str, UUID] = {}
-            for name, kind in (
+            entries: list[tuple[str, str]] = [
                 ("prompt", "prompt"),
                 ("skill_prompt", "prompt"),
                 ("model", "model"),
                 ("skill", "skill"),
                 ("agent", "agent"),
-            ):
+            ]
+            if "provider" in document:
+                entries.insert(0, ("provider", "provider"))
+            for name, kind in entries:
                 item = document[name]
                 content = dict(item["content"])
+                if kind == "provider" and args.credential_id is not None:
+                    content["credential_id"] = str(args.credential_id)
+                if kind == "model" and "provider" in identifiers:
+                    content["provider_id"] = str(identifiers["provider"])
                 if kind == "skill":
                     content["prompt_id"] = str(identifiers["skill_prompt"])
                 if kind == "agent":
@@ -153,7 +161,10 @@ def main() -> int:
             "clone-test",
         ],
     )
-    parser.add_argument("--kind", choices=["prompt", "skill", "model", "agent"], default="agent")
+    parser.add_argument(
+        "--kind", choices=["prompt", "skill", "model", "agent", "provider"], default="agent"
+    )
+    parser.add_argument("--credential-id", type=UUID)
     parser.add_argument("--key", default="learning_assistant")
     parser.add_argument("--actor-id", type=int)
     parser.add_argument("--request-id")

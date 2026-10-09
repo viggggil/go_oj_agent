@@ -1229,6 +1229,14 @@ Gateway 新增受保护 Chat 路由和 HTTP 流式 Client，签发绑定 Agent a
 MySQL 续聊，以及完整业务栈注册/登录后的 Agent 流。无真实模型、业务 Tool、聊天 UI、
 管理员控制面或质量评估。
 
+### PR6 状态（Issue #152：真实模型优先）
+
+在 PR5 配置基础上新增版本化 Provider、AES-GCM 凭据及本机 CLI、Responses Direct Answer、Gateway 流式转发、调用/Token/超时预算和模型调用摘要。首个接入目标为 su8 `https://www.su8.codes/v1` 的 `deepseek-v4-flash`，store=false；DeepSeek 官方/OpenRouter 接入、Provider 自动切换与调用顺序不在本阶段，模型和 Provider 由管理员手动修改配置。
+
+开发顺序调整为：PR6 真实模型单轮链路 → 后续历史上下文/短期记忆 → 模型按需选择 Tools/ReAct → 摘要/长期记忆/RAG/管理后台/完整质量评估。会话存储已有，模型多轮记忆尚未实现。
+
+CI 用 MySQL/Gateway/本地 Responses mock 验证两个 Runtime 阶段，不使用真实 Key/付费服务。提供 opt-in smoke 和人工样例。新增 Provider/凭据/Run 摘要迁移，配套更新部署 keyring、允许 origin、Key 导入、更换/撤销和回滚说明。独立 PR6 关联 #152，不追加到 #142/feat134。
+
 Agent 必须真正使用 OJ 后端能力，而不是成为独立聊天机器人。
 
 ### PR4 状态（只读业务 Tools 与 Agent 服务身份）

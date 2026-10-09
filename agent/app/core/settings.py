@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     readiness_timeout_seconds: float = Field(default=2, gt=0, le=30)
     shutdown_timeout_seconds: int = Field(default=10, ge=1, le=60)
-    runtime_mode: Literal["disabled", "fake", "langgraph_fake"] = "disabled"
+    runtime_mode: Literal["disabled", "fake", "langgraph_fake", "model"] = "disabled"
     config_mode: Literal["demo", "database"] = "demo"
     default_agent_key: str = Field(default="learning_assistant", pattern=r"^[a-z][a-z0-9_]{1,63}$")
     max_run_seconds: float = Field(default=30, gt=0, le=300)
@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     tool_max_page_size: int = Field(default=50, ge=1, le=100)
     tool_max_result_bytes: int = Field(default=256_000, ge=1024, le=1_048_576)
     business_tools_enabled: bool = False
+    credential_keyring_file: Path | None = None
+    provider_allowed_origins: tuple[str, ...] = ()
+    provider_allow_private_network: bool = False
+    max_model_calls: int = Field(default=8, ge=1, le=16)
+    max_input_tokens: int = Field(default=32_000, ge=1, le=128_000)
+    max_output_tokens: int = Field(default=8_000, ge=1, le=32_000)
 
     @field_validator("host", mode="before")
     @classmethod
@@ -93,6 +99,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
+        if self.runtime_mode == "model" and (
+            self.config_mode != "database"
+            or self.credential_keyring_file is None
+            or not self.provider_allowed_origins
+        ):
+            raise ValueError("Model runtime requires database config, keyring and allowed origins")
+        if self.environment == "production" and self.provider_allow_private_network:
+            raise ValueError("Production cannot allow private model endpoints")
         if self.business_tools_enabled and self.agent_private_key_file is None:
             raise ValueError("Business tools require Agent service identity")
         if self.chat_enabled and (
@@ -103,7 +117,7 @@ class Settings(BaseSettings):
             raise ValueError("Chat requires database, Gateway public key and an enabled runtime")
         if self.environment == "production" and self.database_url is None:
             raise ValueError("Production requires a database URL")
-        if self.environment == "production" and self.runtime_mode != "disabled":
+        if self.environment == "production" and self.runtime_mode in {"fake", "langgraph_fake"}:
             raise ValueError("Production cannot use a demo runtime")
         return self
 

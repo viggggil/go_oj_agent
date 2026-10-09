@@ -9,6 +9,7 @@ dependencies = [
     "cryptography>=43,<47",
     "fastapi>=0.115,<1",
     "grpcio>=1.81.1,<2",
+    "httpx>=0.28,<1",
     "langgraph>=1.0,<2",
     "langsmith>=0.14,<1",
     "pydantic-settings>=2.8,<3",

@@ -34,3 +34,9 @@ Compose 新建数据库自动应用此迁移；已有数据库须显式执行 up
 - 跨服务字段只保存外部 ID reference。
 - `status` / `verdict` 使用 `VARCHAR`，暂不使用 MySQL ENUM。
 - 测试数据正文、源码产物、编译日志和大文档正文不直接存入业务事件。
+
+### Agent PR6
+
+先应用 `agent/000003_create_model_provider.up.sql`，再部署启用 model Runtime。空库初始化和已有 PR5 数据均使用这一步；Docker init SQL 只在首次创建数据卷执行，已有卷需要通过正常迁移流程应用。迁移扩展 provider kind、新增加密凭据/引用/审计和 Run 模型摘要，不保存主密钥。
+
+Down 首先拒绝仍有 Provider 配置的库，避免孤立 Model 引用。清理新配置/引用后才可回滚；会删除凭据与模型摘要，不删除业务会话/消息/Run。保留真实运行证据时不要执行 down，旧应用应保留 expand Schema 并关闭真实模型。

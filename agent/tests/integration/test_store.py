@@ -245,11 +245,26 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
     engine: AsyncEngine,
 ) -> None:
     async with engine.begin() as connection:
+        # 此测试明确使用空库；先清理所有配置引用后验证 down/up。
+        for statement in (
+            "UPDATE agent_config_resources SET current_id=NULL",
+            "DELETE FROM agent_provider_credentials",
+            "DELETE FROM agent_config_links",
+            "DELETE FROM agent_config_audits",
+            "UPDATE agent_config_versions SET previous_id=NULL",
+            "DELETE FROM agent_config_versions",
+            "DELETE FROM agent_config_resources",
+            "DELETE FROM agent_credential_audits",
+            "DELETE FROM agent_credentials",
+        ):
+            await connection.execute(text(statement))
         for name, direction in (
+            ("000003_create_model_provider", "down"),
             ("000002_create_agent_configuration", "down"),
             ("000001_create_agent_runtime", "down"),
             ("000001_create_agent_runtime", "up"),
             ("000002_create_agent_configuration", "up"),
+            ("000003_create_model_provider", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):

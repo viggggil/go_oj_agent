@@ -37,6 +37,7 @@ services:
       - ../../migrations/contest/000004_index_cache_lag.up.sql:/docker-entrypoint-initdb.d/404_index_cache_lag.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
       - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/503_create_agent_configuration.sql:ro
+      - ../../migrations/agent/000003_create_model_provider.up.sql:/docker-entrypoint-initdb.d/504_create_model_provider.sql:ro
       - ./agent-user.sql:/docker-entrypoint-initdb.d/502_create_agent_development_user.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -403,7 +404,7 @@ services:
       AGENT_ENVIRONMENT: development
       AGENT_HOST: 0.0.0.0
       AGENT_CHAT_ENABLED: true
-      AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_RUNTIME_MODE: "${AGENT_RUNTIME_MODE:-langgraph_fake}"
       AGENT_CONFIG_MODE: "${AGENT_CONFIG_MODE:-demo}"
       AGENT_DEFAULT_AGENT_KEY: "${AGENT_DEFAULT_AGENT_KEY:-learning_assistant}"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
@@ -419,9 +420,12 @@ services:
       AGENT_MAX_RUN_SECONDS: 30
       AGENT_SSE_HEARTBEAT_SECONDS: 5
       AGENT_MAX_CONCURRENT_RUNS: 8
+      AGENT_CREDENTIAL_KEYRING_FILE: /run/model-keys/keyring.json
+      AGENT_PROVIDER_ALLOWED_ORIGINS: '${AGENT_PROVIDER_ALLOWED_ORIGINS:-["https://www.su8.codes"]}'
     volumes:
       - agent-auth-public:/run/agent-auth:ro
       - agent-auth-private:/run/agent-auth-private:ro
+      - "${AGENT_MODEL_KEY_DIR:-./model-keys}:/run/model-keys:ro"
     depends_on:
       mysql:
         condition: service_healthy

@@ -16,7 +16,7 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        for key in ("error_code", "error_type"):
+        for key in ("error_code", "error_type", "run_id", "request_id"):
             value = getattr(record, key, None)
             if isinstance(value, str):
                 entry[key] = value
