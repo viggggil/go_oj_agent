@@ -3,7 +3,7 @@ service:
 server:
   http:
     address: ":8080"
-    timeout: "100ms"
+    timeout: "5s"
 auth:
   access_token_public_key_file: "/run/keys/user-public.pem"
   access_token_key_id: "user-test"

@@ -615,7 +615,7 @@ Agent 都会检查该限制。请求字段如下：
 PR5 新增可选 `agent_key`、`skill_key`，格式为 `[a-z][a-z0-9_]{1,63}`。数据库模式省略
 Agent 时使用部署默认 key，省略 Skill 使用 Agent 绑定的默认版本；显式 Skill 只能选择绑定
 集合中的 key，绑定始终解析具体 UUID。Demo 模式只接受省略或 `demo`。
-管理员/test Agent 仅允许可信角色 `system_admin` 或 `agent_admin`，不可访问、归档、停用、
+管理员/test Agent 仅允许可信角色 `admin`、`system_admin` 或 `agent_admin`，不可访问、归档、停用、
 依赖停用、测试到期与不存在统一返回 404。不同 Agent 不可共享会话，返回 409。
 Prompt 所需 Context 变量缺失返回 400 `AGENT_PROMPT_CONTEXT_REQUIRED`，不固定预取业务数据。
 `context` 只接受正数 `submission_id`/`problem_id` 和 1–32 个字符的 `language`。顶层和
@@ -695,13 +695,89 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 ### 管理员 Agent Control Plane API
 
-以下为后续接口设计，PR5 尚无管理员 HTTP 写接口/前端。管理入口由 Agent Service 提供，
-Gateway 以绑定操作的管理员委托转发，必须校验 `system_admin` 或 `agent_admin`。
-PR5 仅提供凭数据库凭据授权的本机 `app.config_cli`；操作者参数是审计字段。
+PR7 提供 Agent、Prompt、Skill 的管理 HTTP API 和聊天目录，全部经 Gateway。两端均校验
+管理员角色 `admin`、`system_admin`、`agent_admin`，普通用户的管理请求返回 403。
+内部 RS256 委托绑定 `HTTP <method> <具体路径>`，含资源 key/UUID；Chat、查询或其他资源的
+委托不能用于本次写操作。Agent 只接受 Gateway 签名身份，不信任正文 actor_id/role 或身份 Header。
+管理开关为 `AGENT_ADMIN_ENABLED`，默认关闭；数据库和 Gateway 公钥必须配置。
+管理可独立于 Chat 启用，不要求模型 Key 可解密或启动 Runtime；关闭时返回 503。
+
+对 `agents`、`prompts`、`skills` 三类资源分别提供下列操作，花括号表示明确的资源路由：
+
+```text
+GET  /api/v1/admin/agent/{agents|prompts|skills}
+POST /api/v1/admin/agent/{agents|prompts|skills}
+GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}
+PUT  /api/v1/admin/agent/{agents|prompts|skills}/{key}
+GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}/versions
+GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}/versions/{uuid}
+POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/archive
+POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/restore
+POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/disable
+POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/enable
+GET  /api/v1/admin/agent/model-options
+GET  /api/v1/admin/agent/tools
+GET  /api/v1/agent/agents
+GET  /api/v1/agent/agents/{agent_key}/skills
+```
+
+所有请求需外部 Bearer Access Token。写操作必须显式携带 canonical UUID 格式的
+`X-Request-ID`，作为同一次操作重试的幂等编号；缺失/格式错误返回 400。同一操作者、
+操作/资源、预期 UUID、正文与同编号重试返回原操作结果；同编号不同操作/内容/操作者返回
+409 `AGENT_CONFIGURATION_REQUEST_CONFLICT`。401 刷新重放也必须保留原编号；Chat POST
+不适用这套幂等约定。回放旧结果可能已经归档，客户端需重新读取 current。
+
+创建正文为 `{"key":"test_prompt","content":{"text":"用中文解释算法","variables":[]}}`。
+PUT 正文为 `{"expected_id":"<当前 UUID>","content":{...完整内容...}}`。归档/启停正文为
+`{"expected_id":"<当前 UUID>"}`，恢复为 `{"expected_id":"<当前 UUID>","source_id":"<历史 UUID>"}`。
+不接受正文 actor_id/role/kind/request_id 或未知字段。保存结果统一为
+`{"configuration":{"id":"...","kind":"prompt","key":"...","archived":false,"disabled":false,
+"created_at":"...","created_by":7,"archived_at":null,"archived_by":null,"content":{...}}}`。
+创建、替换与操作成功均返回 200，响应 `Cache-Control: no-store`。
+
+列表支持 `page`（默认 1，最大 501）、`page_size`（默认 20，最大 100）、`search`（key 子串，
+最多 64 字符）和 `state=active|archived|disabled|all`。active 表示当前未归档，仍包含停用
+记录；disabled 筛选当前未归档且停用的记录。响应为 `{"items":[...摘要...],"page":{"page":1,
+"page_size":20,"total":...}}`，列表不返回完整 Prompt/正文。资源按 created_at/id 降序，
+历史版本按版本 created_at/id 降序；total/items 在同一数据库快照中查询。详情无分页参数，
+允许读取归档记录；历史 UUID 必须匹配路径 kind/key。拒绝重复/未知查询参数。
+历史列表、模型选项与 Tools 不支持状态筛选，非 active 的 state 返回 400。
+
+创建已有 key（含归档）或 stale expected_id 返回 409 `AGENT_CONFIGURATION_STALE`，不会
+自动覆盖。输入/引用/工具不合法返回 400，未实现执行模式/非允许模型返回 409
+`AGENT_CONFIGURATION_UNSUPPORTED`，不存在返回 404，数据库/凭据依赖不可用返回 503。
+Gateway 只返回允许的稳定错误码，不透传异常正文。请求体默认最多 256 KiB，JSON 响应最多
+1 MiB，均不接受压缩请求；管理请求使用普通 HTTP deadline，不占用 Chat 的长时间预算。
+
+Agent/Prompt/Skill content 使用现有严格配置 Schema。Prompt 为 text/variables，变量仅
+language/problem_id/submission_id；Skill 为 name/prompt_id/execution_mode/allowed_tools/budget。
+Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
+visibility/is_test/test_expires_at/knowledge_scope。知识范围必须为空，管理创建只支持 direct。
+test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
+
+模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
+参数及上下文/输出上限，只允许部署 `AGENT_ADMIN_PROVIDER_KEY`（默认 su8）下的可用模型。
+保存 Agent 时在事务中复核模型与 Provider，不能靠直接提交 UUID 绕过；不返回 Provider
+正文、Credential ID、Key/密文。模型初始为 deepseek-v4-flash，目录来自数据库，不在前端写死。
+Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 HTTP 写接口。
+
+Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调用/统计/编辑接口。
+普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/execution_mode/default
+及 default_skill_key。权限/可运行条件在 SQL 分页前过滤，普通用户看不到 test/admin Agent，
+不可访问 Skill 子目录统一 404；目录不返回 Prompt、模型、Provider 或预算。Chat 每次重新
+校验权限。Chat 关闭、demo 配置或 Runtime disabled 时目录为空，不将数据库配置伪装为可运行。
+数据库聊天目录独立于管理开关；Chat 和管理均关闭时目录返回 503。
 
 Agent/Prompt/Skill/模型配置不采用草稿发布；创建完整校验后立即生效，修改生成新 UUID，
 原记录归档，删除只归档。替换携带预期当前编号及请求编号，实现并发检查和幂等重放。
 旧配置恢复通过复制生成新编号；共享 Prompt 替换不自动修改已有 Skill/Agent。
+
+归档用于版本历史，不抹除已有绑定；已有 Agent 可继续使用被归档的 Prompt/Skill 具体
+UUID。停用是资源级操作，会阻止后续 Run 使用其任一版本；已开始 Run 保留配置快照。
+Agent 自身归档也会阻止新的 Run。恢复不自动启用已停用资源。
+
+以下旧目标列表中超出上述 PR7 接口的功能（Tools 详情/统计、RAG、Eval、观测等）仍为后续
+设计；前端管理和聊天分别属于 #154 的 PR8/PR9，多轮上下文仍未实现。
 
 Prompt：
 

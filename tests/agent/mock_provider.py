@@ -39,6 +39,11 @@ async def responses(request: Request):
         return JSONResponse({'error': 'invalid config'}, status_code=400)
     completed.clear()
     message = body['input'][0]['content']
+    if message == 'PR7 normal chat' and not all(
+        value in body.get('instructions', '')
+        for value in ['PR7 测试基础提示', 'PR7 测试 Skill 提示']
+    ):
+        return JSONResponse({'error': 'wrong prompt binding'}, status_code=400)
     async def events():
         yield frame('response.output_text.delta', delta='中文算法回答', output_index=0)
         if message == 'wait-for-release':

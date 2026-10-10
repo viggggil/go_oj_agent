@@ -12,16 +12,17 @@ from pydantic import BaseModel
 from app.api.chat import ChatController
 from app.api.chat import router as chat_router
 from app.api.health import router
+from app.api.management import router as management_router
 from app.clients.business import build_business_clients
 from app.clients.model import ResponsesClient
 from app.core.auth import DelegationVerifier
 from app.core.credentials import CredentialCipher
 from app.core.database import DatabaseProbe, ReadinessProbe
+from app.core.management import ManagementService
 from app.core.provider_policy import ProviderPolicy
 from app.core.resources import AppResources
 from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
-from app.graphs.langgraph_runtime import LangGraphRuntime
 from app.graphs.model_runtime import ModelRuntime
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
@@ -54,6 +55,8 @@ def create_app(
         business_clients = None
         business_tools = None
         model_client = None
+        management = None
+        verifier = None
         try:
             if config.business_tools_enabled:
                 business_clients = build_business_clients(config)
@@ -61,8 +64,21 @@ def create_app(
                     business_clients, config.tool_max_result_bytes, config.tool_max_page_size
                 )
             tool_executor = ToolExecutor(business_tools) if business_tools is not None else None
-            if config.chat_enabled:
+            if config.chat_enabled or config.admin_enabled:
                 verifier = DelegationVerifier(config)
+            if config.admin_enabled or (config.chat_enabled and config.config_mode == "database"):
+                if not isinstance(database, DatabaseProbe) or database.engine is None:
+                    raise ConfigurationError("Management requires an Agent database")
+                registry = business_tools or ToolRegistry()
+                management = ManagementService(
+                    ConfigurationStore(
+                        database.engine, registry, provider_policy=ProviderPolicy(config)
+                    ),
+                    config,
+                    registry,
+                )
+            if config.chat_enabled:
+                assert verifier is not None
                 if run_service_factory is not None:
                     service = run_service_factory(config, database)
                 else:
@@ -80,6 +96,8 @@ def create_app(
                             model_client, CredentialStore(database.engine, cipher)
                         )
                     elif config.runtime_mode == "langgraph_fake":
+                        from app.graphs.langgraph_runtime import LangGraphRuntime
+
                         runtime = LangGraphRuntime(FakeModelClient(tool_executor))
                     else:
                         runtime = FakeRuntime(tool_executor=tool_executor)
@@ -115,6 +133,8 @@ def create_app(
                 chat=controller,
                 business_clients=business_clients,
                 tools=business_tools,
+                management=management,
+                verifier=verifier,
             )
             logger.info("Agent service started")
             yield
@@ -174,6 +194,7 @@ def create_app(
         return JSONResponse(status_code=500, content=error.model_dump())
 
     application.include_router(router)
+    application.include_router(management_router)
     if config.chat_enabled:
         application.include_router(chat_router)
     return application

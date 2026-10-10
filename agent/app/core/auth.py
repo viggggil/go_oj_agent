@@ -6,6 +6,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
+from app.core.operations import operation
 from app.core.settings import ConfigurationError, Settings
 from app.models.runtime import Principal
 
@@ -29,8 +30,13 @@ class DelegationVerifier:
         self._key = key
         self._kid = settings.gateway_key_id
 
-    def verify(self, authorization: str | None) -> Principal:
+    def verify(
+        self, authorization: str | None, expected_operation: str = CHAT_OPERATION
+    ) -> Principal:
         try:
+            _, method, path = expected_operation.split(" ", 2)
+            if operation(method, path) != expected_operation:
+                raise ValueError
             if authorization is None or len(authorization) > 16_384:
                 raise ValueError
             scheme, token = authorization.split(" ", 1)
@@ -66,7 +72,7 @@ class DelegationVerifier:
             if (
                 claims["sub"] != "gateway-service"
                 or claims["aud"] != "agent-service"
-                or claims["rpc"] != CHAT_OPERATION
+                or claims["rpc"] != expected_operation
             ):
                 raise ValueError
             actor, issued, expires = claims["actor_id"], claims["iat"], claims["exp"]

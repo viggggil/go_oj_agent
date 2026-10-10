@@ -32,6 +32,7 @@ services:
       AGENT_READINESS_TIMEOUT_SECONDS: 2
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
+      AGENT_ADMIN_ENABLED: true
       AGENT_RUNTIME_MODE: "${AGENT_TEST_RUNTIME_MODE:-langgraph_fake}"
       AGENT_CONFIG_MODE: database
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem

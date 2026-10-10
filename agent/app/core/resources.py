@@ -12,6 +12,8 @@ from app.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
     from app.api.chat import ChatController
+    from app.core.auth import DelegationVerifier
+    from app.core.management import ManagementService
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,8 @@ class AppResources:
     chat: "ChatController | None" = None
     business_clients: BusinessClients | None = None
     tools: ToolRegistry | None = None
+    management: "ManagementService | None" = None
+    verifier: "DelegationVerifier | None" = None
 
 
 def get_resources(request: Request) -> AppResources:

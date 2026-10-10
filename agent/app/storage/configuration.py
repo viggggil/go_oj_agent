@@ -1,6 +1,6 @@
 """不可变配置、原子替换与审计重放；只访问 oj_agent。"""
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
@@ -51,6 +51,10 @@ class ConfigVersion:
     content: ConfigBody
     disabled: bool = False
     archived: bool = False
+    created_at: datetime | None = None
+    created_by: int | None = None
+    archived_at: datetime | None = None
+    archived_by: int | None = None
 
 
 def _version_query() -> Any:
@@ -58,6 +62,9 @@ def _version_query() -> Any:
         versions.c.id,
         versions.c.content,
         versions.c.archived_at,
+        versions.c.archived_by,
+        versions.c.created_at,
+        versions.c.created_by,
         resources.c.kind,
         resources.c.config_key,
         resources.c.disabled,
@@ -73,6 +80,10 @@ def _record(row: RowMapping) -> ConfigVersion:
         content=parse_config(kind, row["content"]),
         disabled=bool(row["disabled"]),
         archived=row["archived_at"] is not None,
+        created_at=row["created_at"],
+        created_by=row["created_by"],
+        archived_at=row["archived_at"],
+        archived_by=row["archived_by"],
     )
 
 
@@ -344,7 +355,13 @@ class ConfigurationStore:
                     raise ConfigError("AGENT_CONFIGURATION_REFERENCE_INVALID")
                 queue.append(child)
 
-    async def create_or_replace(self, write: ConfigWrite, content: Any) -> ConfigVersion:
+    async def create_or_replace(
+        self,
+        write: ConfigWrite,
+        content: Any,
+        *,
+        validator: Callable[[AsyncConnection, ConfigBody], Awaitable[None]] | None = None,
+    ) -> ConfigVersion:
         body = parse_config(write.kind, content)
         serialized = body.model_dump(mode="json")
         fingerprint = config_hash(
@@ -360,6 +377,8 @@ class ConfigurationStore:
                 expected = str(write.expected_id) if write.expected_id else None
                 if old_id != expected:
                     raise ConfigError("AGENT_CONFIGURATION_STALE", 409)
+                if validator is not None:
+                    await validator(connection, body)
                 self._validate_tools(body)
                 preserved_ids = [old_id] if old_id else []
                 if write.source_id is not None:
@@ -417,9 +436,7 @@ class ConfigurationStore:
                     old_id,
                     version_id,
                 )
-                return ConfigVersion(
-                    version_id, write.kind, write.key, body, disabled=bool(resource["disabled"])
-                )
+                return await self._by_id(connection, version_id)
         except IntegrityError:
             # 同一个请求编号在另一个资源上并发提交：失败事务回滚后读取已提交审计。
             async with self._engine.connect() as connection:

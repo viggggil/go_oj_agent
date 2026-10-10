@@ -58,7 +58,9 @@ func NewHTTPServerWithAgent(config *conf.Bootstrap, authMiddleware *gatewaymw.Au
 	registerProblemUploadRoute(server, gatewayService)
 	registerSubmissionEventsRoute(server, gatewayService, sseInterval, sseMaxDuration)
 	registerAgentChatRoute(server, agent)
+	registerAgentManagementRoutes(server, agent)
 	server.Use(client.AgentChatOperation, authMiddleware.Middleware())
+	server.Use(client.AgentJSONOperation, authMiddleware.Middleware())
 	server.ReadHeaderTimeout = 5 * time.Second
 	server.IdleTimeout = time.Minute
 	server.Use(

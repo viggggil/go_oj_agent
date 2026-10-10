@@ -1,10 +1,34 @@
 # Agent Service
 
-## 当前已实现：PR1–PR5 基础设施与 PR6 真实模型单轮回答
+## 当前已实现：PR1–PR7 基础设施、真实单轮回答与配置管理 API
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，但本阶段真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。多轮历史上下文、记忆、真实模型调用工具、RAG、管理 API/前端和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，但真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录。多轮历史上下文、记忆、真实模型调用工具、RAG、管理前端和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+
+## PR7 管理 HTTP 与 test Agent
+
+设置 `AGENT_ADMIN_ENABLED=true`，配置 Agent 数据库与 Gateway 公钥即可独立启用管理；
+不要求 Chat 或模型 Key 可用。默认关闭。Gateway 需启用既有 Agent client，管理员角色为
+`admin`、`system_admin`、`agent_admin`，两端执行授权；所有 API 经 Gateway。
+
+管理 API 前缀为 `/api/v1/admin/agent`，对 agents/prompts/skills 提供列表、详情、创建、
+替换、历史版本、归档、恢复和启停。请求/响应与错误详见 [API 契约](../docs/api.md)。
+写操作显式带 UUID `X-Request-ID`，同操作重试复用；替换/状态操作带 expected_id。
+身份只从短期签名委托取得，CLI actor-id 仍只是本机审计字段。
+
+管理员按 Prompt → Skill → Agent 顺序创建依赖，用 `/model-options` 选择已配置 su8
+Model Profile UUID，Agent 设置 `visibility=admin`、`is_test=true` 和未来到期时间，
+即可通过 Chat 的 agent_key 测试。模型/Provider/凭据继续本机管理；
+`AGENT_ADMIN_PROVIDER_KEY` 指定可选 Provider stable key，默认 su8，无 Provider 管理页。
+
+`GET /api/v1/agent/agents` 和 `GET /api/v1/agent/agents/{key}/skills` 返回当前用户允许
+且可运行的聊天选项，不返回 Prompt/Provider。Chat 必须启用且 config_mode=database，
+否则目录为空；Chat 和管理均关闭时返回 503。目录独立于管理员管理开关。管理本身不受 Chat 生命周期影响，不在管理请求中初始化/清理 Run。
+
+更新共享 Prompt 不自动更新 Skill/Agent 引用。管理员显式选择新 UUID 并保存绑定，
+之后发起新会话验证。归档保留旧绑定；停用资源才阻止依赖的新 Run，已经开始的 Run
+继续使用快照。恢复复制成新 UUID，停用状态不因恢复消失。
 
 ### PR6 配置与安全导入
 

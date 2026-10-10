@@ -35,6 +35,7 @@ func DefaultAgentLimits() AgentLimits {
 
 type AgentClient struct {
 	endpoint string
+	baseURL  string
 	signer   *internalauth.Signer
 	http     *http.Client
 	limits   AgentLimits
@@ -128,11 +129,40 @@ func NewAgentClient(config *conf.Bootstrap) (*AgentClient, func(), error) {
 		DisableCompression: true,
 	}
 	result := &AgentClient{
+		baseURL:  strings.TrimSuffix(endpoint.String(), "/"),
 		endpoint: strings.TrimSuffix(endpoint.String(), "/") + AgentChatPath, signer: signer,
 		http:   &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 		limits: limits, slots: make(chan struct{}, limits.MaxConcurrent),
 	}
 	return result, transport.CloseIdleConnections, nil
+}
+
+// JSON 固定内部目标和公开路径白名单；不重试、不转发调用方身份 Header。
+func (c *AgentClient) JSON(ctx context.Context, method, path, query string, body []byte) (*http.Response, error) {
+	operation, err := AgentOperation(method, path)
+	if err != nil || !c.Enabled() || ValidateAgentContext(ctx) != nil {
+		return nil, fmt.Errorf("invalid Agent request")
+	}
+	rc, _ := gatewaymw.RequestContextFromContext(ctx)
+	token, err := c.signer.Sign(internalauth.Claims{ActorID: rc.GetUserId(), ActorRoles: rc.GetRoles(), RequestID: rc.GetRequestId(), RPC: operation, TokenID: uuid.NewString()})
+	if err != nil {
+		return nil, err
+	}
+	target := c.baseURL + path
+	if query != "" {
+		target += "?" + query
+	}
+	request, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	request.GetBody = nil
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Accept", "application/json")
+	if method != http.MethodGet {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	return c.http.Do(request)
 }
 
 func (c *AgentClient) Limits() AgentLimits {
