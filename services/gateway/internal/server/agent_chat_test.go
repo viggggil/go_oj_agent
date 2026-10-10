@@ -43,7 +43,7 @@ func setAgentHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Agent-Conversation-ID", testConversationID)
 }
 
-func newAgentTestServer(t *testing.T, upstream string, mutate func(*conf.AgentProto)) (*khttp.Server, *internalauth.Verifier) {
+func newAgentTestServer(t *testing.T, upstream string, mutate func(*conf.AgentProto), ordinaryTimeout ...string) (*khttp.Server, *internalauth.Verifier) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -57,6 +57,9 @@ func newAgentTestServer(t *testing.T, upstream string, mutate func(*conf.AgentPr
 	}
 	config := testConfig()
 	config.Server.Http.Timeout = "1ns"
+	if len(ordinaryTimeout) != 0 {
+		config.Server.Http.Timeout = ordinaryTimeout[0]
+	}
 	config.Auth.InternalPrivateKeyFile = file
 	config.Auth.InternalIssuer = "go-oj-gateway"
 	config.Auth.InternalKeyId = "gateway-test"

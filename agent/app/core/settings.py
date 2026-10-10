@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     max_output_chars: int = Field(default=8_000, ge=1, le=32_000)
     max_run_events: int = Field(default=1_000, ge=3, le=10_000)
     chat_enabled: bool = False
+    admin_enabled: bool = False
+    admin_provider_key: str = Field(default="su8", pattern=r"^[a-z][a-z0-9_]{1,63}$")
     gateway_public_key_file: Path | None = None
     gateway_key_id: str = Field(default="gateway-internal-2026-09", min_length=1, max_length=128)
     max_request_bytes: int = Field(default=262_144, ge=1024, le=1_048_576)
@@ -99,6 +101,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
+        if self.admin_enabled and (
+            self.database_url is None or self.gateway_public_key_file is None
+        ):
+            raise ValueError("Management requires database and Gateway public key")
         if self.runtime_mode == "model" and (
             self.config_mode != "database"
             or self.credential_keyring_file is None

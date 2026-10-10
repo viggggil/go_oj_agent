@@ -4,6 +4,7 @@ from typing import Literal, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
 
+from app.core.operations import ADMIN_ROLES
 from app.core.settings import Settings
 from app.models.configuration import (
     AgentConfig,
@@ -99,9 +100,7 @@ class DatabaseConfigReader:
         agent = root.content
         if not isinstance(agent, AgentConfig):
             raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
-        if agent.visibility == "admin" and not principal.roles.intersection(
-            {"system_admin", "agent_admin"}
-        ):
+        if agent.visibility == "admin" and not principal.roles.intersection(ADMIN_ROLES):
             raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
         if agent.test_expires_at is not None and agent.test_expires_at <= datetime.now(UTC):
             raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)

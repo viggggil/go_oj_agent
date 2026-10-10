@@ -90,4 +90,4 @@ AGENT_TEST_GATEWAY_URL="http://127.0.0.1:${AGENT_TEST_GATEWAY_PORT}" \
 AGENT_TEST_MOCK_URL="http://127.0.0.1:${AGENT_TEST_MOCK_PORT}" \
 AGENT_TEST_MODEL_MODE=true \
 AGENT_TEST_USER_PRIVATE_KEY_FILE="${test_key_dir}/user-private.pem" \
-  "${uv_command}" run --directory agent --frozen pytest tests/integration/test_model_http.py -m integration
+  "${uv_command}" run --directory agent --frozen pytest tests/integration/test_model_http.py tests/integration/test_management.py -m integration

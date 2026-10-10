@@ -95,8 +95,7 @@ bootstrap。已有数据卷不会重新执行 SQL；部署者应先应用
 `mysql+asyncmy` 和 `oj_agent` Schema。
 
 PR3/PR4 的 Fake runtime 只用于开发和集成测试；生产环境禁止 `AGENT_RUNTIME_MODE=fake`
-或 `langgraph_fake`。PR4 的只读 Tools 不需要真实模型 API Key；真实模型 Provider、
-知识库和管理员控制面仍未交付。停止可选服务时使用：
+或 `langgraph_fake`。PR4 的只读 Tools 不需要真实模型 API Key；PR6 已支持真实 Responses Provider，PR7 已支持配置管理 HTTP，知识库与前端管理页面后续交付。停止可选服务时使用：
 
 ```bash
 make infra-down
@@ -105,6 +104,8 @@ docker compose --profile agent -f deploy/compose/compose.yaml down
 ```
 
 ## 配置
+
+Agent 管理 API 需要同时开启 Gateway `AGENT_ENABLED=true`、可选 `agent` profile 和 Agent `AGENT_ADMIN_ENABLED=true`，并应用 Agent 的 `000001`、`000002`、`000003` migration。默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；真实模型的 Provider、Credential、Model Profile 按 `agent/README.md` 通过本机 CLI 初始化，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；普通聊天目录要求 Chat 开启且 `AGENT_CONFIG_MODE=database`，无需开启管理开关。现有开发 Fake 配置不会自动变成真实模型配置。
 
 Compose 会自动读取仓库根目录或 `--env-file` 指定的环境文件。可用变量记录在 `deploy/compose/.env.example`。所有默认密码和 JWT 密钥仅供本机开发，不能用于共享、测试平台或生产环境。
 

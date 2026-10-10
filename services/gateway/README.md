@@ -73,6 +73,10 @@ Agent Chat 使用独立的总时长、空闲、响应头和写入预算，不受
 
 ## Agent Chat
 
+PR7 增加 `/api/v1/admin/agent/{agents,prompts,skills}` 管理路由、历史版本与归档/恢复/启停，以及只读 `model-options`、`tools`。管理接口要求 `admin`、`system_admin` 或 `agent_admin`；`/api/v1/agent/agents` 与其 Skill 目录要求登录，Agent Service 再按身份和配置可运行性过滤。写请求要求规范 UUID `X-Request-ID`，Gateway 将可信操作者与请求编号绑定到具体方法和路径签名；不接受 Provider/凭据管理或任意路径代理。
+
+管理 JSON 使用普通 HTTP 请求预算，与 Chat SSE 独立；沿用 Agent 的体积与并发限制，响应上限 1 MiB。Gateway 校验具体路由的响应字段和稳定错误码，不转发后端原始错误、身份 Header 或凭据。Agent 侧 `AGENT_ADMIN_ENABLED` 默认关闭，目录随数据库 Chat 启用。详见 [`docs/api.md`](../../docs/api.md)。
+
 Agent 配置位于 `clients.agent`，默认 `enabled=false`。开启时必须提供仅供 Gateway
 读取的内部 RSA 私钥和固定 `go-oj-gateway` issuer，Agent 侧配置对应的 Gateway 公钥。
 `endpoint` 只允许无 query、fragment、userinfo 的 `http` 或 `https` URL。Gateway 不跟随

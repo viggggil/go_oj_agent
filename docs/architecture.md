@@ -592,7 +592,7 @@ flowchart TB
 PR2 提供 RunService、typed State/Event、Fake Runtime、最小 LangGraph 和 oj_agent 存储。
 PR3 增加 Gateway → Agent HTTP SSE：Gateway 验证外部 Access JWT，再签发绑定 Agent
 与 HTTP 操作的 RS256 委托；Agent 只从验证后的 actor/roles/request_id 创建 Principal。
-默认 Chat/Runtime disabled，开发明确启用 Fake，生产禁止 Fake；控制面和真实模型后续接入。
+默认 Chat/Runtime disabled，开发明确启用 Fake，生产禁止 Fake；真实 Direct Answer 在 PR6 接入，配置管理 HTTP 在 PR7 接入。
 
 身份、输入、owner 和并发在响应头前校验，之后仅输出 SSE。Gateway 按路由设置独立
 Agent 总预算，保留普通预算和父级取消；按有界 UTF-8 SSE 帧增量转发并校验 ID/序号/终态。
@@ -630,7 +630,7 @@ reflection
 
 真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的 `deepseek-v4-flash` 请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
 
-凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；CLI 与未来管理 API 共用底层仓储，但目前没有管理员 HTTP/前端。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
+凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。PR7 提供 Agent、Prompt、Skill 管理 HTTP，前端后续接入。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
 
 Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
 
@@ -665,6 +665,10 @@ rejudge_submission
 
 ### 10.3 Agent Control Plane
 
+PR7 的已实现接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
+
+普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。PR8/PR9 再交付管理页面和对话页面，RAG、多轮上下文和完整质量工程另行实现。
+
 Control Plane 管理以下可版本化资源：
 
 ```text
@@ -685,7 +689,7 @@ CREATED → CURRENT → ARCHIVED
 
 ### 10.4 管理员前端
 
-管理员入口使用 `system_admin` 或明确授权的 `agent_admin` 角色，至少提供：
+管理员入口接受项目现有 `admin`、`system_admin` 或明确授权的 `agent_admin` 角色，至少提供：
 
 - Prompt 管理：编辑、版本 Diff、样例 Eval、替换、归档、恢复和审计。
 - Tool Catalog：查看描述、Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计；RPC 方法和授权代码只读展示。
