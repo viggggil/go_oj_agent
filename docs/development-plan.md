@@ -1277,8 +1277,8 @@ Agent Eval
 ### Issue #154：配置管理与 test Agent 对话
 
 - PR7：Agent/Prompt/Skill 查询、详情、历史和创建/替换/归档/恢复/启停；Gateway 外部认证与具体 HTTP 操作委托；只读 su8 Model Profile 选项和 Tools 元数据；按身份、依赖和运行能力过滤的 Agent/Skill 聊天目录。复用 PR5/PR6 仓储，无新增 migration。
-- PR8：管理员在 Agent 页面边栏进入 Agent、Prompt、Skill 页面，绑定具体配置 UUID，处理并发冲突与归档恢复；表单查询只读 Tools 元数据，模型选择位于 Agent 表单，Provider 保持 CLI 管理。
-- PR9：顶栏新增与题库、比赛并列的 Agent 入口，普通用户只见对话，管理员可切换管理页面；经 Gateway 消费 POST SSE，完成配置 test Agent 后正常对话的闭环。
+- PR8：顶栏 Agent 与题库/比赛并列，工作区默认进入对话路由。管理员边栏进入 Agent、Prompt、Skill 的真实管理页面，绑定具体 UUID、分页查询、创建依赖后返回、处理并发比较与归档恢复。表单查询只读 Tools 元数据，模型选择位于 Agent 表单，Provider 保持 CLI 管理；新增受管理员保护的历史配置/脱敏模型 UUID 查询，无 migration。CI 校验 Vue 类型、单元和 Playwright 管理流程。
+- PR9：接通对话路由中的 Agent/Skill 选择，经 Gateway 消费 POST SSE，完成配置 test Agent 后正常对话的闭环。PR8 的对话入口保留 agent_key，但尚不发送请求。
 
 本阶段无 RAG、多轮上下文恢复、Provider 管理页面、自动 Provider 切换或完整质量工程。Prompt/Skill/Agent 不增加草稿发布机制；真实模型目前只支持 Direct Answer。API、页面、运行闭环分别验收，Issue 在全部交付后关闭。
 

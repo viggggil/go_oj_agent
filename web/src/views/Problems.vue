@@ -56,8 +56,8 @@
       items.value = data.items || []
       page.value = data.page.page
       total.value = data.page.total
-    } catch (error) {
-      error.value = apiErrorMessage(error, '加载题目列表')
+    } catch (cause) {
+      error.value = apiErrorMessage(cause, '加载题目列表')
     } finally {
       loading.value = false
     }

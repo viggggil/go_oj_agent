@@ -91,3 +91,11 @@ AGENT_TEST_MOCK_URL="http://127.0.0.1:${AGENT_TEST_MOCK_PORT}" \
 AGENT_TEST_MODEL_MODE=true \
 AGENT_TEST_USER_PRIVATE_KEY_FILE="${test_key_dir}/user-private.pem" \
   "${uv_command}" run --directory agent --frozen pytest tests/integration/test_model_http.py tests/integration/test_management.py -m integration
+
+# 可选真实浏览器管理链路；仅用户资料 fixture，配置通过 Gateway 写入上述隔离 MySQL。
+if [[ "${AGENT_TEST_WEB:-false}" == "true" ]]; then
+  AGENT_TEST_GATEWAY_URL="http://127.0.0.1:${AGENT_TEST_GATEWAY_PORT}" \
+  AGENT_TEST_MODEL_MODE=true \
+  AGENT_TEST_USER_PRIVATE_KEY_FILE="${test_key_dir}/user-private.pem" \
+    npm --prefix web run test:e2e -- e2e/agent-live.spec.ts
+fi

@@ -711,11 +711,13 @@ GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}
 PUT  /api/v1/admin/agent/{agents|prompts|skills}/{key}
 GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}/versions
 GET  /api/v1/admin/agent/{agents|prompts|skills}/{key}/versions/{uuid}
+GET  /api/v1/admin/agent/{agents|prompts|skills}/versions/{uuid}
 POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/archive
 POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/restore
 POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/disable
 POST /api/v1/admin/agent/{agents|prompts|skills}/{key}/enable
 GET  /api/v1/admin/agent/model-options
+GET  /api/v1/admin/agent/model-options/{uuid}
 GET  /api/v1/admin/agent/tools
 GET  /api/v1/agent/agents
 GET  /api/v1/agent/agents/{agent_key}/skills
@@ -742,6 +744,8 @@ PUT 正文为 `{"expected_id":"<当前 UUID>","content":{...完整内容...}}`�
 历史版本按版本 created_at/id 降序；total/items 在同一数据库快照中查询。详情无分页参数，
 允许读取归档记录；历史 UUID 必须匹配路径 kind/key。拒绝重复/未知查询参数。
 历史列表、模型选项与 Tools 不支持状态筛选，非 active 的 state 返回 400。
+PR8 增加按 kind/UUID 查询历史详情的只读入口（无需先查 key）；UUID 必须为规范小写格式，
+kind 不匹配返回 404，详情禁止查询参数。与 key/UUID 详情使用相同配置 DTO、管理员权限及具体路径委托。
 
 创建已有 key（含归档）或 stale expected_id 返回 409 `AGENT_CONFIGURATION_STALE`，不会
 自动覆盖。输入/引用/工具不合法返回 400，未实现执行模式/非允许模型返回 409
@@ -760,6 +764,10 @@ test Agent 必须管理员可见、到期时间带时区且在未来。程序安
 保存 Agent 时在事务中复核模型与 Provider，不能靠直接提交 UUID 绕过；不返回 Provider
 正文、Credential ID、Key/密文。模型初始为 deepseek-v4-flash，目录来自数据库，不在前端写死。
 Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 HTTP 写接口。
+`GET model-options/{uuid}` 用于显示已有的历史模型绑定，额外返回 archived/disabled/available
+布尔值；available 表示可用于新绑定，归档版本返回 false，但仍显示保留的版本信息。
+该接口只允许部署指定 Provider 的 Responses Profile，不属于该范围或 UUID 不存在返回 404。
+禁用或部署网络策略不允许时仍可查元数据，available=false；响应严格禁止 Provider/凭据字段。
 
 Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调用/统计/编辑接口。
 普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/execution_mode/default
@@ -777,7 +785,8 @@ UUID。停用是资源级操作，会阻止后续 Run 使用其任一版本；�
 Agent 自身归档也会阻止新的 Run。恢复不自动启用已停用资源。
 
 以下旧目标列表中超出上述 PR7 接口的功能（Tools 详情/统计、RAG、Eval、观测等）仍为后续
-设计；前端管理和聊天分别属于 #154 的 PR8/PR9，多轮上下文仍未实现。
+设计；PR8 已接管理页面、配置版本绑定和顶栏/工作区路由，聊天页面暂保留目标 agent_key，
+完整流式对话属于 #154 的 PR9，多轮上下文仍未实现。
 
 Prompt：
 

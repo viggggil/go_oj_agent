@@ -630,7 +630,7 @@ reflection
 
 真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的 `deepseek-v4-flash` 请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
 
-凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。PR7 提供 Agent、Prompt、Skill 管理 HTTP，前端后续接入。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
+凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。PR7 提供 Agent、Prompt、Skill 管理 HTTP，PR8 的 Vue 管理工作区通过 Gateway 接入；历史 UUID 详情仅管理员可见，模型详情严格脱敏，不返回 Provider/凭据。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
 
 Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
 

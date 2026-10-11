@@ -1,10 +1,10 @@
 # Agent Service
 
-## 当前已实现：PR1–PR7 基础设施、真实单轮回答与配置管理 API
+## 当前已实现：PR1–PR8 基础设施、真实单轮回答与配置管理
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，但真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录。多轮历史上下文、记忆、真实模型调用工具、RAG、管理前端和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，但真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。完整对话前端（PR9）、多轮历史上下文、记忆、真实模型调用工具、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
 ## PR7 管理 HTTP 与 test Agent
 
@@ -29,6 +29,20 @@ Model Profile UUID，Agent 设置 `visibility=admin`、`is_test=true` 和未来�
 更新共享 Prompt 不自动更新 Skill/Agent 引用。管理员显式选择新 UUID 并保存绑定，
 之后发起新会话验证。归档保留旧绑定；停用资源才阻止依赖的新 Run，已经开始的 Run
 继续使用快照。恢复复制成新 UUID，停用状态不因恢复消失。
+
+## PR8 管理前端
+
+顶栏 Agent 进入 `/agent/chat`。管理员可从工作区边栏进入 Agent、Prompt、Skill 列表与编辑页；
+普通用户只有对话入口。页面通过 Gateway 执行查询、创建、保存新 UUID、归档、启停、查看历史、
+复制历史恢复。模型在 Agent 表单内从 su8 Profile 选项选择，无 Provider/Key 页面。
+
+绑定选择显示具体 UUID 和历史/停用状态，修改依赖不会自动升级引用。表单内可跳转创建
+Prompt/Skill 后返回并选中新增 UUID；未提交输入仅临时保留在当前账号的页面内存中。
+网络重试/401 重放保留相同写入编号，409 保留输入，读取/比较服务器内容后明确决定下一次操作。
+按 UUID 的管理员详情和脱敏模型详情用于显示历史绑定；没有增加数据库表。
+
+本阶段 `/agent/chat?agent_key=...` 保留目标 Agent，但发送/流式回答由 PR9 接入。
+验证命令、浏览器测试与部署前置条件见 [Web README](../web/README.md)。
 
 ### PR6 配置与安全导入
 

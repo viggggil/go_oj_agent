@@ -10,6 +10,8 @@ _RESOURCE = re.compile(
     r"(?:/(versions|archive|restore|disable|enable)(?:/([0-9a-f-]{36}))?)?"
 )
 _SKILLS = re.compile(rf"/api/v1/agent/agents/({KEY_PATTERN})/skills")
+_MODEL = re.compile(r"/api/v1/admin/agent/model-options/([0-9a-f-]{36})")
+_VERSION = re.compile(r"/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})")
 
 
 def operation(method: str, path: str) -> str:
@@ -22,6 +24,16 @@ def operation(method: str, path: str) -> str:
         "/api/v1/admin/agent/tools",
     } or _SKILLS.fullmatch(path):
         allowed = method == "GET"
+    elif model := _MODEL.fullmatch(path):
+        try:
+            allowed = method == "GET" and str(UUID(model[1])) == model[1]
+        except ValueError:
+            pass
+    elif version := _VERSION.fullmatch(path):
+        try:
+            allowed = method == "GET" and str(UUID(version[2])) == version[2]
+        except ValueError:
+            pass
     elif match := _RESOURCE.fullmatch(path):
         _, key, action, identifier = match.groups()
         if identifier is not None:

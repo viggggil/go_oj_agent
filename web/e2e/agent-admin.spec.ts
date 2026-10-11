@@ -1,0 +1,506 @@
+import { test, expect, type Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
+import { defaultBudget } from '../src/agent/types'
+
+interface Config {
+  id: string
+  key: string
+  kind: string
+  content: any
+  archived: boolean
+  disabled: boolean
+  created_at: string
+  created_by: number
+  archived_at: string | null
+  archived_by: number | null
+}
+async function mockManagement(page: Page, roles = ['admin']) {
+  const current = new Map<string, Config>(),
+    versions = new Map<string, Config>(),
+    writes: string[] = []
+  const model = {
+    id: randomUUID(),
+    key: 'su8_flash',
+    model: 'deepseek-v4-flash',
+    temperature: null,
+    verbosity: null,
+    max_output_tokens: 32000,
+    context_window_tokens: 128000,
+  }
+  let failNext = 0
+  let failProfile = false
+  let failDetail = false
+  const completed = new Map<string, { fingerprint: string; configuration: Config }>()
+  const create = (kind: string, key: string, content: any): Config => {
+    const previous = current.get(kind + '/' + key)
+    if (previous) {
+      previous.archived = true
+      previous.archived_at = new Date().toISOString()
+      previous.archived_by = 7
+    }
+    const cfg = {
+      id: randomUUID(),
+      key,
+      kind: kind.slice(0, -1),
+      content,
+      archived: false,
+      disabled: previous?.disabled || false,
+      created_at: new Date().toISOString(),
+      created_by: 7,
+      archived_at: null,
+      archived_by: null,
+    }
+    current.set(kind + '/' + key, cfg)
+    versions.set(cfg.id, cfg)
+    return cfg
+  }
+  await page.addInitScript(() => {
+    localStorage.setItem('access_token', 'mock-access')
+    localStorage.setItem('refresh_token', 'mock-refresh')
+  })
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url()),
+      method = route.request().method(),
+      parts = url.pathname.split('/').filter(Boolean)
+    const respond = (data: unknown, status = 200) => route.fulfill({ status, json: data })
+    if (url.pathname === '/api/v1/users/me' && failProfile) return respond({}, 503)
+    if (url.pathname === '/api/v1/users/me')
+      return respond({
+        user: { id: 7, username: '管理员', email: 'admin@example.test', status: 'active', roles },
+      })
+    if (!url.pathname.startsWith('/api/v1/admin/agent/')) return respond({}, 404)
+    if (!roles.some((role) => ['admin', 'system_admin', 'agent_admin'].includes(role)))
+      return respond({ reason: 'AGENT_FORBIDDEN' }, 403)
+    const kind = parts[4],
+      key = parts[5],
+      action = parts[6]
+    const paged = (values: unknown[]) => {
+      const number = Number(url.searchParams.get('page') || 1),
+        size = Number(url.searchParams.get('page_size') || 20)
+      return respond({
+        items: values.slice((number - 1) * size, number * size),
+        page: { page: number, page_size: size, total: values.length },
+      })
+    }
+    if (kind === 'model-options')
+      return key
+        ? respond({ model_option: { ...model, archived: false, disabled: false, available: true } })
+        : paged([model])
+    if (kind === 'tools') return paged([])
+    if (method !== 'GET') {
+      writes.push(route.request().headers()['x-request-id'])
+      if (failNext) {
+        const status = failNext
+        failNext = 0
+        return respond(
+          { reason: status === 409 ? 'AGENT_CONFIGURATION_STALE' : 'AGENT_UNAVAILABLE' },
+          status,
+        )
+      }
+      const body = route.request().postDataJSON()
+      const requestId = route.request().headers()['x-request-id']
+      const fingerprint = JSON.stringify({ method, path: url.pathname, body })
+      const replay = completed.get(requestId)
+      if (replay)
+        return replay.fingerprint === fingerprint
+          ? respond({ configuration: replay.configuration })
+          : respond({ reason: 'AGENT_CONFIGURATION_REQUEST_CONFLICT' }, 409)
+      const saved = (configuration: Config) => {
+        completed.set(requestId, { fingerprint, configuration })
+        return respond({ configuration })
+      }
+      if (method === 'POST' && !key) {
+        if (current.has(kind + '/' + body.key))
+          return respond({ reason: 'AGENT_CONFIGURATION_CONFLICT' }, 409)
+        return saved(create(kind, body.key, body.content))
+      }
+      const value = current.get(kind + '/' + key)
+      if (!value) return respond({}, 404)
+      if (body.expected_id !== value.id)
+        return respond({ reason: 'AGENT_CONFIGURATION_STALE' }, 409)
+      if (method === 'PUT') return saved(create(kind, key, body.content))
+      if (action === 'restore')
+        return saved(create(kind, key, versions.get(body.source_id)!.content))
+      if (action === 'archive') value.archived = true
+      if (action === 'disable') value.disabled = true
+      if (action === 'enable') value.disabled = false
+      return saved(value)
+    }
+    if (key === 'versions') {
+      const value = versions.get(action)
+      return value && value.kind + 's' === kind
+        ? respond({ configuration: value })
+        : respond({}, 404)
+    }
+    if (!key) {
+      const state = url.searchParams.get('state') || 'active',
+        search = url.searchParams.get('search') || ''
+      return paged(
+        [...current.values()].filter(
+          (value) =>
+            value.kind + 's' === kind &&
+            value.key.includes(search) &&
+            (state === 'all' ||
+              (state === 'archived' && value.archived) ||
+              (state === 'disabled' && value.disabled) ||
+              (state === 'active' && !value.archived)),
+        ),
+      )
+    }
+    if (action === 'versions') {
+      if (parts[7]) return respond({ configuration: versions.get(parts[7]) })
+      return paged(
+        [...versions.values()]
+          .filter((value) => value.kind + 's' === kind && value.key === key)
+          .reverse(),
+      )
+    }
+    const value = current.get(kind + '/' + key)
+    if (failDetail) {
+      failDetail = false
+      return respond({ reason: 'AGENT_UNAVAILABLE' }, 503)
+    }
+    return value ? respond({ configuration: value }) : respond({}, 404)
+  })
+  page.on('dialog', (dialog) => dialog.accept())
+  return {
+    current,
+    versions,
+    writes,
+    model,
+    create,
+    fail: (status: number) => {
+      failNext = status
+    },
+    profileFailure: (value: boolean) => {
+      failProfile = value
+    },
+    failReadBack: () => {
+      failDetail = true
+    },
+    roles: (value: string[]) => {
+      roles = value
+    },
+  }
+}
+
+test('管理员通过嵌套创建保留表单，保存 test Agent，并查看历史/归档/恢复', async ({ page }) => {
+  const state = await mockManagement(page)
+  await page.goto('/agent/agents/new')
+  await page.getByLabel('稳定标识').fill('test_agent')
+  await page.getByLabel('名称', { exact: true }).fill('算法测试助手')
+  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await page.getByLabel('稳定标识').fill('base_prompt')
+  await page.getByLabel('正文').fill('用中文解释算法')
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('算法测试助手')
+  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await page.getByLabel('稳定标识').fill('explain_skill')
+  await page.getByLabel('名称', { exact: true }).fill('算法讲解')
+  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await page.getByLabel('稳定标识').fill('skill_prompt')
+  await page.getByLabel('正文').fill('提供时间复杂度分析')
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('算法讲解')
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page.getByLabel('稳定标识')).toHaveValue('test_agent')
+  await page.getByLabel('选择模型版本').selectOption(state.model.id)
+  await page.getByLabel('测试 Agent', { exact: true }).check()
+  await page.getByLabel('到期时间（本地时区）').fill('2099-10-10T12:00')
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page).toHaveURL(/\/agent\/agents\/test_agent\/edit$/)
+  const first = state.current.get('agents/test_agent')!
+  expect(first.content.prompt_id).toBe(state.current.get('prompts/base_prompt')!.id)
+  expect(first.content.skill_ids).toEqual([state.current.get('skills/explain_skill')!.id])
+  expect(first.content.visibility).toBe('admin')
+  await page.getByLabel('名称', { exact: true }).fill('新测试助手')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('agents/test_agent')!.id).not.toBe(first.id)
+  await page.getByRole('button', { name: '查看 ' + first.id }).click()
+  await expect(page.getByRole('dialog')).toContainText('算法测试助手')
+  await page.getByRole('button', { name: '关闭版本详情' }).click()
+  await page.getByRole('button', { name: '归档', exact: true }).click()
+  await expect(page.getByRole('button', { name: '保存新版本' })).toBeDisabled()
+  await page.getByRole('button', { name: '从此版本恢复' }).last().click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('算法测试助手')
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.screenshot({ path: 'test-results/agent-desktop.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true)
+  await page.getByRole('button', { name: '切换菜单' }).click()
+  await expect(page.getByRole('navigation', { name: 'Agent 管理导航' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭菜单' }).click()
+  await page.screenshot({ path: 'test-results/agent-mobile.png', fullPage: true })
+})
+
+test('已停用工具仍可从历史绑定中取消后保存', async ({ page }) => {
+  const state = await mockManagement(page)
+  const prompt = state.create('prompts', 'tool_prompt', { text: '提示', variables: [] })
+  const disabledTool = {
+    name: 'old_tool',
+    description: '已下线工具',
+    enabled: false,
+    side_effect: 'read',
+    read_scope: 'public',
+    sensitivity: 'low',
+    allowed_roles: [],
+    input_schema: {},
+    output_schema: {},
+  }
+  await page.route('**/api/v1/admin/agent/tools*', async (route) =>
+    route.fulfill({ json: { items: [disabledTool], page: { page: 1, page_size: 100, total: 1 } } }),
+  )
+  state.create('skills', 'tool_skill', {
+    name: '旧 Skill',
+    prompt_id: prompt.id,
+    execution_mode: 'direct',
+    allowed_tools: ['old_tool'],
+    budget: defaultBudget(),
+  })
+  await page.goto('/agent/skills/tool_skill/edit')
+  const checkbox = page.getByRole('checkbox', { name: /old_tool/ })
+  await expect(checkbox).toBeChecked()
+  await expect(checkbox).toBeEnabled()
+  await checkbox.uncheck()
+  await expect(checkbox).toBeDisabled()
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('skills/tool_skill')!.content.allowed_tools).toEqual([])
+  const skill = state.current.get('skills/tool_skill')!
+  state.create('agents', 'tool_agent', {
+    name: '旧 Agent',
+    prompt_id: prompt.id,
+    skill_ids: [skill.id],
+    default_skill_id: skill.id,
+    model_profile_id: state.model.id,
+    allowed_tools: ['old_tool'],
+    budget: defaultBudget(),
+    visibility: 'user',
+    is_test: false,
+    test_expires_at: null,
+    knowledge_scope: [],
+  })
+  await page.goto('/agent/agents/tool_agent/edit')
+  await expect(checkbox).toBeChecked()
+  await expect(checkbox).toBeEnabled()
+  await checkbox.uncheck()
+  await expect(checkbox).toBeDisabled()
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('agents/tool_agent')!.content.allowed_tools).toEqual([])
+})
+
+test('网络重试保留 UUID，冲突保留输入，明确比较后才能覆盖', async ({ page }) => {
+  const state = await mockManagement(page)
+  const original = state.create('prompts', 'test_prompt', { text: '旧提示', variables: [] })
+  await page.goto('/agent/prompts/test_prompt')
+  await page.getByLabel('正文').fill('管理员的新输入')
+  state.fail(503)
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('alert')).toContainText('暂不可用')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.writes[0]).toBe(state.writes[1])
+  await page.getByLabel('正文').fill('保留输入')
+  const server = state.create('prompts', 'test_prompt', {
+    text: '另一个管理员的版本',
+    variables: [],
+  })
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('alert')).toContainText('配置已被修改')
+  await expect(page.getByLabel('正文')).toHaveValue('保留输入')
+  await page.getByRole('button', { name: '查看当前版本' }).click()
+  await expect(page.getByRole('button', { name: '保存新版本' })).toBeDisabled()
+  await expect(page.locator('.agent-conflict')).toContainText(server.id)
+  await page.getByRole('button', { name: '保留输入，基于当前版本重试' }).click()
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('prompts/test_prompt')!.content.text).toBe('保留输入')
+  expect(state.versions.get(original.id)!.archived).toBe(true)
+  expect(state.writes[state.writes.length - 1]).not.toBe(state.writes[state.writes.length - 2])
+})
+
+test('普通用户管理 URL 转到对话，不读取管理正文；失败详情不允许写入', async ({ page }) => {
+  const requests: string[] = []
+  page.on('request', (req) => requests.push(req.url()))
+  await mockManagement(page, ['user'])
+  await page.goto('/agent/prompts/test_prompt')
+  await expect(page).toHaveURL(/\/agent\/chat$/)
+  expect(requests.some((url) => url.includes('/api/v1/admin/agent/'))).toBe(false)
+  await expect(page.getByRole('link', { name: 'Prompt', exact: true })).toHaveCount(0)
+})
+
+test('管理员详情 404 可重试，正文作为纯文本显示', async ({ page }) => {
+  const state = await mockManagement(page, ['agent_admin'])
+  await page.goto('/agent/prompts/missing_prompt')
+  await expect(page.getByRole('alert')).toContainText('配置不存在')
+  await expect(page.getByRole('button', { name: '保存新版本' })).toHaveCount(0)
+  state.create('prompts', 'missing_prompt', {
+    text: '<img src=x onerror="window.XSS=true">',
+    variables: [],
+  })
+  await page.getByRole('button', { name: '重试加载' }).click()
+  await expect(page.getByLabel('正文')).toHaveValue('<img src=x onerror="window.XSS=true">')
+  expect(await page.evaluate(() => (window as any).XSS)).toBeUndefined()
+})
+
+test('编辑路由复用仍确认离开，取消后保留输入；创建依赖可返回原表单', async ({ page }) => {
+  await mockManagement(page)
+  await page.goto('/agent/skills/new')
+  await page.getByLabel('名称', { exact: true }).fill('保留 Skill 名称')
+  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await page.getByLabel('正文').fill('未保存 Prompt')
+  page.removeAllListeners('dialog')
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: '返回原表单' }).click()
+  await expect(page).toHaveURL(/\/agent\/prompts\/new\?return_to=/)
+  await expect(page.getByLabel('正文')).toHaveValue('未保存 Prompt')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '返回原表单' }).click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('保留 Skill 名称')
+})
+
+test('资料临时失败隐藏管理页，重试恢复输入与嵌套草稿；角色丢失清除管理内容', async ({ page }) => {
+  const state = await mockManagement(page)
+  await page.goto('/agent/agents/new')
+  await page.getByLabel('名称', { exact: true }).fill('网络失败保留 Agent')
+  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await page.getByLabel('名称', { exact: true }).fill('保留 Skill 输入')
+  state.profileFailure(true)
+  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('无法确认账号权限')
+  await expect(page.getByLabel('名称', { exact: true })).toBeHidden()
+  state.profileFailure(false)
+  await page.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('保留 Skill 输入')
+  await page.getByRole('button', { name: '返回原表单' }).click()
+  await expect(page.getByLabel('名称', { exact: true })).toHaveValue('网络失败保留 Agent')
+  state.roles(['user'])
+  await page.getByRole('link', { name: 'Prompt', exact: true }).click()
+  await expect(page).toHaveURL(/\/agent\/chat$/)
+  await expect(page.getByLabel('名称', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Prompt', exact: true })).toHaveCount(0)
+})
+
+test('合法标识 new 可创建、打开编辑和再次保存', async ({ page }) => {
+  const state = await mockManagement(page)
+  await page.goto('/agent/prompts/new')
+  await page.getByLabel('稳定标识').fill('new')
+  await page.getByLabel('正文').fill('合法 new 标识')
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page).toHaveURL(/\/agent\/prompts\/new\/edit$/)
+  await page.getByRole('link', { name: '返回列表' }).click()
+  await page.getByRole('link', { name: '编辑', exact: true }).click()
+  await expect(page.getByLabel('正文')).toHaveValue('合法 new 标识')
+  await page.getByLabel('正文').fill('新版本')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('prompts/new')!.content.text).toBe('新版本')
+})
+
+test('已有 Agent 创建 Skill 后消费返回参数，保存刷新不重复绑定', async ({ page }) => {
+  const state = await mockManagement(page)
+  const prompt = state.create('prompts', 'base_prompt', { text: '基础提示', variables: [] })
+  const skill = state.create('skills', 'base_skill', {
+    name: '原 Skill',
+    prompt_id: prompt.id,
+    execution_mode: 'direct',
+    allowed_tools: [],
+    budget: defaultBudget(),
+  })
+  state.create('agents', 'existing_agent', {
+    name: '已有 Agent',
+    prompt_id: prompt.id,
+    skill_ids: [skill.id],
+    default_skill_id: skill.id,
+    model_profile_id: state.model.id,
+    allowed_tools: [],
+    budget: defaultBudget(),
+    visibility: 'user',
+    is_test: false,
+    test_expires_at: null,
+    knowledge_scope: [],
+  })
+  await page.goto('/agent/agents/existing_agent/edit')
+  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await page.getByLabel('稳定标识').fill('added_skill')
+  await page.getByLabel('名称', { exact: true }).fill('新增 Skill')
+  await page.getByLabel('选择 Prompt 版本').selectOption(prompt.id)
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page).toHaveURL(/\/agent\/agents\/existing_agent\/edit$/)
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  await page.reload()
+  await expect(
+    page.getByText('绑定 Skill', { exact: true }).locator('..').locator('.selected-binding'),
+  ).toHaveCount(2)
+  await page.getByLabel('名称', { exact: true }).fill('刷新后继续修改')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('agents/existing_agent')!.content.skill_ids).toEqual([
+    skill.id,
+    state.current.get('skills/added_skill')!.id,
+  ])
+})
+
+test('保存后跳转遇到资料故障，恢复后仍有未保存离开保护', async ({ page }) => {
+  await mockManagement(page).then(async (state) => {
+    await page.goto('/agent/prompts/new')
+    await page.getByLabel('稳定标识').fill('cancelled_navigation')
+    await page.getByLabel('正文').fill('已写入正文')
+    state.profileFailure(true)
+    await page.getByRole('button', { name: '创建', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('无法确认账号权限')
+    state.profileFailure(false)
+    await page.getByRole('button', { name: '重试', exact: true }).click()
+    await page.getByLabel('正文').fill('仍需保护的新输入')
+    page.removeAllListeners('dialog')
+    page.once('dialog', (dialog) => dialog.dismiss())
+    await page.getByRole('link', { name: '返回列表' }).click()
+    await expect(page).toHaveURL(/\/agent\/prompts\/new$/)
+    await expect(page.getByLabel('正文')).toHaveValue('仍需保护的新输入')
+  })
+})
+
+test('并发创建同标识的 409 比较后可明确保留输入转为替换', async ({ page }) => {
+  const state = await mockManagement(page)
+  await page.goto('/agent/prompts/new')
+  await page.getByLabel('稳定标识').fill('same_key')
+  await page.getByLabel('正文').fill('我要保留的输入')
+  const server = state.create('prompts', 'same_key', { text: '其他管理员创建', variables: [] })
+  await page.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('配置冲突')
+  await page.getByRole('button', { name: '查看当前版本' }).click()
+  await expect(page.locator('.agent-conflict')).toContainText(server.id)
+  await page.getByRole('button', { name: '保留输入，基于当前版本重试' }).click()
+  await expect(page).toHaveURL(/\/agent\/prompts\/same_key\/edit$/)
+  await expect(page.getByLabel('正文')).toHaveValue('我要保留的输入')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  expect(state.current.get('prompts/same_key')!.content.text).toBe('我要保留的输入')
+  expect(state.writes[1]).not.toBe(state.writes[0])
+})
+
+test('写入成功但读回失败保留输入和离开保护，同编号重试不新增版本', async ({ page }) => {
+  const state = await mockManagement(page)
+  state.create('prompts', 'readback_prompt', { text: '原始正文', variables: [] })
+  await page.goto('/agent/prompts/readback_prompt/edit')
+  await page.getByLabel('正文').fill('写入后保留输入')
+  state.failReadBack()
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('alert')).toContainText('暂不可用')
+  const savedId = state.current.get('prompts/readback_prompt')!.id
+  page.removeAllListeners('dialog')
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('link', { name: '返回列表' }).click()
+  await expect(page).toHaveURL(/\/readback_prompt\/edit$/)
+  await expect(page.getByLabel('正文')).toHaveValue('写入后保留输入')
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText(savedId)
+  expect(state.writes[1]).toBe(state.writes[0])
+  expect(state.current.get('prompts/readback_prompt')!.id).toBe(savedId)
+  expect(state.versions.size).toBe(2)
+})

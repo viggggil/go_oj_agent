@@ -15,6 +15,11 @@ import ContestDetail from './views/ContestDetail.vue'
 import ContestLeaderboard from './views/ContestLeaderboard.vue'
 import ContestEditor from './views/ContestEditor.vue'
 import Home from './views/Home.vue'
+import AgentWorkspace from './views/AgentWorkspace.vue'
+import AgentChat from './views/AgentChat.vue'
+import AgentList from './views/AgentList.vue'
+import AgentEditor from './views/AgentEditor.vue'
+import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -34,10 +39,40 @@ const router = createRouter({
     { path: '/contests/new', component: ContestEditor, meta: { auth: true, admin: true } },
     { path: '/contests/:id', component: ContestDetail, meta: { auth: true } },
     { path: '/contests/:id/leaderboard', component: ContestLeaderboard, meta: { auth: true } },
+    {
+      path: '/agent',
+      component: AgentWorkspace,
+      meta: { auth: true },
+      children: [
+        { path: '', redirect: '/agent/chat' },
+        { path: 'chat', component: AgentChat },
+        {
+          path: ':resource(agents|prompts|skills)',
+          component: AgentList,
+          meta: { agentAdmin: true },
+        },
+        {
+          path: ':resource(agents|prompts|skills)/new',
+          component: AgentEditor,
+          meta: { agentAdmin: true },
+        },
+        {
+          path: ':resource(agents|prompts|skills)/:key/edit',
+          component: AgentEditor,
+          meta: { agentAdmin: true },
+        },
+        {
+          path: ':resource(agents|prompts|skills)/:key',
+          redirect: (to) =>
+            '/agent/' + String(to.params.resource) + '/' + String(to.params.key) + '/edit',
+          meta: { agentAdmin: true },
+        },
+      ],
+    },
   ],
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   if (to.meta.auth && !tokens.access) {
     return '/login'
   }
@@ -47,6 +82,17 @@ router.beforeEach(async (to) => {
     const auth = useAuthStore()
     if (!auth.user) await auth.fetchProfile().catch(() => undefined)
     if (!auth.user?.roles.includes('admin')) return '/problems'
+  }
+
+  if (to.path.startsWith('/agent')) {
+    const { useAuthStore } = await import('./stores/auth')
+    const auth = useAuthStore()
+    if (to.path !== from.path || !auth.user || auth.profileError)
+      await auth.fetchProfile().catch(() => undefined)
+    if (!tokens.access) return '/login'
+    if (auth.profileError && from.path.startsWith('/agent')) return false
+    if (to.meta.agentAdmin && !auth.profileError && !agentAdministrator(auth.user?.roles || []))
+      return '/agent/chat'
   }
 
   if ((to.path === '/login' || to.path === '/register') && tokens.access) {
