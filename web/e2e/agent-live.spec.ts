@@ -63,11 +63,13 @@ test('真实 Gateway 与 MySQL 保存页面配置，历史绑定可查并用于 
   await page.getByLabel('稳定标识').fill(prefix)
   await page.getByLabel('名称', { exact: true }).fill('浏览器集成助手')
   await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '新建Prompt', exact: true })).toBeVisible()
   await page.getByLabel('稳定标识').fill(prefix + '_p')
   await page.getByLabel('正文').fill('PR8 浏览器真实配置提示')
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue('浏览器集成助手')
   await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '新建Skill', exact: true })).toBeVisible()
   await page.getByLabel('稳定标识').fill(prefix + '_s')
   await page.getByLabel('名称', { exact: true }).fill('算法解释')
   const base = '/api/v1/admin/agent'

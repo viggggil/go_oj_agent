@@ -2,6 +2,12 @@ import { test, expect, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { defaultBudget } from '../src/agent/types'
 
+async function createDependency(page: Page, kind: 'Prompt' | 'Skill') {
+  await page.getByRole('button', { name: '新建 ' + kind, exact: true }).click()
+  // 导航包含异步权限检查；同名输入框可能暂时仍属于来源表单。
+  await expect(page.getByRole('heading', { name: '新建' + kind, exact: true })).toBeVisible()
+}
+
 interface Config {
   id: string
   key: string
@@ -189,15 +195,15 @@ test('管理员通过嵌套创建保留表单，保存 test Agent，并查看历
   await page.goto('/agent/agents/new')
   await page.getByLabel('稳定标识').fill('test_agent')
   await page.getByLabel('名称', { exact: true }).fill('算法测试助手')
-  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await createDependency(page, 'Prompt')
   await page.getByLabel('稳定标识').fill('base_prompt')
   await page.getByLabel('正文').fill('用中文解释算法')
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue('算法测试助手')
-  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await createDependency(page, 'Skill')
   await page.getByLabel('稳定标识').fill('explain_skill')
   await page.getByLabel('名称', { exact: true }).fill('算法讲解')
-  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await createDependency(page, 'Prompt')
   await page.getByLabel('稳定标识').fill('skill_prompt')
   await page.getByLabel('正文').fill('提供时间复杂度分析')
   await page.getByRole('button', { name: '创建', exact: true }).click()
@@ -351,15 +357,19 @@ test('编辑路由复用仍确认离开，取消后保留输入；创建依赖�
   await mockManagement(page)
   await page.goto('/agent/skills/new')
   await page.getByLabel('名称', { exact: true }).fill('保留 Skill 名称')
-  await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
+  await createDependency(page, 'Prompt')
   await page.getByLabel('正文').fill('未保存 Prompt')
   page.removeAllListeners('dialog')
-  page.once('dialog', (dialog) => dialog.dismiss())
-  await page.getByRole('button', { name: '返回原表单' }).click()
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.dismiss()),
+    page.getByRole('button', { name: '返回原表单' }).click(),
+  ])
   await expect(page).toHaveURL(/\/agent\/prompts\/new\?return_to=/)
   await expect(page.getByLabel('正文')).toHaveValue('未保存 Prompt')
-  page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('button', { name: '返回原表单' }).click()
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
+    page.getByRole('button', { name: '返回原表单' }).click(),
+  ])
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue('保留 Skill 名称')
 })
 
@@ -367,7 +377,7 @@ test('资料临时失败隐藏管理页，重试恢复输入与嵌套草稿；�
   const state = await mockManagement(page)
   await page.goto('/agent/agents/new')
   await page.getByLabel('名称', { exact: true }).fill('网络失败保留 Agent')
-  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await createDependency(page, 'Skill')
   await page.getByLabel('名称', { exact: true }).fill('保留 Skill 输入')
   state.profileFailure(true)
   await page.getByRole('button', { name: '新建 Prompt', exact: true }).click()
@@ -425,7 +435,7 @@ test('已有 Agent 创建 Skill 后消费返回参数，保存刷新不重复绑
     knowledge_scope: [],
   })
   await page.goto('/agent/agents/existing_agent/edit')
-  await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+  await createDependency(page, 'Skill')
   await page.getByLabel('稳定标识').fill('added_skill')
   await page.getByLabel('名称', { exact: true }).fill('新增 Skill')
   await page.getByLabel('选择 Prompt 版本').selectOption(prompt.id)
@@ -458,8 +468,10 @@ test('保存后跳转遇到资料故障，恢复后仍有未保存离开保护',
     await page.getByRole('button', { name: '重试', exact: true }).click()
     await page.getByLabel('正文').fill('仍需保护的新输入')
     page.removeAllListeners('dialog')
-    page.once('dialog', (dialog) => dialog.dismiss())
-    await page.getByRole('link', { name: '返回列表' }).click()
+    await Promise.all([
+      page.waitForEvent('dialog').then((dialog) => dialog.dismiss()),
+      page.getByRole('link', { name: '返回列表' }).click(),
+    ])
     await expect(page).toHaveURL(/\/agent\/prompts\/new$/)
     await expect(page.getByLabel('正文')).toHaveValue('仍需保护的新输入')
   })
@@ -494,8 +506,10 @@ test('写入成功但读回失败保留输入和离开保护，同编号重试�
   await expect(page.getByRole('alert')).toContainText('暂不可用')
   const savedId = state.current.get('prompts/readback_prompt')!.id
   page.removeAllListeners('dialog')
-  page.once('dialog', (dialog) => dialog.dismiss())
-  await page.getByRole('link', { name: '返回列表' }).click()
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.dismiss()),
+    page.getByRole('link', { name: '返回列表' }).click(),
+  ])
   await expect(page).toHaveURL(/\/readback_prompt\/edit$/)
   await expect(page.getByLabel('正文')).toHaveValue('写入后保留输入')
   await page.getByRole('button', { name: '保存新版本' }).click()
@@ -532,7 +546,7 @@ for (const replace of [true, false]) {
       knowledge_scope: [],
     })
     await page.goto('/agent/agents/nested_agent/edit')
-    await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+    await createDependency(page, 'Skill')
     await page.getByLabel('稳定标识').fill('same_skill')
     await page.getByLabel('名称', { exact: true }).fill('新 Skill')
     await page.getByLabel('选择 Prompt 版本').selectOption(prompt.id)
