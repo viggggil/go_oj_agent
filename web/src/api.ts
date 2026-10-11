@@ -47,6 +47,31 @@ export const tokens = {
     localStorage.removeItem('refresh_token')
   },
 }
+// 共享刷新认证，但是否重放请求由调用方决定；Chat 不重放。
+export async function refreshAccessToken(): Promise<string | null> {
+  if (!tokenState.refresh) return null
+  const previousRefresh = tokenState.refresh
+  refreshPromise ||= api
+    .post<TokenPair>(
+      '/api/v1/auth/refresh',
+      { refresh_token: previousRefresh },
+      { timeout: 30_000 },
+    )
+    .then(({ data }) => {
+      if (tokenState.refresh !== previousRefresh) return null
+      tokens.set(data.access_token)
+      tokens.setRefresh(data.refresh_token)
+      return data.access_token
+    })
+    .catch(() => {
+      if (tokenState.refresh === previousRefresh) tokens.clear()
+      return null
+    })
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
+}
 api.interceptors.request.use((config) => {
   if (tokenState.access) config.headers.Authorization = `Bearer ${tokenState.access}`
   return config
@@ -63,21 +88,7 @@ api.interceptors.response.use(
     )
       throw error
     original._retry = true
-    refreshPromise ||= api
-      .post<TokenPair>('/api/v1/auth/refresh', { refresh_token: tokenState.refresh })
-      .then(({ data }) => {
-        tokens.set(data.access_token)
-        tokens.setRefresh(data.refresh_token)
-        return data.access_token
-      })
-      .catch(() => {
-        tokens.clear()
-        return null
-      })
-      .finally(() => {
-        refreshPromise = null
-      })
-    const next = await refreshPromise
+    const next = await refreshAccessToken()
     if (!next) throw error
     original.headers.Authorization = `Bearer ${next}`
     return api(original)

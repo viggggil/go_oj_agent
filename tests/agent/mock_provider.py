@@ -44,6 +44,10 @@ async def responses(request: Request):
         for value in ['PR7 测试基础提示', 'PR7 测试 Skill 提示']
     ):
         return JSONResponse({'error': 'wrong prompt binding'}, status_code=400)
+    if message == 'PR9 browser original' and 'PR8 浏览器真实配置提示' not in body.get('instructions', ''):
+        return JSONResponse({'error': 'wrong original binding'}, status_code=400)
+    if message == 'PR9 browser rebound' and ('新提示' not in body.get('instructions', '') or 'PR8 浏览器真实配置提示' in body.get('instructions', '')):
+        return JSONResponse({'error': 'wrong rebound binding'}, status_code=400)
     async def events():
         yield frame('response.output_text.delta', delta='中文算法回答', output_index=0)
         if message == 'wait-for-release':

@@ -16,6 +16,8 @@
     "@lucide/vue": "^1.55.0",
     "@vitejs/plugin-vue": "latest",
     "axios": "latest",
+    "dompurify": "^3.4.16",
+    "markdown-it": "^15.0.2",
     "pinia": "latest",
     "typescript": "~5.9.3",
     "vite": "latest",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@types/markdown-it": "^14.2.0",
     "prettier": "latest",
     "vitest": "^5.0.3"
   }

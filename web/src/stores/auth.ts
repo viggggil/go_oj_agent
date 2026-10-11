@@ -44,13 +44,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async logout() {
-      try {
-        if (tokens.refresh) await authApi.logout()
-      } finally {
-        tokens.clear()
-        this.user = null
-        clearAgentDrafts()
-      }
+      const request = tokens.refresh ? authApi.logout() : Promise.resolve()
+      tokens.clear()
+      this.user = null
+      clearAgentDrafts()
+      await request
     },
     clear() {
       tokens.clear()
