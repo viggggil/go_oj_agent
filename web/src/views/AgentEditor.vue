@@ -363,8 +363,18 @@
         if (createdKind === 'prompts') (content.value as SkillContent).prompt_id = cfg.id
         else {
           const value = content.value as AgentContent
-          if (!value.skill_ids.includes(cfg.id)) value.skill_ids.push(cfg.id)
-          if (!value.default_skill_id) value.default_skill_id = cfg.id
+          await bindingDetails()
+          if (!alive()) return
+          const previous = bindings.value.find(
+            (item) =>
+              value.skill_ids.includes(item.id) && item.key === cfg.key && item.id !== cfg.id,
+          )
+          if (!previous || window.confirm('将同一 Skill 的历史绑定替换为刚保存的版本？')) {
+            if (previous) value.skill_ids = value.skill_ids.filter((id) => id !== previous.id)
+            if (!value.skill_ids.includes(cfg.id)) value.skill_ids.push(cfg.id)
+            if (!value.default_skill_id || value.default_skill_id === previous?.id)
+              value.default_skill_id = cfg.id
+          }
         }
         const query = { ...route.query }
         delete query.created_kind

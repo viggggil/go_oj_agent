@@ -504,3 +504,54 @@ test('写入成功但读回失败保留输入和离开保护，同编号重试�
   expect(state.current.get('prompts/readback_prompt')!.id).toBe(savedId)
   expect(state.versions.size).toBe(2)
 })
+
+for (const replace of [true, false]) {
+  test(`嵌套返回同名 Skill ${replace ? '确认后替换绑定与默认版本' : '取消后保留原绑定'}`, async ({
+    page,
+  }) => {
+    const state = await mockManagement(page)
+    const prompt = state.create('prompts', 'nested_prompt', { text: '提示', variables: [] })
+    const skill = state.create('skills', 'same_skill', {
+      name: '原 Skill',
+      prompt_id: prompt.id,
+      execution_mode: 'direct',
+      allowed_tools: [],
+      budget: defaultBudget(),
+    })
+    state.create('agents', 'nested_agent', {
+      name: '嵌套 Agent',
+      prompt_id: prompt.id,
+      skill_ids: [skill.id],
+      default_skill_id: skill.id,
+      model_profile_id: state.model.id,
+      allowed_tools: [],
+      budget: defaultBudget(),
+      visibility: 'user',
+      is_test: false,
+      test_expires_at: null,
+      knowledge_scope: [],
+    })
+    await page.goto('/agent/agents/nested_agent/edit')
+    await page.getByRole('button', { name: '新建 Skill', exact: true }).click()
+    await page.getByLabel('稳定标识').fill('same_skill')
+    await page.getByLabel('名称', { exact: true }).fill('新 Skill')
+    await page.getByLabel('选择 Prompt 版本').selectOption(prompt.id)
+    await page.getByRole('button', { name: '创建', exact: true }).click()
+    await page.getByRole('button', { name: '查看当前版本' }).click()
+    await page.getByRole('button', { name: '保留输入，基于当前版本重试' }).click()
+    await expect(page).toHaveURL(/\/agent\/skills\/same_skill\/edit$/)
+    page.removeAllListeners('dialog')
+    page.on('dialog', (dialog) => (replace ? dialog.accept() : dialog.dismiss()))
+    await page.getByRole('button', { name: '保存新版本' }).click()
+    await expect(page).toHaveURL(/\/agent\/agents\/nested_agent\/edit$/)
+    const selected = replace ? state.current.get('skills/same_skill')!.id : skill.id
+    await expect(page.getByLabel('默认 Skill')).toHaveValue(selected)
+    await expect(
+      page.getByText('绑定 Skill', { exact: true }).locator('..').locator('.selected-binding'),
+    ).toHaveCount(1)
+    await page.getByRole('button', { name: '保存新版本' }).click()
+    await expect(page.getByRole('status')).toContainText('已保存版本')
+    expect(state.current.get('agents/nested_agent')!.content.skill_ids).toEqual([selected])
+    expect(state.current.get('agents/nested_agent')!.content.default_skill_id).toBe(selected)
+  })
+}
