@@ -118,4 +118,45 @@ test('真实 Gateway 与 MySQL 保存页面配置，历史绑定可查并用于 
   expect(denied.status()).toBe(403)
   await page.getByRole('link', { name: '对话', exact: true }).last().click()
   await expect(page).toHaveURL(new RegExp('agent_key=' + prefix))
+  await expect(page.getByLabel('选择 Agent')).toHaveValue(prefix)
+  await page.getByLabel('消息', { exact: true }).fill('PR9 browser original')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('回答完成')
+  await expect(page.locator('.assistant')).toContainText('中文算法回答')
+
+  // 页面显式重绑 Skill 和 Agent，新版本才用于新会话。
+  const newPrompt = (await replacement.json()).configuration
+  await page.goto('/agent/skills/' + prefix + '_s/edit')
+  await page.getByLabel('Prompt 搜索', { exact: true }).fill(prefix)
+  await page.getByRole('button', { name: '搜索 Prompt', exact: true }).click()
+  await page.getByLabel('选择 Prompt 版本').selectOption(newPrompt.id)
+  await page.getByRole('button', { name: '保存新版本', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  const newSkill = (
+    await (await request.get(gateway! + base + '/skills/' + prefix + '_s', { headers })).json()
+  ).configuration
+  await page.goto('/agent/agents/' + prefix + '/edit')
+  await page.getByLabel('Prompt 搜索', { exact: true }).fill(prefix)
+  await page.getByRole('button', { name: '搜索 Prompt', exact: true }).click()
+  await page.getByLabel('选择 Prompt 版本').selectOption(newPrompt.id)
+  await page.getByLabel('Skill 搜索', { exact: true }).fill(prefix)
+  await page.getByRole('button', { name: '搜索 Skill', exact: true }).click()
+  await page.getByLabel('选择 Skill 版本').selectOption(newSkill.id)
+  await page.getByRole('button', { name: '保存新版本', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  await page.getByRole('link', { name: '对话', exact: true }).last().click()
+  await page.getByLabel('消息', { exact: true }).fill('PR9 browser rebound')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('回答完成')
+  await expect(page.locator('.assistant')).toContainText('中文算法回答')
+  const userHeaders = { Authorization: 'Bearer ' + tokenFor(['user']) }
+  const directory = await request.get(gateway! + '/api/v1/agent/agents?search=' + prefix, {
+    headers: userHeaders,
+  })
+  expect((await directory.json()).items).toEqual([])
+  const forbiddenChat = await request.post(gateway! + '/api/v1/agent/chat', {
+    headers: userHeaders,
+    data: { agent_key: prefix, message: '探测 test' },
+  })
+  expect(forbiddenChat.status()).toBe(404)
 })

@@ -215,7 +215,7 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 
 管理员不能修改 Tool 的 RPC 实现、目标服务、最终授权、安全前缀或任意 Python 代码。Agent、Prompt、Skill 不使用草稿/发布状态；每次创建校验，修改创建新 UUID 并归档旧版，恢复复制历史正文生成新 UUID。每次 Agent Run 固定 Prompt、Skill、Tool Catalog、模型和知识库索引快照。归档依赖保留已有 UUID 绑定，停用依赖阻止后续运行。
 
-Issue #154 分阶段交付：PR7 提供 Gateway 保护的 Agent/Prompt/Skill 管理 API、只读 su8 模型选项与 Tools、按身份过滤的聊天目录；PR8 提供顶栏 Agent、工作区和可保存的管理员页面，包括历史绑定、创建依赖返回、并发比较与归档恢复；PR9 接通基本流式对话。Provider 沿用 su8，不增加独立管理页面；RAG、多轮上下文和完整观测评估后续交付。
+Issue #154 分阶段交付：PR7 提供 Gateway 保护的 Agent/Prompt/Skill 管理 API、只读 su8 模型选项与 Tools、按身份过滤的聊天目录；PR8 提供顶栏 Agent、工作区和可保存的管理员页面，包括历史绑定、创建依赖返回、并发比较与归档恢复；PR9 已接通 Agent/Skill 选择和 Gateway 流式对话、停止/新对话、安全 Markdown 与代码复制，只有 done 表示完成；失败保留输入、401 不自动重放。Provider 沿用 su8，不增加独立管理页面；RAG、多轮上下文和完整观测评估后续交付。
 
 ---
 

@@ -7,10 +7,10 @@ Go OJ Agent 是一个面向编程学习者和题目管理员的分布式在线�
 - **题库与提交**：管理员可以维护题目和测试点；用户可以浏览题目、提交 Go/Python 等代码，并查看提交状态、判题结果和源码。
 - **自动判题**：Judge Service 和 Judge Worker 在隔离环境中编译、运行用户代码，通过 RabbitMQ 驱动异步判题和结果投影。
 - **比赛与排行榜**：支持比赛创建、编辑、报名、提交和排行榜。排行榜以 MySQL 为事实来源，Redis 作为可重建的查询投影，支持版本保护、回源和故障恢复。
-- **Agent Service**：Python + FastAPI 服务已经接入 Gateway 的可信 RS256 委托和 SSE 流式链路，支持会话、消息和 Run 状态持久化。当前 Runtime 是明确标记的 Fake Runtime，生产环境不会自动降级到模拟回答。
-- **Web 前端**：Vue 3 + Pinia + Axios + Vue Router 前端提供首页、登录、注册、题库、提交记录、比赛和个人资料页面。
+- **Agent Service**：Python + FastAPI 服务已经接入 Gateway 的可信 RS256 委托和 SSE 流式链路，支持会话、消息和 Run 状态持久化。支持 su8 Responses 真实单轮回答，以及管理员配置 Agent/Prompt/Skill、不可变 UUID 绑定与历史恢复。Fake Runtime 仅显式用于测试。
+- **Web 前端**：Vue 3 + Pinia + Axios + Vue Router 前端提供首页、登录、注册、题库、提交记录、比赛、个人资料、Agent 管理与流式对话页面。
 
-Agent 当前不包含真实模型、业务 gRPC Tools、RAG、管理员控制面或完整聊天 UI；这些属于后续阶段。Fake Runtime 只用于本地开发和测试，必须显式启用。
+Agent 对话已完成页面配置 test Agent 后经 Gateway 获得流式回答的闭环，支持 Agent/Skill 选择、停止、新对话和安全 Markdown。真实模型多轮上下文、工具调用、RAG 和完整观测/评估仍在后续范围。Fake Runtime 只用于本地开发和测试，必须显式启用。
 
 ## 技术组成
 
