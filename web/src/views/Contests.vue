@@ -42,8 +42,12 @@
         <span :class="['status-chip', `contest-status-${statusKey(item.status)}`]">{{
           statusLabel(item.status)
         }}</span>
-        <time :datetime="item.start_at">{{ formatDate(item.start_at) }}</time>
-        <time :datetime="item.end_at">{{ formatDate(item.end_at) }}</time>
+        <time :datetime="typeof item.start_at === 'string' ? item.start_at : undefined">{{
+          formatDate(item.start_at)
+        }}</time>
+        <time :datetime="typeof item.end_at === 'string' ? item.end_at : undefined">{{
+          formatDate(item.end_at)
+        }}</time>
       </RouterLink>
     </div>
     <div class="pager">

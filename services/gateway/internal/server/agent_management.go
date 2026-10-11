@@ -29,11 +29,16 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/agents/{agent_key}/skills", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/model-options", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/model-options/{identifier}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/tools", []string{http.MethodGet}},
 	}
 	for _, resource := range []string{"agents", "prompts", "skills"} {
 		path := "/api/v1/admin/agent/" + resource
 		routes = append(routes,
+			struct {
+				path    string
+				methods []string
+			}{path + "/versions/{identifier:[0-9a-f-]{36}}", []string{http.MethodGet}},
 			struct {
 				path    string
 				methods []string

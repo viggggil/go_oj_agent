@@ -7,6 +7,10 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasPrefix(path, "/api/v1/admin/agent/model-options/") {
+		object, ok := agentJSONFields(payload["model_option"], "id key model temperature verbosity max_output_tokens context_window_tokens archived disabled available", "")
+		return len(payload) == 1 && ok && agentJSONTypes(object, "id key model", "archived disabled available", "max_output_tokens context_window_tokens") && agentJSONNullable(object["temperature"], new(float64)) && agentJSONNullable(object["verbosity"], new(string))
+	}
 	admin := strings.HasPrefix(path, "/api/v1/admin/")
 	parts := strings.Split(path, "/")
 	configuration := admin && (method != "GET" || (len(parts) != 6 && !(len(parts) == 8 && parts[7] == "versions")))

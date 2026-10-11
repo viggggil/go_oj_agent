@@ -12,6 +12,8 @@ const AgentJSONOperation = "HTTP Agent JSON"
 
 var agentResource = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)(?:/([a-z][a-z0-9_]{1,63}))?(?:/(versions|archive|restore|disable|enable)(?:/([0-9a-f-]{36}))?)?$`)
 var agentSkills = regexp.MustCompile(`^/api/v1/agent/agents/[a-z][a-z0-9_]{1,63}/skills$`)
+var agentModel = regexp.MustCompile(`^/api/v1/admin/agent/model-options/([0-9a-f-]{36})$`)
+var agentVersion = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})$`)
 
 func AgentOperation(method, path string) (string, error) {
 	allowed := false
@@ -21,7 +23,13 @@ func AgentOperation(method, path string) (string, error) {
 	case path == "/api/v1/agent/agents" || path == "/api/v1/admin/agent/model-options" || path == "/api/v1/admin/agent/tools" || agentSkills.MatchString(path):
 		allowed = method == http.MethodGet
 	default:
-		if match := agentResource.FindStringSubmatch(path); match != nil {
+		if version := agentVersion.FindStringSubmatch(path); version != nil {
+			id, err := uuid.Parse(version[2])
+			allowed = method == http.MethodGet && err == nil && id.String() == version[2]
+		} else if model := agentModel.FindStringSubmatch(path); model != nil {
+			id, err := uuid.Parse(model[1])
+			allowed = method == http.MethodGet && err == nil && id.String() == model[1]
+		} else if match := agentResource.FindStringSubmatch(path); match != nil {
 			key, action, id := match[2], match[3], match[4]
 			switch {
 			case id != "":

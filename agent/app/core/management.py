@@ -92,6 +92,16 @@ class ManagementService:
     ) -> dict[str, Any]:
         return {"configuration": summary(await self.query.detail(kind, key, identifier), full=True)}
 
+    async def version(self, kind: ConfigKind, identifier: str) -> dict[str, Any]:
+        async with self.store._engine.connect() as connection, connection.begin():
+            try:
+                value = await self.store._by_id(connection, identifier)
+            except ConfigError:
+                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404) from None
+            if value.kind != kind:
+                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+            return {"configuration": summary(value, full=True)}
+
     async def save(
         self,
         kind: ConfigKind,
@@ -201,6 +211,61 @@ class ManagementService:
                 continue
             allowed.append(url)
         return allowed
+
+    async def model_detail(self, identifier: str) -> dict[str, Any]:
+        from sqlalchemy import and_, select
+
+        from app.storage.schema import agent_config_resources as resources
+        from app.storage.schema import agent_config_versions as versions
+
+        async with self.store._engine.connect() as connection, connection.begin():
+            try:
+                item = await self.store._by_id(connection, identifier)
+                if (
+                    not isinstance(item.content, ModelProfileConfig)
+                    or item.content.provider != "responses"
+                ):
+                    raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+                provider = await self.store._by_id(connection, str(item.content.provider_id))
+            except ConfigError:
+                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404) from None
+            if provider.key != self.settings.admin_provider_key:
+                raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+            allowed = await self._provider_urls(connection)
+            available = bool(
+                (
+                    await connection.execute(
+                        select(
+                            and_(
+                                resources.c.disabled.is_(False),
+                                versions.c.archived_at.is_(None),
+                                model_supported(
+                                    versions, "model", self.settings.admin_provider_key, allowed
+                                ),
+                            )
+                        )
+                        .select_from(
+                            versions.join(resources, versions.c.resource_id == resources.c.id)
+                        )
+                        .where(versions.c.id == identifier)
+                    )
+                ).scalar_one()
+            )
+        profile = item.content
+        return {
+            "model_option": {
+                "id": item.id,
+                "key": item.key,
+                "model": profile.model,
+                "temperature": profile.temperature,
+                "verbosity": profile.verbosity,
+                "max_output_tokens": profile.max_output_tokens,
+                "context_window_tokens": profile.context_window_tokens,
+                "archived": item.archived,
+                "disabled": item.disabled,
+                "available": available,
+            }
+        }
 
     async def catalog(
         self, query: PageQuery, principal: Principal, key: str | None = None

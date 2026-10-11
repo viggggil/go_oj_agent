@@ -279,6 +279,41 @@ async def test_agent_directory_permissions_expiry_disable_and_model_redaction(
         secret in options.text
         for secret in [provider.id, credential["id"], "private-api-key", "base_url"]
     )
+    model_path = BASE + "/model-options/" + model.id
+    detail = await request(http, key, "GET", model_path)
+    assert detail.status_code == 200 and detail.json()["model_option"]["available"]
+    assert not any(
+        secret in detail.text
+        for secret in [provider.id, credential["id"], "private-api-key", "base_url"]
+    )
+    assert (await request(http, key, "GET", model_path, roles=["user"])).status_code == 403
+    assert (
+        await request(http, key, "GET", BASE + "/model-options/" + prompt["id"])
+    ).status_code == 404
+    for kind, value in [("prompts", prompt), ("skills", skill), ("agents", agent)]:
+        version_path = BASE + "/" + kind + "/versions/" + value["id"]
+        result = await request(http, key, "GET", version_path)
+        assert result.status_code == 200 and result.json()["configuration"]["id"] == value["id"]
+        assert (await request(http, key, "GET", version_path, roles=["user"])).status_code == 403
+        missing = await request(http, key, "GET", BASE + "/" + kind + "/versions/" + str(uuid4()))
+        assert (
+            missing.status_code == 404 and missing.json()["code"] == "AGENT_CONFIGURATION_NOT_FOUND"
+        )
+        # versions 是合法 stable key，新 UUID 路由不能抢占原历史分页路由。
+        existing = await request(http, key, "GET", BASE + "/" + kind + "/versions")
+        expected = existing.json()["configuration"]["id"] if existing.status_code == 200 else None
+        named = await store.create_or_replace(
+            write(value["kind"], "versions", expected), value["content"]
+        )
+        history_path = BASE + "/" + kind + "/versions/versions"
+        compatible = await http.get(
+            history_path + "?page_size=1", headers=headers(key, "GET", history_path)
+        )
+        assert compatible.status_code == 200, compatible.text
+        assert compatible.json()["items"][0]["id"] == named.id
+    assert (
+        await request(http, key, "GET", BASE + "/skills/versions/" + prompt["id"])
+    ).status_code == 404
     # 设置仅用于本实例目录，不启动 Runtime；管理关闭 Chat 时仍可独立查询/修复。
     settings.chat_enabled = True
     settings.runtime_mode = "model"
@@ -300,6 +335,8 @@ async def test_agent_directory_permissions_expiry_disable_and_model_redaction(
     settings.provider_allowed_origins = ()
     options = await request(http, key, "GET", BASE + "/model-options")
     assert options.json()["page"]["total"] == 0
+    detail = await request(http, key, "GET", model_path)
+    assert detail.status_code == 200 and not detail.json()["model_option"]["available"]
     denied = await request(
         http, key, "PUT", BASE + "/agents/" + prefix, {"expected_id": agent["id"], "content": body}
     )
@@ -307,6 +344,17 @@ async def test_agent_directory_permissions_expiry_disable_and_model_redaction(
     result = await http.get(path + "?search=" + prefix, headers=headers(key, "GET", path))
     assert result.json()["page"]["total"] == 0
     settings.provider_allowed_origins = ("https://relay.example",)
+    await store.change_state(write("model", model.key, expected=model.id), "archive")
+    detail = await request(http, key, "GET", model_path)
+    assert (
+        detail.status_code == 200
+        and detail.json()["model_option"]["archived"]
+        and not detail.json()["model_option"]["available"]
+    )
+    await store.change_state(write("model", model.key, expected=model.id), "disable")
+    detail = await request(http, key, "GET", model_path)
+    assert detail.json()["model_option"]["disabled"]
+    await store.change_state(write("model", model.key, expected=model.id), "enable")
     settings.admin_enabled = False
     assert (await request(http, key, "GET", BASE + "/agents")).status_code == 503
     result = await http.get(path + "?search=" + prefix, headers=headers(key, "GET", path))
@@ -429,6 +477,11 @@ async def test_gateway_create_test_agent_then_real_direct_chat() -> None:
             assert history.status_code == 200 and history.json()["page"]["total"] == 2, history.text
             old = await http.get(detail_path + "/versions/" + resource["id"])
             assert old.status_code == 200 and old.json()["configuration"]["archived"], old.text
+            bound = await http.get(path + "/versions/" + resource["id"])
+            assert (
+                bound.status_code == 200
+                and bound.json()["configuration"] == old.json()["configuration"]
+            ), bound.text
             for action in ["archive", "disable", "enable"]:
                 result = await http.post(
                     detail_path + "/" + action,

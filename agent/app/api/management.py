@@ -114,6 +114,8 @@ async def dispatch(
         return await service.catalog(query, principal, key)
     if path.endswith("/model-options"):
         return await service.models(query)
+    if path.startswith("/api/v1/admin/agent/model-options/"):
+        return await service.model_detail(request.path_params["identifier"])
     if path.endswith("/tools"):
         values = [item for item in service.registry.catalog() if query.search in item["name"]]
         offset = (query.page - 1) * query.page_size
@@ -126,6 +128,8 @@ async def dispatch(
     action = request.path_params.get("action")
     identifier = request.path_params.get("identifier")
     if method == "GET":
+        if key is None and identifier is not None:
+            return await service.version(kind, str(identifier))
         if key is None or action == "versions" and identifier is None:
             return await service.list(kind, query, key)
         return await service.detail(kind, key, identifier)
@@ -175,7 +179,11 @@ async def dispatch(
 router.add_api_route("/api/v1/agent/agents", handle, methods=["GET"])
 router.add_api_route("/api/v1/agent/agents/{agent_key}/skills", handle, methods=["GET"])
 router.add_api_route("/api/v1/admin/agent/model-options", handle, methods=["GET"])
+router.add_api_route("/api/v1/admin/agent/model-options/{identifier}", handle, methods=["GET"])
 router.add_api_route("/api/v1/admin/agent/tools", handle, methods=["GET"])
+router.add_api_route(
+    "/api/v1/admin/agent/{resource}/versions/{identifier:uuid}", handle, methods=["GET"]
+)
 # 操作白名单进一步校验 resource/key/action；不是任意路径代理。
 router.add_api_route("/api/v1/admin/agent/{resource}", handle, methods=["GET", "POST"])
 router.add_api_route("/api/v1/admin/agent/{resource}/{key}", handle, methods=["GET", "PUT"])

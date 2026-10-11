@@ -40,8 +40,8 @@
     problem = ref<Problem | null>(null),
     error = ref('')
   const isAdmin = computed(() => auth.user?.roles.includes('admin'))
-  const difficulty = computed(
-    () => ({ 1: '简单', 2: '中等', 3: '困难' })[problem.value?.difficulty || 0] || '未知',
+  const difficulty = computed(() =>
+    problem.value ? { 1: '简单', 2: '中等', 3: '困难' }[problem.value.difficulty] : '未知',
   )
   onMounted(async () => {
     if (!auth.user) await auth.fetchProfile().catch(() => undefined)

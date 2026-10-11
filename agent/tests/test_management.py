@@ -40,6 +40,7 @@ def test_operation_whitelist(resource: str) -> None:
         ("PUT", base + "/test_key"),
         ("GET", base + "/test_key/versions"),
         ("GET", base + "/test_key/versions/" + str(uuid4())),
+        ("GET", base + "/versions/" + str(uuid4())),
     ]
     pairs.extend(
         ("POST", base + "/test_key/" + action)
@@ -55,9 +56,24 @@ def test_operation_whitelist(resource: str) -> None:
         ("GET", base + "/test_key/versions/not-uuid"),
         ("GET", base + "/test_key/versions/" + str(uuid4()).upper()),
         ("GET", base + "/bad-key"),
+        ("PUT", base + "/versions/" + str(uuid4())),
+        ("GET", base + "/versions/not-uuid"),
     ]:
         with pytest.raises(ValueError):
             operation(method, path)
+
+
+def test_model_version_operation_whitelist() -> None:
+    path = "/api/v1/admin/agent/model-options/" + str(uuid4())
+    assert operation("GET", path) == "HTTP GET " + path
+    for method, target in [
+        ("POST", path),
+        ("GET", path.upper()),
+        ("GET", path[:-1]),
+        ("GET", path + "/extra"),
+    ]:
+        with pytest.raises(ValueError):
+            operation(method, target)
 
 
 def test_delegation_cannot_change_method_resource_or_scope(

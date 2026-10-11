@@ -198,3 +198,71 @@ func TestAgentOperationRejectsUnknownPathsAndRoles(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentHistoricalLookupRoutesAndRedaction(t *testing.T) {
+	identifier := uuid.NewString()
+	for _, path := range []string{"/api/v1/admin/agent/model-options/" + identifier, "/api/v1/admin/agent/prompts/versions/" + identifier} {
+		if _, err := client.AgentOperation(http.MethodGet, path); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := client.AgentOperation(http.MethodPut, path); err == nil {
+			t.Fatal("historical lookup accepted write")
+		}
+	}
+	model := `{"model_option":{"id":"` + identifier + `","key":"su8_flash","model":"deepseek-v4-flash","temperature":null,"verbosity":null,"max_output_tokens":8000,"context_window_tokens":32000,"archived":true,"disabled":false,"available":false}}`
+	prompt := `{"configuration":{"id":"` + identifier + `","kind":"prompt","key":"test_prompt","archived":true,"disabled":false,"created_at":"now","created_by":7,"archived_at":"now","archived_by":7,"content":{"text":"historical","variables":[]}}}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/versions/versions") {
+			io.WriteString(w, `{"items":[],"page":{"page":1,"page_size":20,"total":0}}`)
+		} else if strings.Contains(r.URL.Path, "model-options") {
+			io.WriteString(w, model)
+		} else {
+			io.WriteString(w, prompt)
+		}
+	}))
+	defer upstream.Close()
+	server, _ := newAgentTestServer(t, upstream.URL, nil, "2s")
+	gateway := httptest.NewServer(server)
+	defer gateway.Close()
+	for _, path := range []string{"/api/v1/admin/agent/model-options/" + identifier, "/api/v1/admin/agent/prompts/versions/" + identifier} {
+		r, _ := http.NewRequest(http.MethodGet, gateway.URL+path, nil)
+		r.Header.Set("Authorization", "Bearer "+testAccessToken(t))
+		response, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(response.Body)
+		response.Body.Close()
+		if response.StatusCode != 200 {
+			t.Fatalf("%s: %d %s", path, response.StatusCode, body)
+		}
+	}
+	for _, resource := range []string{"agents", "prompts", "skills"} {
+		path := "/api/v1/admin/agent/" + resource + "/versions/versions"
+		r, _ := http.NewRequest(http.MethodGet, gateway.URL+path, nil)
+		r.Header.Set("Authorization", "Bearer "+testAccessToken(t))
+		response, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(response.Body)
+		response.Body.Close()
+		if response.StatusCode != 200 || !strings.Contains(string(body), `"items"`) {
+			t.Fatalf("legacy versions key %s: %d %s", path, response.StatusCode, body)
+		}
+	}
+	var payload map[string]json.RawMessage
+	json.Unmarshal([]byte(model), &payload)
+	path := "/api/v1/admin/agent/model-options/" + identifier
+	if !validAgentJSONEnvelope("GET", path, payload) {
+		t.Fatal("redacted model rejected")
+	}
+	var value map[string]json.RawMessage
+	json.Unmarshal(payload["model_option"], &value)
+	value["credential_id"] = json.RawMessage(`"private"`)
+	payload["model_option"], _ = json.Marshal(value)
+	if validAgentJSONEnvelope("GET", path, payload) {
+		t.Fatal("credential data accepted")
+	}
+}

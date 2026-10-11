@@ -60,7 +60,9 @@
           ><span class="status-chip">{{ statusLabel(item.status) }}</span></span
         >
         <span :class="verdictClass(item.verdict)">{{ verdictLabel(item.verdict) }}</span>
-        <time :datetime="item.created_at">{{ formatDate(item.created_at) }}</time>
+        <time :datetime="typeof item.created_at === 'string' ? item.created_at : undefined">{{
+          formatDate(item.created_at)
+        }}</time>
       </RouterLink>
     </div>
     <div class="pager">
