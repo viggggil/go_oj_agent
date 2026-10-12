@@ -59,7 +59,12 @@ export AUTH_ACCESS_TOKEN_KEY="integration-test-access-token-key"
 export AGENT_ENABLED=true
 # 旧运行时协议回归使用 demo；默认开发页面另由 tests/infra 检查。
 export AGENT_CONFIG_MODE=demo
+export AGENT_RUNTIME_MODE=langgraph_fake
+export AGENT_DEFAULT_AGENT_KEY=learning_assistant
 export AGENT_BOOTSTRAP_DEMO=false
+# 隔离宿主模型 Key，协议回归不因开发机已配置真实模型而改变行为。
+export AGENT_MODEL_KEY_DIR="${test_artifacts_dir}/model-keys"
+mkdir -p "${AGENT_MODEL_KEY_DIR}"
 
 if ! compose up --build --detach --wait; then
   echo "===== integration compose up failed; dumping service logs ====="
