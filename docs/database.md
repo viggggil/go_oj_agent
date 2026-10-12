@@ -561,7 +561,9 @@ down SQL 删除三张表及全部历史数据，不应作为保留数据的应�
 PR3 不改变表结构和索引，复用 PR2 migration；HTTP Chat 接入相同 RunService 事务。
 开发 Compose 的 `agent-user.sql` 只初始化本地开发账户并授予 oj_agent 的
 SELECT/INSERT/UPDATE/DELETE，应用不持有跨业务库权限。该文件不替代表 migration，
-已有数据卷需由部署者应用账户 SQL；配置可覆盖为已经部署的独立数据库账户。
+本地开发的 `agent-db-init` 在启动前复用现有 Agent 迁移和账户 SQL，补齐旧数据卷，
+已完整执行的版本跳过，部分迁移结构明确失败且不删除数据。它只持有本地初始化权限，
+应用容器仍使用上述受限账户。外部数据库由部署者迁移；配置可覆盖为已经部署的独立数据库账户。
 
 ## 8.3 Control Plane 版本实体
 

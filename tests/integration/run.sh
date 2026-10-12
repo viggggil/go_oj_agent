@@ -7,7 +7,7 @@ compose_file="${repository_root}/deploy/compose/compose.yaml"
 project_name="go-oj-auth-integration"
 
 compose() {
-  docker compose --project-name "${project_name}" -f "${compose_file}" --profile agent "$@"
+  docker compose --project-name "${project_name}" -f "${compose_file}" "$@"
 }
 
 cleanup() {

@@ -11,7 +11,8 @@ MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保�
 及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
 启动 user-service、problem-service、judge-service、contest-service、judge-worker、go-judge、
 RabbitMQ、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜，Consul 默认关闭。
-Agent Service 是可选的 `agent` profile，不会默认启动。
+`make infra-up` 默认启动全部应用组件，包括 Agent Service，并开启 Gateway Agent 路由。
+启动顺序为 MySQL 健康 → `agent-db-init` 准备数据库 → Agent 健康 → Gateway → Web。
 
 Contest 消费配置位于 `configs/contest.yaml`：exchange=`oj.events`，queue=`contest.submission-judged`，
 DLQ=`contest.results.dlq`，prefetch=16。RabbitMQ URL 由 `KRATOS_MESSAGING_URL` 注入，使用 Compose 的
@@ -58,28 +59,20 @@ curl http://127.0.0.1:8080/healthz
 make infra-down
 ```
 
-需要重新执行初始化 migration 时，显式删除本地 Compose 数据卷：
+已有开发数据卷的 Agent 升级由 `agent-db-init` 完成，不需要删除数据卷。
+其他服务的历史迁移仍按对应部署说明执行。
+
+### Agent Chat
+
+Agent 默认随 `make infra-up` 启动，不需要设置 `COMPOSE_PROFILES` 或 `--profile agent`。
+本地开发默认使用专用 `oj_agent` 数据库账户、合成 Fake runtime，不调用真实模型：
 
 ```bash
-docker compose -f deploy/compose/compose.yaml down --volumes
+make infra-up
 ```
 
-该命令会永久删除此 Compose 项目的本地 MySQL、Redis 和 MinIO 数据。
-
-### 启动 Agent Chat（PR3）
-
-Agent Chat 需要同时启动 Compose profile 和 Gateway 开关。开发 profile 使用显式的
-`oj_agent` 数据库账户、合成 Fake runtime，不调用真实模型：
-
-```bash
-AGENT_ENABLED=true docker compose \
-  --profile agent \
-  -f deploy/compose/compose.yaml \
-  up --build --detach --wait
-```
-
-也可以执行 `AGENT_ENABLED=true COMPOSE_PROFILES=agent make infra-up`，同时启用网关和
-可选服务。Agent 只在 Compose 网络内监听 `8000`，
+`AGENT_ENABLED=false` 可显式关闭 Gateway Agent 路由，组件仍正常启动。
+若已有 `.env` 设置了这个旧默认值，应改为 `true`。Agent 只在 Compose 网络内监听 `8000`，
 不映射宿主机端口；外部客户端始终通过 Gateway `8080` 访问 `POST /api/v1/agent/chat`。
 Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，以及单独复制出的
 `agent-auth-private` Agent 私钥卷；Gateway 私钥留在 `auth-keys`，不会进入 Agent 容器。
@@ -87,25 +80,29 @@ PR4 的业务 Tool 默认关闭。设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 后
 独立私钥调用 Problem/Judge 的只读 gRPC RPC；目标服务通过 `agent-public.pem` 和 RPC
 allowlist 验证调用。Agent 不会直接挂载业务数据库。
 
-首次使用空 MySQL 数据卷时，Compose 会执行 Agent runtime migration 和本地开发账户
-bootstrap。已有数据卷不会重新执行 SQL；部署者应先应用
-`migrations/agent/000001_create_agent_runtime.up.sql`，并按需执行
-`deploy/compose/agent-user.sql` 创建仅有 `oj_agent` 表读写权限的账户。不要为了应用迁移
-删除已有开发数据卷。`AGENT_DATABASE_URL` 可覆盖默认 DSN，但必须仍使用
-`mysql+asyncmy` 和 `oj_agent` Schema。
+`agent-db-init` 在 MySQL 健康后检查 Agent `000001`～`000003` 的表、增量列和约束，
+按顺序应用尚未执行的迁移；完整的已执行迁移会跳过，保留已有会话、配置和凭据。
+它复用 `migrations/agent/` 的原始 SQL，并幂等执行 `agent-user.sql` 创建仅有 `oj_agent`
+表读写权限的账户，不覆盖已有账户密码。若发现迁移只完成了一部分，会明确失败并要求
+保留数据、检查失败记录后修复，不盲目重跑 DDL。管理凭据只进入初始化容器。
+`AGENT_DATABASE_URL` 可覆盖默认 DSN，但必须仍使用 `mysql+asyncmy` 和 `oj_agent` Schema；
+外部数据库由部署者迁移，本地初始化容器只操作 Compose 中的 MySQL。
 
 PR3/PR4 的 Fake runtime 只用于开发和集成测试；生产环境禁止 `AGENT_RUNTIME_MODE=fake`
-或 `langgraph_fake`。PR4 的只读 Tools 不需要真实模型 API Key；PR6 已支持真实 Responses Provider，PR7 已支持配置管理 HTTP，知识库与前端管理页面后续交付。停止可选服务时使用：
+或 `langgraph_fake`。只读 Tools 不需要真实模型 API Key；真实 Responses Provider、配置管理和
+前端页面已提供。停止全部服务并保留数据时使用：
 
 ```bash
 make infra-down
-# 或显式：
-docker compose --profile agent -f deploy/compose/compose.yaml down
 ```
 
 ## 配置
 
-Agent 管理 API 需要同时开启 Gateway `AGENT_ENABLED=true`、可选 `agent` profile 和 Agent `AGENT_ADMIN_ENABLED=true`，并应用 Agent 的 `000001`、`000002`、`000003` migration。默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；真实模型的 Provider、Credential、Model Profile 按 `agent/README.md` 通过本机 CLI 初始化，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；普通聊天目录要求 Chat 开启且 `AGENT_CONFIG_MODE=database`，无需开启管理开关。现有开发 Fake 配置不会自动变成真实模型配置。
+Gateway Agent 路由默认开启；管理 API 另需 `AGENT_ADMIN_ENABLED=true`，聊天目录需
+`AGENT_CONFIG_MODE=database`。Agent 的 `000001`～`000003` migration 在启动时自动准备。
+默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；真实模型的 Provider、Credential、Model Profile 按
+`agent/README.md` 通过本机 CLI 初始化，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；
+普通聊天目录无需开启管理开关。现有开发 Fake 配置不会自动变成真实模型配置。
 
 Compose 会自动读取仓库根目录或 `--env-file` 指定的环境文件。可用变量记录在 `deploy/compose/.env.example`。所有默认密码和 JWT 密钥仅供本机开发，不能用于共享、测试平台或生产环境。
 
@@ -137,9 +134,9 @@ MySQL 官方镜像仅在数据目录为空时执行 `/docker-entrypoint-initdb.d
 
 Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrations/`。
 
-Agent PR2 将 `oj_agent` Schema 和 `migrations/agent/000001_create_agent_runtime.up.sql`
-加入 MySQL 空数据卷初始化，建立会话、消息和 Run 表。已有数据卷不会重新执行初始化，
-需由部署者显式应用 Agent up SQL。PR3 已提供可选 Agent profile、独立公钥卷和 Gateway Chat 路由。不要为迁移已有数据库而删除当前开发数据卷。
+MySQL 空数据卷初始化包含 Agent `000001`～`000003` 和开发账户 SQL。
+`agent-db-init` 同时兼容这条已初始化路径，以及尚未包含 Agent 或只完成历史完整版本的旧数据卷。
+Agent 使用独立公钥卷和 Gateway Chat 路由。不要为迁移已有数据库而删除当前开发数据卷。
 
 ## 排障
 
@@ -148,6 +145,16 @@ Agent PR2 将 `oj_agent` Schema 和 `migrations/agent/000001_create_agent_runtim
 ```bash
 docker compose -f deploy/compose/compose.yaml logs user-service gateway-service
 ```
+
+Agent 启动失败时，先检查数据库准备和应用日志：
+
+```bash
+docker compose -f deploy/compose/compose.yaml logs agent-db-init agent-service
+```
+
+若报 `failed to fetch oauth token` 或 Docker Hub 连接超时，Docker Desktop 的代理与
+WSL 中 Buildx 的代理都需要可用。在当前 WSL 终端设置 `HTTP_PROXY` / `HTTPS_PROXY` 后
+再执行 `make infra-up`；代理地址应使用本机代理软件实际监听的 HTTP/mixed 端口。
 
 若 MinIO 镜像构建失败，请检查 runner 是否能访问 `github.com` 和公开的
 `alpine:3.23` 基础镜像；构建阶段会下载并校验固定版本的 MinIO server 与 `mc`。
