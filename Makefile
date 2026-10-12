@@ -13,7 +13,7 @@ GO_FILES := $(shell git ls-files '*.go')
 API_PROTO_FILES := $(shell find api -name '*.proto' -type f | sort)
 BUF_GENERATE_PATHS := --path api --path services/user/internal/conf --path services/problem/internal/conf --path services/gateway/internal/conf --path services/judge/internal/conf --path services/contest/internal/conf
 
-.PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-integration test-e2e agent-init agent-dev agent-proto agent-fmt agent-fmt-check agent-lint agent-type agent-check agent-test-unit agent-test-integration agent-eval infra-up infra-down dev
+.PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-infra test-integration test-e2e agent-init agent-dev agent-proto agent-fmt agent-fmt-check agent-lint agent-type agent-check agent-test-unit agent-test-integration agent-eval infra-up infra-down dev
 
 init:
 	@$(GO) version
@@ -87,7 +87,10 @@ test:
 test-unit:
 	@$(GO) test $(GO_PACKAGES)
 
-test-integration:
+test-infra:
+	@bash ./tests/infra/run.sh
+
+test-integration: test-infra
 	@./tests/integration/run.sh
 
 test-e2e:
@@ -129,7 +132,7 @@ infra-up:
 	@$(COMPOSE) -f $(COMPOSE_FILE) up --build --detach --wait
 
 infra-down:
-	@$(COMPOSE) -f $(COMPOSE_FILE) --profile agent down
+	@$(COMPOSE) -f $(COMPOSE_FILE) down
 
 dev:
 	@echo "dev workflow is not wired yet"

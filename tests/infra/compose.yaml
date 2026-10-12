@@ -1,0 +1,10 @@
+# 仅覆盖测试项目的 MySQL：模拟没有 Agent 初始化 SQL 的历史数据卷。
+services:
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: infra-test-root-password
+    ports: !reset []
+    volumes: !reset []
+  agent-db-init:
+    environment:
+      MYSQL_ROOT_PASSWORD: infra-test-root-password

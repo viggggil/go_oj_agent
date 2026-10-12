@@ -372,7 +372,7 @@ services:
       KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
       KRATOS_CLIENTS_PROBLEM_ENDPOINT: "problem-service:9002"
       KRATOS_CLIENTS_SUBMISSION_ENDPOINT: "judge-service:9003"
-      KRATOS_CLIENTS_AGENT_ENABLED: "${AGENT_ENABLED:-false}"
+      KRATOS_CLIENTS_AGENT_ENABLED: "${AGENT_ENABLED:-true}"
       KRATOS_CLIENTS_AGENT_ENDPOINT: "http://agent-service:8000"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"
     ports:
@@ -387,6 +387,8 @@ services:
         condition: service_healthy
       contest-service:
         condition: service_healthy
+      agent-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 3s
@@ -395,8 +397,21 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  agent-db-init:
+    image: mysql:8.4
+    entrypoint: ["/bin/sh", "/bootstrap/agent-db-init.sh"]
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-local-root-password}"
+    volumes:
+      - ./agent-db-init.sh:/bootstrap/agent-db-init.sh:ro
+      - ./agent-user.sql:/bootstrap/agent-user.sql:ro
+      - ../../migrations/agent:/migrations/agent:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
   agent-service:
-    profiles: ["agent"]
     build:
       context: ../../agent
       dockerfile: Dockerfile
@@ -431,8 +446,16 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      agent-db-init:
+        condition: service_completed_successfully
       auth-key-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).close()"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
     restart: unless-stopped
 
   web:
