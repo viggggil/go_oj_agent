@@ -729,7 +729,10 @@ GET  /api/v1/agent/agents/{agent_key}/skills
 409 `AGENT_CONFIGURATION_REQUEST_CONFLICT`。401 刷新重放也必须保留原编号；Chat POST
 不适用这套幂等约定。回放旧结果可能已经归档，客户端需重新读取 current。
 
-创建正文为 `{"key":"test_prompt","content":{"text":"用中文解释算法","variables":[]}}`。
+创建正文为 `{"content":{"name":"算法基础规则","text":"用中文解释算法","variables":[]}}`。
+省略 key 时，后端由资源类型、可信操作者和请求 UUID 生成稳定标识，重试返回同一资源；
+名称允许重复，修改名称不改变 key。返回 configuration.key 是后续 URL/Chat 引用的标识。
+兼容旧客户端显式 key 创建，既有 key 和历史 UUID 不改写。
 PUT 正文为 `{"expected_id":"<当前 UUID>","content":{...完整内容...}}`。归档/启停正文为
 `{"expected_id":"<当前 UUID>"}`，恢复为 `{"expected_id":"<当前 UUID>","source_id":"<历史 UUID>"}`。
 不接受正文 actor_id/role/kind/request_id 或未知字段。保存结果统一为
@@ -737,7 +740,7 @@ PUT 正文为 `{"expected_id":"<当前 UUID>","content":{...完整内容...}}`�
 "created_at":"...","created_by":7,"archived_at":null,"archived_by":null,"content":{...}}}`。
 创建、替换与操作成功均返回 200，响应 `Cache-Control: no-store`。
 
-列表支持 `page`（默认 1，最大 501）、`page_size`（默认 20，最大 100）、`search`（key 子串，
+列表支持 `page`（默认 1，最大 501）、`page_size`（默认 20，最大 100）、`search`（name 或 key 子串，
 最多 64 字符）和 `state=active|archived|disabled|all`。active 表示当前未归档，仍包含停用
 记录；disabled 筛选当前未归档且停用的记录。响应为 `{"items":[...摘要...],"page":{"page":1,
 "page_size":20,"total":...}}`，列表不返回完整 Prompt/正文。资源按 created_at/id 降序，
@@ -753,16 +756,21 @@ kind 不匹配返回 404，详情禁止查询参数。与 key/UUID 详情使用�
 Gateway 只返回允许的稳定错误码，不透传异常正文。请求体默认最多 256 KiB，JSON 响应最多
 1 MiB，均不接受压缩请求；管理请求使用普通 HTTP deadline，不占用 Chat 的长时间预算。
 
-Agent/Prompt/Skill content 使用现有严格配置 Schema。Prompt 为 text/variables，变量仅
-language/problem_id/submission_id；Skill 为 name/prompt_id/execution_mode/allowed_tools/budget。
+Agent/Prompt/Skill content 使用严格配置 Schema。Prompt 为 name/text/variables，变量仅
+language/problem_id/submission_id。新 Skill 为 name/description/text/execution_mode/allowed_tools，
+text 是 1–32,000 字符的任务说明，description 最多 512 字符；文本默认是普通正文，花括号不展开。
+Skill 不设置预算时继承 Agent 和部署上限。兼容旧 Skill 的 prompt_id/budget；text 与 prompt_id
+必须二选一。前端编辑旧 Skill 时复制历史 Prompt 正文为内置文本，保留 variables（包括空列表，
+用于旧模板字面括号转义），保存生成新版本并移除旧 Prompt 绑定/Skill 预算；旧版本继续有效。
+内置 variables 仅用于兼容迁移，声明时沿用 Prompt 模板校验。
 Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
 visibility/is_test/test_expires_at/knowledge_scope。知识范围必须为空，管理创建只支持 direct。
 test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
 
-模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
+真实模式的模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
 参数及上下文/输出上限，只允许部署 `AGENT_ADMIN_PROVIDER_KEY`（默认 su8）下的可用模型。
 保存 Agent 时在事务中复核模型与 Provider，不能靠直接提交 UUID 绕过；不返回 Provider
-正文、Credential ID、Key/密文。模型初始为 deepseek-v4-flash，目录来自数据库，不在前端写死。
+正文、Credential ID、Key/密文。开发环境自动准备 deepseek-v4-flash、deepseek-v4-pro、deepseek-v4.1-flash，目录来自数据库，不在前端写死。
 Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 HTTP 写接口。
 `GET model-options/{uuid}` 用于显示已有的历史模型绑定，额外返回 archived/disabled/available
 布尔值；available 表示可用于新绑定，归档版本返回 false，但仍显示保留的版本信息。
@@ -770,7 +778,7 @@ Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 
 禁用或部署网络策略不允许时仍可查元数据，available=false；响应严格禁止 Provider/凭据字段。
 
 Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调用/统计/编辑接口。
-普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/execution_mode/default
+普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/description/execution_mode/default
 及 default_skill_key。权限/可运行条件在 SQL 分页前过滤，普通用户看不到 test/admin Agent，
 不可访问 Skill 子目录统一 404；目录不返回 Prompt、模型、Provider 或预算。Chat 每次重新
 校验权限。Chat 关闭、demo 配置或 Runtime disabled 时目录为空，不将数据库配置伪装为可运行。
@@ -778,7 +786,7 @@ Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调
 
 Agent/Prompt/Skill/模型配置不采用草稿发布；创建完整校验后立即生效，修改生成新 UUID，
 原记录归档，删除只归档。替换携带预期当前编号及请求编号，实现并发检查和幂等重放。
-旧配置恢复通过复制生成新编号；共享 Prompt 替换不自动修改已有 Skill/Agent。
+旧配置恢复通过复制生成新编号；共享 Prompt 替换不自动修改已有 Agent 或旧版 Skill；Skill 替换不自动重绑 Agent。
 
 归档用于版本历史，不抹除已有绑定；已有 Agent 可继续使用被归档的 Prompt/Skill 具体
 UUID。停用是资源级操作，会阻止后续 Run 使用其任一版本；已开始 Run 保留配置快照。

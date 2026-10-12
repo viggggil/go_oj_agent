@@ -183,7 +183,7 @@ Agent 是面向编程学习的通用 Coding Learning Agent，不绑定某道题�
 - 题目推荐。
 - 基于学习进度的学习计划。
 
-Agent 使用单一 LangGraph Runtime，通过 Skill 声明目标、Prompt、可用 Tool、输出结构和预算。Context Resolver 只解析资源 ID 和约束，不自动读取业务数据；Agent 从策略允许的 Tool 集合中选择需要的 Tool。
+Agent 使用单一 LangGraph Runtime，通过 Skill 声明目标、任务说明、可用 Tool 和输出结构，运行预算由 Agent 与部署上限控制。Context Resolver 只解析资源 ID 和约束，不自动读取业务数据；Agent 从策略允许的 Tool 集合中选择需要的 Tool。
 
 Agent 获取业务信息时必须：
 
@@ -208,7 +208,7 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 - Agent 的 Prompt、Skill、模型选项、可见性、测试有效期与预算。
 - Prompt 编辑、版本查询和 Diff、替换、恢复和归档。
 - Tool Catalog 查看，包括 Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计。
-- Skill 元数据、Prompt 绑定、Tool allowlist、预算和输出结构。
+- Skill 名称、描述、任务说明、Tool allowlist 和输出结构；旧 Prompt 绑定与预算兼容读取。
 - 知识库文档、元数据、版本、切分、索引、发布、归档和回滚。
 - Eval 数据集、样例运行、版本对比、失败样例和人工标注。
 - Agent Run、Tool 调用、Trace、Token、延迟、错误和质量指标。
@@ -216,6 +216,8 @@ Agent 不允许直接查询 User / Problem / Submission / Contest 业务数据�
 管理员不能修改 Tool 的 RPC 实现、目标服务、最终授权、安全前缀或任意 Python 代码。Agent、Prompt、Skill 不使用草稿/发布状态；每次创建校验，修改创建新 UUID 并归档旧版，恢复复制历史正文生成新 UUID。每次 Agent Run 固定 Prompt、Skill、Tool Catalog、模型和知识库索引快照。归档依赖保留已有 UUID 绑定，停用依赖阻止后续运行。
 
 Issue #154 分阶段交付：PR7 提供 Gateway 保护的 Agent/Prompt/Skill 管理 API、只读 su8 模型选项与 Tools、按身份过滤的聊天目录；PR8 提供顶栏 Agent、工作区和可保存的管理员页面，包括历史绑定、创建依赖返回、并发比较与归档恢复；PR9 已接通 Agent/Skill 选择和 Gateway 流式对话、停止/新对话、安全 Markdown 与代码复制，只有 done 表示完成；失败保留输入、401 不自动重放。Provider 沿用 su8，不增加独立管理页面；RAG、多轮上下文和完整观测评估后续交付。
+
+Issue #160 调整当前表单：管理员填写名称，后端自动生成内部标识；Skill 自带任务说明，不再要求绑定 Prompt 或配置预算；Agent 高级设置保留运行限制。开发部署检测宿主 su8.key 后准备 su8 的 deepseek-v4-flash、deepseek-v4-pro、deepseek-v4.1-flash，支持页面创建 test Agent 并通过 Gateway SSE 调用真实模型。
 
 ---
 
@@ -286,7 +288,7 @@ Issue #154 分阶段交付：PR7 提供 Gateway 保护的 Agent/Prompt/Skill 管
 - 创建和编辑 Agent，选择 Prompt、Skill、模型配置、可见性、预算和测试有效期。
 - 编辑 Prompt，查看版本和 Diff，执行样例 Eval，替换、恢复和归档。
 - 查看 Tool Catalog 和 Tool 调用统计，在 Skill 层有限启用或禁用 Tool。
-- 编辑 Skill 的描述、Prompt 绑定、Tool allowlist、预算和输出结构。
+- 编辑 Skill 的名称、描述、任务说明、Tool allowlist 和输出结构，默认继承 Agent 预算。
 - 管理知识库文档、标签、版本、切分、索引、发布和归档。
 - 管理 Eval 数据集，运行评估并查看版本对比和失败样例。
 - 查看脱敏后的 Agent Run、Trace、Tool 调用、Token、延迟和质量指标。

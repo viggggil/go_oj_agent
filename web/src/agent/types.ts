@@ -19,15 +19,19 @@ export interface Budget {
   max_output_tokens: number
 }
 export interface PromptContent {
+  name?: string
   text: string
   variables: string[]
 }
 export interface SkillContent {
   name: string
-  prompt_id: string
+  description?: string
+  text?: string | null
+  variables?: string[] | null
+  prompt_id?: string | null
   execution_mode: 'direct' | 'react'
   allowed_tools: string[]
-  budget: Budget
+  budget?: Budget | null
 }
 export interface AgentContent {
   name: string
@@ -108,7 +112,7 @@ export const budgetFields = [
 ] as const
 export function defaultBudget(): Budget {
   return {
-    max_run_seconds: 30,
+    max_run_seconds: 120,
     max_output_chars: 8000,
     max_events: 1000,
     max_tool_calls: 8,
@@ -118,14 +122,14 @@ export function defaultBudget(): Budget {
   }
 }
 export function emptyContent(resource: Resource): Content {
-  if (resource === 'prompts') return { text: '', variables: [] }
+  if (resource === 'prompts') return { name: '', text: '', variables: [] }
   if (resource === 'skills')
     return {
       name: '',
-      prompt_id: '',
+      description: '',
+      text: '',
       execution_mode: 'direct',
       allowed_tools: [],
-      budget: defaultBudget(),
     }
   return {
     name: '',

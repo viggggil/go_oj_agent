@@ -820,3 +820,18 @@ v0 原则：
 - [ ] Integration Test 是否覆盖。
 - [ ] 是否会暴露敏感数据。
 - [ ] 是否同步更新 API / Event Contract。
+
+### Agent 表单内容兼容（Issue #160）
+
+本次只扩展 Agent 自有版本表 JSON 内容，不新增 DDL，也不原地更新历史版本。
+Prompt 增加 name；Skill 增加 text/description 和兼容模板 variables。旧 Skill 的 prompt_id/budget
+仍能解析，仍沿旧 links 读取指定 Prompt；新 Skill 内置文本不产生 Prompt link，预算默认继承。
+前端编辑旧内容时复制文本，正常保存新 UUID/审计；Agent 需明确重绑才采用新版本。
+资源 key 由后端生成，资源唯一约束不变，名称不要求唯一；重试仍由 request_id/fingerprint 检查。
+名称搜索在 SQL 分页前完成，沿用稳定 created_at/id 排序；目前无名称索引，规模增大时再评估。
+
+开发 su8 准备通过 ConfigurationStore/CredentialStore 事务写入，凭据仍 AES-GCM 加密；
+主密钥保存在独立 Docker 卷，备份/恢复需同时保留数据库与 keyring。初始化复用已有版本，
+不启用停用/归档资源，不覆盖管理员内容，不自动轮换或恢复撤销凭据。
+回滚前端可继续读取旧内容；旧后端不能解析新内置 Skill，部署应同时升级 Agent/Web，
+回滚需先让 Agent 绑定保留的旧版本，不应删除新版本或历史审计。

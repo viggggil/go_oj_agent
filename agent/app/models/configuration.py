@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from string import Formatter
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -37,6 +38,7 @@ class RuntimeBudget(ImmutableConfig):
 
 
 class PromptConfig(ImmutableConfig):
+    name: str = Field(default="", max_length=128)
     text: str = Field(min_length=1, max_length=32_000)
     variables: tuple[PromptVariable, ...] = ()
 
@@ -57,13 +59,27 @@ class PromptConfig(ImmutableConfig):
 
 class SkillConfig(ImmutableConfig):
     name: str = Field(min_length=1, max_length=128)
-    prompt_id: UUID
+    description: str = Field(default="", max_length=512)
+    text: str | None = Field(default=None, min_length=1, max_length=32_000)
+    variables: tuple[PromptVariable, ...] | None = None
+    # 兼容旧不可变版本；新表单直接保存任务说明，不再创建 Prompt 依赖。
+    prompt_id: UUID | None = None
     execution_mode: Literal["direct", "react"] = "direct"
     allowed_tools: tuple[ToolName, ...] = Field(default=(), max_length=32)
-    budget: RuntimeBudget = Field(default_factory=RuntimeBudget)
+    budget: RuntimeBudget | None = None
 
     @model_validator(mode="after")
     def distinct_tools(self) -> "SkillConfig":
+        if (self.text is None) == (self.prompt_id is None):
+            raise ValueError("Skill requires either inline text or a legacy Prompt")
+        if not self.name.strip() or (self.text is not None and not self.text.strip()):
+            raise ValueError("Skill name and text cannot be blank")
+        if self.variables is not None:
+            if self.text is None:
+                raise ValueError("Inline variables require text")
+            PromptConfig(text=self.text, variables=self.variables)
+        if self.prompt_id is not None and self.budget is None:
+            object.__setattr__(self, "budget", RuntimeBudget())
         if len(set(self.allowed_tools)) != len(self.allowed_tools):
             raise ValueError("Duplicate tools")
         return self
@@ -97,6 +113,15 @@ class ProviderConfig(ImmutableConfig):
     adapter: Literal["responses"] = "responses"
     base_url: str = Field(min_length=1, max_length=512)
     credential_id: UUID
+    text_verbosity_supported: bool | None = Field(default=None, strict=True)
+
+    @property
+    def supports_text_verbosity(self) -> bool:
+        # su8 的 Responses 兼容接口不接受 text.verbosity；旧 Provider 也适用。
+        if self.text_verbosity_supported is not None:
+            return self.text_verbosity_supported
+        return urlsplit(self.base_url).hostname != "www.su8.codes"
+
     connect_timeout_seconds: float = Field(default=5, gt=0, le=30)
     first_token_timeout_seconds: float = Field(default=20, gt=0, le=120)
     idle_timeout_seconds: float = Field(default=15, gt=0, le=60)
@@ -160,7 +185,7 @@ def parse_config(kind: ConfigKind, content: Any) -> ConfigBody:
 def config_references(body: ConfigBody) -> dict[str, ConfigKind]:
     if isinstance(body, ModelProfileConfig) and body.provider_id is not None:
         return {str(body.provider_id): "provider"}
-    if isinstance(body, SkillConfig):
+    if isinstance(body, SkillConfig) and body.prompt_id is not None:
         return {str(body.prompt_id): "prompt"}
     if isinstance(body, AgentConfig):
         identifiers = [body.prompt_id, body.model_profile_id, *body.skill_ids]

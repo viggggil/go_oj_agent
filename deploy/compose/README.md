@@ -65,20 +65,40 @@ make infra-down
 ### Agent Chat
 
 Agent 默认随 `make infra-up` 启动，不需要设置 `COMPOSE_PROFILES` 或 `--profile agent`。
-本地开发默认使用专用 `oj_agent` 数据库账户、合成 Fake runtime，不调用真实模型：
+本地开发使用专用 `oj_agent` 数据库账户。默认 `AGENT_RUNTIME_MODE=auto`：
+检测宿主 `~/.config/oj-agent/su8.key`，有 Key 使用真实模型，没有 Key 使用明确标记的 Fake。
 
 ```bash
+chmod 600 ~/.config/oj-agent/su8.key
 make infra-up
 ```
 
-默认启用 `AGENT_ADMIN_ENABLED=true` 和 `AGENT_CONFIG_MODE=database`，管理员可访问
-Agent / Prompt / Skill 管理页，普通用户可访问聊天目录。首次启动会复用
-`agent/examples/learning-assistant.json` 创建学习助手及 direct Skill，页面可以选择并发送消息。
-回答明确标记为演示回答。配置准备只在本地 Fake runtime、默认 Agent key 且
-`AGENT_BOOTSTRAP_DEMO=true` 时执行；重启保留已有版本，管理员已停用或归档的 Agent
-不会自动恢复。真实模型模式不自动创建 Fake 配置。需要完全自行配置时设
-`AGENT_BOOTSTRAP_DEMO=false`。旧 `.env` 中的 `AGENT_ADMIN_ENABLED=false` 或
-`AGENT_CONFIG_MODE=demo` 会覆盖新默认值，应按需更新。
+凭据目录可通过 `AGENT_MODEL_KEY_DIR` 覆盖。`agent-model-key-init` 只在初始化时读取宿主文件，
+为 UID 10001 的 Agent 准备 600 文件；AES-GCM 主密钥保存在独立 `agent-model-keys` 卷中，
+首次优先导入宿主 keyring.json 或旧默认 deploy/compose/model-keys/keyring.json，
+已有卷重启复用，不能随意删除（否则已有数据库凭据无法解密）。API Key 不进入代码、镜像、环境变量或前端。
+
+开发环境自动准备 su8 Provider（`https://www.su8.codes/v1`，Responses/Bearer，`store=false`）
+及三个模型：`deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4.1-flash`。模型 verbosity 配置为
+high；su8 当前不支持 `text.verbosity`，请求省略该字段，通过回答风格指令表达详尽程度。
+模型参数采用本项目保守限制：32,000 上下文、8,000 输出 Token，不代表供应商公布的容量。
+
+默认真实助手 key 为 `su8_learning_assistant`，演示助手仍为 `learning_assistant`，
+可通过 `AGENT_DEFAULT_AGENT_KEY` 指定。旧 Fake 助手、已有资源版本和停用/归档状态完整保留；
+准备步骤不会自动恢复资源，也不会撤销或替换已有凭据。已有 Provider 无效时仍启动管理服务，
+由管理员通过 CLI 修复。替换宿主 Key 不会自动轮换已有数据库凭据；轮换继续使用
+`app.credential_cli` 创建凭据、`app.config_cli` 创建 Provider/模型新版本并重绑 Agent。
+
+管理员可访问 Agent / Prompt / Skill 管理页。新建只填写名称，内部 key 由后端生成；Skill
+直接填写任务说明和简短描述，不再选择 Prompt 或重复配置预算。Agent 选择基础 Prompt、Skill、
+默认 Skill 和模型；运行限制放在高级设置。测试 Agent 必须管理员可见并设置未来到期时间。
+保存后点击“对话”，选择该 Agent/Skill 即可通过 Gateway SSE 调用真实模型。
+
+没有 Key 时复用 `agent/examples/learning-assistant.json` 准备演示目录。显式设置
+`AGENT_RUNTIME_MODE=langgraph_fake` 可强制演示；此模式只用于已有演示助手聊天，Agent 管理保存仍需 Responses 模型配置。
+需要完全自行配置时设 `AGENT_BOOTSTRAP_DEMO=false` 和 `AGENT_BOOTSTRAP_SU8=false`。
+旧环境文件中的 `AGENT_RUNTIME_MODE=langgraph_fake` 会覆盖 auto，使用真实模型需改为 auto/model；
+`AGENT_ADMIN_ENABLED=false` 或 `AGENT_CONFIG_MODE=demo` 也会覆盖新默认值。
 
 `AGENT_ENABLED=false` 可显式关闭 Gateway Agent 路由，组件仍正常启动。
 若已有 `.env` 设置了这个旧默认值，应改为 `true`。Agent 只在 Compose 网络内监听 `8000`，
@@ -109,8 +129,8 @@ make infra-down
 
 Gateway Agent 路由、管理 API 和数据库配置目录默认开启。Agent 的 `000001`～`000003`
 migration 在启动时自动准备。设置 `AGENT_ADMIN_ENABLED=false` 可单独关闭管理功能。
-默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；真实模型的 Provider、Credential、Model Profile 按
-`agent/README.md` 通过本机 CLI 初始化，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；
+默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；开发环境自动准备固定 Provider 和三个模型，
+其他部署或凭据轮换按 `agent/README.md` 使用本机 CLI，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；
 普通聊天目录无需开启管理开关。现有开发 Fake 配置不会自动变成真实模型配置。
 
 Compose 会自动读取仓库根目录或 `--env-file` 指定的环境文件。可用变量记录在 `deploy/compose/.env.example`。所有默认密码和 JWT 密钥仅供本机开发，不能用于共享、测试平台或生产环境。

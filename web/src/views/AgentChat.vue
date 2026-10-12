@@ -36,12 +36,15 @@
       </label>
       <span v-if="loadingCatalog || loadingSkills" class="muted">正在加载配置…</span>
     </div>
+    <p v-if="skills.find((item) => item.key === selectedSkill)?.description" class="muted">
+      {{ skills.find((item) => item.key === selectedSkill)?.description }}
+    </p>
     <form class="chat-directory" @submit.prevent="loadAgents(1)">
       <input
         v-model="search"
         aria-label="搜索 Agent"
         maxlength="64"
-        placeholder="按 key 搜索 Agent"
+        placeholder="按名称或标识搜索 Agent"
       />
       <button class="secondary" :disabled="loadingCatalog" type="submit">搜索 Agent</button>
       <button

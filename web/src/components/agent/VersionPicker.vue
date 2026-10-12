@@ -1,7 +1,12 @@
 <template>
   <div class="binding-picker">
     <div class="agent-control-row">
-      <input v-model="search" :aria-label="`${label} 搜索`" placeholder="搜索标识" maxlength="64" />
+      <input
+        v-model="search"
+        :aria-label="`${label} 搜索`"
+        placeholder="搜索名称或标识"
+        maxlength="64"
+      />
       <button
         type="button"
         class="agent-icon secondary"

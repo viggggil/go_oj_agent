@@ -6,6 +6,7 @@ describe('配置边界', () => {
   it('模板仅允许声明变量，支持字面括号，拒绝表达式和未声明变量', () => {
     expect(
       validateConfiguration('prompts', 'test_prompt', {
+        name: '模板',
         text: '{{literal}} {language}',
         variables: ['language'],
       }),
@@ -19,19 +20,28 @@ describe('配置边界', () => {
       '}',
     ])
       expect(
-        validateConfiguration('prompts', 'test_prompt', { text, variables: ['language'] }),
+        validateConfiguration('prompts', 'test_prompt', {
+          name: '模板',
+          text,
+          variables: ['language'],
+        }),
       ).not.toBeNull()
     expect(
-      validateConfiguration('prompts', 'test_prompt', { text: '{language}', variables: [] }),
+      validateConfiguration('prompts', 'test_prompt', {
+        name: '模板',
+        text: '{language}',
+        variables: [],
+      }),
     ).not.toBeNull()
     expect(
       validateConfiguration('prompts', 'test_prompt', {
+        name: '模板',
         text: '中文'.repeat(16001),
         variables: [],
       }),
     ).not.toBeNull()
     expect(
-      validateConfiguration('prompts', 'Invalid', { text: '正文', variables: [] }),
+      validateConfiguration('prompts', 'Invalid', { name: '模板', text: '正文', variables: [] }),
     ).not.toBeNull()
   })
   it('测试 Agent 强制管理员可见和未来时间，预算和默认 Skill 均有效', () => {

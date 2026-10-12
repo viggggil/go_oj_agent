@@ -628,7 +628,7 @@ reflection
 
 ### PR6 模型边界
 
-真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的 `deepseek-v4-flash` 请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
+真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的三个 DeepSeek 模型请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
 
 凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。PR7 提供 Agent、Prompt、Skill 管理 HTTP，PR8 的 Vue 管理工作区通过 Gateway 接入；历史 UUID 详情仅管理员可见，模型详情严格脱敏，不返回 Provider/凭据。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
 
@@ -663,6 +663,11 @@ rejudge_submission
 
 每个 Tool 声明 `read_scope`、`allowed_roles`、`side_effect`、`sensitivity`、超时、成本和是否需要确认。管理员可以在 Skill 层调整 Tool allowlist 和启用状态，但不能修改 RPC 方法、目标服务或授权实现。写 Tool 默认关闭。
 
+Issue #160 简化当前表单：后端生成稳定资源 key，管理员填写名称；Prompt 负责基础规则，Skill
+直接保存任务说明，Agent 高级设置承载运行预算。版本仍不可变、依赖仍绑定具体 UUID。
+开发 Compose 检测宿主 su8.key 后准备单 su8 Provider 和三个模型并运行真实 Direct Answer，
+无 Key 时保留 Fake。Provider/凭据仍仅部署侧管理，浏览器不接触 Key。
+
 ### 10.3 Agent Control Plane
 
 PR7 的已实现接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
@@ -693,7 +698,7 @@ CREATED → CURRENT → ARCHIVED
 
 - Prompt 管理：编辑、版本 Diff、样例 Eval、替换、归档、恢复和审计。
 - Tool Catalog：查看描述、Schema、来源 RPC、敏感级别、允许角色、启用状态和调用统计；RPC 方法和授权代码只读展示。
-- Skill 管理：编辑元数据、选择 Tool、绑定 Prompt、设置预算、样例运行、替换、归档和复制旧版恢复。
+- Skill 管理：填写名称、描述和任务说明、选择 Tool、替换、归档和复制旧版恢复；旧 Prompt 绑定兼容读取，新 Skill 默认继承 Agent 预算。
 - 知识库管理：文档上传、元数据、标签、切分预览、索引、发布、归档和回滚。
 - Eval 与质量：运行数据集、版本对比、失败样例、工具选择错误、引用错误和拒答错误。
 - 运行观测：请求量、延迟、Token、Tool 错误、RAG 延迟、Skill 分布、Trace 和脱敏后的运行详情。

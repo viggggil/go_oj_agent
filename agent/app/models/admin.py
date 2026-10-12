@@ -13,7 +13,7 @@ class AdminRequest(BaseModel):
 
 
 class CreateConfiguration(AdminRequest):
-    key: ConfigKey
+    key: ConfigKey | None = None
     content: dict[str, Any]
 
 

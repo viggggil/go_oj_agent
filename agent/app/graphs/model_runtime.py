@@ -42,6 +42,13 @@ class ModelRuntime:
                 snapshot.get("skill_prompt_text") or "",
             ]
         )
+        if profile.verbosity is not None and not provider.supports_text_verbosity:
+            styles = {
+                "low": "回答简洁，优先给出结论。",
+                "medium": "回答提供必要的解释和例子。",
+                "high": "回答详尽，说明关键依据、步骤和必要的例子；不要输出内部推理过程。",
+            }
+            instructions += "\n\n" + styles[profile.verbosity]
         # 任意 Byte-level tokenizer 的保守输入上界；不承诺精确 Token。
         input_estimate = len(instructions.encode()) + len(state.user_message.encode()) + 128
         max_output = min(profile.max_output_tokens, budget.max_output_tokens)

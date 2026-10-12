@@ -44,7 +44,7 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 	for _, item := range items {
 		switch {
 		case skills:
-			if object, ok := agentJSONFields(item, "key name execution_mode default", ""); !ok || !agentJSONTypes(object, "key name execution_mode", "default", "") {
+			if object, ok := agentJSONFields(item, "key name execution_mode default", "description"); !ok || !agentJSONTypes(object, "key name execution_mode", "default", "") {
 				return false
 			}
 		case !admin:
@@ -113,7 +113,7 @@ func validAgentConfiguration(value json.RawMessage, full bool, resource string) 
 	if !full {
 		switch kind {
 		case "prompt":
-			return len(object) == 9
+			return len(object) == 9 || (len(object) == 10 && agentJSONTypes(object, "name", "", ""))
 		case "skill":
 			return len(object) == 10 && agentJSONTypes(object, "name", "", "")
 		default:
@@ -125,17 +125,33 @@ func validAgentConfiguration(value json.RawMessage, full bool, resource string) 
 		"skill":  "name prompt_id execution_mode allowed_tools budget",
 		"agent":  "name prompt_id skill_ids default_skill_id model_profile_id allowed_tools budget visibility is_test test_expires_at knowledge_scope",
 	}
-	content, ok := agentJSONFields(object["content"], fields[kind], "")
+	optionalContent := map[string]string{
+		"prompt": "name",
+		"skill":  "description text variables",
+	}
+	content, ok := agentJSONFields(object["content"], fields[kind], optionalContent[kind])
 	if !ok {
 		return false
 	}
 	switch kind {
 	case "prompt":
+		if name, exists := content["name"]; exists && !agentJSONRequired(name, new(string)) {
+			return false
+		}
 		if !agentJSONTypes(content, "text", "", "") || !agentJSONStrings(content["variables"]) {
 			return false
 		}
 	case "skill":
-		if !agentJSONTypes(content, "name prompt_id execution_mode", "", "") || !agentJSONStrings(content["allowed_tools"]) {
+		if !agentJSONTypes(content, "name execution_mode", "", "") || !agentJSONStrings(content["allowed_tools"]) || !agentJSONNullable(content["prompt_id"], new(string)) {
+			return false
+		}
+		if text, exists := content["text"]; exists && !agentJSONNullable(text, new(string)) {
+			return false
+		}
+		if description, exists := content["description"]; exists && !agentJSONRequired(description, new(string)) {
+			return false
+		}
+		if variables, exists := content["variables"]; exists && string(variables) != "null" && !agentJSONStrings(variables) {
 			return false
 		}
 	case "agent":
@@ -144,6 +160,9 @@ func validAgentConfiguration(value json.RawMessage, full bool, resource string) 
 		}
 	}
 	if budget, exists := content["budget"]; exists {
+		if kind == "skill" && string(budget) == "null" {
+			return ok
+		}
 		var limits map[string]json.RawMessage
 		limits, ok = agentJSONFields(budget, "max_run_seconds max_output_chars max_events max_tool_calls max_model_calls max_input_tokens max_output_tokens", "")
 		ok = ok && agentJSONTypes(limits, "", "", "max_output_chars max_events max_tool_calls max_model_calls max_input_tokens max_output_tokens") && agentJSONNullable(limits["max_run_seconds"], new(float64)) && string(limits["max_run_seconds"]) != "null"

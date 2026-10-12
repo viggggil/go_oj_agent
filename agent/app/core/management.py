@@ -3,7 +3,7 @@
 import builtins
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -18,6 +18,7 @@ from app.models.configuration import (
     ConfigKind,
     ConfigWrite,
     ModelProfileConfig,
+    PromptConfig,
     ProviderConfig,
     SkillConfig,
 )
@@ -49,8 +50,8 @@ def summary(value: ConfigVersion, *, full: bool = False) -> dict[str, Any]:
     }
     if full:
         result["content"] = value.content.model_dump(mode="json")
-    elif isinstance(value.content, (AgentConfig, SkillConfig)):
-        result["name"] = value.content.name
+    elif isinstance(value.content, (AgentConfig, SkillConfig, PromptConfig)):
+        result["name"] = value.content.name or value.key
         if isinstance(value.content, AgentConfig):
             result.update(
                 visibility=value.content.visibility,
@@ -105,12 +106,23 @@ class ManagementService:
     async def save(
         self,
         kind: ConfigKind,
-        key: str,
+        key: str | None,
         content: dict[str, Any],
         principal: Principal,
         expected_id: UUID | None = None,
         source_id: UUID | None = None,
     ) -> dict[str, Any]:
+        # 同一操作者/资源类型/请求 UUID 的创建重试获得同一 key；仓储检查正文冲突。
+        if key is None:
+            if not isinstance(content.get("name"), str) or not content["name"].strip():
+                raise ConfigError("AGENT_INVALID_ARGUMENT")
+            key = (
+                kind
+                + "_"
+                + uuid5(
+                    NAMESPACE_URL, f"oj-agent:{kind}:{principal.user_id}:{principal.request_id}"
+                ).hex
+            )
         write = ConfigWrite(
             kind=kind,
             key=key,
@@ -338,5 +350,6 @@ class ManagementService:
             "key": item.key,
             "name": item.content.name,
             "execution_mode": item.content.execution_mode,
+            "description": item.content.description,
             "default": item.id == str(config.default_skill_id),
         }

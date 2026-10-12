@@ -13,6 +13,7 @@ export interface ChatAgent {
   is_default: boolean
 }
 export interface ChatSkill {
+  description?: string
   key: string
   name: string
   execution_mode: string

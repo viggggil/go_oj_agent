@@ -1,4 +1,4 @@
-"""仅为本地 Fake 部署补齐示例配置；保留所有已有配置版本与状态。"""
+"""为本地部署准备真实 su8 或 Fake 示例配置；保留所有已有配置版本与状态。"""
 
 import asyncio
 import json
@@ -21,7 +21,25 @@ from sqlalchemy import select
 
 
 async def main() -> None:
+    mode = os.getenv("AGENT_RUNTIME_MODE", "auto")
+    if mode == "auto":
+        mode = "model" if Path("/run/model-keys/su8.key").is_file() else "langgraph_fake"
+        os.environ["AGENT_RUNTIME_MODE"] = mode
+    if not os.getenv("AGENT_DEFAULT_AGENT_KEY"):
+        os.environ["AGENT_DEFAULT_AGENT_KEY"] = (
+            "su8_learning_assistant" if mode == "model" else "learning_assistant"
+        )
     settings = load_settings()
+    if (settings.environment == "development" and settings.runtime_mode == "model"
+            and settings.config_mode == "database"
+            and os.getenv("AGENT_BOOTSTRAP_SU8", "true").lower() == "true"
+            and Path("/run/model-keys/su8.key").is_file()):
+        from app.development_bootstrap import bootstrap_su8
+        try:
+            await bootstrap_su8(settings)
+        except ConfigError:
+            print("su8 已有配置不可用，保留状态；请通过管理页面/CLI 修复。", flush=True)
+        return
     if (
         os.getenv("AGENT_BOOTSTRAP_DEMO", "false").lower() != "true"
         or settings.environment != "development"
@@ -108,6 +126,9 @@ async def main() -> None:
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+        import sys
+        if "--serve" in sys.argv:
+            os.execvp("python", ["python", "-m", "app"])
     except Exception as exc:  # noqa: BLE001 -- 启动失败必须脱敏，不输出原始驱动异常。
         # 数据库驱动异常可能包含敏感参数，只输出稳定类型。
         print(f"本地 Agent 配置准备失败：{type(exc).__name__}", flush=True)

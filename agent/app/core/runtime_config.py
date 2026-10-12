@@ -131,9 +131,10 @@ class DatabaseConfigReader:
         ):
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
         prompt_version = graph[str(agent.prompt_id)]
-        skill_prompt_version = graph[str(skill.prompt_id)]
-        if not isinstance(prompt_version.content, PromptConfig) or not isinstance(
-            skill_prompt_version.content, PromptConfig
+        skill_prompt_version = graph[str(skill.prompt_id)] if skill.prompt_id else None
+        if not isinstance(prompt_version.content, PromptConfig) or (
+            skill_prompt_version is not None
+            and not isinstance(skill_prompt_version.content, PromptConfig)
         ):
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
 
@@ -151,7 +152,9 @@ class DatabaseConfigReader:
             max_input_tokens=self._settings.max_input_tokens,
             max_output_tokens=self._settings.max_output_tokens,
         )
-        budgets = [agent.budget.model_dump(), skill.budget.model_dump(), system_budget.model_dump()]
+        budgets = [agent.budget.model_dump(), system_budget.model_dump()]
+        if skill.budget is not None:
+            budgets.append(skill.budget.model_dump())
         budget = RuntimeBudget.model_validate(
             {name: min(item[name] for item in budgets) for name in budgets[0]}
         )
@@ -180,8 +183,16 @@ class DatabaseConfigReader:
             skill_key=skill_version.key,
             prompt_id=prompt_version.id,
             prompt_text=render(prompt_version.content),
-            skill_prompt_id=skill_prompt_version.id,
-            skill_prompt_text=render(skill_prompt_version.content),
+            skill_prompt_id=skill_prompt_version.id if skill_prompt_version else None,
+            skill_prompt_text=(
+                render(cast(PromptConfig, skill_prompt_version.content))
+                if skill_prompt_version
+                else (
+                    render(PromptConfig(text=skill.text or "", variables=skill.variables))
+                    if skill.variables is not None
+                    else skill.text
+                )
+            ),
             skill_id=skill_id,
             model_profile_id=str(agent.model_profile_id),
             allowed_tools=tools,

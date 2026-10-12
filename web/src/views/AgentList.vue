@@ -11,7 +11,7 @@
       >
     </div>
     <form class="agent-filter" @submit.prevent="reload">
-      <label>搜索<input v-model="search" placeholder="按 key 搜索" /></label
+      <label>搜索<input v-model="search" placeholder="按名称或标识搜索" /></label
       ><label
         >状态<select v-model="state">
           <option value="active">未归档</option>
