@@ -57,6 +57,9 @@ export ACCESS_TOKEN_TTL="2s"
 export REFRESH_TOKEN_TTL="5m"
 export AUTH_ACCESS_TOKEN_KEY="integration-test-access-token-key"
 export AGENT_ENABLED=true
+# 旧运行时协议回归使用 demo；默认开发页面另由 tests/infra 检查。
+export AGENT_CONFIG_MODE=demo
+export AGENT_BOOTSTRAP_DEMO=false
 
 if ! compose up --build --detach --wait; then
   echo "===== integration compose up failed; dumping service logs ====="

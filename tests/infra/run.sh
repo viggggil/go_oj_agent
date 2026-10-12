@@ -89,6 +89,88 @@ bootstrap
 assert_eq demo "$(sql <<< 'SELECT agent_key FROM oj_agent.agent_conversations;')" "历史会话迁移"
 assert_eq 1 "$(sql <<< 'SELECT COUNT(*) FROM legacy_business.sentinel;')" "保留其他服务数据"
 
+# 默认页面配置：真实仓储创建示例，检查目录、Skill 和重启保留管理员状态。
+compose build agent-service
+compose run --rm --no-deps -T \
+    -e AGENT_DATABASE_URL=mysql+asyncmy://oj_agent:preserved-test-password@mysql:3306/oj_agent \
+    --entrypoint python agent-service - <<'PY'
+import asyncio
+import runpy
+from uuid import uuid4
+
+from app.core.database import DatabaseProbe
+from app.core.management import ManagementService
+from app.core.settings import load_settings
+from app.models.admin import PageQuery
+from app.models.configuration import ConfigWrite
+from app.models.runtime import Principal
+from app.storage.configuration import ConfigurationStore
+from app.storage.schema import agent_config_versions
+from app.tools.registry import ToolRegistry
+from sqlalchemy import func, select
+
+bootstrap_demo = runpy.run_path('/bootstrap/agent-dev-init.py')['main']
+
+async def check():
+    settings = load_settings()
+    assert settings.admin_enabled and settings.config_mode == 'database'
+    await bootstrap_demo()
+    db = DatabaseProbe(settings)
+    try:
+        store = ConfigurationStore(db.engine, ToolRegistry())
+        service = ManagementService(store, settings, ToolRegistry())
+        principal = Principal(user_id=1, roles=frozenset({'user'}), request_id=str(uuid4()))
+        catalog = await service.catalog(PageQuery(), principal)
+        assert catalog['items'][0]['key'] == 'learning_assistant'
+        assert catalog['items'][0]['is_default']
+        skills = await service.catalog(PageQuery(), principal, 'learning_assistant')
+        assert skills['default_skill_key'] == 'algorithm_explain'
+        agent = await store.resolve('agent', 'learning_assistant')
+        await bootstrap_demo()
+        assert (await store.resolve('agent', 'learning_assistant')).id == agent.id
+        await store.change_state(ConfigWrite(kind='agent', key=agent.key, actor_id=1,
+            request_id=str(uuid4()), expected_id=agent.id), 'disable')
+        await bootstrap_demo()
+        assert (await store.resolve('agent', 'learning_assistant')).disabled
+        assert not (await service.catalog(PageQuery(), principal))['items']
+        async with db.engine.connect() as c:
+            count = await c.scalar(select(func.count()).select_from(agent_config_versions))
+        settings.runtime_mode = 'model'
+        import os
+        os.environ['AGENT_RUNTIME_MODE'] = 'model'
+        await bootstrap_demo()
+        async with db.engine.connect() as c:
+            assert await c.scalar(select(func.count()).select_from(agent_config_versions)) == count
+        # 默认 Agent 尚不存在、同名依赖被停用时，准备步骤也不能阻塞管理服务。
+        os.environ['AGENT_RUNTIME_MODE'] = 'langgraph_fake'
+        from sqlalchemy import delete
+        from app.storage.schema import agent_config_audits, agent_config_links, agent_config_resources
+        async with db.engine.begin() as c:
+            await c.execute(delete(agent_config_audits))
+            await c.execute(delete(agent_config_links))
+            await c.execute(agent_config_resources.update().values(current_id=None))
+            await c.execute(delete(agent_config_versions))
+            await c.execute(delete(agent_config_resources))
+        os.environ['AGENT_RUNTIME_MODE'] = 'model'
+        await bootstrap_demo()
+        async with db.engine.connect() as c:
+            assert await c.scalar(select(func.count()).select_from(agent_config_versions)) == 0
+        os.environ['AGENT_RUNTIME_MODE'] = 'langgraph_fake'
+        prompt = await store.create_or_replace(ConfigWrite(kind='prompt', key='learning_identity',
+            actor_id=1, request_id=str(uuid4())), {'text':'管理员保留配置'})
+        await store.change_state(ConfigWrite(kind='prompt', key=prompt.key, actor_id=1,
+            request_id=str(uuid4()), expected_id=prompt.id), 'disable')
+        await bootstrap_demo()
+        assert (await store.resolve('prompt', prompt.key)).disabled
+        async with db.engine.connect() as c:
+            assert await c.scalar(select(func.count()).select_from(agent_config_resources)) == 1
+    finally:
+        await db.close()
+
+asyncio.run(check())
+print('默认页面配置与重启保留检查通过。')
+PY
+
 # DDL 中断留下的部分结构必须明确失败，不能盲目重跑或删除。
 sql <<< 'DROP DATABASE oj_agent; CREATE DATABASE oj_agent; CREATE TABLE oj_agent.agent_runs (id INT PRIMARY KEY); INSERT INTO oj_agent.agent_runs VALUES (7);'
 if bootstrap > "$test_artifacts_dir/partial.log" 2>&1; then

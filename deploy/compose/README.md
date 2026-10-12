@@ -71,6 +71,15 @@ Agent 默认随 `make infra-up` 启动，不需要设置 `COMPOSE_PROFILES` 或 
 make infra-up
 ```
 
+默认启用 `AGENT_ADMIN_ENABLED=true` 和 `AGENT_CONFIG_MODE=database`，管理员可访问
+Agent / Prompt / Skill 管理页，普通用户可访问聊天目录。首次启动会复用
+`agent/examples/learning-assistant.json` 创建学习助手及 direct Skill，页面可以选择并发送消息。
+回答明确标记为演示回答。配置准备只在本地 Fake runtime、默认 Agent key 且
+`AGENT_BOOTSTRAP_DEMO=true` 时执行；重启保留已有版本，管理员已停用或归档的 Agent
+不会自动恢复。真实模型模式不自动创建 Fake 配置。需要完全自行配置时设
+`AGENT_BOOTSTRAP_DEMO=false`。旧 `.env` 中的 `AGENT_ADMIN_ENABLED=false` 或
+`AGENT_CONFIG_MODE=demo` 会覆盖新默认值，应按需更新。
+
 `AGENT_ENABLED=false` 可显式关闭 Gateway Agent 路由，组件仍正常启动。
 若已有 `.env` 设置了这个旧默认值，应改为 `true`。Agent 只在 Compose 网络内监听 `8000`，
 不映射宿主机端口；外部客户端始终通过 Gateway `8080` 访问 `POST /api/v1/agent/chat`。
@@ -98,8 +107,8 @@ make infra-down
 
 ## 配置
 
-Gateway Agent 路由默认开启；管理 API 另需 `AGENT_ADMIN_ENABLED=true`，聊天目录需
-`AGENT_CONFIG_MODE=database`。Agent 的 `000001`～`000003` migration 在启动时自动准备。
+Gateway Agent 路由、管理 API 和数据库配置目录默认开启。Agent 的 `000001`～`000003`
+migration 在启动时自动准备。设置 `AGENT_ADMIN_ENABLED=false` 可单独关闭管理功能。
 默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；真实模型的 Provider、Credential、Model Profile 按
 `agent/README.md` 通过本机 CLI 初始化，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；
 普通聊天目录无需开启管理开关。现有开发 Fake 配置不会自动变成真实模型配置。

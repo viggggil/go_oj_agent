@@ -415,14 +415,17 @@ services:
     build:
       context: ../../agent
       dockerfile: Dockerfile
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["python /bootstrap/agent-dev-init.py && exec python -m app"]
     environment:
       AGENT_ENVIRONMENT: development
       AGENT_HOST: 0.0.0.0
       AGENT_CHAT_ENABLED: true
-      AGENT_ADMIN_ENABLED: "${AGENT_ADMIN_ENABLED:-false}"
+      AGENT_ADMIN_ENABLED: "${AGENT_ADMIN_ENABLED:-true}"
       AGENT_ADMIN_PROVIDER_KEY: "${AGENT_ADMIN_PROVIDER_KEY:-su8}"
       AGENT_RUNTIME_MODE: "${AGENT_RUNTIME_MODE:-langgraph_fake}"
-      AGENT_CONFIG_MODE: "${AGENT_CONFIG_MODE:-demo}"
+      AGENT_CONFIG_MODE: "${AGENT_CONFIG_MODE:-database}"
+      AGENT_BOOTSTRAP_DEMO: "${AGENT_BOOTSTRAP_DEMO:-true}"
       AGENT_DEFAULT_AGENT_KEY: "${AGENT_DEFAULT_AGENT_KEY:-learning_assistant}"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
@@ -440,6 +443,8 @@ services:
       AGENT_CREDENTIAL_KEYRING_FILE: /run/model-keys/keyring.json
       AGENT_PROVIDER_ALLOWED_ORIGINS: '${AGENT_PROVIDER_ALLOWED_ORIGINS:-["https://www.su8.codes"]}'
     volumes:
+      - ./agent-dev-init.py:/bootstrap/agent-dev-init.py:ro
+      - ../../agent/examples/learning-assistant.json:/bootstrap/learning-assistant.json:ro
       - agent-auth-public:/run/agent-auth:ro
       - agent-auth-private:/run/agent-auth-private:ro
       - "${AGENT_MODEL_KEY_DIR:-./model-keys}:/run/model-keys:ro"

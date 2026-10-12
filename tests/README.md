@@ -16,6 +16,8 @@ RabbitMQ/MySQL 组件测试位于 `services/contest/internal/server/result_consu
 
 `make test-infra` 使用临时 MySQL 项目验证 Agent 数据库准备：缺少 Agent 的旧卷、重复
 执行保留会话及账户密码、PR2 历史版本升级、受限应用权限和部分迁移明确失败。
+同时验证默认学习助手和 Skill 目录可用，重复初始化不覆盖配置，管理员停用状态保留，
+真实模型运行模式不创建演示配置。
 `make test-integration` 先执行这组回归检查，再运行业务集成测试；清理仅针对随机测试项目。
 
 集成测试通过独立 Docker Compose project 启动 MySQL、Redis、MinIO、user-service、problem-service 和 gateway-service：
