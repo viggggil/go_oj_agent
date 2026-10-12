@@ -41,7 +41,7 @@ bootstrap() {
 }
 
 # 确保默认服务集合包含 Agent，无需额外 profile。
-compose config --services | rg -x agent-service
+compose config --services | grep -Fx agent-service
 compose up --detach --wait mysql
 sql <<'SQL'
 CREATE DATABASE legacy_business;
@@ -95,6 +95,6 @@ if bootstrap > "$test_artifacts_dir/partial.log" 2>&1; then
     echo "部分迁移应阻止继续启动。" >&2
     exit 1
 fi
-rg '结构不完整' "$test_artifacts_dir/partial.log"
+grep -F '结构不完整' "$test_artifacts_dir/partial.log"
 assert_eq 7 "$(sql <<< 'SELECT id FROM oj_agent.agent_runs;')" "失败时保留数据"
 echo "基础设施升级回归检查通过。"
