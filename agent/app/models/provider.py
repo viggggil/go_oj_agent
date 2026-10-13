@@ -1,6 +1,7 @@
 """模型调用公开错误及有界运行摘要，不保存原始 Provider 响应。"""
 
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,6 +17,7 @@ MODEL_ERROR_CODES = frozenset(
         "AGENT_MODEL_OUTPUT_LIMIT",
         "AGENT_MODEL_INPUT_LIMIT",
         "AGENT_MODEL_CALL_LIMIT",
+        "AGENT_TOOL_CALL_LIMIT",
         "AGENT_MODEL_BLOCKED",
         "AGENT_MODEL_UNSUPPORTED_OUTPUT",
         "AGENT_CREDENTIAL_UNAVAILABLE",
@@ -29,6 +31,24 @@ class ModelFailure(RuntimeError):
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+
+
+class FunctionCall(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    call_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]{1,127}$")
+    arguments: str = Field(max_length=8192)
+
+    def input_item(self) -> dict[str, Any]:
+        return {"type": "function_call", **self.model_dump()}
+
+
+@dataclass
+class ModelResponse:
+    # 仅持有校验后的函数调用，不保存推理、Provider 原始响应或凭据。
+    calls: tuple[FunctionCall, ...] = field(default_factory=tuple)
+    spent_input: int = 0
+    spent_output: int = 0
 
 
 class ModelAttempt(BaseModel):

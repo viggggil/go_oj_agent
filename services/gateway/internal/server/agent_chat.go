@@ -243,7 +243,22 @@ func readAgentFrame(reader *bufio.Reader, maximum int) ([]byte, error) {
 var publicAgentErrors = map[string]bool{
 	"AGENT_DEADLINE_EXCEEDED": true, "AGENT_RUNTIME_INCOMPLETE": true, "AGENT_EVENT_LIMIT": true,
 	"AGENT_RUNTIME_INVALID_EVENT": true, "AGENT_OUTPUT_LIMIT": true, "AGENT_RUNTIME_FAILED": true,
-	"AGENT_RUN_FAILED": true,
+	"AGENT_RUN_FAILED":               true,
+	"AGENT_MODEL_AUTH_FAILED":        true,
+	"AGENT_MODEL_QUOTA":              true,
+	"AGENT_MODEL_RATE_LIMIT":         true,
+	"AGENT_MODEL_UNAVAILABLE":        true,
+	"AGENT_MODEL_TIMEOUT":            true,
+	"AGENT_MODEL_INVALID_RESPONSE":   true,
+	"AGENT_MODEL_REJECTED":           true,
+	"AGENT_MODEL_OUTPUT_LIMIT":       true,
+	"AGENT_MODEL_INPUT_LIMIT":        true,
+	"AGENT_MODEL_CALL_LIMIT":         true,
+	"AGENT_MODEL_BLOCKED":            true,
+	"AGENT_MODEL_UNSUPPORTED_OUTPUT": true,
+	"AGENT_MODEL_ENDPOINT_DENIED":    true,
+	"AGENT_TOOL_CALL_LIMIT":          true,
+	"AGENT_CREDENTIAL_UNAVAILABLE":   true,
 }
 
 func validateAgentFrame(frame []byte, identity *agentStreamIdentity) (bool, error) {

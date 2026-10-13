@@ -676,15 +676,32 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 ### PR6 真实 Responses 模型
 
-外部 Chat 请求和 SSE envelope 不变，Gateway 仍验证 Access JWT、签发可信委托并校验/转发有界 SSE。新增模型错误只使用已有 error 事件的稳定 code：`AGENT_MODEL_AUTH_FAILED`、`AGENT_MODEL_QUOTA`、`AGENT_MODEL_RATE_LIMIT`、`AGENT_MODEL_UNAVAILABLE`、`AGENT_MODEL_TIMEOUT`、`AGENT_MODEL_INVALID_RESPONSE`、`AGENT_MODEL_REJECTED`、`AGENT_MODEL_INPUT_LIMIT`、`AGENT_MODEL_OUTPUT_LIMIT`、`AGENT_MODEL_CALL_LIMIT`、`AGENT_MODEL_BLOCKED`、`AGENT_MODEL_UNSUPPORTED_OUTPUT`、`AGENT_MODEL_ENDPOINT_DENIED`、`AGENT_CREDENTIAL_UNAVAILABLE`。不透传 Provider HTTP 错误正文。
+外部 Chat 请求和 SSE envelope 不变，Gateway 仍验证 Access JWT、签发可信委托并校验/转发有界 SSE。新增模型错误只使用已有 error 事件的稳定 code：`AGENT_MODEL_AUTH_FAILED`、`AGENT_MODEL_QUOTA`、`AGENT_MODEL_RATE_LIMIT`、`AGENT_MODEL_UNAVAILABLE`、`AGENT_MODEL_TIMEOUT`、`AGENT_MODEL_INVALID_RESPONSE`、`AGENT_MODEL_REJECTED`、`AGENT_MODEL_INPUT_LIMIT`、`AGENT_MODEL_OUTPUT_LIMIT`、`AGENT_MODEL_CALL_LIMIT`、`AGENT_TOOL_CALL_LIMIT`、`AGENT_MODEL_BLOCKED`、`AGENT_MODEL_UNSUPPORTED_OUTPUT`、`AGENT_MODEL_ENDPOINT_DENIED`、`AGENT_CREDENTIAL_UNAVAILABLE`。不透传 Provider HTTP 错误正文。
 
 模型配置与选定 Skill 不兼容时，建流前返回 409 `AGENT_CONFIGURATION_UNSUPPORTED`；凭据引用不存在或撤销时返回 503。Gateway 使用已有状态映射，不透传内部错误正文。建流后的模型失败由 SSE error 表示，即使已有部分 token，也不能当成成功答案；done 仍表示最终持久化成功。
 
-内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id 或 tools。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
+内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；direct 模式不传 tools。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
 
 同会话续聊自动取本人最近最多 20 个成功完整轮次（候选最多 64,000 字符），再为本轮必需输入和输出预留预算，按 UTF-8 字节上界与逐消息开销裁剪最旧整轮。失败、取消、中断、RUNNING 和残缺消息不进入模型输入。历史被裁剪不会新增 SSE 事件；必需输入本身超限仍返回已有 AGENT_MODEL_INPUT_LIMIT。新对话没有历史。外部 Chat 请求、响应、错误码、Gateway 委托和 SSE envelope 不变，无需前端传递历史正文或供应商会话 ID。
 
 本阶段没有公开凭据读写 API。`app.credential_cli` 仅提供本机 create/get/list/revoke 和 init-keyring，读取 Key 使用 600 文件或 stdin；查询不会返回原始 Key。`app.config_cli` 扩展 provider kind 和可选的 bootstrap credential-id；仍不能把 actor-id 当作可信管理员角色。
+
+### Issue #162 PR3：只读工具循环
+
+Skill 的 execution_mode 支持 direct 与 react；页面“回答方式”可选择直接回答或读取业务信息后回答。
+react 使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
+Responses 请求携带 function schema、parallel_tool_calls=false；校验 completed 中的 function_call 后，
+通过现有带 Agent 委托身份的 gRPC 执行工具，再按 call_id 回传 function_call_output。
+只回传校验后的 name/call_id/arguments，不重放供应商 reasoning、ID、状态或原始错误。
+工具结果仅进入本次模型输入，SSE 不新增工具参数/结果事件；允许模型最终答案引用已授权业务证据。
+工具失败回传稳定 Tool 错误，拥有数据的 Go 服务仍校验授权；未读取成功不得声称已获取证据。
+
+每次模型尝试（含重试）累计消耗模型次数、输入和输出预算；工具批次累计限制 max_tool_calls。
+参数为最多 8 KiB 的 JSON 对象，拒绝重复键、非有限数字及重复 call_id；批次先校验再执行，
+越权/未知工具不执行。工具结果受字节、模型窗口与累计输入上限限制，循环没有自动恢复。
+新增稳定 SSE 错误 AGENT_TOOL_CALL_LIMIT；Gateway 明确允许既有模型错误码，仍拒绝任意上游错误。
+取消/断连/Run deadline 传播到当前 HTTP 或 gRPC/工具等待；成功保存后才发送 done。
+REST/SSE envelope、Proto、数据库表均兼容；更新时应一起发布 Gateway 和 Agent 错误白名单。
 
 ### 其他用户 API
 

@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 directory = Path(sys.argv[1])
-for name in ("user", "gateway"):
+for name in ("user", "gateway", "agent"):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     (directory / f"{name}-private.pem").write_bytes(
         key.private_bytes(

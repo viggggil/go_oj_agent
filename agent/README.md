@@ -107,9 +107,9 @@ Docker 中密钥文件必须对 Agent 的 UID/GID 10001 可读，keyring 与 API
 
 ### PR6 运行与验证边界
 
-文本增量沿 `Provider → Agent → Gateway → 客户端` 传递，沿用 `thinking/token/done/error` 契约；`thinking` 只是状态。推理内容、工具事件和上游错误正文不透传。成功完成事件的最终文本必须与已输出文本一致；异常 EOF、拒绝、工具输出和上限截断会使 Run 失败。答案和 COMPLETED 在本地事务中成功保存后才发 done；半途失败/取消不保存成功的 assistant 消息。断连、超时、关闭会关闭上游 HTTP stream。
+文本增量沿 `Provider → Agent → Gateway → 客户端` 传递，沿用 `thinking/token/done/error` 契约；`thinking` 只是状态。推理内容、工具事件和上游错误正文不透传。成功完成事件的最终文本必须与已输出文本一致；异常 EOF、拒绝、direct 的工具输出和上限截断会使 Run 失败。答案和 COMPLETED 在本地事务中成功保存后才发 done；半途失败/取消不保存成功的 assistant 消息。断连、超时、关闭会关闭上游 HTTP stream。
 
-真实 Runtime 只支持 `direct`；绑定 Fake Profile 或未实现的执行模式明确拒绝。不同 Runtime 不静默降级。默认没有重试；设置 `max_retries` 后仅对输出前的 429/部分 5xx 在同一 Provider 有限重试，所有尝试受调用次数、输入预算和 Run deadline 限制。401/403、余额不足、配置错误、网络结果不确定及输出后的失败均不自动重试。外部模型调用可能重复计费，不承诺 exactly-once；Chat POST 本身不幂等。
+真实 Runtime 支持 `direct` 和只读工具循环 `react`；绑定 Fake Profile 或未实现的执行模式明确拒绝。不同 Runtime 不静默降级。默认没有重试；设置 `max_retries` 后仅对输出前的 429/部分 5xx 在同一 Provider 有限重试，所有尝试受调用次数、输入预算和 Run deadline 限制。401/403、余额不足、配置错误、网络结果不确定及输出后的失败均不自动重试。外部模型调用可能重复计费，不承诺 exactly-once；Chat POST 本身不幂等。
 
 输入使用 `utf8_bytes_upper_bound_v1` 保守预检并保留协议开销；输出有本地字节上界、字符/事件限额及 Provider `max_output_tokens`。预算可比真实 tokenizer 更严格；Provider 返回 usage 时记录精确报告值，否则明确标为 estimated。Run 的 `model_summary` 保存有界尝试列表、配置 ID、请求/返回模型、usage 来源、延迟、完成原因和公开错误码，不保存凭据、原始 HTTP 响应或推理。
 
@@ -167,7 +167,7 @@ uv run --directory agent --frozen python -m app.config_cli clone-test \
 ```
 
 PR6 真实 Direct Answer 执行模型调用/Token 上限；Fake 仍只消费运行时长、字符、事件和
-显式工具禁用预算。自动 Skill 路由和真实工具编排后续实现。
+显式工具禁用预算。Issue #162 PR3 已支持 react 只读工具编排；自动 Skill 路由后续实现。
 工具权限为 Registry 已启用只读集合、Agent 和选中 Skill 的交集；预算取系统、Agent 和旧版 Skill 显式预算
 各字段最小值。分级提示可创建多个独立 Agent，本阶段没有检索和可靠的内容级提示限制。
 

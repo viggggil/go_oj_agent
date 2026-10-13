@@ -123,7 +123,9 @@ class DatabaseConfigReader:
         if not isinstance(profile, ModelProfileConfig):
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
         real = self._settings.runtime_mode == "model"
-        if real != (profile.provider == "responses") or (real and skill.execution_mode != "direct"):
+        if real != (profile.provider == "responses") or (
+            real and skill.execution_mode not in {"direct", "react"}
+        ):
             raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         provider_version = graph[str(profile.provider_id)] if real else None
         if provider_version is not None and not isinstance(

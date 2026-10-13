@@ -135,7 +135,7 @@ class ManagementService:
         return {"configuration": summary(value, full=True)}
 
     async def _validate(self, connection: AsyncConnection, body: ConfigBody) -> None:
-        if isinstance(body, SkillConfig) and body.execution_mode != "direct":
+        if isinstance(body, SkillConfig) and body.execution_mode not in {"direct", "react"}:
             raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         if isinstance(body, AgentConfig):
             model = await self.store._by_id(connection, str(body.model_profile_id))
@@ -153,10 +153,9 @@ class ManagementService:
             for skill in await self.query._by_ids(
                 connection, [str(identifier) for identifier in body.skill_ids]
             ):
-                if (
-                    not isinstance(skill.content, SkillConfig)
-                    or skill.content.execution_mode != "direct"
-                ):
+                if not isinstance(
+                    skill.content, SkillConfig
+                ) or skill.content.execution_mode not in {"direct", "react"}:
                     raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
 
     async def models(self, query: PageQuery) -> dict[str, Any]:
@@ -322,7 +321,7 @@ class ManagementService:
                     and not item.disabled
                     and (
                         self.settings.runtime_mode != "model"
-                        or item.content.execution_mode == "direct"
+                        or item.content.execution_mode in {"direct", "react"}
                     )
                 ]
                 default = next((value["key"] for value in values if value["default"]), None)

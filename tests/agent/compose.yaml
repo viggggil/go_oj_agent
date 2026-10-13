@@ -40,10 +40,14 @@ services:
       AGENT_CREDENTIAL_KEYRING_FILE: /run/keys/model-keyring.json
       AGENT_PROVIDER_ALLOWED_ORIGINS: '["http://mock-provider:8001"]'
       AGENT_PROVIDER_ALLOW_PRIVATE_NETWORK: true
+      AGENT_BUSINESS_TOOLS_ENABLED: true
+      AGENT_AGENT_PRIVATE_KEY_FILE: /run/keys/agent-private.pem
+      AGENT_PROBLEM_SERVICE_ENDPOINT: mock-business:9002
     ports:
       - "127.0.0.1:${AGENT_TEST_HTTP_PORT}:8000"
     volumes:
       - "${AGENT_TEST_KEY_DIR}/gateway-public.pem:/run/keys/gateway-public.pem:ro"
+      - "${AGENT_TEST_KEY_DIR}/agent-private.pem:/run/keys/agent-private.pem:ro"
       - "${AGENT_TEST_KEY_DIR}/model-keyring.json:/run/keys/model-keyring.json:ro"
     depends_on:
       mysql:
@@ -84,3 +88,17 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  mock-business:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    entrypoint: ["python", "/mock/mock_business.py"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 9002), timeout=2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./mock_business.py:/mock/mock_business.py:ro
+      - "${AGENT_TEST_KEY_DIR}/agent-public.pem:/run/keys/agent-public.pem:ro"

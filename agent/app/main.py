@@ -94,7 +94,11 @@ def create_app(
                         )
                         model_client = ResponsesClient(policy)
                         runtime = ModelRuntime(
-                            model_client, CredentialStore(database.engine, cipher)
+                            model_client,
+                            CredentialStore(database.engine, cipher),
+                            business_tools,
+                            tool_max_result_bytes=config.tool_max_result_bytes,
+                            tool_timeout_seconds=config.tool_timeout_seconds,
                         )
                     elif config.runtime_mode == "langgraph_fake":
                         from app.graphs.langgraph_runtime import LangGraphRuntime

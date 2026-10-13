@@ -25,6 +25,12 @@
     <template v-if="resource === 'skills'">
       <label>简短描述<input v-model="skill.description" maxlength="512" /></label>
       <label
+        >回答方式<select v-model="skill.execution_mode">
+          <option value="direct">直接回答</option>
+          <option value="react">读取业务信息后回答</option>
+        </select></label
+      >
+      <label
         >任务说明<textarea
           v-model="skill.text"
           class="agent-prompt"
@@ -100,7 +106,10 @@
       <summary>高级设置</summary>
       <fieldset>
         <legend>工具白名单</legend>
-        <p class="muted agent-caption">当前运行时尚未执行工具调用；白名单用于保存配置。</p>
+        <p class="muted agent-caption">
+          选择“读取业务信息后回答”时，使用 Agent 与 Skill
+          白名单中共同允许的只读工具；业务服务校验用户权限。
+        </p>
         <p v-if="toolError" class="error" role="alert">
           {{ toolError }} <button class="link" type="button" @click="loadTools">重试</button>
         </p>

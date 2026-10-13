@@ -477,3 +477,17 @@ func TestAgentWriteFailureClosesUpstreamReader(t *testing.T) {
 		t.Fatal("upstream reader was not closed")
 	}
 }
+
+func TestAgentFrameAcceptsStableModelErrorsOnly(t *testing.T) {
+	for _, code := range []string{"AGENT_MODEL_TIMEOUT", "AGENT_MODEL_INPUT_LIMIT", "AGENT_MODEL_CALL_LIMIT", "AGENT_TOOL_CALL_LIMIT", "AGENT_CREDENTIAL_UNAVAILABLE", "PRIVATE_PROVIDER_DETAIL"} {
+		identity := &agentStreamIdentity{RunID: testRunID, ConversationID: testConversationID}
+		terminal, err := validateAgentFrame([]byte(testAgentFrame("error", 1, map[string]string{"code": code})), identity)
+		if code == "PRIVATE_PROVIDER_DETAIL" {
+			if err == nil {
+				t.Fatal("unknown provider error accepted")
+			}
+		} else if err != nil || !terminal {
+			t.Fatalf("stable error %s rejected: %v", code, err)
+		}
+	}
+}

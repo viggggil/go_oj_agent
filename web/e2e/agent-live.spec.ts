@@ -167,6 +167,30 @@ test('真实 Gateway 与 MySQL 保存页面配置，历史绑定可查并用于 
   await page.getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.getByRole('status')).toHaveText('回答完成')
   await expect(page.locator('.assistant')).toContainText('中文算法回答')
+  // 页面配置只读模式，真实 Gateway → Responses mock → 带身份的 gRPC → 模型回答。
+  await page.goto('/agent/skills/' + skillKey + '/edit')
+  await page.getByLabel('回答方式', { exact: true }).selectOption('react')
+  await page.getByText('高级设置', { exact: true }).click()
+  await page.getByRole('checkbox', { name: /^get_problem/ }).check()
+  await page.getByRole('button', { name: '保存新版本', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  const toolSkill = (
+    await (await request.get(gateway! + base + '/skills/' + skillKey, { headers })).json()
+  ).configuration
+  await page.goto('/agent/agents/' + agentKey + '/edit')
+  await page.getByLabel('Skill 搜索', { exact: true }).fill(prefix)
+  await page.getByRole('button', { name: '搜索 Skill', exact: true }).click()
+  await page.getByLabel('选择 Skill 版本').selectOption(toolSkill.id)
+  await page.getByText('高级设置', { exact: true }).click()
+  await page.getByRole('checkbox', { name: /^get_problem/ }).check()
+  await page.getByRole('button', { name: '保存新版本', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  await page.getByRole('link', { name: '对话', exact: true }).last().click()
+  await page.getByLabel('消息', { exact: true }).fill('PR3 read problem')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('回答完成')
+  await expect(page.locator('.assistant')).toContainText('证据数字 739216')
+  await expect(page.locator('.assistant')).not.toContainText('function_call')
   const userHeaders = { Authorization: 'Bearer ' + tokenFor(['user']) }
   const directory = await request.get(gateway! + '/api/v1/agent/agents?search=' + agentKey, {
     headers: userHeaders,

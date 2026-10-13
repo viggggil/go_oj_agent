@@ -61,7 +61,7 @@ export function validateConfiguration(kind: Resource, key: string, body: Content
       })
       if (error) return error
     }
-    return skill.execution_mode === 'direct' ? null : '当前模型仅支持 direct'
+    return ['direct', 'react'].includes(skill.execution_mode) ? null : '请选择支持的回答方式'
   }
   const agent = body as AgentContent
   if (!agent.prompt_id) return '请选择 Prompt 版本'
