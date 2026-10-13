@@ -78,6 +78,8 @@ async def test_owner_isolation_and_latest_history_order(engine: AsyncEngine) -> 
         with pytest.raises(ConversationNotFound):
             await store.list_messages(user_id, conversation.id)
         with pytest.raises(ConversationNotFound):
+            await store.list_completed_turns(user_id, conversation.id)
+        with pytest.raises(ConversationNotFound):
             await store.create_run_with_user_message(
                 user_id=user_id,
                 conversation_id=conversation.id,
@@ -91,6 +93,55 @@ async def test_owner_isolation_and_latest_history_order(engine: AsyncEngine) -> 
             await store.finish_run(user_id=user_id, run_id=run.id, status="FAILED")
     with pytest.raises(ConversationNotFound):
         await store.get_conversation(7, uuid4())
+
+
+async def test_model_history_pairs_only_completed_runs_and_caps_recent_turns(
+    engine: AsyncEngine,
+) -> None:
+    store = AgentStore(engine)
+    conversation = await store.create_conversation(7)
+    for index in range(22):
+        run = await new_run(store, conversation.id)
+        await store.finish_run(
+            user_id=7, run_id=run.id, status="COMPLETED", answer=f"answer {index}"
+        )
+    for status in ("FAILED", "CANCELLED", "INTERRUPTED"):
+        run = await new_run(store, conversation.id)
+        await store.finish_run(user_id=7, run_id=run.id, status=status)
+        # 即便旧数据错误地留有部分 assistant，也必须按 Run 状态排除。
+        async with engine.begin() as connection:
+            await connection.execute(
+                insert(agent_messages).values(
+                    conversation_id=conversation.id,
+                    run_id=run.id,
+                    role="assistant",
+                    content="invalid partial answer",
+                    created_at=utc_now(),
+                )
+            )
+    # 模拟旧数据中的 tool/无 Run 消息，以及成功 Run 的残缺问答。
+    incomplete = await new_run(store, conversation.id)
+    await store.finish_run(user_id=7, run_id=incomplete.id, status="COMPLETED", answer="deleted")
+    async with engine.begin() as connection:
+        await connection.execute(
+            agent_messages.delete().where(
+                (agent_messages.c.run_id == incomplete.id) & (agent_messages.c.role == "assistant")
+            )
+        )
+        await connection.execute(
+            insert(agent_messages).values(
+                conversation_id=conversation.id,
+                role="tool",
+                content="not model history",
+                created_at=utc_now(),
+            )
+        )
+    await new_run(store, conversation.id)  # 本轮 RUNNING 用户消息不进入历史。
+    turns = await store.list_completed_turns(7, conversation.id, limit=200)
+    assert turns == [("介绍二分查找", f"answer {index}") for index in range(2, 22)]
+    assert await store.list_completed_turns(7, conversation.id, limit=1) == turns[-1:]
+    other = await store.create_conversation(7)
+    assert await store.list_completed_turns(7, other.id) == []
 
 
 async def test_same_conversation_concurrent_run_is_unique(engine: AsyncEngine) -> None:

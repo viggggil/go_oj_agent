@@ -101,6 +101,40 @@ async def test_gateway_partial_failure_has_no_done_or_successful_answer() -> Non
         await engine.dispose()
 
 
+async def test_gateway_followup_uses_completed_history_and_new_conversation_is_empty() -> None:
+    gateway, _ = urls()
+    headers = {"Authorization": "Bearer " + user_token(7204)}
+    async with httpx.AsyncClient(timeout=10) as http:
+
+        async def chat(message: str, conversation: str | None = None) -> httpx.Response:
+            body = {"message": message}
+            if conversation is not None:
+                body["conversation_id"] = conversation
+            response = await http.post(gateway + "/api/v1/agent/chat", json=body, headers=headers)
+            assert response.status_code == 200
+            events = [
+                json.loads(line[6:])
+                for line in response.text.splitlines()
+                if line.startswith("data: ")
+            ]
+            assert events[-1]["type"] == ("error" if message == "fail-after-token" else "done")
+            return response
+
+        first = await chat("PR2 remember 314159")
+        conversation = first.headers["x-agent-conversation-id"]
+        await chat("fail-after-token", conversation)
+        # mock 精确检查两条已完成历史及本轮输入，失败轮次不得混入。
+        await chat("PR2 context followup", conversation)
+        other_user = await http.post(
+            gateway + "/api/v1/agent/chat",
+            json={"message": "PR2 context followup", "conversation_id": conversation},
+            headers={"Authorization": "Bearer " + user_token(7205)},
+        )
+        assert other_user.status_code == 404
+        fresh = await chat("PR2 new conversation")
+        assert fresh.headers["x-agent-conversation-id"] != conversation
+
+
 async def test_gateway_disconnect_cancels_graph_and_provider_without_saving_partial_answer() -> (
     None
 ):

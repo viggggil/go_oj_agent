@@ -107,7 +107,7 @@ def client_for(handler: Any) -> ResponsesClient:
 
 
 @pytest.mark.parametrize("native_verbosity", [True, False])
-async def test_first_token_precedes_completion_and_history_never_leaks(
+async def test_first_token_precedes_completion_and_incomplete_history_is_excluded(
     native_verbosity: bool,
 ) -> None:
     gate = asyncio.Event()
@@ -262,9 +262,11 @@ async def test_network_split_utf8_reasoning_is_hidden_and_missing_usage_is_estim
 
 async def test_retry_is_bounded_and_keeps_the_same_provider() -> None:
     calls: list[str] = []
+    inputs: list[list[dict[str, str]]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(str(request.url))
+        inputs.append(json.loads(request.content)["input"])
         return (
             httpx.Response(429)
             if len(calls) == 1
@@ -277,6 +279,10 @@ async def test_retry_is_bounded_and_keeps_the_same_provider() -> None:
 
     client = client_for(handler)
     value = configured()
+    value.history = (
+        HistoryMessage(role="user", content="之前的问题"),
+        HistoryMessage(role="assistant", content="之前的回答"),
+    )
     value.config_snapshot["provider_config"]["max_retries"] = 1
     credentials = Credentials()
     try:
@@ -284,6 +290,72 @@ async def test_retry_is_bounded_and_keeps_the_same_provider() -> None:
         assert events[-1].type == "done" and len(calls) == 2 and credentials.reads == 2
         assert len(set(calls)) == 1
         assert value.model_summary is not None and len(value.model_summary.attempts) == 2
+        assert (
+            inputs[0]
+            == inputs[1]
+            == [
+                *(item.model_dump() for item in value.history),
+                {"role": "user", "content": value.user_message},
+            ]
+        )
+    finally:
+        await client.close()
+
+
+@pytest.mark.parametrize("constraint", ["input", "context"])
+async def test_history_keeps_recent_whole_turns_within_input_and_context_limits(
+    constraint: str,
+) -> None:
+    from app.graphs.direct_answer import DirectAnswer
+
+    calls: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame(delta()), frame(complete(usage=False))]),
+        )
+
+    client = client_for(handler)
+    value = configured()
+    value.history = ()
+    base = DirectAnswer(client, Credentials()).prepare(value)
+    older = (
+        HistoryMessage(role="user", content="旧问题"),
+        HistoryMessage(role="assistant", content="旧回答"),
+    )
+    recent = (
+        HistoryMessage(role="user", content="记住数字 314159"),
+        HistoryMessage(role="assistant", content="已记住 314159"),
+    )
+    cost = sum(len(item.content.encode()) + 128 for item in recent)
+    limit = base.input_estimate + cost
+    if constraint == "input":
+        value.config_snapshot["budget"]["max_input_tokens"] = limit
+    else:
+        value.config_snapshot["model_profile"]["context_window_tokens"] = limit + base.max_output
+    value.history = (*older, *recent)
+    try:
+        events = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert events[-1].type == "done"
+        expected = [item.model_dump() for item in recent] + [
+            {"role": "user", "content": value.user_message}
+        ]
+        assert calls[0]["input"] == expected
+        assert "314159" not in calls[0]["instructions"]
+        assert calls[0]["store"] is False and "previous_response_id" not in calls[0]
+        assert value.model_summary is not None
+        assert value.model_summary.attempts[0].input_tokens == limit
+        # 少一个估算 Token 时整轮退出，不截断成单条 assistant；当前输入保留。
+        if constraint == "input":
+            value.config_snapshot["budget"]["max_input_tokens"] -= 1
+        else:
+            value.config_snapshot["model_profile"]["context_window_tokens"] -= 1
+        _ = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert calls[1]["input"] == [{"role": "user", "content": value.user_message}]
+        assert value.model_summary.attempts[0].input_tokens == base.input_estimate
     finally:
         await client.close()
 

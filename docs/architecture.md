@@ -654,9 +654,27 @@ custom 流桥接采用逐事件消费确认：消费者继续请求下一事件�
 
 图不配置自动重试、checkpointer、持久化恢复或外部 tracing；进程重启仍由现有单实例
 初始化把遗留 RUNNING 收敛为 INTERRUPTED。对外 HTTP/SSE、配置 JSON、数据库表不变。
-Fake 两节点图保留，真实多轮上下文和工具循环仍属于后续阶段。
+Fake 两节点图保留；PR2 在现有 prepare 节点增加上下文，不改变图拓扑。
 
-真实模型暂不使用已存历史、不调用业务 Tools，只使用安全前缀、已解析配置 Prompt 与当前消息；多轮上下文、ReAct 和完整 Eval/观测后续交付。运行摘要和人工 smoke 样例只是最小验证基础。
+### Issue #162 PR2：有界多轮上下文
+
+RunService 在创建本轮 Run 后，通过 AgentStore 查询本人、同会话的成功问答。
+仅选择 COMPLETED Run 中由同一 run_id 关联的 user/assistant 对，按用户消息 ID
+选最近最多 20 轮、恢复时间顺序；失败、取消、中断、本轮 RUNNING、tool 和残缺问答不参与。
+候选历史按整轮限制到 64,000 字符，创建本轮与完成事务的原有边界不变。
+
+prepare 先估算安全前缀、解析后的 Agent/Skill 文本及当前问题，再预留 max_output_tokens，
+取 max_input_tokens 与 context_window_tokens 减输出预留的较小上限。
+历史内容按 UTF-8 字节上界加每条 128 的保守消息开销估算，只保留能容纳的最近完整后缀；
+不因历史过大拒绝本轮，不截断单条消息，也不另调模型摘要。若必需输入本身超限，沿用
+AGENT_MODEL_INPUT_LIMIT。有限重试使用相同 PreparedAnswer，完整输入估算计入每次调用预算。
+
+Responses input 按 user/assistant 角色传递历史，当前问题只追加一次；历史不进入 instructions，
+也不能修改安全规则。每轮请求仍 store=false、不使用 previous_response_id，服务端已存消息
+是上下文来源，不引入供应商托管会话、持久化 checkpointer 或长期记忆。
+配置版本仍由当前 Run 固定，新对话历史为空；同会话 Agent key 归属规则不变。
+
+真实模型不调用业务 Tools；ReAct、工具循环和完整 Eval/观测后续交付。运行摘要和人工 smoke 样例只是最小验证基础。
 
 ### 10.2 Tool Registry 与策略
 

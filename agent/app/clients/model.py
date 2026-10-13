@@ -13,6 +13,7 @@ from pydantic import SecretStr
 from app.core.provider_policy import ProviderPolicy
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig
 from app.models.provider import ModelAttempt, ModelFailure
+from app.models.runtime import HistoryMessage
 
 MAX_FRAME_BYTES = 262_144
 
@@ -93,6 +94,7 @@ class ResponsesClient:
         *,
         max_output_chars: int,
         max_events: int,
+        history: tuple[HistoryMessage, ...] = (),
     ) -> AsyncGenerator[str, None]:
         try:
             self._policy.validate(provider)
@@ -101,7 +103,10 @@ class ResponsesClient:
         body: dict[str, Any] = {
             "model": profile.model,
             "instructions": instructions,
-            "input": [{"role": "user", "content": message}],
+            "input": [
+                *({"role": item.role, "content": item.content} for item in history),
+                {"role": "user", "content": message},
+            ],
             "stream": True,
             "store": False,
             "max_output_tokens": max_output,

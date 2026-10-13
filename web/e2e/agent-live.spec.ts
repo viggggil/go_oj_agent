@@ -133,6 +133,17 @@ test('真实 Gateway 与 MySQL 保存页面配置，历史绑定可查并用于 
   await expect(page.getByRole('status')).toHaveText('回答完成')
   await expect(page.locator('.assistant')).toContainText('中文算法回答')
 
+  // 同一页面续聊，mock 校验已完成整轮通过真实 Gateway/仓储进入模型输入。
+  await page.getByLabel('消息', { exact: true }).fill('PR2 browser followup')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('回答完成')
+  await expect(page.locator('.assistant')).toHaveCount(2)
+  await page.getByRole('button', { name: '新对话', exact: true }).click()
+  await expect(page.locator('.assistant')).toHaveCount(0)
+  await page.getByLabel('消息', { exact: true }).fill('PR2 new conversation')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('回答完成')
+
   // 页面显式重绑 Skill 和 Agent，新版本才用于新会话。
   const newPrompt = (await replacement.json()).configuration
   await page.goto('/agent/skills/' + skillKey + '/edit')

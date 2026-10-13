@@ -23,7 +23,7 @@ from app.models.runtime import (
     StreamEvent,
     validate_run_transition,
 )
-from app.storage.repository import MessageRecord, RunRecord, utc_now
+from app.storage.repository import RunRecord, utc_now
 
 
 def state() -> AgentState:
@@ -159,9 +159,9 @@ class MemoryStore:
     async def expire_running_runs(self) -> int:
         return 0
 
-    async def list_messages(
-        self, user_id: int, conversation_id: str | UUID, *, limit: int = 100
-    ) -> list[MessageRecord]:
+    async def list_completed_turns(
+        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
+    ) -> list[tuple[str, str]]:
         return []
 
 
