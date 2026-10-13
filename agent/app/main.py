@@ -23,7 +23,6 @@ from app.core.provider_policy import ProviderPolicy
 from app.core.resources import AppResources
 from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
-from app.graphs.model_runtime import ModelRuntime
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
 from app.storage.configuration import ConfigurationStore
@@ -87,6 +86,8 @@ def create_app(
                     runtime: AgentRuntime
                     policy = ProviderPolicy(config)
                     if config.runtime_mode == "model":
+                        from app.graphs.model_runtime import ModelRuntime
+
                         cipher = CredentialCipher.from_file(
                             config.credential_keyring_file,
                             allow_insecure_test_file=config.environment == "test",

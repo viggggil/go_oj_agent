@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from time import monotonic
 from typing import Any, cast
 
@@ -93,7 +93,7 @@ class ResponsesClient:
         *,
         max_output_chars: int,
         max_events: int,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         try:
             self._policy.validate(provider)
         except ConfigError:
