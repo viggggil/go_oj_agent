@@ -444,7 +444,7 @@ services:
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
       AGENT_GATEWAY_KEY_ID: gateway-internal-2026-09
-      AGENT_BUSINESS_TOOLS_ENABLED: "${AGENT_BUSINESS_TOOLS_ENABLED:-false}"
+      AGENT_BUSINESS_TOOLS_ENABLED: "${AGENT_BUSINESS_TOOLS_ENABLED:-true}"
       AGENT_AGENT_PRIVATE_KEY_FILE: /run/agent-auth-private/agent-private.pem
       AGENT_AGENT_KEY_ID: agent-internal-2026-10
       AGENT_AGENT_ISSUER: go-oj-agent

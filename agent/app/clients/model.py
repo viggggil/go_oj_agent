@@ -8,11 +8,11 @@ from time import monotonic
 from typing import Any, cast
 
 import httpx
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from app.core.provider_policy import ProviderPolicy
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig
-from app.models.provider import ModelAttempt, ModelFailure
+from app.models.provider import FunctionCall, ModelAttempt, ModelFailure, ModelResponse
 from app.models.runtime import HistoryMessage
 
 MAX_FRAME_BYTES = 262_144
@@ -95,6 +95,9 @@ class ResponsesClient:
         max_output_chars: int,
         max_events: int,
         history: tuple[HistoryMessage, ...] = (),
+        input_items: list[dict[str, Any]] | None = None,
+        tools: tuple[dict[str, Any], ...] = (),
+        result: ModelResponse | None = None,
     ) -> AsyncGenerator[str, None]:
         try:
             self._policy.validate(provider)
@@ -115,11 +118,16 @@ class ResponsesClient:
             body["temperature"] = profile.temperature
         if profile.verbosity is not None and provider.supports_text_verbosity:
             body["text"] = {"verbosity": profile.verbosity}
+        if input_items is not None:
+            body["input"] = input_items
+        if tools:
+            body.update(tools=tools, parallel_tool_calls=False)
         started = monotonic()
         answer = ""
         completed = False
         event_count = 0
         output_index: int | None = None
+        argument_bytes = 0
         try:
             async with asyncio.timeout(provider.request_timeout_seconds):
                 timeout = httpx.Timeout(
@@ -150,7 +158,7 @@ class ResponsesClient:
                             )
                             wait = (
                                 provider.idle_timeout_seconds
-                                if answer
+                                if attempt.first_token_ms is not None
                                 else min(provider.idle_timeout_seconds, max(0, first_remaining))
                             )
                             try:
@@ -183,7 +191,11 @@ class ResponsesClient:
                                         attempt.first_token_ms = int((monotonic() - started) * 1000)
                                     yield text
                             elif kind == "response.completed":
-                                self._complete(event, attempt, answer)
+                                calls = self._complete(
+                                    event, attempt, answer, allow_tools=bool(tools)
+                                )
+                                if result is not None:
+                                    result.calls = calls
                                 completed = True
                                 return
                             elif kind in {"response.failed", "response.incomplete", "error"}:
@@ -202,11 +214,25 @@ class ResponsesClient:
                                 raise ModelFailure("AGENT_MODEL_BLOCKED")
                             elif kind == "response.output_item.added":
                                 item = event.get("item")
-                                if not isinstance(item, dict) or item.get("type") not in {
-                                    "message",
-                                    "reasoning",
-                                }:
+                                allowed = {"message", "reasoning"} | (
+                                    {"function_call"} if tools else set()
+                                )
+                                if not isinstance(item, dict) or item.get("type") not in allowed:
                                     raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                            elif tools and kind in {
+                                "response.function_call_arguments.delta",
+                                "response.function_call_arguments.done",
+                            }:
+                                argument = event.get(
+                                    "delta" if kind.endswith("delta") else "arguments"
+                                )
+                                if not isinstance(argument, str):
+                                    raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+                                if argument and attempt.first_token_ms is None:
+                                    attempt.first_token_ms = int((monotonic() - started) * 1000)
+                                argument_bytes += len(argument.encode())
+                                if argument_bytes > 32 * 8192 * 2:
+                                    raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
                             elif "function_call" in kind or "tool" in kind:
                                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
                     finally:
@@ -220,22 +246,34 @@ class ResponsesClient:
             raise ModelFailure("AGENT_MODEL_UNAVAILABLE") from None
 
     @staticmethod
-    def _complete(event: dict[str, Any], attempt: ModelAttempt, answer: str) -> None:
+    def _complete(
+        event: dict[str, Any], attempt: ModelAttempt, answer: str, *, allow_tools: bool = False
+    ) -> tuple[FunctionCall, ...]:
         response = event.get("response")
-        if (
-            not isinstance(response, dict)
-            or response.get("status") != "completed"
-            or not answer.strip()
-        ):
+        if not isinstance(response, dict) or response.get("status") != "completed":
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         output = response.get("output")
         if not isinstance(output, list):
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         texts: list[str] = []
+        calls: list[FunctionCall] = []
         for item in output:
             if not isinstance(item, dict):
                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
             if item.get("type") == "reasoning":
+                continue
+            if item.get("type") == "function_call" and allow_tools:
+                if item.get("status", "completed") != "completed":
+                    raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+                try:
+                    call = FunctionCall.model_validate(
+                        {key: item.get(key) for key in ("call_id", "name", "arguments")}
+                    )
+                except ValidationError:
+                    raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE") from None
+                if len(call.arguments.encode()) > 8192 or len(calls) >= 32:
+                    raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                calls.append(call)
                 continue
             if item.get("type") != "message" or item.get("role") != "assistant":
                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
@@ -252,6 +290,14 @@ class ResponsesClient:
                 texts.append(part["text"])
         if "".join(texts) != answer:
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+        if (calls and answer) or (not calls and not answer.strip()):
+            raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+        if len({call.call_id for call in calls}) != len(calls):
+            raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+        if calls:
+            attempt.output_tokens = sum(
+                len(json.dumps(call.input_item()).encode()) for call in calls
+            )
         returned_model = response.get("model")
         if isinstance(returned_model, str) and re.fullmatch(
             r"[a-zA-Z0-9_./:@+-]{1,200}", returned_model
@@ -268,3 +314,4 @@ class ResponsesClient:
                 attempt.output_tokens = cast(int, values[1])
                 attempt.usage_source = "provider"
         attempt.finish_reason = "completed"
+        return tuple(calls)

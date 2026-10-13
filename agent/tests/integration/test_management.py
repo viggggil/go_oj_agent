@@ -233,7 +233,7 @@ async def test_http_concurrent_save_pagination_and_invalid_skill(
     )
     assert sorted(response.status_code for response in changed) == [200, 409, 409, 409]
     invalid_skills: list[dict[str, Any]] = [
-        {"execution_mode": "react"},
+        {"execution_mode": "plan_execute"},
         {"allowed_tools": ["not_registered"]},
         {"budget": {"max_model_calls": 0}},
         {"prompt_id": str(uuid4())},

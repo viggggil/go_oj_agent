@@ -293,11 +293,10 @@
     try {
       const { data } = await chatCatalog.skills(key, controller.signal)
       if (controller.signal.aborted) return
-      skills.value = data.items.filter((item) => item.execution_mode === 'direct')
+      skills.value = data.items.filter((item) => ['direct', 'react'].includes(item.execution_mode))
       selectedSkill.value =
         skills.value.find((item) => item.key === data.default_skill_key)?.key || ''
-      if (!selectedSkill.value)
-        catalogError.value = '此 Agent 没有可用于当前运行时的默认 direct Skill。'
+      if (!selectedSkill.value) catalogError.value = '此 Agent 没有可用于当前运行时的默认 Skill。'
     } catch (error) {
       if (!controller.signal.aborted) catalogError.value = directoryError(error)
     } finally {

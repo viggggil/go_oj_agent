@@ -44,7 +44,29 @@ async def responses(request: Request):
     if body.get('store') is not False or body.get('model') != 'deepseek-v4-flash':
         return JSONResponse({'error': 'invalid config'}, status_code=400)
     completed.clear()
-    message = body['input'][-1]['content']
+    last = body['input'][-1]
+    message = last.get('content', '')
+    if message in {'PR3 read problem', 'PR3 denied problem'} or last.get('type') == 'function_call_output':
+        if body.get('parallel_tool_calls') is not False or [tool['name'] for tool in body.get('tools', [])] != ['get_problem']:
+            return JSONResponse({'error': 'wrong tools'}, status_code=400)
+        if last.get('type') == 'function_call_output':
+            if last.get('call_id') != 'call_read_problem' or body['input'][-2].get('name') != 'get_problem':
+                return JSONResponse({'error': 'wrong tool output binding'}, status_code=400)
+            result = json.loads(last['output'])
+            text = '已读取题目，证据数字 739216' if result.get('ok') and '739216' in last['output'] else '无权读取题目'
+            if not result.get('ok') and result.get('error_code') != 'TOOL_PERMISSION_DENIED':
+                return JSONResponse({'error': 'unexpected tool failure'}, status_code=400)
+            async def answer():
+                yield frame('response.output_text.delta', delta=text, output_index=0)
+                yield frame('response.completed', response={'status': 'completed', 'output': [
+                    {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': text}]}]})
+            return StreamingResponse(answer(), media_type='text/event-stream')
+        async def call():
+            yield frame('response.function_call_arguments.delta', delta='{"problem_id":', output_index=0)
+            yield frame('response.completed', response={'status': 'completed', 'output': [
+                {'type': 'function_call', 'name': 'get_problem', 'call_id': 'call_read_problem',
+                 'arguments': json.dumps({'problem_id': 42 if message == 'PR3 denied problem' else 41}), 'status': 'completed'}]})
+        return StreamingResponse(call(), media_type='text/event-stream')
     if message in {'PR2 context followup', 'PR2 browser followup'}:
         first = 'PR2 remember 314159' if message == 'PR2 context followup' else 'PR9 browser original'
         expected = [

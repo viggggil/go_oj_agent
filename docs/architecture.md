@@ -674,7 +674,21 @@ Responses input 按 user/assistant 角色传递历史，当前问题只追加一
 是上下文来源，不引入供应商托管会话、持久化 checkpointer 或长期记忆。
 配置版本仍由当前 Run 固定，新对话历史为空；同会话 Agent key 归属规则不变。
 
-真实模型不调用业务 Tools；ReAct、工具循环和完整 Eval/观测后续交付。运行摘要和人工 smoke 样例只是最小验证基础。
+### Issue #162 PR3：有界只读工具循环
+
+react 图沿 generate → tools → check_budget → generate 循环，最终回答经过 validate_answer → END。
+direct 路径保持不调用工具。prepare 固定可用 schema 与会话输入；工具是 Agent/Skill 白名单、
+Registry enabled/read 及可信角色策略的交集，执行器再次校验，业务数据仅经带委托 JWT 的 gRPC 访问。
+
+每个 Run 独立持有有界 ToolSession。模型函数调用与结果只在本次会话内按 call_id 成对保存，
+不进入长期历史；供应商 reasoning 不回传、不持久化。输入估算包含工具 schema、调用与结果开销，
+模型尝试和工具次数累计限制；没有统一节点重试、写工具、自动 Skill 路由或 checkpointer。
+工具结果视为不可信证据，模型最终回答可引用业务内容，SSE 仅提供短状态与回答文本。
+取消沿节点传播关闭上游与工具等待，RunService 仍管理持久化和唯一终态。
+
+开发 Compose 默认启用业务只读工具（可设置 AGENT_BUSINESS_TOOLS_ENABLED=false），
+页面必须给 Agent 和 react Skill 同时勾选工具。完整数据集 Eval/质量观测仍待后续实现；
+当前以协议/授权/预算/取消回归和三个 su8 模型 smoke 验证最小行为。
 
 ### 10.2 Tool Registry 与策略
 
