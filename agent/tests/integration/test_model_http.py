@@ -99,3 +99,48 @@ async def test_gateway_partial_failure_has_no_done_or_successful_answer() -> Non
             assert count == 0
     finally:
         await engine.dispose()
+
+
+async def test_gateway_disconnect_cancels_graph_and_provider_without_saving_partial_answer() -> (
+    None
+):
+    import asyncio
+    from time import monotonic
+
+    gateway, mock = urls()
+    engine = create_async_engine(os.environ["AGENT_TEST_DATABASE_URL"])
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            async with http.stream(
+                "POST",
+                gateway + "/api/v1/agent/chat",
+                json={"message": "wait-for-cancel"},
+                headers={"Authorization": "Bearer " + user_token(7203)},
+            ) as response:
+                assert response.status_code == 200
+                run_id = response.headers["x-agent-run-id"]
+                async for line in response.aiter_lines():
+                    if line.startswith("data: ") and json.loads(line[6:])["type"] == "token":
+                        break
+                else:
+                    pytest.fail("未收到首段回答")
+            # 模拟浏览器 Abort；等待 Gateway → 图 → Provider 关闭与数据库终态收敛。
+            deadline = monotonic() + 5
+            while True:
+                async with engine.connect() as connection:
+                    status = await connection.scalar(
+                        text("SELECT status FROM agent_runs WHERE id=:id"), {"id": run_id}
+                    )
+                cancelled = (await http.get(mock + "/cancelled")).json()["cancelled"]
+                if status == "CANCELLED" and cancelled:
+                    break
+                assert monotonic() < deadline, (status, cancelled)
+                await asyncio.sleep(0.05)
+        async with engine.connect() as connection:
+            count = await connection.scalar(
+                text("SELECT COUNT(*) FROM agent_messages WHERE run_id=:id AND role='assistant'"),
+                {"id": run_id},
+            )
+        assert count == 0
+    finally:
+        await engine.dispose()

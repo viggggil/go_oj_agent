@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 app = FastAPI()
 completed = asyncio.Event()
+cancelled = asyncio.Event()
 
 
 def frame(kind, **values):
@@ -22,6 +23,11 @@ async def health():
 @app.get('/completed')
 async def status():
     return {'completed': completed.is_set()}
+
+
+@app.get('/cancelled')
+async def cancellation_status():
+    return {'cancelled': cancelled.is_set()}
 
 
 @app.post('/release')
@@ -39,6 +45,8 @@ async def responses(request: Request):
         return JSONResponse({'error': 'invalid config'}, status_code=400)
     completed.clear()
     message = body['input'][0]['content']
+    if message == 'wait-for-cancel':
+        cancelled.clear()
     if message == 'PR7 normal chat' and not all(
         value in body.get('instructions', '')
         for value in ['PR7 测试基础提示', 'PR7 测试 Skill 提示']
@@ -49,18 +57,22 @@ async def responses(request: Request):
     if message == 'PR9 browser rebound' and ('新提示' not in body.get('instructions', '') or 'PR8 浏览器真实配置提示' in body.get('instructions', '')):
         return JSONResponse({'error': 'wrong rebound binding'}, status_code=400)
     async def events():
-        yield frame('response.output_text.delta', delta='中文算法回答', output_index=0)
-        if message == 'wait-for-release':
-            await completed.wait()
-        else:
-            completed.set()
-        if message == 'fail-after-token':
-            yield frame('response.failed', response={'status': 'failed', 'error': {'message': 'private-api-key'}})
-            return
-        yield frame('response.completed', response={
-            'status': 'completed', 'model': body['model'],
-            'output': [{'type': 'message', 'role': 'assistant', 'content': [
-                {'type': 'output_text', 'text': '中文算法回答'}]}],
-            'usage': {'input_tokens': 300, 'output_tokens': 8}
-        })
+        try:
+            yield frame('response.output_text.delta', delta='中文算法回答', output_index=0)
+            if message in {'wait-for-release', 'wait-for-cancel'}:
+                await completed.wait()
+            else:
+                completed.set()
+            if message == 'fail-after-token':
+                yield frame('response.failed', response={'status': 'failed', 'error': {'message': 'private-api-key'}})
+                return
+            yield frame('response.completed', response={
+                'status': 'completed', 'model': body['model'],
+                'output': [{'type': 'message', 'role': 'assistant', 'content': [
+                    {'type': 'output_text', 'text': '中文算法回答'}]}],
+                'usage': {'input_tokens': 300, 'output_tokens': 8}
+            })
+        finally:
+            if message == 'wait-for-cancel':
+                cancelled.set()
     return StreamingResponse(events(), media_type='text/event-stream')
