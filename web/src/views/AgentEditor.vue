@@ -74,16 +74,19 @@
           </button>
         </div>
       </section>
+      <p
+        v-if="resource === 'skills' && (current?.content as SkillContent)?.prompt_id"
+        class="notice"
+      >
+        此版本使用历史 Prompt。保存会将其正文复制为 Skill 任务说明，并改为继承 Agent
+        运行限制；旧版本和现有 Agent 绑定保留。
+      </p>
       <form class="agent-editor" @submit.prevent="save">
         <fieldset class="agent-form-body" :disabled="busy">
-          <label
-            >稳定标识<input
-              v-model="key"
-              :disabled="!isNew"
-              maxlength="64"
-              required
-              pattern="[a-z][a-z0-9_]{1,63}"
-          /></label>
+          <details v-if="!isNew" class="agent-version-meta">
+            <summary>内部标识</summary>
+            <code>{{ key }}</code>
+          </details>
           <p v-if="expected" class="agent-version-meta">
             表单基于 UUID <code>{{ expected }}</code>
           </p>
@@ -234,6 +237,7 @@
     type Page,
     type Resource,
     type SkillContent,
+    type PromptContent,
     type Summary,
   } from '../agent/types'
   import {
@@ -303,6 +307,24 @@
       if (alive()) await router.replace('/agent/chat')
     }
   }
+  async function editableContent(body: Content, fallbackName: string): Promise<Content> {
+    const value = copy(body)
+    if (resource === 'prompts') {
+      ;(value as PromptContent).name ||= fallbackName
+    } else if (resource === 'skills') {
+      const skill = value as SkillContent
+      if (!skill.text && skill.prompt_id) {
+        const { data } = await agentApi.version('prompts', skill.prompt_id, life.signal)
+        const prompt = data.configuration.content as PromptContent
+        skill.text = prompt.text
+        skill.variables = [...prompt.variables]
+      }
+      skill.description ||= ''
+      delete skill.prompt_id
+      delete skill.budget
+    }
+    return value
+  }
   async function bindingDetails() {
     const selected = content.value as Partial<AgentContent>,
       pairs: [Resource, string][] = []
@@ -353,14 +375,14 @@
       if (
         typeof createdId === 'string' &&
         /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(createdId) &&
-        ((createdKind === 'prompts' && resource !== 'prompts') ||
+        ((createdKind === 'prompts' && resource === 'agents') ||
           (createdKind === 'skills' && resource === 'agents'))
       ) {
         const data = await agentApi.version(createdKind, createdId, life.signal)
         if (!alive()) return
         const cfg = data.data.configuration
         if (cfg.archived || cfg.disabled) throw new Error('Returned version unavailable')
-        if (createdKind === 'prompts') (content.value as SkillContent).prompt_id = cfg.id
+        if (createdKind === 'prompts') (content.value as AgentContent).prompt_id = cfg.id
         else {
           const value = content.value as AgentContent
           await bindingDetails()
@@ -382,6 +404,9 @@
         await router.replace({ path, query })
         if (!alive()) return
       }
+      content.value = await editableContent(content.value, current.value?.key || '')
+      if (!alive()) return
+      if (!savedDraft) checkpoint()
       await bindingDetails()
       if (!alive()) return
       ready.value = true
@@ -422,7 +447,7 @@
       notice.value += '；服务器已存在后续版本，表单输入保留。'
       conflict.value = data.configuration
     } else if (replaceBody) {
-      content.value = copy(data.configuration.content)
+      content.value = await editableContent(data.configuration.content, data.configuration.key)
       checkpoint()
       await bindingDetails()
     }
@@ -458,7 +483,7 @@
         life.signal,
       )
       if (!alive()) return
-      key.value = savedKey
+      key.value = data.configuration.key
       if (returnTo.value) {
         skipLeave = true
         await router.push({
@@ -467,7 +492,7 @@
         })
       } else if (isNew) {
         skipLeave = true
-        await router.replace('/agent/' + resource + '/' + savedKey + '/edit')
+        await router.replace('/agent/' + resource + '/' + data.configuration.key + '/edit')
       } else await refreshAfterWrite(data.configuration, true)
     } catch (cause) {
       await handleError(cause)
@@ -501,7 +526,7 @@
     }
     current.value = conflict.value
     expected.value = conflict.value.id
-    content.value = copy(conflict.value.content)
+    content.value = await editableContent(conflict.value.content, conflict.value.key)
     conflict.value = undefined
     error.value = ''
     checkpoint()

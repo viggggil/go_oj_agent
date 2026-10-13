@@ -164,12 +164,110 @@ async def check():
         assert (await store.resolve('prompt', prompt.key)).disabled
         async with db.engine.connect() as c:
             assert await c.scalar(select(func.count()).select_from(agent_config_resources)) == 1
+
+        # 无外网/计费的真实配置准备：三个模型、内置 Skill、重启幂等和停用保留。
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from app.credential_cli import init_keyring
+        from app.development_bootstrap import bootstrap_su8, SU8_MODELS
+        from app.core.provider_policy import ProviderPolicy
+        from app.core.runtime_config import DatabaseConfigReader
+        from app.models.runtime import ChatRequest
+        from app.storage.schema import agent_credentials
+        with TemporaryDirectory() as directory:
+            ring, key_file = Path(directory) / 'keyring.json', Path(directory) / 'su8.key'
+            init_keyring(ring)
+            key_file.write_text('infra-test-key')
+            key_file.chmod(0o600)
+            real_settings = settings.model_copy(update={
+                'runtime_mode':'model', 'default_agent_key':'su8_learning_assistant',
+                'credential_keyring_file':ring,
+                'provider_allowed_origins':('https://www.su8.codes',),
+            })
+            await bootstrap_su8(real_settings, key_file=key_file)
+            real_store = ConfigurationStore(db.engine, ToolRegistry(), provider_policy=ProviderPolicy(real_settings))
+            service = ManagementService(real_store, real_settings, ToolRegistry())
+            models = await service.models(PageQuery())
+            assert {v['model'] for v in models['items']} == set(SU8_MODELS)
+            assert all(v['verbosity']=='high' for v in models['items'])
+            root = await real_store.resolve('agent', 'su8_learning_assistant')
+            reader = DatabaseConfigReader(real_store, real_settings, ToolRegistry())
+            snapshot = await reader.read(ChatRequest(message='hello'), principal)
+            assert snapshot.skill_prompt_text and snapshot.skill_prompt_id is None
+            assert not snapshot.provider_config['text_verbosity_supported']
+            async with db.engine.connect() as c:
+                version_count = await c.scalar(select(func.count()).select_from(agent_config_versions))
+                encrypted = await c.scalar(select(agent_credentials.c.encrypted_secret).where(agent_credentials.c.name=='su8'))
+                assert b'infra-test-key' not in encrypted
+            await bootstrap_su8(real_settings, key_file=key_file)
+            assert (await real_store.resolve('agent', root.key)).id == root.id
+            async with db.engine.connect() as c:
+                assert await c.scalar(select(func.count()).select_from(agent_config_versions)) == version_count
+            selected = models['items'][0]
+            await real_store.change_state(ConfigWrite(kind='model', key=selected['key'], actor_id=1,
+                request_id=str(uuid4()), expected_id=selected['id']), 'disable')
+            try:
+                await bootstrap_su8(real_settings, key_file=key_file)
+            except Exception as error:
+                assert error.code == 'AGENT_CONFIGURATION_REFERENCE_INVALID'
+            else:
+                raise AssertionError('不能恢复停用的模型')
+            assert (await real_store.resolve('model', selected['key'])).disabled
     finally:
         await db.close()
 
 asyncio.run(check())
 print('默认页面配置与重启保留检查通过。')
 PY
+
+# 旧默认宿主 keyring 首次导入新卷，DB 凭据继续解密；重启不覆盖主密钥。
+mkdir -p "$test_artifacts_dir/legacy-model-keys" "$test_artifacts_dir/empty-model-keys"
+python3 - "$test_artifacts_dir/legacy-model-keys" <<'PY_KEYS'
+import base64, json, os, sys
+from pathlib import Path
+path = Path(sys.argv[1]) / 'keyring.json'
+path.write_text(json.dumps({'active':'legacy', 'keys':{'legacy':base64.b64encode(os.urandom(32)).decode()}}))
+path.chmod(0o600)
+PY_KEYS
+compose run --rm --no-deps -T \
+    --volume "$test_artifacts_dir/legacy-model-keys:/legacy-model-keys:ro" \
+    --volume "$test_artifacts_dir/empty-model-keys:/host-model-keys:ro" agent-model-key-init
+compose run --rm --no-deps -T --user 0:0 \
+    -e AGENT_DATABASE_URL=mysql+asyncmy://oj_agent:preserved-test-password@mysql:3306/oj_agent \
+    --volume "$test_artifacts_dir/legacy-model-keys:/legacy-model-keys:ro" \
+    --entrypoint python agent-service - <<'PY_CREDENTIAL'
+import asyncio
+from pathlib import Path
+from uuid import uuid4
+from pydantic import SecretStr
+from app.core.credentials import CredentialCipher
+from app.core.database import DatabaseProbe
+from app.core.settings import load_settings
+from app.storage.credentials import CredentialStore, CredentialWrite
+
+async def check():
+    db = DatabaseProbe(load_settings())
+    try:
+        old = CredentialStore(db.engine, CredentialCipher.from_file(Path('/legacy-model-keys/keyring.json')))
+        credential = await old.create(CredentialWrite(actor_id=1, request_id=str(uuid4())),
+            '旧部署凭据', SecretStr('legacy-integration-key'))
+        new = CredentialStore(db.engine, CredentialCipher.from_file(Path('/run/model-keys/keyring.json')))
+        assert (await new.read(credential['id'])).get_secret_value() == 'legacy-integration-key'
+    finally:
+        await db.close()
+asyncio.run(check())
+print('旧部署凭据升级后仍可解密。')
+PY_CREDENTIAL
+# 清除旧来源后再次初始化，也不能生成新主密钥。
+compose run --rm --no-deps -T \
+    --volume "$test_artifacts_dir/empty-model-keys:/legacy-model-keys:ro" \
+    --volume "$test_artifacts_dir/empty-model-keys:/host-model-keys:ro" agent-model-key-init
+compose run --rm --no-deps -T --entrypoint python agent-service - <<'PY_REUSE'
+import json
+from pathlib import Path
+assert json.loads(Path('/run/model-keys/keyring.json').read_text())['active'] == 'legacy'
+print('主密钥重启复用检查通过。')
+PY_REUSE
 
 # DDL 中断留下的部分结构必须明确失败，不能盲目重跑或删除。
 sql <<< 'DROP DATABASE oj_agent; CREATE DATABASE oj_agent; CREATE TABLE oj_agent.agent_runs (id INT PRIMARY KEY); INSERT INTO oj_agent.agent_runs VALUES (7);'

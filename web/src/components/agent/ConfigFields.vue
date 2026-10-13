@@ -1,4 +1,5 @@
 <template>
+  <label>名称<input v-model="named.name" required maxlength="128" /></label>
   <template v-if="resource === 'prompts'">
     <label
       >正文<textarea
@@ -9,8 +10,8 @@
         spellcheck="false"
       ></textarea>
     </label>
-    <fieldset>
-      <legend>模板变量</legend>
+    <details>
+      <summary>高级设置：模板变量</summary>
       <div class="agent-checks">
         <label v-for="variable in ['language', 'problem_id', 'submission_id']" :key="variable"
           ><input v-model="prompt.variables" type="checkbox" :value="variable" />{{
@@ -18,31 +19,41 @@
           }}</label
         >
       </div>
-    </fieldset>
+    </details>
   </template>
   <template v-else>
-    <label>名称<input v-model="named.name" required maxlength="128" /></label>
-    <fieldset>
-      <legend>基础 Prompt</legend>
-      <VersionPicker
-        label="Prompt"
-        resource="prompts"
-        :model-value="named.prompt_id ? [named.prompt_id] : []"
-        :initial="localBindings"
-        @bindings="mergeBindings"
-        @update:model-value="named.prompt_id = $event[0] || ''"
-        @create="$emit('create', 'prompts')"
-      />
-    </fieldset>
     <template v-if="resource === 'skills'">
+      <label>简短描述<input v-model="skill.description" maxlength="512" /></label>
       <label
-        >执行模式<select v-model="skill.execution_mode">
-          <option value="direct">direct</option>
-          <option value="react" disabled>react（不可用）</option>
-        </select></label
-      >
+        >任务说明<textarea
+          v-model="skill.text"
+          class="agent-prompt"
+          required
+          maxlength="64000"
+          spellcheck="false"
+        ></textarea>
+      </label>
+      <p class="muted">说明这项任务的目标、回答方式和要求；运行限制继承 Agent。</p>
+      <fieldset v-if="skill.variables?.length">
+        <legend>从历史 Prompt 保留的模板变量</legend>
+        <label v-for="variable in skill.variables" :key="variable">
+          <input v-model="skill.variables" type="checkbox" :value="variable" />{{ variable }}
+        </label>
+      </fieldset>
     </template>
     <template v-else>
+      <fieldset>
+        <legend>基础 Prompt</legend>
+        <VersionPicker
+          label="Prompt"
+          resource="prompts"
+          :model-value="agent.prompt_id ? [agent.prompt_id] : []"
+          :initial="localBindings"
+          @bindings="mergeBindings"
+          @update:model-value="agent.prompt_id = $event[0] || ''"
+          @create="$emit('create', 'prompts')"
+        />
+      </fieldset>
       <fieldset>
         <legend>绑定 Skill</legend>
         <VersionPicker
@@ -85,74 +96,81 @@
         /></label>
       </div>
     </template>
-    <fieldset>
-      <legend>工具白名单</legend>
-      <p class="muted agent-caption">当前运行时尚未执行工具调用；白名单用于保存配置。</p>
-      <p v-if="toolError" class="error" role="alert">
-        {{ toolError }} <button class="link" type="button" @click="loadTools">重试</button>
-      </p>
-      <p v-if="!tools.length && !toolError" class="muted">
-        {{ toolsLoading ? '加载中...' : '无可用工具' }}
-      </p>
-      <div class="agent-tool-list">
-        <label v-for="tool in tools" :key="tool.name"
-          ><input
-            v-model="named.allowed_tools"
-            type="checkbox"
-            :value="tool.name"
-            :disabled="
-              !named.allowed_tools.includes(tool.name) &&
-              (!tool.enabled || tool.side_effect !== 'read')
-            "
-          /><span
-            ><strong>{{ tool.name }}</strong
-            ><span class="agent-caption">{{ tool.description }}</span
-            ><span class="agent-caption muted"
-              >{{ tool.read_scope }} · {{ tool.sensitivity }}</span
-            ></span
+    <details>
+      <summary>高级设置</summary>
+      <fieldset>
+        <legend>工具白名单</legend>
+        <p class="muted agent-caption">当前运行时尚未执行工具调用；白名单用于保存配置。</p>
+        <p v-if="toolError" class="error" role="alert">
+          {{ toolError }} <button class="link" type="button" @click="loadTools">重试</button>
+        </p>
+        <p v-if="!tools.length && !toolError" class="muted">
+          {{ toolsLoading ? '加载中...' : '无可用工具' }}
+        </p>
+        <div class="agent-tool-list">
+          <label v-for="tool in tools" :key="tool.name"
+            ><input
+              v-model="toolConfig.allowed_tools"
+              type="checkbox"
+              :value="tool.name"
+              :disabled="
+                !toolConfig.allowed_tools.includes(tool.name) &&
+                (!tool.enabled || tool.side_effect !== 'read')
+              "
+            /><span
+              ><strong>{{ tool.name }}</strong
+              ><span class="agent-caption">{{ tool.description }}</span
+              ><span class="agent-caption muted"
+                >{{ tool.read_scope }} · {{ tool.sensitivity }}</span
+              ></span
+            >
+            <details>
+              <summary>Schema</summary>
+              <pre>{{
+                JSON.stringify({ input: tool.input_schema, output: tool.output_schema }, null, 2)
+              }}</pre>
+            </details></label
           >
-          <details>
-            <summary>Schema</summary>
-            <pre>{{
-              JSON.stringify({ input: tool.input_schema, output: tool.output_schema }, null, 2)
-            }}</pre>
-          </details></label
-        >
-        <div
-          v-for="name in named.allowed_tools.filter(
-            (value) => !tools.some((tool) => tool.name === value),
-          )"
-          :key="name"
-          class="selected-binding"
-        >
-          <span>{{ name }} · 未注册</span
-          ><button
-            class="agent-icon secondary"
-            type="button"
-            :title="`移除 ${name}`"
-            :aria-label="`移除 ${name}`"
-            @click="named.allowed_tools = named.allowed_tools.filter((value) => value !== name)"
+          <div
+            v-for="name in toolConfig.allowed_tools.filter(
+              (value) => !tools.some((tool) => tool.name === value),
+            )"
+            :key="name"
+            class="selected-binding"
           >
-            <X :size="16" />
-          </button>
+            <span>{{ name }} · 未注册</span
+            ><button
+              class="agent-icon secondary"
+              type="button"
+              :title="`移除 ${name}`"
+              :aria-label="`移除 ${name}`"
+              @click="
+                toolConfig.allowed_tools = toolConfig.allowed_tools.filter(
+                  (value) => value !== name,
+                )
+              "
+            >
+              <X :size="16" />
+            </button>
+          </div>
         </div>
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>运行预算</legend>
-      <div class="agent-field-grid">
-        <label v-for="[field, label, min, max, step] in budgetFields" :key="field"
-          >{{ label
-          }}<input
-            v-model.number="named.budget[field]"
-            type="number"
-            :min="min"
-            :max="max"
-            :step="step"
-            required
-        /></label>
-      </div>
-    </fieldset>
+      </fieldset>
+      <fieldset v-if="resource === 'agents'">
+        <legend>运行限制</legend>
+        <div class="agent-field-grid">
+          <label v-for="[field, label, min, max, step] in budgetFields" :key="field"
+            >{{ label
+            }}<input
+              v-model.number="agent.budget[field]"
+              type="number"
+              :min="min"
+              :max="max"
+              :step="step"
+              required
+          /></label>
+        </div>
+      </fieldset>
+    </details>
   </template>
 </template>
 <script setup lang="ts">
@@ -182,7 +200,8 @@
   const prompt = computed(() => props.content as PromptContent),
     skill = computed(() => props.content as SkillContent),
     agent = computed(() => props.content as AgentContent),
-    named = computed(() => props.content as SkillContent | AgentContent)
+    named = computed(() => props.content as SkillContent | AgentContent | PromptContent),
+    toolConfig = computed(() => props.content as SkillContent | AgentContent)
   const tools = ref<Tool[]>([]),
     toolError = ref(''),
     toolsLoading = ref(false),

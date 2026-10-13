@@ -8,3 +8,8 @@ services:
   agent-db-init:
     environment:
       MYSQL_ROOT_PASSWORD: infra-test-root-password
+
+  agent-service:
+    environment:
+      AGENT_RUNTIME_MODE: langgraph_fake
+      AGENT_DEFAULT_AGENT_KEY: learning_assistant

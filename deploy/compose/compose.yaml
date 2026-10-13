@@ -411,22 +411,36 @@ services:
         condition: service_healthy
     restart: "no"
 
+  agent-model-key-init:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    user: "0:0"
+    entrypoint: ["python", "/bootstrap/agent-model-key-init.py"]
+    volumes:
+      - ./agent-model-key-init.py:/bootstrap/agent-model-key-init.py:ro
+      - ./model-keys:/legacy-model-keys:ro
+      - "${AGENT_MODEL_KEY_DIR:-${HOME}/.config/oj-agent}:/host-model-keys:ro"
+      - agent-model-keys:/run/model-keys
+    restart: "no"
+
   agent-service:
     build:
       context: ../../agent
       dockerfile: Dockerfile
     entrypoint: ["/bin/sh", "-c"]
-    command: ["python /bootstrap/agent-dev-init.py && exec python -m app"]
+    command: ["exec python /bootstrap/agent-dev-init.py --serve"]
     environment:
       AGENT_ENVIRONMENT: development
       AGENT_HOST: 0.0.0.0
       AGENT_CHAT_ENABLED: true
       AGENT_ADMIN_ENABLED: "${AGENT_ADMIN_ENABLED:-true}"
       AGENT_ADMIN_PROVIDER_KEY: "${AGENT_ADMIN_PROVIDER_KEY:-su8}"
-      AGENT_RUNTIME_MODE: "${AGENT_RUNTIME_MODE:-langgraph_fake}"
+      AGENT_RUNTIME_MODE: "${AGENT_RUNTIME_MODE:-auto}"
       AGENT_CONFIG_MODE: "${AGENT_CONFIG_MODE:-database}"
+      AGENT_BOOTSTRAP_SU8: "${AGENT_BOOTSTRAP_SU8:-true}"
       AGENT_BOOTSTRAP_DEMO: "${AGENT_BOOTSTRAP_DEMO:-true}"
-      AGENT_DEFAULT_AGENT_KEY: "${AGENT_DEFAULT_AGENT_KEY:-learning_assistant}"
+      AGENT_DEFAULT_AGENT_KEY: "${AGENT_DEFAULT_AGENT_KEY:-}"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
       AGENT_GATEWAY_KEY_ID: gateway-internal-2026-09
@@ -437,7 +451,7 @@ services:
       AGENT_AGENT_SUBJECT: agent-service
       AGENT_PROBLEM_SERVICE_ENDPOINT: problem-service:9002
       AGENT_JUDGE_SERVICE_ENDPOINT: judge-service:9003
-      AGENT_MAX_RUN_SECONDS: 30
+      AGENT_MAX_RUN_SECONDS: "${AGENT_MAX_RUN_SECONDS:-120}"
       AGENT_SSE_HEARTBEAT_SECONDS: 5
       AGENT_MAX_CONCURRENT_RUNS: 8
       AGENT_CREDENTIAL_KEYRING_FILE: /run/model-keys/keyring.json
@@ -447,8 +461,10 @@ services:
       - ../../agent/examples/learning-assistant.json:/bootstrap/learning-assistant.json:ro
       - agent-auth-public:/run/agent-auth:ro
       - agent-auth-private:/run/agent-auth-private:ro
-      - "${AGENT_MODEL_KEY_DIR:-./model-keys}:/run/model-keys:ro"
+      - agent-model-keys:/run/model-keys:ro
     depends_on:
+      agent-model-key-init:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       agent-db-init:
@@ -477,6 +493,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  agent-model-keys:
   mysql-data:
   redis-data:
   minio-data:

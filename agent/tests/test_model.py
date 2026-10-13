@@ -106,7 +106,10 @@ def client_for(handler: Any) -> ResponsesClient:
     )
 
 
-async def test_first_token_precedes_completion_and_history_never_leaks() -> None:
+@pytest.mark.parametrize("native_verbosity", [True, False])
+async def test_first_token_precedes_completion_and_history_never_leaks(
+    native_verbosity: bool,
+) -> None:
     gate = asyncio.Event()
     stream = Stream([frame(delta()), frame(complete())], gate=gate)
     calls: list[dict[str, Any]] = []
@@ -119,11 +122,17 @@ async def test_first_token_precedes_completion_and_history_never_leaks() -> None
 
     client = client_for(handler)
     value = configured()
+    value.config_snapshot["provider_config"]["text_verbosity_supported"] = native_verbosity
+    value.config_snapshot["model_profile"]["verbosity"] = "high"
     iterator = ModelRuntime(client, Credentials()).run(value)
     try:
         assert (await anext(iterator)).type == "thinking"
         token = await asyncio.wait_for(anext(iterator), 1)
         assert token.type == "token" and not gate.is_set()
+        if native_verbosity:
+            assert calls[0]["text"] == {"verbosity": "high"}
+        else:
+            assert "text" not in calls[0] and "回答详尽" in calls[0]["instructions"]
         assert calls[0]["store"] is False and calls[0]["stream"] is True
         assert calls[0]["input"] == [{"role": "user", "content": value.user_message}]
         assert "history-must-not-be-sent" not in json.dumps(calls)

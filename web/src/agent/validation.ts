@@ -8,8 +8,10 @@ import {
 } from './types'
 
 export function validateConfiguration(kind: Resource, key: string, body: Content): string | null {
-  if (!/^[a-z][a-z0-9_]{1,63}$/.test(key))
+  if (key && !/^[a-z][a-z0-9_]{1,63}$/.test(key))
     return '标识须为 2–64 位小写字母、数字或下划线，以字母开头'
+  const named = body as { name?: string }
+  if (!named.name?.trim() || [...named.name].length > 128) return '名称不能为空，最多 128 个字符'
   if (kind === 'prompts') {
     const prompt = body as PromptContent
     if (!prompt.text.trim() || [...prompt.text].length > 32000)
@@ -41,14 +43,30 @@ export function validateConfiguration(kind: Resource, key: string, body: Content
   }
   const item = body as SkillContent | AgentContent
   if (!item.name.trim() || [...item.name].length > 128) return '名称不能为空，最多 128 个字符'
-  if (!item.prompt_id) return '请选择 Prompt 版本'
   if (
     new Set(item.allowed_tools).size !== item.allowed_tools.length ||
     item.allowed_tools.length > 32
   )
     return '工具白名单不能重复，最多 32 个'
+  if (kind === 'skills') {
+    const skill = body as SkillContent
+    if (!skill.text?.trim() || [...skill.text].length > 32000)
+      return '任务说明不能为空，最多 32000 个字符'
+    if ([...(skill.description || '')].length > 512) return '描述最多 512 个字符'
+    if (skill.variables != null) {
+      const error = validateConfiguration('prompts', '', {
+        name: skill.name,
+        text: skill.text,
+        variables: skill.variables,
+      })
+      if (error) return error
+    }
+    return skill.execution_mode === 'direct' ? null : '当前模型仅支持 direct'
+  }
+  const agent = body as AgentContent
+  if (!agent.prompt_id) return '请选择 Prompt 版本'
   for (const [field, label, min, max, step] of budgetFields) {
-    const value = item.budget[field]
+    const value = agent.budget[field]
     if (
       !Number.isFinite(value) ||
       value < min ||
@@ -57,9 +75,6 @@ export function validateConfiguration(kind: Resource, key: string, body: Content
     )
       return `${label}超出允许范围`
   }
-  if (kind === 'skills')
-    return (body as SkillContent).execution_mode === 'direct' ? null : '当前模型仅支持 direct'
-  const agent = body as AgentContent
   if (!agent.model_profile_id) return '请选择模型版本'
   if (new Set(agent.skill_ids).size !== agent.skill_ids.length) return 'Skill 版本不能重复'
   if (!agent.is_test && agent.test_expires_at !== null) return '普通 Agent 不能设置测试到期时间'

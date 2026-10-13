@@ -159,6 +159,42 @@ async def test_http_prompt_crud_history_replay_and_conflict(
         assert [row.actor_id for row in rows] == [7]
 
 
+async def test_generated_keys_inline_skill_replay_and_name_search(
+    management_http: tuple[httpx.AsyncClient, rsa.RSAPrivateKey, Settings],
+) -> None:
+    http, key, _ = management_http
+    name = "简化配置_" + uuid4().hex
+    for kind, content in (
+        ("prompts", {"name": name, "text": "基础规则"}),
+        ("skills", {"name": name, "description": "直接解释", "text": "任务说明含 {普通括号}"}),
+    ):
+        path, request_id = BASE + "/" + kind, str(uuid4())
+        first = await request(http, key, "POST", path, {"content": content}, request_id=request_id)
+        assert first.status_code == 200, first.text
+        config = first.json()["configuration"]
+        assert config["key"].startswith(kind[:-1] + "_")
+        retry = await request(http, key, "POST", path, {"content": content}, request_id=request_id)
+        assert retry.json()["configuration"]["id"] == config["id"]
+        conflict = await request(
+            http,
+            key,
+            "POST",
+            path,
+            {"content": {**content, "name": "修改名称"}},
+            request_id=request_id,
+        )
+        assert conflict.status_code == 409
+        same_name = await request(http, key, "POST", path, {"content": content})
+        assert same_name.status_code == 200
+        assert same_name.json()["configuration"]["key"] != config["key"]
+        listing = await http.get(path + "?search=" + name, headers=headers(key, "GET", path))
+        assert listing.json()["page"]["total"] == 2
+        if kind == "skills":
+            assert config["content"]["prompt_id"] is None and config["content"]["budget"] is None
+        unnamed = await request(http, key, "POST", path, {"content": {"text": "无名称"}})
+        assert unnamed.status_code == 400
+
+
 async def test_http_concurrent_save_pagination_and_invalid_skill(
     management_http: tuple[httpx.AsyncClient, rsa.RSAPrivateKey, Settings],
 ) -> None:

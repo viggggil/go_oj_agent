@@ -108,7 +108,7 @@ class ResponsesClient:
         }
         if profile.temperature is not None:
             body["temperature"] = profile.temperature
-        if profile.verbosity is not None:
+        if profile.verbosity is not None and provider.supports_text_verbosity:
             body["text"] = {"verbosity": profile.verbosity}
         started = monotonic()
         answer = ""

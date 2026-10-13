@@ -84,7 +84,8 @@ PY_CONFIG
 "${uv_command}" run --directory agent --frozen python -m app.config_cli bootstrap \
   --file "${test_key_dir}/model-config.json" --actor-id 7 --request-id model-integration-bootstrap
 export AGENT_TEST_RUNTIME_MODE=model
-compose up --detach --wait --force-recreate agent-service
+# Runtime 阶段切换同时重建 Gateway，清除连向上一容器的连接池；Chat POST 不自动重放。
+compose up --detach --wait --force-recreate agent-service gateway-service
 AGENT_TEST_DATABASE_URL="${AGENT_DATABASE_URL}" \
 AGENT_TEST_GATEWAY_URL="http://127.0.0.1:${AGENT_TEST_GATEWAY_PORT}" \
 AGENT_TEST_MOCK_URL="http://127.0.0.1:${AGENT_TEST_MOCK_PORT}" \

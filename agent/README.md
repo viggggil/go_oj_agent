@@ -1,5 +1,15 @@
 # Agent Service
 
+
+开发 Compose 现在支持从 `~/.config/oj-agent/su8.key` 自动准备单 su8 Provider 与三个模型：
+`deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4.1-flash`。详见
+[`deploy/compose/README.md`](../deploy/compose/README.md)。非 Compose 的 Settings 默认仍为 disabled。
+管理页面只填写资源名称，后端自动生成 key；Skill 直接保存任务说明并默认继承 Agent 预算。
+旧 Skill 的 Prompt 绑定、模板变量和预算保留兼容；编辑保存会复制成内置正文的新版本。
+模型 verbosity=high；su8 不接受 `text.verbosity`，通过回答风格指令应用。Provider 可用
+`text_verbosity_supported` 显式声明兼容能力；省略时 www.su8.codes 默认不支持，其他地址支持。
+请求始终 store=false，不会因字段被拒绝而自动重试或切换模型。
+
 ## 当前已实现：PR1–PR9 基础设施、真实单轮回答与配置管理
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
@@ -71,11 +81,11 @@ uv run --directory agent --frozen python -m app.config_cli bootstrap \
 
 启用配置：`AGENT_CONFIG_MODE=database`、`AGENT_RUNTIME_MODE=model`、`AGENT_CHAT_ENABLED=true`，并配置 `AGENT_DATABASE_URL`、Gateway 公钥及 `AGENT_CREDENTIAL_KEYRING_FILE`。`AGENT_PROVIDER_ALLOWED_ORIGINS` 是部署侧精确协议/主机/端口 allowlist，不能由 Chat 请求或模型修改。开发 mock 需要显式 `AGENT_PROVIDER_ALLOW_PRIVATE_NETWORK=true`；生产禁止该开关。HTTP Client 不读取环境代理、不自动跟随重定向，不在地址中接受内嵌凭据；部署还应限制网络出口，防止可信域名的 DNS/网络配置变化访问内部资源。
 
-Docker 中密钥文件必须对 Agent 的 UID/GID 10001 可读，可使用归属 10001 的 600 文件，或受控组的 640 文件。开发 Compose 挂载 `AGENT_MODEL_KEY_DIR`（默认 `deploy/compose/model-keys`）至 `/run/model-keys`，其中 `keyring.json` 需提前生成。该目录不要存进仓库。
+Docker 中密钥文件必须对 Agent 的 UID/GID 10001 可读，keyring 与 API Key 使用 600。开发 Compose 从 `AGENT_MODEL_KEY_DIR`（默认 `~/.config/oj-agent`）读取 `su8.key`，初始化到独立 `agent-model-keys` 卷。新卷优先导入该目录的 keyring.json，也兼容旧默认 `deploy/compose/model-keys/keyring.json`，否则生成主密钥。已有卷永不覆盖主密钥；自定义旧目录请保持 AGENT_MODEL_KEY_DIR 或将旧 keyring 迁入新目录。密钥文件不要存进仓库。
 
 更换 Key：新建凭据 → 新建引用它的 Provider 版本 → 新建 Model/Agent 引用版本 → 独立撤销旧凭据。配置归档保留历史引用，凭据撤销阻止后续调用/重试；已发出的请求无法保证撤回。`credential_cli get/list` 不提供解密接口，`revoke --id <uuid> --actor-id ... --request-id ...` 可撤销。创建与撤销有请求幂等和并发冲突检查。主密钥轮换时保留旧版本用于解密历史凭据，新凭据使用 active 版本；丢失旧主密钥无法从数据库恢复 Key，需要重新导入，并替换依赖配置。
 
-`verbosity`/`temperature` 可选，未设置时不发送；su8 当前 `deepseek-v4-flash` 拒绝 `text.verbosity=high`（400），所以示例省略 verbosity。Codex 客户端中的 `model_verbosity` 不能直接当作所有模型都支持的 API 参数。
+`verbosity`/`temperature` 可选。su8 当前拒绝 `text.verbosity`（400），示例配置 verbosity=high 并标记不支持该请求字段，运行时改用回答风格指令。其他支持该字段的 Responses Provider 仍发送 text.verbosity。
 
 ### PR6 运行与验证边界
 
@@ -140,7 +150,7 @@ uv run --directory agent --frozen python -m app.config_cli clone-test \
 
 PR6 真实 Direct Answer 执行模型调用/Token 上限；Fake 仍只消费运行时长、字符、事件和
 显式工具禁用预算。自动 Skill 路由和真实工具编排后续实现。
-工具权限为 Registry 已启用只读集合、Agent 和选中 Skill 的交集；预算取系统、Agent、Skill
+工具权限为 Registry 已启用只读集合、Agent 和选中 Skill 的交集；预算取系统、Agent 和旧版 Skill 显式预算
 各字段最小值。分级提示可创建多个独立 Agent，本阶段没有检索和可靠的内容级提示限制。
 
 本阶段提供两个健康端点：

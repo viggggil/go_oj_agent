@@ -58,7 +58,7 @@ export const agentApi = {
         )
       : api.post<{ configuration: Configuration }>(
           `${base}/${kind}`,
-          { key, content },
+          { ...(key ? { key } : {}), content },
           { ...bounded, signal, headers: { 'X-Request-ID': requestId } },
         ),
   action: (

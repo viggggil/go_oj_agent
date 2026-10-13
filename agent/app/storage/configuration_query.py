@@ -157,7 +157,12 @@ class ConfigurationQuery:
         if key is not None:
             filters.append(resources.c.config_key == key)
         if search:
-            filters.append(resources.c.config_key.contains(search, autoescape=True))
+            filters.append(
+                or_(
+                    resources.c.config_key.contains(search, autoescape=True),
+                    json_text(versions, "name").contains(search, autoescape=True),
+                )
+            )
         if not history:
             filters.append(resources.c.current_id == versions.c.id)
             if state == "active":
