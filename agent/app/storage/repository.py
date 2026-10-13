@@ -151,6 +151,39 @@ class AgentStore:
         # 取最近的有界历史，再恢复稳定的时间顺序。
         return [MessageRecord(**row) for row in reversed(rows)]
 
+    async def list_completed_turns(
+        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
+    ) -> list[tuple[str, str]]:
+        """模型上下文只取成功事务中同一 Run 的完整问答；不改变页面消息列表。"""
+        conversation = await self.get_conversation(user_id, conversation_id)
+        users = agent_messages.alias("history_user")
+        answers = agent_messages.alias("history_assistant")
+        query = (
+            select(users.c.content, answers.c.content)
+            .select_from(
+                agent_runs.join(users, users.c.run_id == agent_runs.c.id).join(
+                    answers, answers.c.run_id == agent_runs.c.id
+                )
+            )
+            .where(
+                and_(
+                    agent_runs.c.user_id == user_id,
+                    agent_runs.c.conversation_id == conversation.id,
+                    agent_runs.c.status == "COMPLETED",
+                    users.c.conversation_id == conversation.id,
+                    answers.c.conversation_id == conversation.id,
+                    users.c.role == "user",
+                    answers.c.role == "assistant",
+                    users.c.id < answers.c.id,
+                )
+            )
+            .order_by(users.c.id.desc())
+            .limit(min(max(limit, 1), 20))
+        )
+        async with self._engine.connect() as connection:
+            rows = (await connection.execute(query)).all()
+        return [(row[0], row[1]) for row in reversed(rows)]
+
     async def create_run_with_user_message(
         self,
         *,

@@ -522,9 +522,14 @@ INDEX(run_id)
 敏感源码、Prompt、Tool Result 是否持久化应由后续隐私策略明确；默认避免无必要长期保存。
 
 PR2 实际保存用户输入和完成后的 assistant 答案，不写入 tool 消息、源码对象或原始模型
-Prompt。每条消息上限 32,000 字符，查询最近最多 200 条并按 ID 升序返回；Runtime 使用
-最近 100 条且总历史上限 64,000 字符。表结构见
+Prompt。每条消息上限 32,000 字符，页面消息查询最近最多 200 条并按 ID 升序返回。表结构见
 `migrations/agent/000001_create_agent_runtime.up.sql`；应用不运行自动建表。
+
+Issue #162 PR2 的模型历史查询独立于页面消息列表：在 oj_agent 内按 run_id 关联
+user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 conversation_id，
+按 user 消息 ID 取最近最多 20 个完整轮次，恢复升序后再限制 64,000 字符。
+运行中、失败、取消、中断、tool、run_id=NULL 和缺少 user/assistant 的记录不进入上下文。
+查询复用 conversation 与 run_id 索引，无新 DDL、无回填、不修改历史消息；旧应用可继续读取原表。
 
 ### PR2 `agent_runs` 实际字段与一致性
 

@@ -44,7 +44,18 @@ async def responses(request: Request):
     if body.get('store') is not False or body.get('model') != 'deepseek-v4-flash':
         return JSONResponse({'error': 'invalid config'}, status_code=400)
     completed.clear()
-    message = body['input'][0]['content']
+    message = body['input'][-1]['content']
+    if message in {'PR2 context followup', 'PR2 browser followup'}:
+        first = 'PR2 remember 314159' if message == 'PR2 context followup' else 'PR9 browser original'
+        expected = [
+            {'role': 'user', 'content': first},
+            {'role': 'assistant', 'content': '中文算法回答'},
+            {'role': 'user', 'content': message},
+        ]
+        if body['input'] != expected:
+            return JSONResponse({'error': 'wrong completed history'}, status_code=400)
+    if message == 'PR2 new conversation' and body['input'] != [{'role': 'user', 'content': message}]:
+        return JSONResponse({'error': 'history leaked to new conversation'}, status_code=400)
     if message == 'wait-for-cancel':
         cancelled.clear()
     if message == 'PR7 normal chat' and not all(

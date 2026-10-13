@@ -14,7 +14,7 @@
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，但真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Agent/Skill 选择与 Gateway 流式对话前端。多轮历史上下文、记忆、真实模型调用工具、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Agent/Skill 选择与 Gateway 流式对话前端。长期记忆、真实模型调用工具、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
 Issue #162 的 PR1 将 `AGENT_RUNTIME_MODE=model` 接入真实 LangGraph：
 `START → prepare → check_budget → generate → validate_answer → END`。
@@ -23,7 +23,16 @@ Issue #162 的 PR1 将 `AGENT_RUNTIME_MODE=model` 接入真实 LangGraph：
 避免图内部提前读取供应商流并积压回答。图到达 END 后才给出完成信号，RunService 成功
 保存回答和终态后才对外发送 done。停止、断连与 deadline 关闭图和上游 HTTP 流；
 不启用图节点自动重试、checkpointer、恢复执行或外部 LangSmith tracing。
-本阶段继续只发送本轮消息；多轮上下文、只读工具循环在后续 PR 交付。
+PR2 在 prepare 中接入有界多轮上下文；只读工具循环在后续 PR 交付。
+
+Issue #162 的 PR2 自动读取当前用户、同一会话最近最多 20 个 COMPLETED Run 的完整问答，
+最多 64,000 历史字符，不使用失败、取消、中断、活动 Run、tool 或无 Run 的消息。
+prepare 为当前安全前缀、Agent/Skill 提示词、当前问题和输出预算预留空间，
+再按 UTF-8 字节上界与逐消息开销估算输入，取预算内最近完整轮次并按时间顺序发送。
+超过预算从最旧整轮裁剪，不摘要历史、不截断单条消息；单轮本身超限仍报 AGENT_MODEL_INPUT_LIMIT。
+历史分别使用 user/assistant 角色，不拼入 instructions；当前问题只追加一次。
+每次重试固定同一份上下文并计入累计输入预算；store=false，不使用 previous_response_id。
+页面在同一会话续聊即可使用上下文，新对话从空历史开始。历史可能因预算裁剪，不能保证永久记忆。
 
 ## PR7 管理 HTTP 与 test Agent
 
@@ -60,7 +69,7 @@ Prompt/Skill 后返回并选中新增 UUID；未提交输入仅临时保留在�
 网络重试/401 重放保留相同写入编号，409 保留输入，读取/比较服务器内容后明确决定下一次操作。
 按 UUID 的管理员详情和脱敏模型详情用于显示历史绑定；没有增加数据库表。
 
-PR9 的 `/agent/chat?agent_key=...` 已验证目录目标、选择绑定 Skill，并通过 Gateway 流式回答；支持停止、新对话和切换取消。模型仍仅处理当前消息。
+PR9 的 `/agent/chat?agent_key=...` 已验证目录目标、选择绑定 Skill，并通过 Gateway 流式回答；支持停止、新对话和切换取消。PR2 的同会话续聊自动使用上述有界上下文。
 验证命令、浏览器测试与部署前置条件见 [Web README](../web/README.md)。
 
 ### PR6 配置与安全导入

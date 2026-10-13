@@ -19,7 +19,7 @@ from app.models.runtime import (
     RunStatus,
     StreamEvent,
 )
-from app.storage.repository import MessageRecord, RunRecord, utc_now
+from app.storage.repository import RunRecord, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,9 @@ class RuntimeStore(Protocol):
 
     async def expire_running_runs(self) -> int: ...
 
-    async def list_messages(
-        self, user_id: int, conversation_id: str | UUID, *, limit: int = 100
-    ) -> list[MessageRecord]: ...
+    async def list_completed_turns(
+        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
+    ) -> list[tuple[str, str]]: ...
 
 
 class RuntimeFailure(RuntimeError):
@@ -148,22 +148,21 @@ class RunService:
             deadline_at=record.deadline_at,
         )
         try:
-            messages = await self._store.list_messages(principal.user_id, record.conversation_id)
+            turns = await self._store.list_completed_turns(
+                principal.user_id, record.conversation_id
+            )
             history: list[HistoryMessage] = []
             chars = 0
-            for message in reversed(messages):
-                if message.run_id == record.id:
-                    continue
-                chars += len(message.content)
+            for user, assistant in reversed(turns):
+                chars += len(user) + len(assistant)
                 if chars > 64_000:
                     break
-                history.append(
-                    HistoryMessage.model_validate(
-                        {
-                            "role": message.role,
-                            "content": message.content,
-                        }
-                    )
+                # 从最新整轮往前取；反转后保留 user → assistant 顺序。
+                history.extend(
+                    [
+                        HistoryMessage(role="assistant", content=assistant),
+                        HistoryMessage(role="user", content=user),
+                    ]
                 )
             state.history = tuple(reversed(history))
         except asyncio.CancelledError:
