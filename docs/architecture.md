@@ -634,6 +634,28 @@ reflection
 
 Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
 
+### Issue #162 PR1：真实 LangGraph Direct Answer
+
+`model` 模式由 `ModelRuntime` 编译并执行固定图：
+
+```text
+START → prepare → check_budget → generate → validate_answer → END
+```
+
+prepare 解析本次配置快照并组合提示词；check_budget 校验保守输入估算与输出预留；
+generate 通过可注入 DirectAnswer/ResponsesClient 流式生成，保留同 Provider 的有限重试；
+validate_answer 检查非空答案与供应商完成状态。图状态仅在本次运行内存在，明文凭据仅在
+调用客户端时短暂读取，不进入图状态。共享编译图的每次调用独立保存状态和流消费确认。
+
+custom 流桥接采用逐事件消费确认：消费者继续请求下一事件后，生成节点才继续读取
+供应商，避免慢速客户端造成图内无界文本积压。取消传播到正在读取或等待消费确认的节点，
+节点 finally 关闭模型生成器与上游 HTTP 流。外层 RunService 继续统一检查总 deadline、
+事件/字符预算、ID/序号与终态，成功事务保存后才发 done；失败/取消不保存部分 assistant。
+
+图不配置自动重试、checkpointer、持久化恢复或外部 tracing；进程重启仍由现有单实例
+初始化把遗留 RUNNING 收敛为 INTERRUPTED。对外 HTTP/SSE、配置 JSON、数据库表不变。
+Fake 两节点图保留，真实多轮上下文和工具循环仍属于后续阶段。
+
 真实模型暂不使用已存历史、不调用业务 Tools，只使用安全前缀、已解析配置 Prompt 与当前消息；多轮上下文、ReAct 和完整 Eval/观测后续交付。运行摘要和人工 smoke 样例只是最小验证基础。
 
 ### 10.2 Tool Registry 与策略

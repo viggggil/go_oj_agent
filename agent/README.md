@@ -16,6 +16,15 @@ PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Respons
 
 会话和消息已经持久化，但真实模型只使用程序安全前缀、解析后的 Agent/Skill Prompt 和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Agent/Skill 选择与 Gateway 流式对话前端。多轮历史上下文、记忆、真实模型调用工具、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
+Issue #162 的 PR1 将 `AGENT_RUNTIME_MODE=model` 接入真实 LangGraph：
+`START → prepare → check_budget → generate → validate_answer → END`。
+`DirectAnswer` 复用 Responses 调用与有限重试，`ModelRuntime` 负责图调度；不需要新环境开关。
+生成节点通过 custom stream 即时输出既有 thinking/token，每个事件等待消费者继续消费，
+避免图内部提前读取供应商流并积压回答。图到达 END 后才给出完成信号，RunService 成功
+保存回答和终态后才对外发送 done。停止、断连与 deadline 关闭图和上游 HTTP 流；
+不启用图节点自动重试、checkpointer、恢复执行或外部 LangSmith tracing。
+本阶段继续只发送本轮消息；多轮上下文、只读工具循环在后续 PR 交付。
+
 ## PR7 管理 HTTP 与 test Agent
 
 设置 `AGENT_ADMIN_ENABLED=true`，配置 Agent 数据库与 Gateway 公钥即可独立启用管理；
@@ -196,8 +205,9 @@ agent/
 
 `app/graphs/service.py` 的 `RunService` 接收 typed `ChatRequest` 和由可信入口创建的
 `Principal`。Context 只保存题目/提交 ID 与语言，不自动读取业务数据。Runtime/ModelClient
-是可注入协议，LangGraph 当前只运行 `thinking → response` 两个节点并调用 FakeModelClient；
-它没有实现 ReAct、计划执行或 Reflection。Fake 回答带明确的演示标识，不伪称算法答案。
+是可注入协议，`langgraph_fake` 仍运行 `thinking → response` 两个节点并调用 FakeModelClient；
+真实 `model` 模式使用上文四节点 Direct Answer 图。ReAct、计划执行和 Reflection 尚未实现。
+Fake 回答带明确的演示标识，不伪称算法答案。
 
 `ToolRegistry` 支持重复名称检查和 JSON Schema 导出；`ToolExecutor` 检查 Run allowlist、
 启用状态、角色、输入/输出 Schema 和有界超时，取消会传到 handler。PR4 注册六个只读

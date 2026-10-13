@@ -462,3 +462,175 @@ async def test_final_storage_failure_does_not_emit_done() -> None:
         assert store.record is not None and store.record.status == "FAILED" and not store.answers
     finally:
         await client.close()
+
+
+async def test_graph_backpressure_and_tracing_stay_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    from langsmith import get_tracing_context, tracing_context
+
+    from app.graphs.direct_answer import DirectAnswer
+
+    stages: list[str] = []
+    prepare = DirectAnswer.prepare
+    validate = DirectAnswer.validate_answer
+
+    def traced_prepare(self: DirectAnswer, value: AgentState) -> Any:
+        assert get_tracing_context()["enabled"] is False
+        stages.append("prepare")
+        return prepare(self, value)
+
+    def traced_validate(self: DirectAnswer, value: AgentState, answer: str) -> None:
+        assert get_tracing_context()["enabled"] is False
+        stages.append("validate")
+        validate(self, value, answer)
+
+    monkeypatch.setattr(DirectAnswer, "prepare", traced_prepare)
+    monkeypatch.setattr(DirectAnswer, "validate_answer", traced_validate)
+
+    class ObservedStream(Stream):
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            async for chunk in super().__aiter__():
+                stages.append("read")
+                yield chunk
+
+    stream = ObservedStream([frame(delta("前")), frame(delta("后")), frame(complete("前后"))])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert get_tracing_context()["enabled"] is False
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=stream)
+
+    client = client_for(handler)
+    iterator = ModelRuntime(client, Credentials()).run(configured())
+    try:
+        with tracing_context(enabled=True):
+            assert (await anext(iterator)).type == "thinking"
+            # 消费者还没请求下一事件，不能读取供应商。
+            assert stages == ["prepare"]
+            assert (await anext(iterator)).data["text"] == "前"
+            await asyncio.sleep(0)
+            assert stages == ["prepare", "read"]
+            assert (await anext(iterator)).data["text"] == "后"
+            assert (await anext(iterator)).type == "done"
+            assert stages == ["prepare", "read", "read", "read", "validate"]
+            assert get_tracing_context()["enabled"] is True
+    finally:
+        await iterator.aclose()
+        await client.close()
+    assert stream.closed
+
+
+async def test_shared_graph_keeps_concurrent_runs_isolated() -> None:
+    streams: dict[str, Stream] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        message = json.loads(request.content)["input"][0]["content"]
+        stream = Stream([frame(delta(message)), frame(complete(message))])
+        streams[message] = stream
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=stream)
+
+    client = client_for(handler)
+    runtime = ModelRuntime(client, Credentials())
+    first, second = configured(), configured()
+    first.user_message, second.user_message = "第一轮", "第二轮"
+    iterator = runtime.run(first)
+    try:
+        assert (await anext(iterator)).type == "thinking"
+        assert (await anext(iterator)).data["text"] == "第一轮"
+        # 第一条流暂停时，同一个编译图上的另一条流可以独立完成。
+        events = [event async for event in runtime.run(second)]
+        assert [event.sequence for event in events] == [1, 2, 3]
+        assert all(event.run_id == second.run_id for event in events)
+        assert events[1].data["text"] == "第二轮" and streams["第二轮"].closed
+        assert not streams["第一轮"].closed
+        await iterator.aclose()
+        assert streams["第一轮"].closed
+        assert first.model_summary is not None and second.model_summary is not None
+        assert first.model_summary.attempts[0].finish_reason == "cancelled"
+        assert second.model_summary.attempts[0].finish_reason == "completed"
+        assert (
+            first.model_summary.attempts[0].provider_id
+            != second.model_summary.attempts[0].provider_id
+        )
+    finally:
+        await iterator.aclose()
+        await client.close()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_deadline_and_cancel_close_graph_waiting_for_first_token(cancel: bool) -> None:
+    started = asyncio.Event()
+
+    class WaitingStream(Stream):
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            started.set()
+            await asyncio.Event().wait()
+            yield b"unreachable"
+
+    stream = WaitingStream([])
+    client = client_for(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=stream
+        )
+    )
+    store, reader = MemoryStore(), Reader()
+    snapshot = configured().config_snapshot
+    snapshot["budget"]["max_run_seconds"] = 30 if cancel else 1
+    reader.snapshot = reader.snapshot.model_validate({**reader.snapshot.model_dump(), **snapshot})
+    service = RunService(store, ModelRuntime(client, Credentials()), reader)
+    accepted = await service.accept(ChatRequest(message="算法"), state().principal)
+    try:
+        async with accepted:
+            assert (await anext(accepted.events)).type == "thinking"
+            task = asyncio.ensure_future(anext(accepted.events))
+            await asyncio.wait_for(started.wait(), 1)
+            if cancel:
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                event = await asyncio.wait_for(task, 3)
+                assert event.type == "error" and event.data["code"] == "AGENT_DEADLINE_EXCEEDED"
+        assert stream.closed and not store.answers
+        assert store.record is not None and store.record.status == (
+            "CANCELLED" if cancel else "FAILED"
+        )
+    finally:
+        await client.close()
+
+
+async def test_provider_timeout_while_token_is_paused_keeps_failure_classification() -> None:
+    closed = asyncio.Event()
+
+    class ClosingStream(Stream):
+        async def aclose(self) -> None:
+            await super().aclose()
+            closed.set()
+
+    stream = ClosingStream([frame(delta()), frame(complete())])
+    client = client_for(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=stream
+        )
+    )
+    store, reader = MemoryStore(), Reader()
+    snapshot = configured().config_snapshot
+    snapshot["provider_config"]["request_timeout_seconds"] = 0.2
+    reader.snapshot = reader.snapshot.model_validate({**reader.snapshot.model_dump(), **snapshot})
+    service = RunService(store, ModelRuntime(client, Credentials()), reader)
+    accepted = await service.accept(ChatRequest(message="算法"), state().principal)
+    try:
+        async with accepted:
+            assert (await anext(accepted.events)).type == "thinking"
+            assert (await anext(accepted.events)).type == "token"
+            # 不确认 token，等 Provider 总超时主动关闭上游，再继续消费。
+            await asyncio.wait_for(closed.wait(), 2)
+            event = await anext(accepted.events)
+            assert event.type == "error" and event.data["code"] == "AGENT_MODEL_TIMEOUT"
+        assert not store.answers
+        assert store.record is not None and store.record.status == "FAILED"
+        assert store.record.model_summary is not None
+        attempt = store.record.model_summary["attempts"][-1]
+        assert (
+            attempt["finish_reason"] == "failed" and attempt["error_code"] == "AGENT_MODEL_TIMEOUT"
+        )
+    finally:
+        await client.close()

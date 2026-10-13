@@ -219,6 +219,11 @@ Issue #154 分阶段交付：PR7 提供 Gateway 保护的 Agent/Prompt/Skill 管
 
 Issue #160 调整当前表单：管理员填写名称，后端自动生成内部标识；Skill 自带任务说明，不再要求绑定 Prompt 或配置预算；Agent 高级设置保留运行限制。开发部署检测宿主 su8.key 后准备 su8 的 deepseek-v4-flash、deepseek-v4-pro、deepseek-v4.1-flash，支持页面创建 test Agent 并通过 Gateway SSE 调用真实模型。
 
+Issue #162 分阶段引入 LangGraph：PR1 将真实单轮回答编排为准备、预算检查、流式生成、
+答案验证四个节点，保持既有 Gateway SSE、取消、配置快照和保存后 done 语义；
+PR2 接入有界多轮上下文，PR3 在验证供应商工具协议后引入有预算限制的只读工具循环。
+PR1 不启用图持久化恢复或外部 tracing。
+
 ---
 
 ## 5. 功能需求
