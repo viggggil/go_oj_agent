@@ -27,6 +27,8 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		methods []string
 	}{
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
+		{"/api/v1/agent/conversations", []string{http.MethodGet}},
+		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},
 		{"/api/v1/agent/agents/{agent_key}/skills", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/model-options", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/model-options/{identifier}", []string{http.MethodGet}},
@@ -189,7 +191,8 @@ func agentJSONTimeout(ctx context.Context, err error) bool {
 }
 
 var agentManagementErrors = map[string]bool{
-	"AGENT_INVALID_ARGUMENT": true, "AGENT_UNSUPPORTED_MEDIA_TYPE": true, "AGENT_REQUEST_TOO_LARGE": true,
+	"AGENT_CONVERSATION_NOT_FOUND": true,
+	"AGENT_INVALID_ARGUMENT":       true, "AGENT_UNSUPPORTED_MEDIA_TYPE": true, "AGENT_REQUEST_TOO_LARGE": true,
 	"AGENT_FORBIDDEN": true, "AGENT_UNAVAILABLE": true, "AGENT_MANAGEMENT_DISABLED": true,
 	"AGENT_CONFIGURATION_NOT_FOUND": true, "AGENT_CONFIGURATION_UNSUPPORTED": true, "AGENT_CONFIGURATION_STALE": true,
 	"AGENT_CONFIGURATION_REQUEST_CONFLICT": true, "AGENT_CONFIGURATION_REFERENCE_INVALID": true,

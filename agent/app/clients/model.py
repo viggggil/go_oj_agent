@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import AsyncGenerator
 from time import monotonic
@@ -14,6 +15,8 @@ from app.core.provider_policy import ProviderPolicy
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig
 from app.models.provider import FunctionCall, ModelAttempt, ModelFailure, ModelResponse
 from app.models.runtime import HistoryMessage
+
+logger = logging.getLogger(__name__)
 
 MAX_FRAME_BYTES = 262_144
 
@@ -125,6 +128,7 @@ class ResponsesClient:
         started = monotonic()
         answer = ""
         completed = False
+        headers_received = False
         event_count = 0
         output_index: int | None = None
         argument_bytes = 0
@@ -143,6 +147,7 @@ class ResponsesClient:
                     },
                     timeout=timeout,
                 ) as response:
+                    headers_received = True
                     if response.status_code != 200:
                         raise _http_failure(response.status_code)
                     if (
@@ -241,7 +246,13 @@ class ResponsesClient:
                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         except (TimeoutError, httpx.TimeoutException):
             raise ModelFailure("AGENT_MODEL_TIMEOUT") from None
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            # 仅记录类型与阶段，不记录异常正文、URL、消息或凭据。
+            logger.warning(
+                "Model transport failed (%s, headers_received=%s)",
+                type(exc).__name__,
+                headers_received,
+            )
             # 网络错误可能已被计费；不自动重试不确定的连接结果。
             raise ModelFailure("AGENT_MODEL_UNAVAILABLE") from None
 

@@ -22,6 +22,9 @@ async function setup(page: Page) {
   await page.route('**/api/v1/users/me', (route) =>
     route.fulfill({ json: { user: { id: 7, username: '测试用户', roles: ['user'] } } }),
   )
+  await page.route('**/api/v1/agent/conversations?*', (route) =>
+    route.fulfill({ json: { items: [], page: { page: 1, page_size: 20, total: 0 } } }),
+  )
   await page.route('**/api/v1/agent/agents?*', (route) =>
     route.fulfill({
       json: {
@@ -79,7 +82,7 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
   await expect(page.getByRole('status')).toHaveText('回答完成')
   expect(requests[0].conversation_id).toBeUndefined()
   expect(requests[1]).toMatchObject({ conversation_id: conversation, skill_key: 'other_skill' })
-  await page.getByRole('button', { name: '新对话', exact: true }).click()
+  await page.getByLabel('选择对话').selectOption('new')
   await expect(page.locator('.chat-message')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/agent-chat-desktop.png', fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
@@ -120,7 +123,7 @@ test('401 共享刷新但不重放 Chat，HTTP 拒绝和 EOF 保留输入并标�
   await page.getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('连接提前结束')
   await expect(page.locator('.assistant').last()).toContainText('部分答案')
-  await expect(page.locator('.assistant').last()).toContainText('回答未完成')
+  await expect(page.locator('.assistant').last()).toContainText('连接提前结束')
   await expect(page.getByLabel('消息', { exact: true })).toHaveValue('保留原消息')
 })
 test('不可访问目标保持空选择，不回退到默认 Agent', async ({ page }) => {
@@ -192,7 +195,7 @@ test('真实流的停止、新对话、切换与离开会 abort，迟到 token �
     await page.getByRole('button', { name: '停止', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('已停止')
     streams[0]?.write(frame('token', 2, { text: '迟到污染' }))
-    await page.getByRole('button', { name: '新对话', exact: true }).click()
+    await page.getByLabel('选择对话').selectOption('new')
     await send()
     await page.getByLabel('选择 Agent').selectOption('second_agent')
     await expect(page.locator('.chat-message')).toHaveCount(0)
@@ -200,7 +203,7 @@ test('真实流的停止、新对话、切换与离开会 abort，迟到 token �
     await send()
     expect(requests.at(-1)).toMatchObject({ agent_key: 'second_agent' })
     expect(requests.at(-1).conversation_id).toBeUndefined()
-    await page.getByRole('button', { name: '新对话', exact: true }).click()
+    await page.getByLabel('选择对话').selectOption('new')
     await expect(page.locator('.chat-message')).toHaveCount(0)
     await expect(page.locator('.chat-messages')).not.toContainText('迟到污染')
     await send()
@@ -211,4 +214,52 @@ test('真实流的停止、新对话、切换与离开会 abort，迟到 token �
     server.closeAllConnections()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
+})
+
+test('恢复历史后续聊，失败在回答位置显示且不自动重发', async ({ page }) => {
+  await setup(page)
+  await page.route('**/api/v1/agent/conversations?*', (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: conversation,
+            agent_key: 'public_agent',
+            title: '题目讲解',
+            updated_at: '2026-10-14T06:00:00',
+          },
+        ],
+        page: { page: 1, page_size: 20, total: 1 },
+      },
+    }),
+  )
+  await page.route('**/api/v1/agent/conversations/*/messages*', (route) =>
+    route.fulfill({
+      json: {
+        conversation: { id: conversation, agent_key: 'public_agent', title: '题目讲解' },
+        items: [
+          { id: 1, role: 'user', content: '第一题', status: 'COMPLETED', error_code: null },
+          { id: 2, role: 'assistant', content: '题目内容', status: 'COMPLETED', error_code: null },
+        ],
+        next_before: null,
+      },
+    }),
+  )
+  let posts = 0
+  await page.route('**/api/v1/agent/chat', (route) => {
+    posts++
+    expect(route.request().postDataJSON().conversation_id).toBe(conversation)
+    return route.fulfill({ headers, body: frame('error', 1, { code: 'AGENT_MODEL_UNAVAILABLE' }) })
+  })
+  await page.goto('/agent/chat')
+  await page.getByLabel('选择对话').selectOption(conversation)
+  await expect(page.locator('.assistant')).toContainText('题目内容')
+  await expect(page.getByLabel('搜索 Agent')).toHaveCount(0)
+  await page.getByLabel('消息', { exact: true }).fill('解释思路')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.locator('.assistant').last()).toContainText('模型连接中断')
+  await expect(page.getByLabel('消息', { exact: true })).toHaveValue('解释思路')
+  expect(posts).toBe(1)
+  await page.getByLabel('选择对话').selectOption('new')
+  await expect(page.locator('.chat-message')).toHaveCount(0)
 })

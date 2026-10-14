@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.chat import ChatController
     from app.core.auth import DelegationVerifier
     from app.core.management import ManagementService
+    from app.storage.repository import AgentStore
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class AppResources:
     tools: ToolRegistry | None = None
     management: "ManagementService | None" = None
     verifier: "DelegationVerifier | None" = None
+    store: "AgentStore | None" = None
 
 
 def get_resources(request: Request) -> AppResources:

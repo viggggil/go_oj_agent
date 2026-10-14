@@ -7,6 +7,9 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasPrefix(path, "/api/v1/agent/conversations") {
+		return validAgentHistory(path, payload)
+	}
 	if strings.HasPrefix(path, "/api/v1/admin/agent/model-options/") {
 		object, ok := agentJSONFields(payload["model_option"], "id key model temperature verbosity max_output_tokens context_window_tokens archived disabled available", "")
 		return len(payload) == 1 && ok && agentJSONTypes(object, "id key model", "archived disabled available", "max_output_tokens context_window_tokens") && agentJSONNullable(object["temperature"], new(float64)) && agentJSONNullable(object["verbosity"], new(string))
@@ -64,6 +67,45 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 			if !validAgentConfiguration(item, false, parts[5]) {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+func validAgentHistory(path string, payload map[string]json.RawMessage) bool {
+	var items []json.RawMessage
+	if json.Unmarshal(payload["items"], &items) != nil || items == nil {
+		return false
+	}
+	if strings.HasSuffix(path, "/messages") {
+		conversation, ok := agentJSONFields(payload["conversation"], "id agent_key title", "")
+		if len(payload) != 3 || !ok || !agentJSONTypes(conversation, "id title", "", "") ||
+			!agentJSONNullable(conversation["agent_key"], new(string)) ||
+			!agentJSONNullable(payload["next_before"], new(int64)) || len(items) > 4 {
+			return false
+		}
+		for _, item := range items {
+			object, ok := agentJSONFields(item, "id role content status error_code", "")
+			if !ok || !agentJSONTypes(object, "role content", "", "id") ||
+				!agentJSONNullable(object["status"], new(string)) || !agentJSONNullable(object["error_code"], new(string)) {
+				return false
+			}
+			var role string
+			_ = json.Unmarshal(object["role"], &role)
+			if role != "user" && role != "assistant" {
+				return false
+			}
+		}
+		return true
+	}
+	page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+	if len(payload) != 2 || !ok || !agentJSONTypes(page, "", "", "page page_size total") || len(items) > 20 {
+		return false
+	}
+	for _, item := range items {
+		object, ok := agentJSONFields(item, "id agent_key title updated_at", "")
+		if !ok || !agentJSONTypes(object, "id title updated_at", "", "") || !agentJSONNullable(object["agent_key"], new(string)) {
+			return false
 		}
 	}
 	return true

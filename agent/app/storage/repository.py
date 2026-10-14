@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import Select, and_, insert, select, update
+from sqlalchemy import Select, and_, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -151,6 +151,89 @@ class AgentStore:
         # 取最近的有界历史，再恢复稳定的时间顺序。
         return [MessageRecord(**row) for row in reversed(rows)]
 
+    async def list_conversations(self, user_id: int, page: int) -> dict[str, Any]:
+        # 旧会话没有标题；只取首条用户消息的短摘要，不返回配置快照。
+        first_message = (
+            select(func.left(agent_messages.c.content, 80))
+            .where(
+                agent_messages.c.conversation_id == agent_conversations.c.id,
+                agent_messages.c.role == "user",
+            )
+            .order_by(agent_messages.c.id)
+            .limit(1)
+            .scalar_subquery()
+        )
+        async with self._engine.connect() as connection:
+            total = await connection.scalar(
+                select(func.count())
+                .select_from(agent_conversations)
+                .where(agent_conversations.c.user_id == user_id)
+            )
+            rows = (
+                (
+                    await connection.execute(
+                        select(
+                            agent_conversations.c.id,
+                            agent_conversations.c.agent_key,
+                            func.coalesce(
+                                agent_conversations.c.title, first_message, "新对话"
+                            ).label("title"),
+                            agent_conversations.c.updated_at,
+                        )
+                        .where(agent_conversations.c.user_id == user_id)
+                        .order_by(
+                            agent_conversations.c.updated_at.desc(), agent_conversations.c.id.desc()
+                        )
+                        .offset((page - 1) * 20)
+                        .limit(20)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [dict(row) for row in rows],
+            "page": {"page": page, "page_size": 20, "total": total or 0},
+        }
+
+    async def conversation_messages(
+        self, user_id: int, conversation_id: str, before: int | None = None
+    ) -> dict[str, Any]:
+        conversation = await self.get_conversation(user_id, conversation_id)
+        query = (
+            select(
+                agent_messages.c.id,
+                agent_messages.c.role,
+                agent_messages.c.content,
+                agent_runs.c.status,
+                agent_runs.c.error_code,
+            )
+            .select_from(
+                agent_messages.outerjoin(agent_runs, agent_messages.c.run_id == agent_runs.c.id)
+            )
+            .where(
+                agent_messages.c.conversation_id == conversation.id,
+                agent_messages.c.role.in_(("user", "assistant")),
+            )
+            .order_by(agent_messages.c.id.desc())
+            .limit(5)
+        )
+        if before is not None:
+            query = query.where(agent_messages.c.id < before)
+        async with self._engine.connect() as connection:
+            rows = (await connection.execute(query)).mappings().all()
+        # 四条完整消息，即使 JSON 转义达到每字符六字节，也小于 Gateway 的 1 MiB 上限。
+        items = [dict(row) for row in reversed(rows[:4])]
+        return {
+            "conversation": {
+                "id": conversation.id,
+                "agent_key": conversation.agent_key,
+                "title": conversation.title or "历史对话",
+            },
+            "items": items,
+            "next_before": items[0]["id"] if len(rows) > 4 else None,
+        }
+
     async def list_completed_turns(
         self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
     ) -> list[tuple[str, str]]:
@@ -216,6 +299,7 @@ class AgentStore:
                         id=conversation_id,
                         user_id=user_id,
                         agent_key=agent_key,
+                        title=content.strip()[:80],
                         created_at=now,
                         updated_at=now,
                     )

@@ -1557,3 +1557,22 @@ RabbitMQ：
 - [ ] 是否需要权限校验。
 - [ ] 是否需要 Contract Test。
 - [ ] 是否更新 OpenAPI / Proto Docs。
+
+### 本人 Agent 会话（Issue #167）
+
+`GET /api/v1/agent/conversations?page=1`：登录用户的历史会话，固定每页 20 条，
+`page` 为 1–10000，按 `updated_at DESC, id DESC` 排序。
+返回 `{items:[{id,agent_key,title,updated_at}],page:{page,page_size,total}}`。
+新会话标题取首条消息前 80 字；旧空标题读取首条用户消息摘要。
+
+`GET /api/v1/agent/conversations/{canonical_uuid}/messages?before={message_id}`：
+只读取本人会话，每次返回最多四条完整 user/assistant 消息，按 ID 升序；
+`before` 为正整数，省略时读取最新消息。返回
+`{conversation:{id,agent_key,title},items:[{id,role,content,status,error_code}],next_before}`。
+`next_before` 非空时可继续向前分页。失败、停止的用户消息保留稳定 Run 状态/错误码，
+不返回未完成助手文本、工具原文、模型摘要或配置快照。未找到与越权均返回
+`404 AGENT_CONVERSATION_NOT_FOUND`，管理员也不能读取其他用户会话。
+重复/未知查询参数和 GET 请求体返回 400。响应 `Cache-Control: no-store`。
+
+两条只读接口均经 Gateway 用户鉴权、具体路径委托与 Agent owner 校验，无需管理员角色。
+恢复会话后聊天仍使用原 Agent；选择其他 Agent 会开始新对话。Chat POST 不自动重放。

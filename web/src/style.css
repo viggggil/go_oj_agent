@@ -1448,37 +1448,44 @@ dd {
   }
 }
 
+.agent-chat-workspace {
+  display: block;
+}
+.agent-chat-workspace .agent-main {
+  padding: 0;
+}
 .agent-chat-page {
-  max-width: 1000px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1rem 1rem;
 }
-.chat-toolbar {
+.chat-heading {
   display: flex;
+  align-items: center;
   gap: 1rem;
-  align-items: end;
-  flex-wrap: wrap;
-  padding: 1rem;
-  border: 1px solid var(--border, #dfe3e8);
-  border-radius: 0.75rem;
-  background: var(--surface, #fff);
+  margin-bottom: 0.5rem;
 }
-.chat-toolbar label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+.chat-heading h1 {
+  margin: 0;
+  font-size: 1.3rem;
 }
-.chat-toolbar select {
-  min-width: 210px;
+.chat-history-select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  min-width: 0;
+}
+.chat-history-select select {
+  max-width: 340px;
+  min-width: 0;
 }
 .chat-messages {
-  min-height: 340px;
-  max-height: 55vh;
+  min-height: 300px;
+  height: calc(100dvh - 350px);
   overflow-y: auto;
-  margin: 1rem 0;
-  padding: 1rem;
-  border: 1px solid var(--border, #dfe3e8);
-  border-radius: 0.75rem;
-  background: var(--surface, #fff);
+  margin: 0.5rem 0;
+  padding: 1rem 0;
 }
 .chat-empty {
   color: #6b7280;
@@ -1497,7 +1504,8 @@ dd {
   background: #e8f0ff;
 }
 .chat-message.assistant {
-  background: #f3f4f6;
+  background: transparent;
+  max-width: 100%;
 }
 .chat-role {
   font-size: 0.75rem;
@@ -1538,6 +1546,12 @@ dd {
 .chat-status {
   min-height: 1.5rem;
 }
+.chat-compose {
+  padding: 0.8rem;
+  border: 1px solid var(--border, #dfe3e8);
+  border-radius: 1rem;
+  background: var(--surface, #fff);
+}
 .chat-compose textarea {
   width: 100%;
   resize: vertical;
@@ -1545,7 +1559,8 @@ dd {
 }
 .chat-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
@@ -1553,16 +1568,24 @@ dd {
   color: #6b7280;
   font-size: 0.85rem;
 }
-.chat-directory {
+.chat-agent-select,
+.chat-skill-select {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-items: center;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  min-width: 0;
 }
-.chat-directory input {
+.chat-actions select {
+  max-width: 200px;
+  min-width: 0;
+}
+.chat-action-spacer {
   flex: 1;
-  min-width: 120px;
+}
+.chat-failure {
+  display: block;
+  margin-top: 0.5rem;
 }
 .chat-note {
   color: #6b7280;
@@ -1590,21 +1613,23 @@ dd {
   border: 1px solid #dfe3e8;
 }
 @media (max-width: 700px) {
-  .chat-toolbar label {
+  .chat-heading {
+    flex-wrap: wrap;
+  }
+  .chat-history-select {
+    flex: 1;
+  }
+  .chat-history-select select {
     width: 100%;
   }
-  .chat-toolbar select {
-    width: 100%;
-    min-width: 0;
+  .chat-actions select {
+    max-width: 135px;
   }
   .chat-message {
     max-width: 100%;
   }
   .chat-messages {
     padding: 0.5rem;
-  }
-  .chat-directory input {
-    width: 100%;
   }
   .agent-chat-page {
     min-width: 0;

@@ -181,6 +181,7 @@ async def check():
             key_file.chmod(0o600)
             real_settings = settings.model_copy(update={
                 'runtime_mode':'model', 'default_agent_key':'su8_learning_assistant',
+                'business_tools_enabled':False,
                 'credential_keyring_file':ring,
                 'provider_allowed_origins':('https://www.su8.codes',),
             })
@@ -203,6 +204,34 @@ async def check():
             assert (await real_store.resolve('agent', root.key)).id == root.id
             async with db.engine.connect() as c:
                 assert await c.scalar(select(func.count()).select_from(agent_config_versions)) == version_count
+            # 原 Compose direct 默认助手升级为只读题目 Skill；重启幂等且不覆盖管理员另存版本。
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from app.clients.business import build_business_clients
+            from app.tools.business import build_business_tool_registry
+            from uuid import UUID
+            identity = Path(directory) / 'agent-private.pem'
+            identity.write_bytes(rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            tool_settings = real_settings.model_copy(update={'business_tools_enabled': True, 'agent_private_key_file':identity})
+            clients = build_business_clients(tool_settings)
+            try:
+                registry = build_business_tool_registry(clients, tool_settings.tool_max_result_bytes, tool_settings.tool_max_page_size)
+                tool_store = ConfigurationStore(db.engine, registry, provider_policy=ProviderPolicy(tool_settings))
+                await bootstrap_su8(tool_settings, key_file=key_file)
+                upgraded = await tool_store.resolve('agent', root.key)
+                assert upgraded.id != root.id and set(upgraded.content.allowed_tools) == {'get_problem', 'list_problems'}
+                snapshot = await DatabaseConfigReader(tool_store, tool_settings, registry).read(ChatRequest(message='介绍第一题'), principal)
+                assert snapshot.execution_mode == 'react' and 'get_problem' in snapshot.allowed_tools
+                await bootstrap_su8(tool_settings, key_file=key_file)
+                assert (await tool_store.resolve('agent', root.key)).id == upgraded.id
+                customized = await tool_store.create_or_replace(ConfigWrite(kind='agent', key=root.key, actor_id=1,
+                    request_id=str(uuid4()), expected_id=UUID(upgraded.id)),
+                    {**upgraded.content.model_dump(mode='json'), 'name':'管理员定制助手'})
+                await bootstrap_su8(tool_settings, key_file=key_file)
+                assert (await tool_store.resolve('agent', root.key)).id == customized.id
+            finally:
+                await clients.close()
             selected = models['items'][0]
             await real_store.change_state(ConfigWrite(kind='model', key=selected['key'], actor_id=1,
                 request_id=str(uuid4()), expected_id=selected['id']), 'disable')

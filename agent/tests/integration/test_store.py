@@ -72,7 +72,21 @@ async def test_owner_isolation_and_latest_history_order(engine: AsyncEngine) -> 
     assert [message.role for message in messages] == ["assistant", "user", "assistant"]
     assert [message.content for message in messages] == ["second", "介绍二分查找", "third"]
     assert [message.id for message in messages] == sorted(message.id for message in messages)
+    recent = await store.conversation_messages(7, conversation.id)
+    assert [item["content"] for item in recent["items"]] == [
+        "介绍二分查找",
+        "second",
+        "介绍二分查找",
+        "third",
+    ]
+    older = await store.conversation_messages(7, conversation.id, recent["next_before"])
+    assert [item["content"] for item in older["items"]] == ["介绍二分查找", "first"]
+    assert older["next_before"] is None
+    assert (await store.list_conversations(7, 1))["items"][0]["title"] == "介绍二分查找"
     for user_id in (8, 999):
+        assert (await store.list_conversations(user_id, 1))["items"] == []
+        with pytest.raises(ConversationNotFound):
+            await store.conversation_messages(user_id, conversation.id)
         with pytest.raises(ConversationNotFound):
             await store.get_conversation(user_id, conversation.id)
         with pytest.raises(ConversationNotFound):

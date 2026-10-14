@@ -3,10 +3,12 @@
 import asyncio
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from pydantic import SecretStr
 from sqlalchemy import select
 
+from app.clients.business import build_business_clients
 from app.core.credentials import CredentialCipher
 from app.core.database import DatabaseProbe
 from app.core.provider_policy import ProviderPolicy
@@ -14,7 +16,9 @@ from app.core.settings import Settings
 from app.models.configuration import ConfigError, ConfigKind, ConfigWrite, ProviderConfig
 from app.storage.configuration import ConfigurationStore, ConfigVersion
 from app.storage.credentials import CredentialStore, CredentialWrite
+from app.storage.schema import agent_config_audits as audits
 from app.storage.schema import agent_config_resources as resources
+from app.tools.business import build_business_tool_registry
 from app.tools.registry import ToolRegistry
 
 SU8_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4.1-flash")
@@ -24,12 +28,19 @@ async def bootstrap_su8(
     settings: Settings, *, key_file: Path = Path("/run/model-keys/su8.key")
 ) -> None:
     database = DatabaseProbe(settings)
+    clients = None
     try:
         engine = database.engine
         assert engine is not None
         cipher = CredentialCipher.from_file(settings.credential_keyring_file)
         credentials = CredentialStore(engine, cipher)
-        store = ConfigurationStore(engine, ToolRegistry(), provider_policy=ProviderPolicy(settings))
+        registry = ToolRegistry()
+        if settings.business_tools_enabled:
+            clients = build_business_clients(settings)
+            registry = build_business_tool_registry(
+                clients, settings.tool_max_result_bytes, settings.tool_max_page_size
+            )
+        store = ConfigurationStore(engine, registry, provider_policy=ProviderPolicy(settings))
 
         async def existing(kind: ConfigKind, key: str) -> ConfigVersion | None:
             async with engine.connect() as connection:
@@ -114,8 +125,20 @@ async def bootstrap_su8(
                     },
                 )
             )
-        # 单独准备真实助手，旧 Fake 默认助手和用户定制版本均完整保留。
-        if await existing("agent", settings.default_agent_key) is None:
+        current = await existing("agent", settings.default_agent_key)
+        # 只升级仍指向 Compose 首次创建版本的默认助手，管理员另存过的版本完整保留。
+        async with engine.connect() as connection:
+            original_id = await connection.scalar(
+                select(audits.c.new_id).where(
+                    audits.c.request_id == f"compose.su8.v1.agent.{settings.default_agent_key}"
+                )
+            )
+        upgrade = (
+            current is not None
+            and current.id == original_id
+            and not getattr(current.content, "allowed_tools", ())
+        )
+        if current is None or upgrade:
             prompt = await ensure(
                 "prompt",
                 "su8_learning_identity",
@@ -127,7 +150,7 @@ async def bootstrap_su8(
                     ),
                 },
             )
-            skill = await ensure(
+            direct = await ensure(
                 "skill",
                 "su8_direct_answer",
                 {
@@ -136,19 +159,60 @@ async def bootstrap_su8(
                     "text": "直接回答用户的问题，解释关键思路、适用条件、复杂度和必要的例子。",
                 },
             )
-            await ensure(
-                "agent",
-                settings.default_agent_key,
-                {
-                    "name": "学习助手",
-                    "prompt_id": prompt.id,
-                    "skill_ids": [skill.id],
+            tools = ["get_problem", "list_problems"] if settings.business_tools_enabled else []
+            skill = direct
+            if tools:
+                skill = await ensure(
+                    "skill",
+                    "su8_problem_answer",
+                    {
+                        "name": "题目讲解",
+                        "description": "按题号读取公开题目，解释题意、算法与复杂度。",
+                        "execution_mode": "react",
+                        "allowed_tools": tools,
+                        "text": (
+                            "用户提到题号时，先通过 get_problem 读取真实题目，再根据题意回答。"
+                            "需要查找题目时使用 list_problems。不能编造题目内容；"
+                            "工具返回不可用或无权限时明确说明。"
+                        ),
+                    },
+                )
+            content = {
+                "name": "学习助手",
+                "prompt_id": prompt.id,
+                "skill_ids": list(dict.fromkeys([skill.id, direct.id])),
+                "default_skill_id": skill.id,
+                "model_profile_id": model_versions[0].id,
+                "allowed_tools": tools,
+                "visibility": "user",
+                "budget": {"max_run_seconds": 120},
+            }
+            if current is None:
+                await ensure("agent", settings.default_agent_key, content)
+            elif tools:
+                # 保留首次版本的不可变绑定和预算，不因独立 Prompt/Model 编辑而隐式重绑。
+                content = {
+                    **current.content.model_dump(mode="json"),
+                    "skill_ids": list(
+                        dict.fromkeys(
+                            [skill.id, *current.content.model_dump(mode="json")["skill_ids"]]
+                        )
+                    ),
                     "default_skill_id": skill.id,
-                    "model_profile_id": model_versions[0].id,
-                    "visibility": "user",
-                    "budget": {"max_run_seconds": 120},
-                },
-            )
+                    "allowed_tools": tools,
+                }
+                await store.create_or_replace(
+                    ConfigWrite(
+                        kind="agent",
+                        key=settings.default_agent_key,
+                        actor_id=1,
+                        request_id=f"compose.su8.v2.agent.{settings.default_agent_key}",
+                        expected_id=UUID(current.id),
+                    ),
+                    content,
+                )
         print("su8 Provider 与三个真实模型已准备，保留所有已有配置。", flush=True)
     finally:
+        if clients is not None:
+            await clients.close()
         await database.close()
