@@ -62,6 +62,7 @@
       </fieldset>
       <fieldset>
         <legend>绑定 Skill</legend>
+        <p class="muted">模型会按问题参考已绑定技能的适用说明与任务文本，无需用户选择。</p>
         <VersionPicker
           label="Skill"
           resource="skills"

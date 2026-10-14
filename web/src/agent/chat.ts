@@ -35,7 +35,7 @@ export const chatCatalog = {
 export interface ChatRequest {
   message: string
   agent_key: string
-  skill_key: string
+  skill_key?: string
   conversation_id?: string
 }
 export interface ChatConversation {

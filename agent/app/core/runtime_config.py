@@ -41,6 +41,8 @@ class ConfigSnapshot(BaseModel):
     configurations: dict[str, dict[str, object]] = {}
     is_test: bool = False
     execution_mode: str = "direct"
+    skill_selection: Literal["explicit", "automatic"] = "explicit"
+    skill_references: tuple[dict[str, object], ...] = ()
     provider_id: str | None = None
     model_profile: dict[str, object] | None = None
     provider_config: dict[str, object] | None = None
@@ -146,6 +148,41 @@ class DatabaseConfigReader:
                 raise ConfigError("AGENT_PROMPT_CONTEXT_REQUIRED")
             return prompt.text.format(**values)
 
+        def render_skill(value: SkillConfig) -> str:
+            if value.prompt_id is not None:
+                return render(cast(PromptConfig, graph[str(value.prompt_id)].content))
+            if value.variables is not None:
+                return render(PromptConfig(text=value.text or "", variables=value.variables))
+            return value.text or ""
+
+        # 未指定 Skill 时让模型在同一次回答中参考绑定技能；不额外调用分类模型。
+        references: list[dict[str, object]] = []
+        reference_skills: list[SkillConfig] = []
+        automatic = real and request.skill_key is None
+        if automatic:
+            for identifier in dict.fromkeys([agent.default_skill_id, *agent.skill_ids]):
+                version = graph[str(identifier)]
+                candidate = cast(SkillConfig, version.content)
+                try:
+                    text = render_skill(candidate)
+                except ConfigError as error:
+                    if error.code != "AGENT_PROMPT_CONTEXT_REQUIRED":
+                        raise
+                    # 例如提交诊断需要 submission_id，不能让它阻断普通算法对话。
+                    continue
+                references.append(
+                    {
+                        "id": version.id,
+                        "key": version.key,
+                        "name": candidate.name,
+                        "description": candidate.description,
+                        "text": text,
+                    }
+                )
+                reference_skills.append(candidate)
+            if not references:
+                raise ConfigError("AGENT_PROMPT_CONTEXT_REQUIRED")
+
         system_budget = RuntimeBudget(
             max_run_seconds=self._settings.max_run_seconds,
             max_output_chars=self._settings.max_output_chars,
@@ -155,8 +192,10 @@ class DatabaseConfigReader:
             max_output_tokens=self._settings.max_output_tokens,
         )
         budgets = [agent.budget.model_dump(), system_budget.model_dump()]
-        if skill.budget is not None:
-            budgets.append(skill.budget.model_dump())
+        active_skills = reference_skills if automatic else [skill]
+        budgets.extend(
+            value.budget.model_dump() for value in active_skills if value.budget is not None
+        )
         budget = RuntimeBudget.model_validate(
             {name: min(item[name] for item in budgets) for name in budgets[0]}
         )
@@ -166,7 +205,13 @@ class DatabaseConfigReader:
             if self._registry.get(name).spec.enabled
             and self._registry.get(name).spec.side_effect == "read"
         }
-        tools = tuple(sorted(system_tools & set(agent.allowed_tools) & set(skill.allowed_tools)))
+        skill_tools = {
+            name
+            for value in active_skills
+            if not automatic or value.execution_mode == "react"
+            for name in value.allowed_tools
+        }
+        tools = tuple(sorted(system_tools & set(agent.allowed_tools) & skill_tools))
         configurations: dict[str, dict[str, object]] = {
             version.id: {
                 "kind": version.kind,
@@ -186,22 +231,16 @@ class DatabaseConfigReader:
             prompt_id=prompt_version.id,
             prompt_text=render(prompt_version.content),
             skill_prompt_id=skill_prompt_version.id if skill_prompt_version else None,
-            skill_prompt_text=(
-                render(cast(PromptConfig, skill_prompt_version.content))
-                if skill_prompt_version
-                else (
-                    render(PromptConfig(text=skill.text or "", variables=skill.variables))
-                    if skill.variables is not None
-                    else skill.text
-                )
-            ),
+            skill_prompt_text=None if automatic else render_skill(skill),
             skill_id=skill_id,
             model_profile_id=str(agent.model_profile_id),
             allowed_tools=tools,
             budget=budget,
             configurations=configurations,
             is_test=agent.is_test,
-            execution_mode=skill.execution_mode,
+            execution_mode=("react" if tools else "direct") if automatic else skill.execution_mode,
+            skill_selection="automatic" if automatic else "explicit",
+            skill_references=tuple(references),
             provider_id=provider_version.id if provider_version is not None else None,
             model_profile=profile.model_dump(mode="json") if real else None,
             provider_config=provider_version.content.model_dump(mode="json")

@@ -79,7 +79,7 @@
       <textarea
         v-model="draft"
         aria-label="消息"
-        rows="3"
+        rows="2"
         :disabled="streaming || !selectedAgent || loadingHistory"
         placeholder="输入消息，按 Ctrl/⌘ + Enter 发送"
         @keydown="keyDown"
@@ -100,27 +100,13 @@
             <option v-if="catalogPage * 20 < catalogTotal" value="more">加载更多 Agent…</option>
           </select>
         </label>
-        <label class="chat-skill-select"
-          >Skill
-          <select
-            v-model="selectedSkill"
-            aria-label="选择 Skill"
-            :disabled="streaming || !selectedAgent || loadingSkills || loadingHistory"
-          >
-            <option v-for="item in skills" :key="item.key" :value="item.key">
-              {{ item.name }}
-            </option>
-          </select>
-        </label>
         <span class="chat-action-spacer"></span>
         <button v-if="streaming" class="button secondary" type="button" @click="stop">停止</button>
         <button
           v-else
           class="button"
           type="submit"
-          :disabled="
-            !draft.trim() || !selectedAgent || !selectedSkill || loadingSkills || loadingHistory
-          "
+          :disabled="!draft.trim() || !selectedAgent || loadingHistory"
         >
           发送
         </button>
@@ -142,7 +128,6 @@
     chatHttpError,
     streamChat,
     type ChatAgent,
-    type ChatSkill,
   } from '../agent/chat'
   import { agentAdministrator } from '../agent/state'
   import { ChatFailure } from '../agent/stream'
@@ -160,15 +145,12 @@
     router = useRouter(),
     auth = useAuthStore()
   const agents = ref<ChatAgent[]>([]),
-    skills = ref<ChatSkill[]>([]),
     selected = ref<ChatAgent>()
   const selectedAgent = ref(''),
-    selectedSkill = ref(''),
     draft = ref('')
   const messages = ref<Message[]>([]),
     streaming = ref(false),
-    loadingCatalog = ref(false),
-    loadingSkills = ref(false)
+    loadingCatalog = ref(false)
   const catalogPage = ref(1),
     catalogTotal = ref(0)
   const conversations = ref<ChatConversation[]>([]),
@@ -186,7 +168,6 @@
   let conversationId: string | undefined, activeAbort: AbortController | undefined
   let generation = 0,
     directoryAbort: AbortController | undefined,
-    skillAbort: AbortController | undefined,
     initAbort: AbortController | undefined
   const conversationOptions = computed(() => {
     const id = historySelection.value
@@ -251,14 +232,11 @@
   }
   async function initialize() {
     initAbort?.abort()
-    skillAbort?.abort()
     const controller = new AbortController()
     initAbort = controller
     newConversation()
     selectedAgent.value = ''
     selected.value = undefined
-    skills.value = []
-    selectedSkill.value = ''
     catalogError.value = ''
     void loadHistory()
     const loaded = await loadAgents()
@@ -295,32 +273,11 @@
       }
       selectedAgent.value = candidate.key
       selected.value = candidate
-      await loadSkills(candidate.key)
     } catch (error) {
       if (!controller.signal.aborted)
         catalogError.value = error instanceof ChatFailure ? error.message : directoryError(error)
     } finally {
       if (initAbort === controller) loadingCatalog.value = false
-    }
-  }
-  async function loadSkills(key: string) {
-    skillAbort?.abort()
-    const controller = new AbortController()
-    skillAbort = controller
-    skills.value = []
-    selectedSkill.value = ''
-    loadingSkills.value = true
-    try {
-      const { data } = await chatCatalog.skills(key, controller.signal)
-      if (controller.signal.aborted) return
-      skills.value = data.items.filter((item) => ['direct', 'react'].includes(item.execution_mode))
-      selectedSkill.value =
-        skills.value.find((item) => item.key === data.default_skill_key)?.key || ''
-      if (!selectedSkill.value) catalogError.value = '此 Agent 没有可用于当前运行时的默认 Skill。'
-    } catch (error) {
-      if (!controller.signal.aborted) catalogError.value = directoryError(error)
-    } finally {
-      if (skillAbort === controller) loadingSkills.value = false
     }
   }
   async function agentChanged() {
@@ -334,7 +291,6 @@
     newConversation()
     catalogError.value = ''
     selected.value = agentOptions.value.find((item) => item.key === selectedAgent.value)
-    void loadSkills(selectedAgent.value)
     if (targetKey() !== selectedAgent.value)
       await router.replace({ query: { agent_key: selectedAgent.value } })
   }
@@ -366,15 +322,7 @@
   }
   async function send() {
     const text = draft.value
-    if (
-      !text.trim() ||
-      !selectedAgent.value ||
-      !selectedSkill.value ||
-      streaming.value ||
-      loadingSkills.value ||
-      loadingHistory.value
-    )
-      return
+    if (!text.trim() || !selectedAgent.value || streaming.value || loadingHistory.value) return
     if ([...text].length > 32000) {
       status.value = '消息最多 32,000 个字符'
       statusError.value = true
@@ -400,7 +348,6 @@
       await streamChat(
         {
           agent_key: selectedAgent.value,
-          skill_key: selectedSkill.value,
           message: text,
           ...(conversationId ? { conversation_id: conversationId } : {}),
         },
@@ -498,7 +445,6 @@
     newConversation()
     if (!id || id === 'new') return
     initAbort?.abort()
-    skillAbort?.abort()
     const controller = new AbortController()
     historyAbort = controller
     historySelection.value = id
@@ -516,7 +462,6 @@
       conversationId = id
       messages.value = historyMessages(data.items)
       nextBefore.value = data.next_before
-      await loadSkills(key)
       if (!controller.signal.aborted) {
         await router.replace({ query: { agent_key: key } })
         void scrollBottom()
@@ -619,13 +564,10 @@
       nextBefore.value = null
       loadingHistory.value = false
       directoryAbort?.abort()
-      skillAbort?.abort()
       initAbort?.abort()
       selectedAgent.value = ''
-      selectedSkill.value = ''
       selected.value = undefined
       agents.value = []
-      skills.value = []
       if (auth.user && !auth.profileError && tokenState.access) void initialize()
     },
     { flush: 'sync' },
@@ -635,7 +577,6 @@
     historyAbort?.abort()
     historyListAbort?.abort()
     directoryAbort?.abort()
-    skillAbort?.abort()
     initAbort?.abort()
   })
   void initialize()

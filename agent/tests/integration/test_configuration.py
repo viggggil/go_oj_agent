@@ -426,3 +426,119 @@ async def test_configuration_cli_bootstrap_retry_and_secret_redaction(
         )
         assert failed.returncode == 2 and "AGENT_CONFIGURATION_FAILED" in failed.stderr
         assert "wrong-password" not in failed.stderr and "Traceback" not in failed.stderr
+
+
+async def test_automatic_skill_references_binding_context_and_authority(
+    config_engine: AsyncEngine,
+) -> None:
+    tools = registry()
+    from app.core.provider_policy import ProviderPolicy
+
+    policy_settings = Settings(
+        runtime_mode="model",
+        config_mode="database",
+        credential_keyring_file=Path("/not-read"),
+        provider_allowed_origins=("https://relay.example",),
+    )
+    store = ConfigurationStore(
+        config_engine, tools, provider_policy=ProviderPolicy(policy_settings)
+    )
+    prefix = "test_" + uuid4().hex
+    prompt = await store.create_or_replace(write("prompt", prefix + "_p"), {"text": "基础规则"})
+    # 自建加密凭据和模型配置图，不访问外部模型、不依赖其他测试的副作用。
+    from pydantic import SecretStr
+
+    from app.core.credentials import CredentialCipher
+    from app.storage.credentials import CredentialStore, CredentialWrite
+
+    credentials = CredentialStore(config_engine, CredentialCipher("v1", {"v1": b"k" * 32}))
+    credential = await credentials.create(
+        CredentialWrite(actor_id=7, request_id=str(uuid4())),
+        "reference-test",
+        SecretStr("test-only-key"),
+    )
+    provider = await store.create_or_replace(
+        write("provider", prefix + "_provider"),
+        {
+            "name": "reference-test",
+            "base_url": "https://relay.example/v1",
+            "credential_id": credential["id"],
+        },
+    )
+    model = await store.create_or_replace(
+        write("model", prefix + "_model"),
+        {"provider": "responses", "provider_id": provider.id, "model": "deepseek-v4-flash"},
+    )
+    explain = await store.create_or_replace(
+        write("skill", prefix + "_explain"),
+        {
+            "name": "算法讲解",
+            "description": "理解算法",
+            "text": "算法讲解的专属说明",
+            "execution_mode": "direct",
+            "allowed_tools": ["read_third"],
+        },
+    )
+    hints = await store.create_or_replace(
+        write("skill", prefix + "_hints"),
+        {
+            "name": "题目提示",
+            "text": "题目提示的专属说明",
+            "execution_mode": "react",
+            "allowed_tools": ["read_first", "read_second"],
+            "budget": {"max_tool_calls": 2},
+        },
+    )
+    context = await store.create_or_replace(
+        write("skill", prefix + "_context"),
+        {
+            "name": "提交诊断",
+            "text": "诊断提交 {submission_id}",
+            "variables": ["submission_id"],
+            "execution_mode": "react",
+            "allowed_tools": ["read_third"],
+        },
+    )
+    # 未绑定的配置不能进入模型参考。
+    await store.create_or_replace(
+        write("skill", prefix + "_unbound"), {"name": "未绑定", "text": "不得进入模型"}
+    )
+    root = await store.create_or_replace(
+        write("agent", prefix),
+        {
+            "model_profile_id": model.id,
+            "name": "自动技能助手",
+            "prompt_id": prompt.id,
+            "skill_ids": [explain.id, hints.id, context.id],
+            "default_skill_id": explain.id,
+            "allowed_tools": ["read_second", "read_third"],
+        },
+    )
+    reader = DatabaseConfigReader(
+        store,
+        Settings(
+            runtime_mode="model",
+            config_mode="database",
+            credential_keyring_file=Path("/not-read"),
+            default_agent_key=root.key,
+            provider_allowed_origins=("https://relay.example",),
+        ),
+        tools,
+    )
+    principal = Principal(user_id=7, request_id="skill-reference-test")
+    snapshot = await reader.read(ChatRequest(message="解释算法"), principal)
+    assert snapshot.skill_selection == "automatic" and snapshot.execution_mode == "react"
+    assert [item["id"] for item in snapshot.skill_references] == [explain.id, hints.id]
+    assert snapshot.allowed_tools == ("read_second",) and snapshot.budget.max_tool_calls == 2
+    with_context = await reader.read(
+        ChatRequest(message="诊断", context=ChatContext(submission_id=1)), principal
+    )
+    assert len(with_context.skill_references) == 3 and with_context.allowed_tools == (
+        "read_second",
+        "read_third",
+    )
+    explicit = await reader.read(ChatRequest(message="解释", skill_key=explain.key), principal)
+    assert explicit.skill_selection == "explicit" and not explicit.skill_references
+    assert (
+        explicit.skill_prompt_text == "算法讲解的专属说明" and explicit.execution_mode == "direct"
+    )

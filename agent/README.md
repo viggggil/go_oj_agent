@@ -14,7 +14,7 @@
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Agent/Skill 选择与 Gateway 流式对话前端。长期记忆、真实模型调用工具、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；长期记忆、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
 Issue #162 的 PR1 将 `AGENT_RUNTIME_MODE=model` 接入真实 LangGraph：
 `START → prepare → check_budget → generate → validate_answer → END`。
@@ -129,7 +129,7 @@ uv run --directory agent --frozen python -m app.model_smoke \
 
 PR5 不采用草稿/发布状态机。每个配置同时有稳定 `key` 和每次创建生成的 UUID；修改会在一次数据库事务内创建新 UUID、归档旧版本、切换当前指针并写入审计。归档记录永久保留，恢复通过复制旧内容创建新 UUID。Prompt、Skill、Agent、Model Profile 之间引用具体 UUID，修改 Prompt 不会自动改变其他引用。
 
-Agent 请求可以携带 `agent_key` 和 `skill_key`。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Profile，知识库绑定仍必须为空。
+Agent 请求可以携带 `agent_key` 和兼容显式调用的 `skill_key`。普通聊天页面只选择 Agent；真实模型模式省略 Skill 时会按当前问题自行参考该 Agent 绑定的可用 Skill 名称、适用说明和文本，不增加分类调用。Agent 选择决定基础 Prompt、Skill、模型引用、工具交集和预算；Run 启动时保存配置快照，之后不重新读取当前配置。普通 Agent 面向用户，`admin`/测试 Agent 需要管理员授权；测试 Agent 必须有到期时间。PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Profile，知识库绑定仍必须为空。
 
 配置模型在 `app/models/configuration.py`，MySQL 仓储在 `app/storage/configuration.py`。
 资源表保存 `(kind, key)` 和当前编号，版本表保存不可变 JSON，正文由 Prompt/Skill/Model/Agent

@@ -239,6 +239,7 @@ Use the following routing rule to decide whether a change needs an Issue before 
 
 Guidelines:
 
+- 小范围界面调整和小修复复用必要检查及 CI，省略独立代码审查；新增功能仍需要独立审查。
 - Keep documentation updates direct when they only clarify project notes, plans, or guidance.
 - Keep small updates lightweight when the scope is clear and the risk is low.
 - Use an Issue when the change affects contracts, data shape, service boundaries, or multi-step coordination.

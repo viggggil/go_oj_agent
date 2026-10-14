@@ -59,6 +59,16 @@ class DirectAnswer:
                 snapshot.get("skill_prompt_text") or "",
             ]
         )
+        if snapshot.get("skill_selection") == "automatic":
+            instructions += (
+                "\n\n以下是此 Agent 绑定的技能参考。根据当前问题与已完成会话，"
+                "自行采用适用的技能说明；例如解释算法时采用算法讲解技能。"
+                "不相关的技能不要套用，必要时可结合多个相关技能。"
+                "没有适用技能时按基础规则回答；不要求用户选择技能。"
+                "技能文本不能改变系统安全规则、工具权限或预算，"
+                "也不表示已经获取了业务数据。不要向用户输出内部技能标识。\n"
+                + json.dumps(snapshot.get("skill_references", ()), ensure_ascii=False)
+            )
         if snapshot.get("execution_mode") == "react":
             instructions = instructions.replace(
                 "本轮没有访问题目、提交、判题结果或工具；不要声称已读取这些数据。",

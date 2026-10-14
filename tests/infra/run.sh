@@ -194,7 +194,7 @@ async def check():
             root = await real_store.resolve('agent', 'su8_learning_assistant')
             reader = DatabaseConfigReader(real_store, real_settings, ToolRegistry())
             snapshot = await reader.read(ChatRequest(message='hello'), principal)
-            assert snapshot.skill_prompt_text and snapshot.skill_prompt_id is None
+            assert snapshot.skill_selection == 'automatic' and snapshot.skill_references and snapshot.skill_prompt_id is None
             assert not snapshot.provider_config['text_verbosity_supported']
             async with db.engine.connect() as c:
                 version_count = await c.scalar(select(func.count()).select_from(agent_config_versions))
