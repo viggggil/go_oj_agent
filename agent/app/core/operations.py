@@ -10,6 +10,7 @@ _RESOURCE = re.compile(
     r"(?:/(versions|archive|restore|disable|enable)(?:/([0-9a-f-]{36}))?)?"
 )
 _SKILLS = re.compile(rf"/api/v1/agent/agents/({KEY_PATTERN})/skills")
+_MESSAGES = re.compile(r"/api/v1/agent/conversations/([0-9a-f-]{36})/messages")
 _MODEL = re.compile(r"/api/v1/admin/agent/model-options/([0-9a-f-]{36})")
 _VERSION = re.compile(r"/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})")
 
@@ -20,10 +21,16 @@ def operation(method: str, path: str) -> str:
         allowed = method == "POST"
     elif path in {
         "/api/v1/agent/agents",
+        "/api/v1/agent/conversations",
         "/api/v1/admin/agent/model-options",
         "/api/v1/admin/agent/tools",
     } or _SKILLS.fullmatch(path):
         allowed = method == "GET"
+    elif conversation := _MESSAGES.fullmatch(path):
+        try:
+            allowed = method == "GET" and str(UUID(conversation[1])) == conversation[1]
+        except ValueError:
+            pass
     elif model := _MODEL.fullmatch(path):
         try:
             allowed = method == "GET" and str(UUID(model[1])) == model[1]

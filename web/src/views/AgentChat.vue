@@ -1,70 +1,27 @@
 <template>
   <section class="agent-page agent-chat-page">
-    <div class="page-head">
-      <div>
-        <span class="eyebrow">Agent</span>
-        <h1>对话</h1>
-      </div>
-      <button class="button secondary" type="button" @click="newConversation">新对话</button>
-    </div>
-    <div class="chat-toolbar">
-      <label
-        >Agent
+    <div class="chat-heading">
+      <h1>对话</h1>
+      <label class="chat-history-select"
+        >会话
         <select
-          v-model="selectedAgent"
-          aria-label="选择 Agent"
-          :disabled="loadingCatalog"
-          @change="agentChanged"
+          v-model="historySelection"
+          aria-label="选择对话"
+          :disabled="loadingHistory"
+          @change="historyChanged"
         >
-          <option value="" disabled>选择 Agent</option>
-          <option v-for="item in agentOptions" :key="item.key" :value="item.key">
-            {{ item.name }}（{{ item.key }}）
+          <option value="" disabled>新对话</option>
+          <option value="new">开启新对话</option>
+          <option v-for="item in conversationOptions" :key="item.id" :value="item.id">
+            {{ item.title }}
           </option>
+          <option v-if="historyPage * 20 < historyTotal" value="more">加载更多历史对话…</option>
         </select>
       </label>
-      <label
-        >Skill
-        <select
-          v-model="selectedSkill"
-          aria-label="选择 Skill"
-          :disabled="streaming || !selectedAgent || loadingSkills"
-        >
-          <option v-for="item in skills" :key="item.key" :value="item.key">
-            {{ item.name }}（{{ item.key }}）
-          </option>
-        </select>
-      </label>
-      <span v-if="loadingCatalog || loadingSkills" class="muted">正在加载配置…</span>
+      <RouterLink v-if="agentAdministrator(auth.user?.roles || [])" to="/agent/agents" class="link"
+        >管理 Agent</RouterLink
+      >
     </div>
-    <p v-if="skills.find((item) => item.key === selectedSkill)?.description" class="muted">
-      {{ skills.find((item) => item.key === selectedSkill)?.description }}
-    </p>
-    <form class="chat-directory" @submit.prevent="loadAgents(1)">
-      <input
-        v-model="search"
-        aria-label="搜索 Agent"
-        maxlength="64"
-        placeholder="按名称或标识搜索 Agent"
-      />
-      <button class="secondary" :disabled="loadingCatalog" type="submit">搜索 Agent</button>
-      <button
-        class="secondary"
-        :disabled="loadingCatalog || catalogPage <= 1"
-        type="button"
-        @click="loadAgents(catalogPage - 1)"
-      >
-        上一页
-      </button>
-      <span>{{ catalogPage }} / {{ Math.max(1, Math.ceil(catalogTotal / 20)) }}</span>
-      <button
-        class="secondary"
-        :disabled="loadingCatalog || catalogPage * 20 >= catalogTotal"
-        type="button"
-        @click="loadAgents(catalogPage + 1)"
-      >
-        下一页
-      </button>
-    </form>
     <p v-if="catalogError" class="error" role="alert">
       {{ catalogError }} <button class="link" @click="initialize">重新加载</button>
     </p>
@@ -75,8 +32,18 @@
       @scroll="trackScroll"
       @click="copyCode"
     >
+      <button
+        v-if="nextBefore"
+        class="link"
+        type="button"
+        :disabled="loadingHistory"
+        @click="loadOlder"
+      >
+        加载更早消息
+      </button>
       <div v-if="!messages.length" class="chat-empty">
-        选择 Agent 后发送消息，回答会以流式方式显示。
+        <strong>有什么可以帮你？</strong>
+        <p>选择学习助手，开始讨论题目与算法。</p>
       </div>
       <article
         v-for="message in messages"
@@ -91,7 +58,10 @@
           v-html="render(message.text)"
         ></div>
         <div v-else class="chat-content">{{ message.text }}</div>
-        <span v-if="message.incomplete" class="chat-incomplete">回答未完成</span>
+        <span v-if="message.failure" class="error chat-failure">{{ message.failure }}</span>
+        <span v-else-if="message.incomplete" class="chat-incomplete">{{
+          streaming && !message.text ? '正在等待模型回答…' : '回答未完成'
+        }}</span>
         <button
           v-if="message.role === 'assistant' && message.text"
           class="link copy-answer"
@@ -102,7 +72,6 @@
         </button>
       </article>
     </div>
-    <p class="chat-note">页面内可连续对话。当前模型只处理本次消息，尚不读取历史上下文。</p>
     <p v-if="status" class="chat-status" :class="{ error: statusError }" role="status">
       {{ status }}
     </p>
@@ -111,17 +80,47 @@
         v-model="draft"
         aria-label="消息"
         rows="3"
-        :disabled="streaming || !selectedAgent"
+        :disabled="streaming || !selectedAgent || loadingHistory"
         placeholder="输入消息，按 Ctrl/⌘ + Enter 发送"
         @keydown="keyDown"
       ></textarea>
       <div class="chat-actions">
+        <label class="chat-agent-select"
+          >Agent
+          <select
+            v-model="selectedAgent"
+            aria-label="选择 Agent"
+            :disabled="loadingCatalog || loadingHistory"
+            @change="agentChanged"
+          >
+            <option value="" disabled>选择 Agent</option>
+            <option v-for="item in agentOptions" :key="item.key" :value="item.key">
+              {{ item.name }}
+            </option>
+            <option v-if="catalogPage * 20 < catalogTotal" value="more">加载更多 Agent…</option>
+          </select>
+        </label>
+        <label class="chat-skill-select"
+          >Skill
+          <select
+            v-model="selectedSkill"
+            aria-label="选择 Skill"
+            :disabled="streaming || !selectedAgent || loadingSkills || loadingHistory"
+          >
+            <option v-for="item in skills" :key="item.key" :value="item.key">
+              {{ item.name }}
+            </option>
+          </select>
+        </label>
+        <span class="chat-action-spacer"></span>
         <button v-if="streaming" class="button secondary" type="button" @click="stop">停止</button>
         <button
           v-else
           class="button"
           type="submit"
-          :disabled="!draft.trim() || !selectedAgent || !selectedSkill || loadingSkills"
+          :disabled="
+            !draft.trim() || !selectedAgent || !selectedSkill || loadingSkills || loadingHistory
+          "
         >
           发送
         </button>
@@ -131,17 +130,21 @@
 </template>
 <script setup lang="ts">
   import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
+  import { RouterLink, useRoute, useRouter } from 'vue-router'
   import MarkdownIt from 'markdown-it'
   import DOMPurify from 'dompurify'
   import axios from 'axios'
   import {
     chatCatalog,
+    chatHistory,
+    modelErrorMessage,
+    type ChatConversation,
     chatHttpError,
     streamChat,
     type ChatAgent,
     type ChatSkill,
   } from '../agent/chat'
+  import { agentAdministrator } from '../agent/state'
   import { ChatFailure } from '../agent/stream'
   import { tokenState } from '../api'
   import { useAuthStore } from '../stores/auth'
@@ -151,6 +154,7 @@
     role: 'user' | 'assistant'
     text: string
     incomplete?: boolean
+    failure?: string
   }
   const route = useRoute(),
     router = useRouter(),
@@ -165,9 +169,15 @@
     streaming = ref(false),
     loadingCatalog = ref(false),
     loadingSkills = ref(false)
-  const search = ref(''),
-    catalogPage = ref(1),
+  const catalogPage = ref(1),
     catalogTotal = ref(0)
+  const conversations = ref<ChatConversation[]>([]),
+    historySelection = ref(''),
+    historyPage = ref(1),
+    historyTotal = ref(0),
+    loadingHistory = ref(false),
+    nextBefore = ref<number | null>(null)
+  let historyAbort: AbortController | undefined, historyListAbort: AbortController | undefined
   const catalogError = ref(''),
     status = ref(''),
     statusError = ref(false)
@@ -178,6 +188,15 @@
     directoryAbort: AbortController | undefined,
     skillAbort: AbortController | undefined,
     initAbort: AbortController | undefined
+  const conversationOptions = computed(() => {
+    const id = historySelection.value
+    return id &&
+      id !== 'more' &&
+      id !== 'new' &&
+      !conversations.value.some((item) => item.id === id)
+      ? [{ id, title: '当前对话' }, ...conversations.value]
+      : conversations.value
+  })
   const agentOptions = computed(() =>
     selected.value && !agents.value.some((item) => item.key === selected.value?.key)
       ? [selected.value, ...agents.value]
@@ -218,9 +237,9 @@
     directoryAbort = controller
     loadingCatalog.value = true
     try {
-      const { data } = await chatCatalog.agents(page, search.value.trim(), controller.signal)
+      const { data } = await chatCatalog.agents(page, '', controller.signal)
       if (controller.signal.aborted) return
-      agents.value = data.items
+      agents.value = page === 1 ? data.items : [...agents.value, ...data.items]
       catalogPage.value = data.page.page
       catalogTotal.value = data.page.total
       return true
@@ -232,6 +251,7 @@
   }
   async function initialize() {
     initAbort?.abort()
+    skillAbort?.abort()
     const controller = new AbortController()
     initAbort = controller
     newConversation()
@@ -240,7 +260,7 @@
     skills.value = []
     selectedSkill.value = ''
     catalogError.value = ''
-    search.value = ''
+    void loadHistory()
     const loaded = await loadAgents()
     if (!loaded || controller.signal.aborted) return
     loadingCatalog.value = true
@@ -304,6 +324,11 @@
     }
   }
   async function agentChanged() {
+    if (selectedAgent.value === 'more') {
+      selectedAgent.value = selected.value?.key || ''
+      await loadAgents(catalogPage.value + 1)
+      return
+    }
     initAbort?.abort()
     loadingCatalog.value = false
     newConversation()
@@ -314,6 +339,10 @@
       await router.replace({ query: { agent_key: selectedAgent.value } })
   }
   function newConversation() {
+    historyAbort?.abort()
+    loadingHistory.value = false
+    historySelection.value = ''
+    nextBefore.value = null
     stop()
     conversationId = undefined
     messages.value = []
@@ -342,7 +371,8 @@
       !selectedAgent.value ||
       !selectedSkill.value ||
       streaming.value ||
-      loadingSkills.value
+      loadingSkills.value ||
+      loadingHistory.value
     )
       return
     if ([...text].length > 32000) {
@@ -376,8 +406,11 @@
         },
         abort.signal,
         (identity) => {
-          if (current === generation && !abort.signal.aborted)
+          if (current === generation && !abort.signal.aborted) {
             conversationId = identity.conversationId
+            historySelection.value = conversationId
+            void loadHistory()
+          }
         },
         (event) => {
           if (current !== generation || abort.signal.aborted) return
@@ -395,7 +428,8 @@
             statusError.value = false
           }
           if (event.type === 'error') {
-            status.value = `回答失败（${event.data.code}），部分回答未完成，请重新发送或新建对话`
+            status.value = modelErrorMessage(event.data.code || '')
+            assistant.failure = status.value
             statusError.value = true
           }
         },
@@ -406,12 +440,127 @@
       status.value =
         error instanceof ChatFailure ? error.message : '连接失败，回答未完成，请检查网络后重试'
       statusError.value = true
+      assistant.failure = status.value
     } finally {
       if (current === generation) {
         if (assistant.incomplete && !draft.value) draft.value = text
         streaming.value = false
         activeAbort = undefined
+        void loadHistory()
       }
+    }
+  }
+  async function loadHistory(page = 1) {
+    historyListAbort?.abort()
+    const controller = new AbortController()
+    historyListAbort = controller
+    try {
+      const { data } = await chatHistory.list(page, controller.signal)
+      if (controller.signal.aborted) return
+      const items = page === 1 ? data.items : [...conversations.value, ...data.items]
+      conversations.value = [...new Map(items.map((item) => [item.id, item])).values()]
+      historyPage.value = data.page.page
+      historyTotal.value = data.page.total
+    } catch (error) {
+      if (!controller.signal.aborted)
+        catalogError.value = '无法加载历史对话。' + directoryError(error)
+    }
+  }
+  function historyMessages(
+    items: Awaited<ReturnType<typeof chatHistory.messages>>['data']['items'],
+  ): Message[] {
+    return items.flatMap((item) => {
+      const result: Message[] = [{ id: String(item.id), role: item.role, text: item.content }]
+      if (item.role === 'user' && item.status && item.status !== 'COMPLETED') {
+        result.push({
+          id: 'failure-' + item.id,
+          role: 'assistant',
+          text: '',
+          incomplete: true,
+          failure:
+            item.status === 'RUNNING'
+              ? '此前的回答仍在运行，请稍后重试。'
+              : item.status === 'CANCELLED' || item.status === 'INTERRUPTED'
+                ? '此前的回答已停止，未保存完整回答。'
+                : modelErrorMessage(item.error_code || ''),
+        })
+      }
+      return result
+    })
+  }
+  async function historyChanged() {
+    const id = historySelection.value
+    if (id === 'more') {
+      historySelection.value = conversationId || ''
+      await loadHistory(historyPage.value + 1)
+      return
+    }
+    newConversation()
+    if (!id || id === 'new') return
+    initAbort?.abort()
+    skillAbort?.abort()
+    const controller = new AbortController()
+    historyAbort = controller
+    historySelection.value = id
+    loadingHistory.value = true
+    try {
+      const { data } = await chatHistory.messages(id, controller.signal)
+      if (controller.signal.aborted) return
+      const key = data.conversation.agent_key || 'demo'
+      selectedAgent.value = key
+      selected.value = agentOptions.value.find((item) => item.key === key) || {
+        key,
+        name: '历史 Agent',
+        is_default: false,
+      }
+      conversationId = id
+      messages.value = historyMessages(data.items)
+      nextBefore.value = data.next_before
+      await loadSkills(key)
+      if (!controller.signal.aborted) {
+        await router.replace({ query: { agent_key: key } })
+        void scrollBottom()
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        historySelection.value = ''
+        status.value = directoryError(error)
+        statusError.value = true
+      }
+    } finally {
+      if (historyAbort === controller) loadingHistory.value = false
+    }
+  }
+  async function loadOlder() {
+    if (!conversationId || !nextBefore.value || loadingHistory.value) return
+    const controller = new AbortController()
+    historyAbort?.abort()
+    historyAbort = controller
+    loadingHistory.value = true
+    const box = scrollBox.value,
+      height = box?.scrollHeight || 0,
+      top = box?.scrollTop || 0
+    try {
+      const { data } = await chatHistory.messages(
+        conversationId,
+        controller.signal,
+        nextBefore.value,
+      )
+      if (controller.signal.aborted) return
+      const existing = new Set(messages.value.map((item) => item.id))
+      messages.value.unshift(
+        ...historyMessages(data.items).filter((item) => !existing.has(item.id)),
+      )
+      nextBefore.value = data.next_before
+      await nextTick()
+      if (box) box.scrollTop = top + box.scrollHeight - height
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        status.value = directoryError(error)
+        statusError.value = true
+      }
+    } finally {
+      if (historyAbort === controller) loadingHistory.value = false
     }
   }
   function keyDown(event: KeyboardEvent) {
@@ -463,6 +612,12 @@
       conversationId = undefined
       messages.value = []
       draft.value = ''
+      historyAbort?.abort()
+      historyListAbort?.abort()
+      conversations.value = []
+      historySelection.value = ''
+      nextBefore.value = null
+      loadingHistory.value = false
       directoryAbort?.abort()
       skillAbort?.abort()
       initAbort?.abort()
@@ -477,6 +632,8 @@
   )
   onBeforeUnmount(() => {
     stop()
+    historyAbort?.abort()
+    historyListAbort?.abort()
     directoryAbort?.abort()
     skillAbort?.abort()
     initAbort?.abort()

@@ -70,6 +70,29 @@ async def test_gateway_signed_actor_persistence_and_conversation_restore() -> No
             )
         )
         assert second[-1]["conversation_id"] == conversation
+        listing = await http.get("/api/v1/agent/conversations", headers=headers)
+        assert listing.status_code == 200, listing.text
+        assert any(item["id"] == conversation for item in listing.json()["items"])
+        history = await http.get(
+            f"/api/v1/agent/conversations/{conversation}/messages", headers=headers
+        )
+        assert history.status_code == 200, history.text
+        assert [item["role"] for item in history.json()["items"]] == [
+            "user",
+            "assistant",
+            "user",
+            "assistant",
+        ]
+        assert "config_snapshot" not in history.text and "model_summary" not in history.text
+        foreign = await http.get(
+            f"/api/v1/agent/conversations/{conversation}/messages",
+            headers={"Authorization": "Bearer " + user_token(7002, ["admin"])},
+        )
+        absent = await http.get(f"/api/v1/agent/conversations/{uuid4()}/messages", headers=headers)
+        assert foreign.status_code == absent.status_code == 404
+        assert foreign.json() == absent.json()
+        invalid = await http.get("/api/v1/agent/conversations?page=1&page=2", headers=headers)
+        assert invalid.status_code == 400
         denied = await http.post(
             "/api/v1/agent/chat",
             json={"message": "other owner", "conversation_id": conversation},

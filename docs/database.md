@@ -840,3 +840,17 @@ Prompt 增加 name；Skill 增加 text/description 和兼容模板 variables。�
 不启用停用/归档资源，不覆盖管理员内容，不自动轮换或恢复撤销凭据。
 回滚前端可继续读取旧内容；旧后端不能解析新内置 Skill，部署应同时升级 Agent/Web，
 回滚需先让 Agent 绑定保留的旧版本，不应删除新版本或历史审计。
+
+### Agent 会话展示与默认助手升级（Issue #167）
+
+会话列表和消息读取仅访问 Agent 自有表，复用
+`idx_agent_conversations_user_updated_id` 与会话消息索引，无 DDL/回填迁移。
+新会话在创建 Run 的同一事务中写入首条消息的 80 字标题，旧 NULL 标题按需读取首条用户消息。
+消息通过 ID 游标向前读取最多四条完整消息，32,000 字符上限保证响应小于 Gateway 1 MiB。
+显示 Run 状态的本地 join 不读取配置 JSON；会话恢复不改变模型只使用完整成功轮次的规则。
+会话列表按活动时间分页，活动更新可能移动页位置，前端加载更多时按 ID 去重。
+
+Compose su8 默认助手增加只读 get_problem/list_problems 与 react「题目讲解」Skill，保留「直接回答」。
+仅当前版本 ID 等于 `compose.su8.v1.agent.{key}` 审计创建的版本且无工具时进行 v2 版本化升级；
+管理员另存版本、停用/归档状态完整保留，expected_id 防止并发覆盖。新版本及审计均保留，
+回滚需要明确重绑保留的旧 Agent 版本，不删除历史记录或凭据。

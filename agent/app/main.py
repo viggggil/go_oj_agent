@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.api.chat import ChatController
 from app.api.chat import router as chat_router
 from app.api.health import router
+from app.api.history import router as history_router
 from app.api.management import router as management_router
 from app.clients.business import build_business_clients
 from app.clients.model import ResponsesClient
@@ -56,6 +57,7 @@ def create_app(
         model_client = None
         management = None
         verifier = None
+        store = None
         try:
             if config.business_tools_enabled:
                 business_clients = build_business_clients(config)
@@ -140,6 +142,7 @@ def create_app(
                 tools=business_tools,
                 management=management,
                 verifier=verifier,
+                store=store,
             )
             logger.info("Agent service started")
             yield
@@ -200,6 +203,7 @@ def create_app(
 
     application.include_router(router)
     application.include_router(management_router)
+    application.include_router(history_router)
     if config.chat_enabled:
         application.include_router(chat_router)
     return application

@@ -38,6 +38,48 @@ export interface ChatRequest {
   skill_key: string
   conversation_id?: string
 }
+export interface ChatConversation {
+  id: string
+  agent_key: string | null
+  title: string
+  updated_at: string
+}
+export const chatHistory = {
+  list: (page: number, signal: AbortSignal) =>
+    api.get<PageResult<ChatConversation>>('/api/v1/agent/conversations', {
+      params: { page },
+      signal,
+    }),
+  messages: (id: string, signal: AbortSignal, before?: number) =>
+    api.get<{
+      conversation: { id: string; agent_key: string | null; title: string }
+      items: {
+        id: number
+        role: 'user' | 'assistant'
+        content: string
+        status: string | null
+        error_code: string | null
+      }[]
+      next_before: number | null
+    }>(`/api/v1/agent/conversations/${encodeURIComponent(id)}/messages`, {
+      params: { before },
+      signal,
+    }),
+}
+export function modelErrorMessage(code: string): string {
+  return (
+    (
+      {
+        AGENT_MODEL_UNAVAILABLE: '模型连接中断或暂不可用，回答未完成，请重新发送。',
+        AGENT_MODEL_TIMEOUT: '等待模型回答超时，请稍后重新发送。',
+        AGENT_MODEL_AUTH_FAILED: '模型认证失败，请联系管理员检查 Provider 凭据。',
+        AGENT_MODEL_QUOTA: '模型额度不足，请联系管理员。',
+        AGENT_MODEL_RATE_LIMIT: '模型请求受限，请稍后重新发送。',
+        AGENT_MODEL_INVALID_RESPONSE: '模型返回的流式回答不完整，请重新发送。',
+      } as Record<string, string>
+    )[code] || '回答失败或未完成，请重新发送或开启新对话。'
+  )
+}
 export function chatHttpError(status: number): string {
   return (
     (

@@ -706,3 +706,42 @@ async def test_provider_timeout_while_token_is_paused_keeps_failure_classificati
         )
     finally:
         await client.close()
+
+
+async def test_stream_disconnect_after_200_is_visible_without_replay(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class BrokenStream(httpx.AsyncByteStream):
+        async def __aiter__(self) -> AsyncIterator[bytes]:
+            yield b": connected\n\n"
+            raise httpx.RemoteProtocolError("private-api-key provider-internal-details")
+
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=BrokenStream()
+        )
+
+    client = client_for(handler)
+    store = MemoryStore()
+    reader = Reader()
+    reader.snapshot = reader.snapshot.model_validate(
+        {**reader.snapshot.model_dump(), **configured().config_snapshot}
+    )
+    service = RunService(store, ModelRuntime(client, Credentials()), reader)
+    try:
+        accepted = await service.accept(ChatRequest(message="解释算法"), state().principal)
+        async with accepted:
+            events = [event async for event in accepted.events]
+        assert events[-1].type == "error"
+        assert events[-1].data["code"] == "AGENT_MODEL_UNAVAILABLE"
+        assert calls == 1 and not store.answers
+        assert "RemoteProtocolError" in caplog.text and "headers_received=True" in caplog.text
+        assert (
+            "private-api-key" not in caplog.text and "provider-internal-details" not in caplog.text
+        )
+    finally:
+        await client.close()
