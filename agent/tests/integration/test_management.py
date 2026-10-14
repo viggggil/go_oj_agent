@@ -547,6 +547,12 @@ async def test_gateway_create_test_agent_then_real_direct_chat() -> None:
                     snapshot["version"] == agent["id"]
                     and snapshot["prompt_text"] == "PR7 测试基础提示"
                 )
-                assert snapshot["skill_prompt_text"] == "PR7 测试 Skill 提示"
+                assert (
+                    snapshot["skill_selection"] == "automatic"
+                    and snapshot["skill_prompt_text"] is None
+                )
+                assert len(snapshot["skill_references"]) == 1
+                assert snapshot["skill_references"][0]["text"] == "PR7 测试 Skill 提示"
+                assert snapshot["skill_references"][0]["id"] == skill["id"]
         finally:
             await engine.dispose()

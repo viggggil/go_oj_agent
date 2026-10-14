@@ -613,8 +613,12 @@ Agent 都会检查该限制。请求字段如下：
 `message` 必须是 1–32,000 个字符且不能全为空白；新会话可省略 `conversation_id`，
 继续会话时必须提供 UUID；
 PR5 新增可选 `agent_key`、`skill_key`，格式为 `[a-z][a-z0-9_]{1,63}`。数据库模式省略
-Agent 时使用部署默认 key，省略 Skill 使用 Agent 绑定的默认版本；显式 Skill 只能选择绑定
-集合中的 key，绑定始终解析具体 UUID。Demo 模式只接受省略或 `demo`。
+Agent 时使用部署默认 key。数据库真实模型模式省略 Skill 时，固定 Agent 绑定的可用技能
+UUID、名称、适用说明和渲染文本，交给模型在本次回答中自行参考；缺少 Context 的技能不参与，
+若全部缺少则返回 `AGENT_PROMPT_CONTEXT_REQUIRED`。默认 Skill 排在参考集合首位，
+运行快照的 skill_key/skill_id 是兼容默认绑定标识，不代表模型实际采用的技能。
+显式 Skill 仍只选择绑定集合中的 key，沿用单技能说明/权限/预算行为；Fake 模式沿用默认 Skill。
+普通聊天页面只发送 Agent，不提供 Skill 选择。Demo 模式只接受省略或 `demo`。
 管理员/test Agent 仅允许可信角色 `admin`、`system_admin` 或 `agent_admin`，不可访问、归档、停用、
 依赖停用、测试到期与不存在统一返回 404。不同 Agent 不可共享会话，返回 409。
 Prompt 所需 Context 变量缺失返回 400 `AGENT_PROMPT_CONTEXT_REQUIRED`，不固定预取业务数据。
@@ -1576,3 +1580,12 @@ RabbitMQ：
 
 两条只读接口均经 Gateway 用户鉴权、具体路径委托与 Agent owner 校验，无需管理员角色。
 恢复会话后聊天仍使用原 Agent；选择其他 Agent 会开始新对话。Chat POST 不自动重放。
+
+### 自动 Skill 参考（Issue #169）
+
+Run 快照新增 `skill_selection`（automatic/explicit）、`skill_references`，仅 Agent 自有库保存；
+不增加 REST/SSE 字段，不向用户暴露技能正文或原始配置。自动模式的工具范围为可用 react
+技能工具并集 ∩ Agent 白名单 ∩ 系统启用的只读工具；最终业务权限仍由 Go 服务检查。
+预算保守取 Agent、部署上限与参与参考技能的兼容旧预算最小值。一次模型请求同时参考技能，
+没有独立分类请求；超过输入预算明确失败，不静默丢弃说明。模型采用哪个说明是回答行为，
+当前不生成可靠的 selected_skill 审计字段。

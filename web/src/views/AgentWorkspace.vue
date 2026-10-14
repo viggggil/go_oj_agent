@@ -1,9 +1,6 @@
 <template>
-  <section
-    class="agent-workspace"
-    :class="{ 'agent-chat-workspace': route.path === '/agent/chat' }"
-  >
-    <div v-if="route.path !== '/agent/chat'" class="agent-mobile-bar">
+  <section class="agent-workspace">
+    <div class="agent-mobile-bar">
       <strong>Agent 工作区</strong>
       <button
         class="agent-icon secondary"
@@ -15,7 +12,7 @@
         <Menu :size="18" />
       </button>
     </div>
-    <aside v-if="route.path !== '/agent/chat'" class="agent-sidebar" :class="{ open }">
+    <aside class="agent-sidebar" :class="{ open }">
       <div class="agent-sidebar-title">
         <strong>Agent</strong
         ><button
@@ -45,11 +42,7 @@
       <p v-if="!auth.user && !auth.loading" class="agent-side-note">正在确认账号权限…</p>
       <p v-if="auth.user && !isAdmin" class="agent-side-note">当前账号只能使用对话</p>
     </aside>
-    <div
-      v-if="open && route.path !== '/agent/chat'"
-      class="agent-sidebar-backdrop"
-      @click="open = false"
-    ></div>
+    <div v-if="open" class="agent-sidebar-backdrop" @click="open = false"></div>
     <main class="agent-main">
       <p v-if="auth.profileError" class="error" role="alert">
         无法确认账号权限。<button class="link" @click="retry">重试</button>

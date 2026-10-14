@@ -745,3 +745,48 @@ async def test_stream_disconnect_after_200_is_visible_without_replay(
         )
     finally:
         await client.close()
+
+
+async def test_automatic_skill_references_reach_model_without_extra_call() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame(delta()), frame(complete())]),
+        )
+
+    value = configured()
+    value.config_snapshot.update(
+        skill_selection="automatic",
+        skill_prompt_text=None,
+        skill_references=[
+            {
+                "id": str(uuid4()),
+                "key": "explain_algorithm",
+                "name": "算法讲解",
+                "description": "理解算法与复杂度",
+                "text": "从直觉、步骤、复杂度解释算法。",
+            },
+            {
+                "id": str(uuid4()),
+                "key": "problem_hint",
+                "name": "题目提示",
+                "description": "按需给提示",
+                "text": "只给提示，避免直接公布完整代码。",
+            },
+        ],
+    )
+    client = client_for(handler)
+    try:
+        events = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert events[-1].type == "done" and len(calls) == 1
+        instructions = calls[0]["instructions"]
+        assert "自行采用适用的技能说明" in instructions
+        assert "从直觉、步骤、复杂度解释算法。" in instructions
+        assert "只给提示，避免直接公布完整代码。" in instructions
+        assert "本轮没有访问题目" in instructions and "tools" not in calls[0]
+    finally:
+        await client.close()

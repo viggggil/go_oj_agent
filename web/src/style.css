@@ -1448,12 +1448,6 @@ dd {
   }
 }
 
-.agent-chat-workspace {
-  display: block;
-}
-.agent-chat-workspace .agent-main {
-  padding: 0;
-}
 .agent-chat-page {
   max-width: 960px;
   margin: 0 auto;
@@ -1554,6 +1548,9 @@ dd {
 }
 .chat-compose textarea {
   width: 100%;
+  min-height: 64px;
+  max-height: 180px;
+  padding: 0.55rem 0.7rem;
   resize: vertical;
   box-sizing: border-box;
 }
@@ -1568,8 +1565,7 @@ dd {
   color: #6b7280;
   font-size: 0.85rem;
 }
-.chat-agent-select,
-.chat-skill-select {
+.chat-agent-select {
   display: flex;
   gap: 0.35rem;
   align-items: center;
