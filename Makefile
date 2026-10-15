@@ -136,3 +136,10 @@ infra-down:
 
 dev:
 	@echo "dev workflow is not wired yet"
+
+.PHONY: rag-test-integration rag-corpus-check
+rag-test-integration:
+	@UV="$(UV)" ./tests/rag/run.sh
+
+rag-corpus-check:
+	@python3 scripts/build_algorithm_corpus.py

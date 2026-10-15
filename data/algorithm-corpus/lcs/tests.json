@@ -1,0 +1,46 @@
+[
+  {
+    "input": "abcde\nace\n",
+    "output": "3\n"
+  },
+  {
+    "input": "abc\ndef\n",
+    "output": "0\n"
+  },
+  {
+    "input": "aaa\naa\n",
+    "output": "2\n"
+  },
+  {
+    "input": "feadfbbeefcfbbeeecaeefbefafafdddcfcbebefdcffcdcfebadffcedabdddcfeecaddcdffdddaaeccffdaaacfecbeaebdda\ncebacddfdbeecbdbdcaf\n",
+    "output": "18\n"
+  },
+  {
+    "input": "eabeadfdcbbcbafbefedabcaebdbfaeabddacefeecdddfbbffddfccaafcdcdfeffddcaaecafbdfbbfeefbfbfdaccbcddcddb\nfeefbfbfdaccbcddcddb\n",
+    "output": "20\n"
+  },
+  {
+    "input": "afbaeffebdbaaebaccfcfeedabbaacdeddedffabcdafafaffcfeaccdddecbaacddcceedaeaddccbdeaccdbbbfcbadcddbcaf\nbafddbdfeeceecaeabfb\n",
+    "output": "19\n"
+  },
+  {
+    "input": "feceecfacdcecdfdffdbdbddfaeceaeddadbfaffbfafcbffeafdecccdcadaadbbadbcbaaaccccdfeadfaecefdcdacfcbdbca\nadfaecefdcdacfcbdbca\n",
+    "output": "20\n"
+  },
+  {
+    "input": "feefcddcebaadedbeeddbcdacdbdeebefcdcafdaccdebdcfbeeaffecfeccaaebdaedacaeddaacecabcebcecccdcceeedfadc\nbfcddddeccbebfefcbab\n",
+    "output": "19\n"
+  },
+  {
+    "input": "dbdeecbafbeefeaaaecfdaaefcfdaddbcdbeadebaaedbebafbfcbebccdcfaeefebbbbbbbeafaefbdeaadbdfffcdedefeafbe\neaadbdfffcdedefeafbe\n",
+    "output": "20\n"
+  },
+  {
+    "input": "eebaeaaadadfaedfaabdaedaafeeebeefafbbefdfaeedcafffabeedcafaceeedfdfcababbfcacdbdfdfafadffffcaebccfec\nbbeceeeaefbbacdadbbc\n",
+    "output": "18\n"
+  },
+  {
+    "input": "ebbdfaaaafeaceedbedafdaccacadbcfcafcbccecbdcdcaffacedacbbffaacaefaadccdedecbefdeddeabefaacdedfbbadab\nddeabefaacdedfbbadab\n",
+    "output": "20\n"
+  }
+]

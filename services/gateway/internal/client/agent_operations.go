@@ -10,6 +10,8 @@ import (
 
 const AgentJSONOperation = "HTTP Agent JSON"
 
+var agentRAG = regexp.MustCompile(`^/api/v1/admin/agent/rag/documents/([0-9a-f-]{36})(?:/(enable|archive|retry))?$`)
+
 var agentResource = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)(?:/([a-z][a-z0-9_]{1,63}))?(?:/(versions|archive|restore|disable|enable)(?:/([0-9a-f-]{36}))?)?$`)
 var agentSkills = regexp.MustCompile(`^/api/v1/agent/agents/[a-z][a-z0-9_]{1,63}/skills$`)
 var agentMessages = regexp.MustCompile(`^/api/v1/agent/conversations/([0-9a-f-]{36})/messages$`)
@@ -19,6 +21,18 @@ var agentVersion = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skil
 func AgentOperation(method, path string) (string, error) {
 	allowed := false
 	switch {
+	case path == "/api/v1/admin/agent/rag/knowledge-bases" || path == "/api/v1/admin/agent/rag/documents":
+		allowed = method == http.MethodGet || method == http.MethodPost
+	case path == "/api/v1/admin/agent/rag/search":
+		allowed = method == http.MethodPost
+	case agentRAG.MatchString(path):
+		match := agentRAG.FindStringSubmatch(path)
+		id, err := uuid.Parse(match[1])
+		expected := http.MethodGet
+		if match[2] != "" {
+			expected = http.MethodPost
+		}
+		allowed = err == nil && id.String() == match[1] && method == expected
 	case path == AgentChatPath:
 		allowed = method == http.MethodPost
 	case path == "/api/v1/agent/conversations" || path == "/api/v1/agent/agents" || path == "/api/v1/admin/agent/model-options" || path == "/api/v1/admin/agent/tools" || agentSkills.MatchString(path):

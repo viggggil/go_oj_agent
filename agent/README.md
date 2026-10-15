@@ -610,3 +610,22 @@ PR5 的 Agent、Prompt、Skill、Model 使用 `agent_config_resources`、`agent_
 - 配置替换和归档必须可审计，历史配置可以复制恢复，运行快照可复现。
 - 写 Tool 默认关闭，启用需要角色、确认和审计。
 - Tool 次数、计划步数、Token 和时间必须有上限。
+
+
+## RAG PR1：摄取与检索内核
+
+已实现 Qdrant + 本地 `BAAI/bge-small-zh-v1.5`（512 维、固定 revision）的管理员知识 API、
+MinIO 不可变文档、MySQL 租约索引 worker、幂等上传与版本发布。模型检索工具及 RAG 页面分别留给 PR3/PR2，
+不能把管理员检索 API 视为普通用户模型权限。完整契约见 `docs/api.md`，部署见 `deploy/compose/README.md`。
+
+`make infra-up` 包含 embedding、qdrant、rag-worker。Embedding 镜像构建时显式下载固定模型，
+运行阶段 `HF_HUB_OFFLINE=1`，不调用 su8 Embedding。查询和索引使用同一 tokenizer/模型/归一化，
+文档 360 token 窗口、48 token 重叠，尽量选择换行边界；长代码保留原文偏移并拆开，不承诺每个块独立可执行。
+
+```bash
+make rag-test-integration  # 隔离真实 MySQL / MinIO / Qdrant / BGE，退出清理测试项目
+make rag-corpus-check     # 50 题参考程序与 550 组测试
+```
+
+语料导入与真实判题验证见 `data/algorithm-corpus/README.md`。普通用户不能获取原文；PR3 接入模型时
+还必须通过业务 gRPC 验证题号权限并固定 Run 的版本清单，不能直接复用管理员搜索作为普通用户工具。

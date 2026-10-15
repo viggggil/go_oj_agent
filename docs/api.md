@@ -877,7 +877,7 @@ POST /api/v1/admin/agent/knowledge/documents/{document_id}/archive
 ```
 
 知识库 API 管理文档元数据、版本、切分、索引状态、发布和归档。文档原文存 MinIO，
-向量存 Chroma 或 Qdrant；检索结果必须带文档版本和引用位置。
+向量存 Qdrant；检索结果必须带文档版本和引用位置。
 
 Eval 与观测：
 
@@ -1589,3 +1589,40 @@ Run 快照新增 `skill_selection`（automatic/explicit）、`skill_references`�
 预算保守取 Agent、部署上限与参与参考技能的兼容旧预算最小值。一次模型请求同时参考技能，
 没有独立分类请求；超过输入预算明确失败，不静默丢弃说明。模型采用哪个说明是回答行为，
 当前不生成可靠的 selected_skill 审计字段。
+
+
+## Agent RAG PR1 管理接口
+
+前缀 `/api/v1/admin/agent/rag`。Gateway 和 Agent 均只允许 `admin`、`system_admin`、`agent_admin`；
+Gateway 签署绑定具体方法/路径的短期委托。普通用户没有知识列表/原文/下载接口，RAG API 不属于聊天 SSE。
+`AGENT_ADMIN_ENABLED` 与 `AGENT_RAG_ENABLED` 均须开启。PR1 保持 `knowledge_scope` 只允许为空，后续 PR2/3 接入配置和模型工具。
+
+| 方法与相对路径 | 请求 | 响应 |
+| --- | --- | --- |
+| GET `/knowledge-bases` | page/page_size | items + page |
+| POST `/knowledge-bases` | name | knowledge_base |
+| GET `/documents` | page/page_size，可选 base_id UUID | items + page |
+| POST `/documents` | 下述 Upload | document（初始 PENDING） |
+| GET `/documents/{uuid}` | 无查询参数 | document 含当前版本 content、索引状态及 active_version |
+| POST `/documents/{uuid}/enable` | expected_version UUID | result：document_id/version_id/action |
+| POST `/documents/{uuid}/archive` | 同上 | 同上，立即排除后续检索 |
+| POST `/documents/{uuid}/retry` | 同上，仅 FAILED 允许 | 同上，重新排队 |
+| POST `/search` | base_ids（1–20 个 UUID）、query（1–400 字符）、top_k（1–10，默认 5）、可选 problem_id | matches |
+
+所有写入须携带规范 UUID `X-Request-ID`。上传为受限 JSON 文本（兼容现有 Gateway JSON 代理），
+并非任意文件路径/下载 URL：`base_id,title,filename,content,kind(editorial/lecture/platform),problem_id?,source_url?,tags?`。
+替换需同时提供 `document_id` 和 `expected_version`，不符返回 409。仅 UTF-8 Markdown/TXT，正文非空、
+无 NUL、最多 120000 字节；整个 JSON 上限 262144 字节。名称/标题最多 128 字符，标签最多 20 个、每个最多 64 字符。
+索引完成后 active_version 切换但新文档仍需管理员 enable；已有启用文档更新后自动使用完整就绪新版本。
+启停要求 current_version 一致，归档不物理删除文档。列表 page≥1、page_size≤50，有稳定顺序。
+
+文档返回 id（版本 UUID）、document_id、base_id、enabled、active_version、标题/类型/题号/来源/标签/文件名、
+hash/大小、模型 revision、splitter 版本、创建者/时间、state/chunk_count/error_code；仅详情额外含 content，
+不返回 MinIO object key 或凭据。检索测试仅管理员可用，匹配项含 score、内部文档/版本/知识库 UUID、标题、
+problem_id、number、text、section、start/end（原文 Unicode 字符偏移，非字节）。最多 2000 个启用版本，超出返回 AGENT_UNAVAILABLE，不部分检索或回退全库；
+Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR1 不对普通模型开放此管理员测试接口。
+
+错误沿用单字段 `{code}`：400 AGENT_INVALID_ARGUMENT；403 AGENT_FORBIDDEN；404 AGENT_RAG_NOT_FOUND；
+409 AGENT_RAG_STALE / AGENT_RAG_NOT_READY / AGENT_RAG_REQUEST_CONFLICT；413/415 沿用请求错误；
+503 AGENT_RAG_DEPENDENCY_UNAVAILABLE / AGENT_UNAVAILABLE / AGENT_MANAGEMENT_DISABLED。依赖错误脱敏，
+不返回第三方原始正文。此增量不改变已有配置、REST/gRPC/SSE 契约，不新增 MQ 事件。

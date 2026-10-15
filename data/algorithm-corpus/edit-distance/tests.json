@@ -1,0 +1,46 @@
+[
+  {
+    "input": "horse\nros\n",
+    "output": "3\n"
+  },
+  {
+    "input": "a\na\n",
+    "output": "0\n"
+  },
+  {
+    "input": "abc\nx\n",
+    "output": "3\n"
+  },
+  {
+    "input": "debaabdeddefadfebdeaeebeaedaebaeddfbfcbbcddfbaccfbfebefdabaafdacebcdbccedaceeefbfbbaeaebbcadddceaefb\nfdbefdeacbffaeadbbce\n",
+    "output": "81\n"
+  },
+  {
+    "input": "afbeeefddcbafbdfbafcbcccafcfccfbcdebfbdaebdebdfebaeadabbbffbdbacfbdbbdaabceaebfcbebfacbccbadbaadefec\nbebfacbccbadbaadefec\n",
+    "output": "80\n"
+  },
+  {
+    "input": "acfcabaedaeefaabfebeffbaeafedebfabfdfafcfabbfccceecfcdaccdfbdaecacbccbccaafeeedcaffdfbecededbbdffcaf\nbdbccdbafaffebbccbaf\n",
+    "output": "82\n"
+  },
+  {
+    "input": "cbcfabfccbcfbaedacbabeeefceacbccfdffedaaedabdebcfabadbdadffdedbbadceafeffaacdcbfefafcdeaaafbcdcdedad\nefafcdeaaafbcdcdedad\n",
+    "output": "80\n"
+  },
+  {
+    "input": "acaebeebcdfbbbcedccbdcedaccabecafeaccdcdbdbddafeabbdcbfaffaeaadadaeebadafeccdfbebdfafbdeddfacaefbdda\naddcdcbcaaeebfcdeefc\n",
+    "output": "80\n"
+  },
+  {
+    "input": "bbeefdbecedbaeeadbbfabfacebdddebcbdeeadeafaaaaadbadccbbaeebdfdfeafddfadcbcbfddadcdfbfcafdbabedfdcbde\ncdfbfcafdbabedfdcbde\n",
+    "output": "80\n"
+  },
+  {
+    "input": "afccfdcfdeacdeccbfbcdbdbedbbcaacbabfbabaeecaeeffededfafaffdccbddcccabababebcaeaacdebbffdcdfefdcdacdf\nbfaecacabaaffbecbdba\n",
+    "output": "82\n"
+  },
+  {
+    "input": "abcbfefdefddffebdbbcfcdbaaecdeadeffedaeedeeedadebddaddcefbddffebadeaeaacaefdfffefedefcacfaedeffcbadc\nfedefcacfaedeffcbadc\n",
+    "output": "80\n"
+  }
+]

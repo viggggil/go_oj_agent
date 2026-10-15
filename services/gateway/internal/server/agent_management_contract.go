@@ -7,6 +7,9 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasPrefix(path, "/api/v1/admin/agent/rag/") {
+		return validRAGEnvelope(path, payload)
+	}
 	if strings.HasPrefix(path, "/api/v1/agent/conversations") {
 		return validAgentHistory(path, payload)
 	}

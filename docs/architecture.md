@@ -40,7 +40,7 @@ flowchart TB
 
     subgraph AI["AI Domain"]
         Agent["Agent Service<br/>FastAPI + LangChain/LangGraph"]
-        Vector["Chroma / Qdrant"]
+        Vector["Qdrant"]
     end
 
     subgraph Infra["Infrastructure"]
@@ -793,7 +793,7 @@ flowchart LR
     Storage --> Worker["RAG Ingestion Worker"]
     Worker --> Split["Loader + Splitter"]
     Split --> Embed["Embedding"]
-    Embed --> Vector[("Chroma / Qdrant")]
+    Embed --> Vector[("Qdrant")]
 
     Query["Agent Query"] --> Retriever["Retriever"]
     Retriever --> Vector
@@ -813,7 +813,7 @@ language
 document_type
 ```
 
-Development 使用 Chroma；Production-like 可替换 Qdrant。
+开发与部署统一使用 Qdrant。中文向量化固定采用本地 `BAAI/bge-small-zh-v1.5`，与 su8 回答模型独立。PR1 的管理员摄取/检索 API、MySQL 租约 worker 和文档版本发布已实现；聊天工具在后续 PR 接入。选型与边界见 ADR-0002。
 
 ---
 

@@ -55,6 +55,8 @@ def create_app(
         business_clients = None
         business_tools = None
         model_client = None
+        rag = None
+        rag_clients = None
         management = None
         verifier = None
         store = None
@@ -78,6 +80,15 @@ def create_app(
                     config,
                     registry,
                 )
+            if config.rag_enabled:
+                from app.rag.clients import RagClients
+                from app.rag.service import KnowledgeService
+                from app.rag.store import KnowledgeStore
+
+                if not isinstance(database, DatabaseProbe) or database.engine is None:
+                    raise ConfigurationError("RAG requires an Agent database")
+                rag_clients = RagClients(config)
+                rag = KnowledgeService(KnowledgeStore(database.engine), rag_clients)
             if config.chat_enabled:
                 assert verifier is not None
                 if run_service_factory is not None:
@@ -143,6 +154,7 @@ def create_app(
                 management=management,
                 verifier=verifier,
                 store=store,
+                rag=rag,
             )
             logger.info("Agent service started")
             yield
@@ -150,6 +162,8 @@ def create_app(
             try:
                 try:
                     try:
+                        if rag_clients is not None:
+                            await rag_clients.close()
                         if controller is not None:
                             async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                                 await controller.close()
@@ -202,6 +216,9 @@ def create_app(
         return JSONResponse(status_code=500, content=error.model_dump())
 
     application.include_router(router)
+    from app.rag.api import router as rag_router
+
+    application.include_router(rag_router)
     application.include_router(management_router)
     application.include_router(history_router)
     if config.chat_enabled:
