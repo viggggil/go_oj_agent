@@ -140,10 +140,12 @@ class AgentConfig(ImmutableConfig):
     visibility: Literal["user", "admin"] = "user"
     is_test: bool = Field(default=False, strict=True)
     test_expires_at: datetime | None = None
-    knowledge_scope: tuple[UUID, ...] = Field(default=(), max_length=0)
+    knowledge_scope: tuple[UUID, ...] = Field(default=(), max_length=20)
 
     @model_validator(mode="after")
     def validate_bindings(self) -> "AgentConfig":
+        if len(set(self.knowledge_scope)) != len(self.knowledge_scope):
+            raise ValueError("Duplicate knowledge groups")
         if len(set(self.skill_ids)) != len(self.skill_ids):
             raise ValueError("Duplicate skills")
         if self.default_skill_id not in self.skill_ids:

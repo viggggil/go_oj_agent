@@ -15,7 +15,15 @@ from app.core.auth import InvalidDelegation
 from app.core.operations import ADMIN_ROLES, operation
 from app.core.resources import get_resources
 from app.models.configuration import ConfigError
-from app.rag.models import BaseInput, Page, SearchInput, StateInput, Upload
+from app.rag.models import (
+    BaseInput,
+    Page,
+    PreviewInput,
+    RenameInput,
+    SearchInput,
+    StateInput,
+    Upload,
+)
 from app.rag.service import KnowledgeService
 from app.rag.store import public
 
@@ -45,7 +53,15 @@ async def handle(request: Request) -> JSONResponse:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                 page = Page.model_validate(parameters)
                 doc_id = request.path_params.get("document_id")
-                if doc_id:
+                if base_id := request.path_params.get("base_id"):
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    result = await service.store.base_detail(str(base_id))
+                elif doc_id and request.url.path.endswith("/versions"):
+                    if page.base_id:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    result = await service.store.page("documents", page, str(doc_id))
+                elif doc_id:
                     if parameters:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                     row = await service.store.detail(str(doc_id))
@@ -78,6 +94,19 @@ async def dispatch(request: Request, service: KnowledgeService, principal: Any) 
     if path.endswith("/knowledge-bases"):
         body = cast(BaseInput, await read_body(request, BaseInput, maximum))
         return await service.store.create_base(principal, body.name)
+    if path.endswith("/rename"):
+        rename = cast(RenameInput, await read_body(request, RenameInput, maximum))
+        return await service.store.rename_base(
+            principal, str(request.path_params["base_id"]), rename.name, rename.expected_name
+        )
+    if path.endswith("/preview"):
+        preview = cast(PreviewInput, await read_body(request, PreviewInput, maximum))
+        chunks = await service.clients.split(preview.content)
+        start = (preview.page - 1) * 20
+        return {
+            "chunks": chunks[start : start + 20],
+            "page": {"page": preview.page, "page_size": 20, "total": len(chunks)},
+        }
     if path.endswith("/documents"):
         upload = cast(Upload, await read_body(request, Upload, maximum))
         return await service.store.upload(principal, upload, service.clients)
@@ -95,8 +124,11 @@ async def dispatch(request: Request, service: KnowledgeService, principal: Any) 
 
 PREFIX = "/api/v1/admin/agent/rag"
 router.add_api_route(f"{PREFIX}/knowledge-bases", handle, methods=["GET", "POST"])
+router.add_api_route(f"{PREFIX}/knowledge-bases/{{base_id:uuid}}", handle, methods=["GET"])
+router.add_api_route(f"{PREFIX}/knowledge-bases/{{base_id:uuid}}/rename", handle, methods=["POST"])
 router.add_api_route(f"{PREFIX}/documents", handle, methods=["GET", "POST"])
 router.add_api_route(f"{PREFIX}/documents/{{document_id:uuid}}", handle, methods=["GET"])
+router.add_api_route(f"{PREFIX}/documents/{{document_id:uuid}}/versions", handle, methods=["GET"])
 # UUID converter 的值在处理时规范化为 str。
 for action in ("enable", "archive", "retry"):
     router.add_api_route(
@@ -106,3 +138,4 @@ for action in ("enable", "archive", "retry"):
         name=action,
     )
 router.add_api_route(f"{PREFIX}/search", handle, methods=["POST"])
+router.add_api_route(f"{PREFIX}/preview", handle, methods=["POST"])

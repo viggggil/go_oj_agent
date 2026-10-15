@@ -1591,25 +1591,31 @@ Run 快照新增 `skill_selection`（automatic/explicit）、`skill_references`�
 当前不生成可靠的 selected_skill 审计字段。
 
 
-## Agent RAG PR1 管理接口
+## Agent RAG 管理接口与分组绑定
 
 前缀 `/api/v1/admin/agent/rag`。Gateway 和 Agent 均只允许 `admin`、`system_admin`、`agent_admin`；
 Gateway 签署绑定具体方法/路径的短期委托。普通用户没有知识列表/原文/下载接口，RAG API 不属于聊天 SSE。
-`AGENT_ADMIN_ENABLED` 与 `AGENT_RAG_ENABLED` 均须开启。PR1 保持 `knowledge_scope` 只允许为空，后续 PR2/3 接入配置和模型工具。
+`AGENT_ADMIN_ENABLED` 与 `AGENT_RAG_ENABLED` 均须开启。PR2 允许 `knowledge_scope` 绑定 0–20 个不重复且已存在的知识分组 UUID；空数组表示不访问任何知识库。
+分组复用 knowledge_base，每份文档属于一个分组，Agent 不逐篇绑定；分组改名不改变 UUID。
+PR3 再接入模型工具和 Run 固定版本清单，不能把管理员测试搜索开放给普通用户。
 
 | 方法与相对路径 | 请求 | 响应 |
 | --- | --- | --- |
 | GET `/knowledge-bases` | page/page_size | items + page |
 | POST `/knowledge-bases` | name | knowledge_base |
+| GET `/knowledge-bases/{uuid}` | 无查询参数 | knowledge_base |
+| POST `/knowledge-bases/{uuid}/rename` | name、expected_name | knowledge_base；名称不符返回 409 |
 | GET `/documents` | page/page_size，可选 base_id UUID | items + page |
 | POST `/documents` | 下述 Upload | document（初始 PENDING） |
 | GET `/documents/{uuid}` | 无查询参数 | document 含当前版本 content、索引状态及 active_version |
+| GET `/documents/{uuid}/versions` | page/page_size，不接受 base_id | items + page；不可变版本元数据、索引状态，含 active_version，不含正文/对象键 |
+| POST `/preview` | content、page（默认 1） | chunks + page；每页 20 个片段，含 number/text/section/start/end，不保存文档 |
 | POST `/documents/{uuid}/enable` | expected_version UUID | result：document_id/version_id/action |
 | POST `/documents/{uuid}/archive` | 同上 | 同上，立即排除后续检索 |
 | POST `/documents/{uuid}/retry` | 同上，仅 FAILED 允许 | 同上，重新排队 |
 | POST `/search` | base_ids（1–20 个 UUID）、query（1–400 字符）、top_k（1–10，默认 5）、可选 problem_id | matches |
 
-所有写入须携带规范 UUID `X-Request-ID`。上传为受限 JSON 文本（兼容现有 Gateway JSON 代理），
+上述 POST（包括 preview/search）须携带规范 UUID `X-Request-ID`。上传为受限 JSON 文本（兼容现有 Gateway JSON 代理），
 并非任意文件路径/下载 URL：`base_id,title,filename,content,kind(editorial/lecture/platform),problem_id?,source_url?,tags?`。
 替换需同时提供 `document_id` 和 `expected_version`，不符返回 409。仅 UTF-8 Markdown/TXT，正文非空、
 无 NUL、最多 120000 字节；整个 JSON 上限 262144 字节。名称/标题最多 128 字符，标签最多 20 个、每个最多 64 字符。
@@ -1620,9 +1626,11 @@ Gateway 签署绑定具体方法/路径的短期委托。普通用户没有知�
 hash/大小、模型 revision、splitter 版本、创建者/时间、state/chunk_count/error_code；仅详情额外含 content，
 不返回 MinIO object key 或凭据。检索测试仅管理员可用，匹配项含 score、内部文档/版本/知识库 UUID、标题、
 problem_id、number、text、section、start/end（原文 Unicode 字符偏移，非字节）。最多 2000 个启用版本，超出返回 AGENT_UNAVAILABLE，不部分检索或回退全库；
-Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR1 不对普通模型开放此管理员测试接口。
+Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR2 仍不对普通模型开放此管理员测试接口。
 
 错误沿用单字段 `{code}`：400 AGENT_INVALID_ARGUMENT；403 AGENT_FORBIDDEN；404 AGENT_RAG_NOT_FOUND；
 409 AGENT_RAG_STALE / AGENT_RAG_NOT_READY / AGENT_RAG_REQUEST_CONFLICT；413/415 沿用请求错误；
 503 AGENT_RAG_DEPENDENCY_UNAVAILABLE / AGENT_UNAVAILABLE / AGENT_MANAGEMENT_DISABLED。依赖错误脱敏，
-不返回第三方原始正文。此增量不改变已有配置、REST/gRPC/SSE 契约，不新增 MQ 事件。
+不返回第三方原始正文。本阶段扩展管理员 REST 与 Agent knowledge_scope 校验，默认空范围兼容已有配置；Go Gateway allowlist/响应校验、Python 服务及 Web 客户端同步更新，不改变 gRPC/SSE，不新增 MQ 事件。
+
+管理员页面位于 `/agent/rag`，保留 Agent 左侧导航，仅管理角色可见；支持分组创建/改名、文档上传与版本编辑、状态刷新/失败重试、启用/归档、切分预览和当前分组检索。正文以纯文本显示，不执行上传 Markdown/HTML。文件在浏览器按 UTF-8 校验后作为受限 JSON 上传。Agent 编辑页按组多选；普通用户直接进入管理 URL 会返回对话页，后端仍独立拒绝管理 API。

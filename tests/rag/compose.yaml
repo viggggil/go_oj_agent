@@ -9,6 +9,9 @@ services:
     ports:
       - "127.0.0.1:${RAG_MYSQL_PORT}:3306"
     volumes:
+      - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_agent.sql:ro
+      - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/502_configuration.sql:ro
+      - ../../migrations/agent/000003_create_model_provider.up.sql:/docker-entrypoint-initdb.d/503_provider.sql:ro
       - ../../migrations/agent/000004_create_knowledge.up.sql:/docker-entrypoint-initdb.d/504_knowledge.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot-password"]

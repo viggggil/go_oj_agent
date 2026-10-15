@@ -315,6 +315,17 @@ class ConfigurationStore:
         preserved_ids: tuple[str, ...],
     ) -> None:
         old_links: set[str] = set()
+        if isinstance(body, AgentConfig) and body.knowledge_scope:
+            from app.rag.schema import bases
+
+            identifiers = [str(value) for value in body.knowledge_scope]
+            found = (
+                (await connection.execute(select(bases.c.id).where(bases.c.id.in_(identifiers))))
+                .scalars()
+                .all()
+            )
+            if set(found) != set(identifiers):
+                raise ConfigError("AGENT_CONFIGURATION_REFERENCE_INVALID")
         await self._check_credential(connection, body, lock=True)
         for old_id in preserved_ids:
             old_links.update(

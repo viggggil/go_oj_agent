@@ -615,7 +615,7 @@ PR5 的 Agent、Prompt、Skill、Model 使用 `agent_config_resources`、`agent_
 ## RAG PR1：摄取与检索内核
 
 已实现 Qdrant + 本地 `BAAI/bge-small-zh-v1.5`（512 维、固定 revision）的管理员知识 API、
-MinIO 不可变文档、MySQL 租约索引 worker、幂等上传与版本发布。模型检索工具及 RAG 页面分别留给 PR3/PR2，
+MinIO 不可变文档、MySQL 租约索引 worker、幂等上传与版本发布。PR2 提供 `/agent/rag` 分组与文档管理页，Agent 按组选择可访问资料；模型检索工具留给 PR3，
 不能把管理员检索 API 视为普通用户模型权限。完整契约见 `docs/api.md`，部署见 `deploy/compose/README.md`。
 
 `make infra-up` 包含 embedding、qdrant、rag-worker。Embedding 镜像构建时显式下载固定模型，
@@ -629,3 +629,5 @@ make rag-corpus-check     # 50 题参考程序与 550 组测试
 
 语料导入与真实判题验证见 `data/algorithm-corpus/README.md`。普通用户不能获取原文；PR3 接入模型时
 还必须通过业务 gRPC 验证题号权限并固定 Run 的版本清单，不能直接复用管理员搜索作为普通用户工具。
+
+PR2 中知识库即分组：管理员可创建/改名分组，按分组上传题解、讲义和平台文档，查看正文与版本、预览切分、刷新索引状态、重试失败任务、启用/归档和测试检索。Agent `knowledge_scope` 绑定最多 20 个现有分组，空范围不访问知识库；改名不影响绑定。普通用户无法直接访问管理文档。

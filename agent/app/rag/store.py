@@ -99,6 +99,37 @@ class KnowledgeStore:
 
         return await self.write(principal, "create_base", {"name": name}, mutation)
 
+    async def base_detail(self, base_id: str) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            row = (
+                (await conn.execute(select(bases).where(bases.c.id == base_id)))
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise ConfigError("AGENT_RAG_NOT_FOUND", 404)
+            return {"knowledge_base": public(dict(row))}
+
+    async def rename_base(
+        self, principal: Principal, base_id: str, name: str, expected_name: str
+    ) -> dict[str, Any]:
+        async def mutation(conn: AsyncConnection) -> dict[str, Any]:
+            row = (
+                (await conn.execute(select(bases).where(bases.c.id == base_id).with_for_update()))
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise ConfigError("AGENT_RAG_NOT_FOUND", 404)
+            if row["name"] != expected_name:
+                raise ConfigError("AGENT_RAG_STALE", 409)
+            await conn.execute(update(bases).where(bases.c.id == base_id).values(name=name))
+            return {"knowledge_base": public(dict(row) | {"name": name})}
+
+        return await self.write(
+            principal, f"rename:{base_id}", {"name": name, "expected_name": expected_name}, mutation
+        )
+
     async def upload(
         self,
         principal: Principal,
@@ -211,7 +242,7 @@ class KnowledgeStore:
 
         return await self.write(principal, "upload", body.model_dump(mode="json"), mutation)
 
-    def document_query(self) -> Any:
+    def document_query(self, *, history: bool = False) -> Any:
         return select(
             documents.c.base_id,
             documents.c.enabled,
@@ -221,9 +252,12 @@ class KnowledgeStore:
             tasks.c.chunk_count,
             tasks.c.error_code,
         ).select_from(
-            documents.join(versions, documents.c.current_version == versions.c.id).join(
-                tasks, tasks.c.version_id == versions.c.id
-            )
+            documents.join(
+                versions,
+                versions.c.document_id == documents.c.id
+                if history
+                else documents.c.current_version == versions.c.id,
+            ).join(tasks, tasks.c.version_id == versions.c.id)
         )
 
     async def detail(self, document_id: str) -> dict[str, Any]:
@@ -243,13 +277,25 @@ class KnowledgeStore:
                 raise ConfigError("AGENT_RAG_NOT_FOUND", 404)
             return dict(row)
 
-    async def page(self, resource: str, page: Page) -> dict[str, Any]:
-        query = select(bases) if resource == "knowledge-bases" else self.document_query()
+    async def page(
+        self, resource: str, page: Page, document_id: str | None = None
+    ) -> dict[str, Any]:
+        if document_id:
+            await self.detail(document_id)
+        query = (
+            select(bases)
+            if resource == "knowledge-bases"
+            else self.document_query(history=document_id is not None)
+        )
+        if document_id:
+            query = query.where(documents.c.id == document_id)
         if page.base_id:
             if resource == "knowledge-bases":
                 raise ConfigError("AGENT_INVALID_ARGUMENT")
             query = query.where(documents.c.base_id == str(page.base_id))
-        ordering = bases if resource == "knowledge-bases" else documents
+        ordering = (
+            bases if resource == "knowledge-bases" else versions if document_id else documents
+        )
         async with self.engine.connect() as conn:
             total = (
                 await conn.execute(select(func.count()).select_from(query.subquery()))

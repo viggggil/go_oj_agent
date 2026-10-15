@@ -24,6 +24,12 @@ async function mockManagement(page: Page, roles = ['admin']) {
   const current = new Map<string, Config>(),
     versions = new Map<string, Config>(),
     writes: string[] = []
+  const knowledgeGroup = {
+    id: randomUUID(),
+    name: '题解',
+    created_by: 7,
+    created_at: new Date().toISOString(),
+  }
   const model = {
     id: randomUUID(),
     key: 'su8_flash',
@@ -93,6 +99,10 @@ async function mockManagement(page: Page, roles = ['admin']) {
         ? respond({ model_option: { ...model, archived: false, disabled: false, available: true } })
         : paged([model])
     if (kind === 'tools') return paged([])
+    if (kind === 'rag')
+      return parts[5] === 'knowledge-bases' && parts[6]
+        ? respond({ knowledge_base: knowledgeGroup })
+        : paged([knowledgeGroup])
     if (method !== 'GET') {
       writes.push(route.request().headers()['x-request-id'])
       if (failNext) {
@@ -176,6 +186,7 @@ async function mockManagement(page: Page, roles = ['admin']) {
     versions,
     writes,
     model,
+    knowledgeGroup,
     create,
     fail: (status: number) => {
       failNext = status
@@ -209,6 +220,7 @@ test('管理员通过嵌套创建保留表单，保存 test Agent，并查看历
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue('算法测试助手')
   await page.getByLabel('选择模型版本').selectOption(state.model.id)
+  await page.getByRole('checkbox', { name: '题解', exact: true }).check()
   await page.getByLabel('测试 Agent', { exact: true }).check()
   await page.getByLabel('到期时间（本地时区）').fill('2099-10-10T12:00')
   await page.getByRole('button', { name: '创建', exact: true }).click()
@@ -217,6 +229,7 @@ test('管理员通过嵌套创建保留表单，保存 test Agent，并查看历
   expect(first.content.prompt_id).toBe(state.named('基础规则').id)
   expect(first.content.skill_ids).toEqual([state.named('算法讲解').id])
   expect(first.content.visibility).toBe('admin')
+  expect(first.content.knowledge_scope).toEqual([state.knowledgeGroup.id])
   await page.getByLabel('名称', { exact: true }).fill('新测试助手')
   await page.getByRole('button', { name: '保存新版本' }).click()
   await expect(page.getByRole('status')).toContainText('已保存版本')

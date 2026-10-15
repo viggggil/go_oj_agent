@@ -138,6 +138,8 @@ class ManagementService:
         if isinstance(body, SkillConfig) and body.execution_mode not in {"direct", "react"}:
             raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         if isinstance(body, AgentConfig):
+            if body.knowledge_scope and not self.settings.rag_enabled:
+                raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
             model = await self.store._by_id(connection, str(body.model_profile_id))
             if (
                 not isinstance(model.content, ModelProfileConfig)

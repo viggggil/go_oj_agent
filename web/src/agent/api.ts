@@ -98,6 +98,11 @@ export function agentError(error: unknown): string {
   if (!error.response) return '请求未确认，请检查网络后重试'
   const body = error.response.data as { reason?: string; code?: string }
   const messages: Record<string, string> = {
+    AGENT_RAG_STALE: '文档或分组已变化，请刷新当前版本后再操作',
+    AGENT_RAG_REQUEST_CONFLICT: '请求编号已用于其他内容，请重新确认本次操作',
+    AGENT_RAG_NOT_READY: '文档尚未完成索引，请等待索引就绪后启用',
+    AGENT_RAG_NOT_FOUND: '知识分组或文档不存在，请刷新后重试',
+    AGENT_RAG_DEPENDENCY_UNAVAILABLE: '知识检索依赖暂不可用，请稍后重试',
     AGENT_CONFIGURATION_STALE: '配置已被修改，请查看当前版本后再保存',
     AGENT_CONFIGURATION_REQUEST_CONFLICT: '请求编号已用于其他操作，请重新确认本次内容',
     AGENT_CONFIGURATION_REFERENCE_INVALID: '绑定版本不存在、已归档或已停用，请检查依赖',

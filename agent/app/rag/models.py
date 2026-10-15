@@ -18,6 +18,29 @@ class Input(BaseModel):
 class BaseInput(Input):
     name: str = Field(min_length=1, max_length=128)
 
+    @field_validator("name")
+    @classmethod
+    def name_valid(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Blank group name")
+        return value
+
+
+class RenameInput(BaseInput):
+    expected_name: str = Field(min_length=1, max_length=128)
+
+
+class PreviewInput(Input):
+    content: str = Field(min_length=1, max_length=120_000)
+    page: int = Field(default=1, ge=1, le=1000)
+
+    @field_validator("content")
+    @classmethod
+    def content_valid(cls, value: str) -> str:
+        if not value.strip() or "\x00" in value or len(value.encode("utf-8")) > 120_000:
+            raise ValueError("Invalid document")
+        return value
+
 
 class Upload(Input):
     base_id: UUID
