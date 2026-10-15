@@ -20,6 +20,20 @@ func validRAGBase(raw json.RawMessage) bool {
 	return ok && agentJSONTypes(object, "id name created_at", "", "created_by")
 }
 func validRAGEnvelope(path string, payload map[string]json.RawMessage) bool {
+	if value, ok := payload["chunks"]; ok {
+		var chunks []json.RawMessage
+		page, valid := agentJSONFields(payload["page"], "page page_size total", "")
+		if len(payload) != 2 || !valid || !agentJSONTypes(page, "", "", "page page_size total") || !agentJSONRequired(value, &chunks) || chunks == nil || len(chunks) > 20 {
+			return false
+		}
+		for _, chunk := range chunks {
+			fields, valid := agentJSONFields(chunk, "number text section start end", "")
+			if !valid || !agentJSONTypes(fields, "text section", "", "number start end") {
+				return false
+			}
+		}
+		return true
+	}
 	if value, ok := payload["document"]; ok {
 		return len(payload) == 1 && validRAGDocument(value)
 	}

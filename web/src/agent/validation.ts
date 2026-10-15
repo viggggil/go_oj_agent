@@ -64,6 +64,11 @@ export function validateConfiguration(kind: Resource, key: string, body: Content
     return ['direct', 'react'].includes(skill.execution_mode) ? null : '请选择支持的回答方式'
   }
   const agent = body as AgentContent
+  if (
+    agent.knowledge_scope.length > 20 ||
+    new Set(agent.knowledge_scope).size !== agent.knowledge_scope.length
+  )
+    return '知识分组不能重复，最多绑定 20 个'
   if (!agent.prompt_id) return '请选择 Prompt 版本'
   for (const [field, label, min, max, step] of budgetFields) {
     const value = agent.budget[field]

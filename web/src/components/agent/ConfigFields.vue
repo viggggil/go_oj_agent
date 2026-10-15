@@ -86,6 +86,7 @@
         <legend>模型</legend>
         <ModelPicker v-model="agent.model_profile_id" />
       </fieldset>
+      <KnowledgePicker v-model="agent.knowledge_scope" />
       <div class="agent-field-grid">
         <label
           >可见范围<select v-model="agent.visibility" :disabled="agent.is_test">
@@ -188,6 +189,7 @@
   import { X } from '@lucide/vue'
   import VersionPicker from './VersionPicker.vue'
   import ModelPicker from './ModelPicker.vue'
+  import KnowledgePicker from './KnowledgePicker.vue'
   import { agentApi, agentError } from '../../agent/api'
   import {
     budgetFields,

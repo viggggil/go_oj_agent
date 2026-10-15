@@ -27,10 +27,14 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		methods []string
 	}{
 		{"/api/v1/admin/agent/rag/knowledge-bases", []string{http.MethodGet, http.MethodPost}},
+		{"/api/v1/admin/agent/rag/knowledge-bases/{base_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/rag/knowledge-bases/{base_id:[0-9a-f-]{36}}/rename", []string{http.MethodPost}},
 		{"/api/v1/admin/agent/rag/documents", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/rag/documents/{document_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/rag/documents/{document_id:[0-9a-f-]{36}}/versions", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/rag/documents/{document_id:[0-9a-f-]{36}}/{action:enable|archive|retry}", []string{http.MethodPost}},
 		{"/api/v1/admin/agent/rag/search", []string{http.MethodPost}},
+		{"/api/v1/admin/agent/rag/preview", []string{http.MethodPost}},
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},

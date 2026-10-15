@@ -12,7 +12,7 @@ import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -27,6 +27,8 @@ from app.rag.schema import tasks, versions
 from app.rag.service import KnowledgeService
 from app.rag.store import KnowledgeStore, now
 from app.rag.worker import process_one
+from app.storage.configuration import ConfigurationStore
+from tests.integration.test_configuration import registry, setup_agent, write
 from tests.test_chat import token
 
 pytestmark = pytest.mark.integration
@@ -201,7 +203,7 @@ async def test_admin_http_auth_validation_and_document_access(
     tmp_path: Path,
 ) -> None:
     store, clients, settings = rag
-    _, doc = await upload(store, clients)
+    base_id, doc = await upload(store, clients)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     path = tmp_path / "public.pem"
     path.write_bytes(
@@ -219,7 +221,13 @@ async def test_admin_http_auth_validation_and_document_access(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as client:
             base = "/api/v1/admin/agent/rag"
-            for suffix in ("/knowledge-bases", "/documents", "/documents/" + doc["document_id"]):
+            for suffix in (
+                "/knowledge-bases",
+                "/knowledge-bases/" + base_id,
+                "/documents",
+                "/documents/" + doc["document_id"],
+                "/documents/" + doc["document_id"] + "/versions",
+            ):
                 operation = "HTTP GET " + base + suffix
                 user_token = token(key, rpc=operation, actor_roles=["user"])
                 assert (
@@ -242,7 +250,103 @@ async def test_admin_http_auth_validation_and_document_access(
             assert (
                 await client.post(post, headers=headers, json={"filename": "../../secret.md"})
             ).status_code == 400
+
+            def auth(
+                method: str, target: str, roles: list[str], request_id: str | None = None
+            ) -> dict[str, str]:
+                return {
+                    "Authorization": "Bearer "
+                    + token(
+                        key,
+                        rpc=f"HTTP {method} {target}",
+                        actor_roles=roles,
+                        request_id=request_id or str(uuid4()),
+                    )
+                }
+
+            history_url = target + "/versions"
+            history_response = await client.get(
+                history_url, headers=auth("GET", history_url, ["admin"])
+            )
+            assert history_response.status_code == 200
+            assert history_response.json()["items"][0]["id"] == doc["id"]
+            assert "object_key" not in history_response.text
+            rename_url = base + "/knowledge-bases/" + base_id + "/rename"
+            rename_headers = auth("POST", rename_url, ["admin"])
+            renamed = await client.post(
+                rename_url,
+                json={"name": "题解", "expected_name": "测试知识库"},
+                headers=rename_headers,
+            )
+            assert renamed.status_code == 200 and renamed.json()["knowledge_base"]["name"] == "题解"
+            replay = await client.post(
+                rename_url,
+                json={"name": "题解", "expected_name": "测试知识库"},
+                headers=rename_headers,
+            )
+            assert replay.json() == renamed.json()
+            stale = await client.post(
+                rename_url,
+                json={"name": "新名字", "expected_name": "测试知识库"},
+                headers=auth("POST", rename_url, ["admin"]),
+            )
+            assert stale.status_code == 409
+            preview_url = base + "/preview"
+            for suffix, body in (
+                (rename_url, {"name": "禁止", "expected_name": "题解"}),
+                (preview_url, {"content": "隐藏资料"}),
+            ):
+                assert (
+                    await client.post(suffix, json=body, headers=auth("POST", suffix, ["user"]))
+                ).status_code == 403
+            source = "# 算法\n\n使用单调队列维护窗口最大值。"
+            preview = await client.post(
+                preview_url, json={"content": source}, headers=auth("POST", preview_url, ["admin"])
+            )
+            assert preview.status_code == 200
+            assert preview.json()["page"]["total"] > 0
+            chunk = preview.json()["chunks"][0]
+            assert source[chunk["start"] : chunk["end"]] == chunk["text"]
+            assert (
+                await client.post(
+                    preview_url,
+                    json={"content": "中" * 40001},
+                    headers=auth("POST", preview_url, ["admin"]),
+                )
+            ).status_code == 400
     # Delegation binds exact route; reusing a token for a different document fails.
     verifier = DelegationVerifier(config)
     with pytest.raises(ValueError):
         verifier.verify("Bearer " + admin_token, "HTTP GET " + base + "/documents/" + str(uuid4()))
+
+
+async def test_group_binding_references_and_rename_preserve_scope(
+    rag: tuple[KnowledgeStore, RagClients, Settings],
+) -> None:
+    store, clients, _ = rag
+    base_id, doc = await upload(store, clients)
+    configs = ConfigurationStore(store.engine, registry())
+    agent = await setup_agent(configs)
+    body = agent.content.model_dump(mode="json") | {"knowledge_scope": [base_id]}
+    changed = await configs.create_or_replace(write("agent", agent.key, agent.id), body)
+    from app.models.configuration import AgentConfig
+
+    assert isinstance(changed.content, AgentConfig)
+    assert [str(value) for value in changed.content.knowledge_scope] == [base_id]
+    await store.rename_base(principal(), base_id, "题解组", "测试知识库")
+    assert (await configs.resolve("agent", agent.key)).content == changed.content
+    for invalid in (doc["document_id"], str(uuid4())):
+        with pytest.raises(ConfigError, match="REFERENCE_INVALID"):
+            await configs.create_or_replace(
+                write("agent", agent.key, changed.id), body | {"knowledge_scope": [invalid]}
+            )
+    for invalid_scope in ([base_id, base_id], [str(uuid4()) for _ in range(21)]):
+        with pytest.raises(ValidationError):
+            await configs.create_or_replace(
+                write("agent", agent.key, changed.id), body | {"knowledge_scope": invalid_scope}
+            )
+    cleared = await configs.create_or_replace(
+        write("agent", agent.key, changed.id), body | {"knowledge_scope": []}
+    )
+    assert isinstance(cleared.content, AgentConfig)
+    assert not cleared.content.knowledge_scope

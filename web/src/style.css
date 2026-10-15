@@ -1631,3 +1631,81 @@ dd {
     min-width: 0;
   }
 }
+
+.rag-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 250px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.rag-groups {
+  border: 1px solid var(--border, #dfe3e8);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.rag-groups form,
+.rag-search form {
+  display: grid;
+  gap: 0.75rem;
+}
+.rag-group-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.rag-group-list button {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.rag-content {
+  min-width: 0;
+}
+.rag-document-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.rag-document,
+.rag-match,
+.rag-history {
+  border: 1px solid var(--border, #dfe3e8);
+  border-radius: 10px;
+  padding: 1rem;
+  margin: 0.75rem 0;
+}
+.rag-document h3,
+.rag-match h3 {
+  margin-top: 0;
+}
+.rag-inline-form {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  flex-wrap: wrap;
+}
+.rag-search {
+  border-top: 1px solid var(--border, #dfe3e8);
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+.rag-editor {
+  width: min(960px, calc(100vw - 2rem));
+}
+.rag-editor textarea {
+  min-height: 240px;
+}
+.rag-match pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+}
+.rag-history code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .rag-layout {
+    grid-template-columns: 1fr;
+  }
+}
