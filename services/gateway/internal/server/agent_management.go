@@ -26,6 +26,11 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		path    string
 		methods []string
 	}{
+		{"/api/v1/admin/agent/rag/knowledge-bases", []string{http.MethodGet, http.MethodPost}},
+		{"/api/v1/admin/agent/rag/documents", []string{http.MethodGet, http.MethodPost}},
+		{"/api/v1/admin/agent/rag/documents/{document_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/rag/documents/{document_id:[0-9a-f-]{36}}/{action:enable|archive|retry}", []string{http.MethodPost}},
+		{"/api/v1/admin/agent/rag/search", []string{http.MethodPost}},
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},
@@ -191,6 +196,8 @@ func agentJSONTimeout(ctx context.Context, err error) bool {
 }
 
 var agentManagementErrors = map[string]bool{
+	"AGENT_RAG_NOT_FOUND": true, "AGENT_RAG_STALE": true, "AGENT_RAG_NOT_READY": true,
+	"AGENT_RAG_REQUEST_CONFLICT": true, "AGENT_RAG_DEPENDENCY_UNAVAILABLE": true,
 	"AGENT_CONVERSATION_NOT_FOUND": true,
 	"AGENT_INVALID_ARGUMENT":       true, "AGENT_UNSUPPORTED_MEDIA_TYPE": true, "AGENT_REQUEST_TOO_LARGE": true,
 	"AGENT_FORBIDDEN": true, "AGENT_UNAVAILABLE": true, "AGENT_MANAGEMENT_DISABLED": true,

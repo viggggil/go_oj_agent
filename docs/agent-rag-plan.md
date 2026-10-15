@@ -1,7 +1,7 @@
-# Agent RAG 实施计划（讨论稿）
+# Agent RAG 实施计划（Issue #171）
 
 当前真实聊天已具备 LangGraph、模型 Responses 调用、完整成功轮次历史、只读业务工具和 Agent/Skill 管理。
-RAG 尚未实现，Agent 的 knowledge_scope 目前只允许为空。本计划首阶段以管理员提供的题解为核心，同时支持算法讲义和平台文档，
+PR1 实现管理员知识 API、摄取与检索内核及 50 题语料；聊天 RAG 工具尚未接入，Agent 的 knowledge_scope 目前只允许为空。本计划首阶段以管理员提供的题解为核心，同时支持算法讲义和平台文档，
 后续再扩展私有笔记和检索质量。不把 Skill 与知识文档混为一类：Skill 描述任务方法，RAG 提供回答证据。
 
 ## 目标与验收
@@ -37,8 +37,8 @@ RAG 推荐作为 `retrieve_knowledge` 只读工具接入同一有界循环：模
 | --- | --- | --- |
 | 文档/版本/索引任务状态 | Agent 自有 MySQL | 作为真源，复用服务所有权与迁移机制 |
 | 原始文档 | MinIO 独立知识文档 bucket | 复用已有设施，按内容哈希/版本使用不可变对象键 |
-| 向量库 | Qdrant，开发与部署统一 | 支持元数据过滤；避免 Chroma 开发/Qdrant 部署的双实现。现架构文档写的是开发 Chroma，采用本建议需同步 ADR/文档 |
-| 中文 embedding | 本地 BAAI/bge-small-zh-v1.5（建议） | 用户确认 su8 无 embedding，采用本地中文小模型；先用 CPU、512 维向量与该模型输入上限做基线，模型 revision 固定，后续按评测升级 |
+| 向量库 | Qdrant，开发与部署统一 | 支持元数据过滤；避免 Chroma 开发/Qdrant 部署的双实现。现架构文档写的是开发 Chroma，已由用户确认，见 ADR-0002 |
+| 中文 embedding | 本地 BAAI/bge-small-zh-v1.5（已确认） | 用户确认 su8 无 embedding，采用本地中文小模型；先用 CPU、512 维向量与该模型输入上限做基线，模型 revision 固定，后续按评测升级 |
 | 文档解析/切分 | Markdown 标题优先，保留代码块与位置 | 可用小型库/自有逻辑，避免为初版引入整套编排框架。按所选 embedding tokenizer 计数，BGE-small-zh-v1.5 初始约 300–380 tokens、重叠约 40–60，含指令和特殊 token 不超过 512；长代码按结构拆分，需用实际题解评测调整 |
 | 初版检索 | 向量召回 + 元数据筛选 | 先建立可量化基线，top-k/阈值/上下文预算可配置，不能跨 embedding 模型共用阈值 |
 | 混合检索/重排 | 第二阶段按评测加入 | OJ 的算法名、题号、符号适合关键词补充；先保留接口，必要时增加稀疏检索与融合、cross-encoder 重排，避免首版额外重排服务 |
@@ -100,14 +100,14 @@ Qdrant/embedding 不可用时返回明确的检索失败结果，不声称检索
 重领、重复索引、embedding 失败、归档过滤与索引版本切换；Gateway/浏览器验证上传、发布、
 管理员查看文档、模型使用知识、普通用户读文档越权拒绝，以及 SSE 不透传检索片段。一个小语料评测集包含有证据、无证据、注入文本、版本变化、符号/算法名。
 
-修改 docs/api.md、database.md、architecture.md 与 Agent README；选型确定后新增 ADR。
+修改 docs/api.md、database.md、architecture.md 与 Agent README；选型见 ADR-0002。
 新增功能走 Issue→PR→CI→独立审查；纯界面小调整/小修复复用必要检查，省略独立审查。
 
 ## 已确认与剩余决策
 
 已确认：首批语料以题解为核心，兼容算法讲义/平台文档；su8 无 embedding，使用本地中文小模型。
 
-建议默认采用 Qdrant + BAAI/bge-small-zh-v1.5 CPU，固定模型 revision 与 512 维向量；开发和部署
+已确认采用 Qdrant + BAAI/bge-small-zh-v1.5 CPU，固定模型 revision 与 512 维向量；开发和部署
 统一 Qdrant，替代原文档中的 Chroma→Qdrant 双路线，落地时写 ADR。
 
 已确认文档来源与页面边界：管理员在 `Agent / RAG` 页上传、查看、启用知识文档，题解也是
@@ -118,3 +118,5 @@ Qdrant/embedding 不可用时返回明确的检索失败结果，不声称检索
 这只是回答策略，不能代替比赛/发布可见性的硬授权。如果希望默认直接给完整解法，可调整 Skill。
 
 切分大小、top-k、相似度阈值与何时重排属于可评测的实现参数，先设有界默认值，不要求用户逐项拍板。
+
+PR1 的文档版本 UUID 同时充当文档索引 generation，逐文档完整构建后切换 active_version。知识库是已启用文档的集合；PR3 再固定 Run 的版本清单并加入撤销检查。题库扩展到 50 题，每题含标准题解，导入与验证说明见 `data/algorithm-corpus/README.md`。

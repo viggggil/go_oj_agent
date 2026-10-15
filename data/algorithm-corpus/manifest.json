@@ -1,0 +1,455 @@
+[
+  {
+    "slug": "pair-sum-index",
+    "title": "两数目标和",
+    "source": "https://leetcode.cn/problems/two-sum/",
+    "tags": [
+      "数组",
+      "哈希表"
+    ]
+  },
+  {
+    "slug": "maximum-contiguous-sum",
+    "title": "最大连续子段",
+    "source": "https://leetcode.cn/problems/maximum-subarray/",
+    "tags": [
+      "数组",
+      "动态规划"
+    ]
+  },
+  {
+    "slug": "word-frequency-order",
+    "title": "单词频次排序",
+    "source": "https://leetcode.cn/problems/top-k-frequent-words/",
+    "tags": [
+      "哈希表",
+      "排序",
+      "字符串"
+    ]
+  },
+  {
+    "slug": "static-range-minimum-query",
+    "title": "区间最小值查询",
+    "source": "https://www.luogu.com.cn/problem/P3865",
+    "tags": [
+      "ST表",
+      "倍增",
+      "数据结构"
+    ]
+  },
+  {
+    "slug": "container-water",
+    "title": "盛水容器",
+    "source": "https://leetcode.cn/problems/container-with-most-water/",
+    "tags": [
+      "双指针",
+      "贪心"
+    ]
+  },
+  {
+    "slug": "longest-unique",
+    "title": "最长无重复子串",
+    "source": "https://leetcode.cn/problems/longest-substring-without-repeating-characters/",
+    "tags": [
+      "字符串",
+      "滑动窗口"
+    ]
+  },
+  {
+    "slug": "min-window-sum",
+    "title": "最短达标子数组",
+    "source": "https://leetcode.cn/problems/minimum-size-subarray-sum/",
+    "tags": [
+      "数组",
+      "滑动窗口"
+    ]
+  },
+  {
+    "slug": "binary-search",
+    "title": "二分查找首个目标",
+    "source": "https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/",
+    "tags": [
+      "数组",
+      "二分查找"
+    ]
+  },
+  {
+    "slug": "integer-sqrt",
+    "title": "整数平方根",
+    "source": "https://leetcode.cn/problems/sqrtx/",
+    "tags": [
+      "数学",
+      "二分查找"
+    ]
+  },
+  {
+    "slug": "split-array",
+    "title": "最小化最大分段和",
+    "source": "https://leetcode.cn/problems/split-array-largest-sum/",
+    "tags": [
+      "二分答案",
+      "贪心"
+    ]
+  },
+  {
+    "slug": "range-sum",
+    "title": "静态区间求和",
+    "source": "https://leetcode.cn/problems/range-sum-query-immutable/",
+    "tags": [
+      "前缀和",
+      "数组"
+    ]
+  },
+  {
+    "slug": "subarray-sum",
+    "title": "和为 K 的子数组数",
+    "source": "https://leetcode.cn/problems/subarray-sum-equals-k/",
+    "tags": [
+      "前缀和",
+      "哈希表"
+    ]
+  },
+  {
+    "slug": "balanced-bracket-sequence",
+    "title": "括号序列检查",
+    "source": "https://leetcode.cn/problems/valid-parentheses/",
+    "tags": [
+      "栈",
+      "字符串"
+    ]
+  },
+  {
+    "slug": "daily-temperatures",
+    "title": "等待更高温度",
+    "source": "https://leetcode.cn/problems/daily-temperatures/",
+    "tags": [
+      "单调栈",
+      "数组"
+    ]
+  },
+  {
+    "slug": "sliding-maximum",
+    "title": "滑动窗口最大值",
+    "source": "https://leetcode.cn/problems/sliding-window-maximum/",
+    "tags": [
+      "单调队列",
+      "滑动窗口"
+    ]
+  },
+  {
+    "slug": "merge-overlapping-intervals",
+    "title": "合并重叠区间",
+    "source": "https://leetcode.cn/problems/merge-intervals/",
+    "tags": [
+      "排序",
+      "贪心"
+    ]
+  },
+  {
+    "slug": "jump-game",
+    "title": "能否到达终点",
+    "source": "https://leetcode.cn/problems/jump-game/",
+    "tags": [
+      "贪心",
+      "数组"
+    ]
+  },
+  {
+    "slug": "stock-profit",
+    "title": "单次股票交易",
+    "source": "https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/",
+    "tags": [
+      "贪心",
+      "数组"
+    ]
+  },
+  {
+    "slug": "climbing-stairs",
+    "title": "爬楼梯计数",
+    "source": "https://leetcode.cn/problems/climbing-stairs/",
+    "tags": [
+      "动态规划",
+      "递推"
+    ]
+  },
+  {
+    "slug": "house-robber",
+    "title": "不相邻元素最大和",
+    "source": "https://leetcode.cn/problems/house-robber/",
+    "tags": [
+      "动态规划",
+      "数组"
+    ]
+  },
+  {
+    "slug": "coin-change",
+    "title": "最少硬币数",
+    "source": "https://leetcode.cn/problems/coin-change/",
+    "tags": [
+      "动态规划",
+      "完全背包"
+    ]
+  },
+  {
+    "slug": "longest-increasing-subsequence",
+    "title": "最长严格递增子序列",
+    "source": "https://leetcode.cn/problems/longest-increasing-subsequence/",
+    "tags": [
+      "动态规划",
+      "二分查找"
+    ]
+  },
+  {
+    "slug": "lcs",
+    "title": "最长公共子序列",
+    "source": "https://leetcode.cn/problems/longest-common-subsequence/",
+    "tags": [
+      "字符串",
+      "动态规划"
+    ]
+  },
+  {
+    "slug": "edit-distance",
+    "title": "编辑距离",
+    "source": "https://leetcode.cn/problems/edit-distance/",
+    "tags": [
+      "字符串",
+      "动态规划"
+    ]
+  },
+  {
+    "slug": "grid-paths",
+    "title": "网格路径数",
+    "source": "https://leetcode.cn/problems/unique-paths-ii/",
+    "tags": [
+      "网格",
+      "动态规划"
+    ]
+  },
+  {
+    "slug": "islands",
+    "title": "岛屿数量",
+    "source": "https://leetcode.cn/problems/number-of-islands/",
+    "tags": [
+      "网格",
+      "广度优先搜索"
+    ]
+  },
+  {
+    "slug": "dependency-topological-order",
+    "title": "任务依赖排序",
+    "source": "https://leetcode.cn/problems/course-schedule/",
+    "tags": [
+      "图论",
+      "拓扑排序"
+    ]
+  },
+  {
+    "slug": "nonnegative-single-source-shortest-path",
+    "title": "非负权单源最短路",
+    "source": "https://leetcode.cn/problems/network-delay-time/",
+    "tags": [
+      "图论",
+      "最短路"
+    ]
+  },
+  {
+    "slug": "dynamic-connectivity-queries",
+    "title": "动态图连通查询",
+    "source": "https://www.luogu.com.cn/problem/P3367",
+    "tags": [
+      "并查集",
+      "图论"
+    ]
+  },
+  {
+    "slug": "tree-depth",
+    "title": "有根树最大深度",
+    "source": "https://leetcode.cn/problems/maximum-depth-of-binary-tree/",
+    "tags": [
+      "树",
+      "广度优先搜索"
+    ]
+  },
+  {
+    "slug": "tree-diameter",
+    "title": "树的直径",
+    "source": "https://leetcode.cn/problems/diameter-of-binary-tree/",
+    "tags": [
+      "树",
+      "图论"
+    ]
+  },
+  {
+    "slug": "reverse-list",
+    "title": "反转单链表序列",
+    "source": "https://leetcode.cn/problems/reverse-linked-list/",
+    "tags": [
+      "链表",
+      "模拟"
+    ]
+  },
+  {
+    "slug": "single-number",
+    "title": "只出现一次的数",
+    "source": "https://leetcode.cn/problems/single-number/",
+    "tags": [
+      "位运算",
+      "数组"
+    ]
+  },
+  {
+    "slug": "kmp",
+    "title": "字符串匹配位置",
+    "source": "https://www.luogu.com.cn/problem/P3375",
+    "tags": [
+      "字符串",
+      "KMP"
+    ]
+  },
+  {
+    "slug": "zero-one-capacity-pack",
+    "title": "有限容量装载",
+    "source": "https://www.luogu.com.cn/problem/P1048",
+    "tags": [
+      "动态规划",
+      "零一背包"
+    ]
+  },
+  {
+    "slug": "triangle-path",
+    "title": "数字三角形",
+    "source": "https://www.luogu.com.cn/problem/P1216",
+    "tags": [
+      "动态规划",
+      "网格"
+    ]
+  },
+  {
+    "slug": "mst",
+    "title": "最小生成树",
+    "source": "https://www.luogu.com.cn/problem/P3366",
+    "tags": [
+      "图论",
+      "最小生成树",
+      "并查集"
+    ]
+  },
+  {
+    "slug": "floyd",
+    "title": "多源最短路",
+    "source": "https://www.luogu.com.cn/problem/P2910",
+    "tags": [
+      "图论",
+      "Floyd"
+    ]
+  },
+  {
+    "slug": "grid-shortest-steps",
+    "title": "网格中的最短步数",
+    "source": "https://www.luogu.com.cn/problem/P1141",
+    "tags": [
+      "广度优先搜索",
+      "网格"
+    ]
+  },
+  {
+    "slug": "n-queens",
+    "title": "N 皇后方案数",
+    "source": "https://www.luogu.com.cn/problem/P1219",
+    "tags": [
+      "回溯",
+      "搜索"
+    ]
+  },
+  {
+    "slug": "mod-power",
+    "title": "快速幂取模",
+    "source": "https://www.luogu.com.cn/problem/P1226",
+    "tags": [
+      "数论",
+      "快速幂"
+    ]
+  },
+  {
+    "slug": "prime-count",
+    "title": "区间素数计数",
+    "source": "https://www.luogu.com.cn/problem/P3383",
+    "tags": [
+      "数论",
+      "筛法"
+    ]
+  },
+  {
+    "slug": "fenwick",
+    "title": "单点加区间和",
+    "source": "https://www.luogu.com.cn/problem/P3374",
+    "tags": [
+      "树状数组",
+      "数据结构"
+    ]
+  },
+  {
+    "slug": "segment-tree",
+    "title": "区间加与区间和",
+    "source": "https://www.luogu.com.cn/problem/P3372",
+    "tags": [
+      "线段树",
+      "数据结构"
+    ]
+  },
+  {
+    "slug": "inversions",
+    "title": "逆序对计数",
+    "source": "https://www.luogu.com.cn/problem/P1908",
+    "tags": [
+      "归并排序",
+      "分治"
+    ]
+  },
+  {
+    "slug": "huffman",
+    "title": "合并果子",
+    "source": "https://www.luogu.com.cn/problem/P1090",
+    "tags": [
+      "堆",
+      "贪心"
+    ]
+  },
+  {
+    "slug": "interval-schedule",
+    "title": "最多不重叠活动",
+    "source": "https://www.luogu.com.cn/problem/P1803",
+    "tags": [
+      "贪心",
+      "排序"
+    ]
+  },
+  {
+    "slug": "lca",
+    "title": "最近公共祖先",
+    "source": "https://www.luogu.com.cn/problem/P3379",
+    "tags": [
+      "树",
+      "倍增"
+    ]
+  },
+  {
+    "slug": "trie",
+    "title": "前缀单词计数",
+    "source": "https://www.luogu.com.cn/problem/P8306",
+    "tags": [
+      "字符串",
+      "Trie"
+    ]
+  },
+  {
+    "slug": "bipartite",
+    "title": "二分图判定",
+    "source": "https://leetcode.cn/problems/is-graph-bipartite/",
+    "tags": [
+      "图论",
+      "染色"
+    ]
+  }
+]

@@ -193,3 +193,34 @@ WSL 中 Buildx 的代理都需要可用。在当前 WSL 终端设置 `HTTP_PROXY
 ```bash
 GATEWAY_HTTP_PORT=18080 MYSQL_PORT=13306 make infra-up
 ```
+
+
+## RAG PR1 组件与语料
+
+默认 `make infra-up` 同时启动 `qdrant`、`embedding`、`rag-worker`，无 profile。
+Qdrant 使用独立持久卷 `qdrant-data`，主机端口默认仅绑定 127.0.0.1:6333；Embedding 和 worker 不开放主机端口。
+Embedding 构建阶段安装 CPU PyTorch 并从 Hugging Face 下载固定 revision 的 BGE-small-zh-v1.5，
+首次构建需联网和数百 MiB 下载空间，随后使用镜像缓存。构建失败可重跑 `docker compose -f deploy/compose/compose.yaml build embedding`；
+构建日志会指出依赖或模型下载失败。运行阶段完全离线，不会因未缓存模型静默下载。共享/离线部署提前在联网机器构建并传输镜像。
+
+Embedding 限制 2 CPU / 2 GiB，默认限制底层计算 2 线程，模型健康后 worker 启动。
+模型就绪健康返回 revision 和 dimensions；Qdrant 检查 /readyz；worker 查询 MySQL 持久任务。
+Agent 不因索引依赖暂时故障停止已有聊天，管理检索返回明确 503、索引任务有限重试后显示 FAILED。
+生产部署应配置独立 bucket 凭据及服务网络隔离，勿使用开发默认 MinIO root 凭据。
+
+新增环境项：`AGENT_RAG_ENABLED`、`AGENT_RAG_EMBEDDING_URL`、`AGENT_RAG_QDRANT_URL`、
+`AGENT_RAG_MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET/SECURE`。Compose 默认 bucket 为 `agent-knowledge`。
+旧数据卷由 `agent-db-init` 自动增加 000004 的五张表，保留题目、聊天及凭据。
+
+```bash
+docker compose -f deploy/compose/compose.yaml ps
+docker compose -f deploy/compose/compose.yaml logs --tail=80 embedding rag-worker
+# 查询索引任务状态使用管理员文档列表/详情 API，FAILED 后 POST documents/{id}/retry。
+# 孤立对象先预览；仅使用知识库 UUID，不是管理员名称。
+docker compose -f deploy/compose/compose.yaml exec rag-worker python -m app.rag.gc BASE_UUID
+# 确认预览后添加 --apply；每次最多 500 对象，可按输出 start-after 继续。
+```
+
+50 题及题解通过 `scripts/import_algorithm_corpus.py` 显式导入；不在启动时自动写入业务题库。
+管理员令牌文件和导入/判题报告不提交仓库。操作说明见 `data/algorithm-corpus/README.md`。
+PR1 未提供管理页面和聊天检索工具，分别由后续 PR2 / PR3 完成。

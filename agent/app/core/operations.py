@@ -41,6 +41,18 @@ def operation(method: str, path: str) -> str:
             allowed = method == "GET" and str(UUID(version[2])) == version[2]
         except ValueError:
             pass
+    elif path.startswith("/api/v1/admin/agent/rag/"):
+        tail = path.removeprefix("/api/v1/admin/agent/rag/")
+        if tail in {"knowledge-bases", "documents"}:
+            allowed = method in {"GET", "POST"}
+        elif tail == "search":
+            allowed = method == "POST"
+        elif match_rag := re.fullmatch(
+            r"documents/([0-9a-f-]{36})(?:/(enable|archive|retry))?", tail
+        ):
+            allowed = str(UUID(match_rag[1])) == match_rag[1] and (
+                method == ("POST" if match_rag[2] else "GET")
+            )
     elif match := _RESOURCE.fullmatch(path):
         _, key, action, identifier = match.groups()
         if identifier is not None:

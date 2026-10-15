@@ -91,7 +91,8 @@ services:
       - >-
         mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
         mc mb --ignore-existing local/problem-data &&
-        mc mb --ignore-existing local/submission-source
+        mc mb --ignore-existing local/submission-source &&
+        mc mb --ignore-existing local/agent-knowledge
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -431,6 +432,12 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["exec python /bootstrap/agent-dev-init.py --serve"]
     environment:
+      AGENT_RAG_ENABLED: "true"
+      AGENT_RAG_EMBEDDING_URL: http://embedding:8001
+      AGENT_RAG_QDRANT_URL: http://qdrant:6333
+      AGENT_RAG_MINIO_ENDPOINT: minio:9000
+      AGENT_RAG_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AGENT_RAG_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       AGENT_ENVIRONMENT: development
       AGENT_HOST: 0.0.0.0
       AGENT_CHAT_ENABLED: true
@@ -479,6 +486,51 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333; printf \"GET /readyz HTTP/1.0\\r\\n\\r\\n\" >&3; read -r line <&3; [[ $$line == *200* ]]'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  embedding:
+    build:
+      context: ../../agent/embedding
+    mem_limit: 2g
+    cpus: 2
+    restart: unless-stopped
+
+  rag-worker:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "app.rag.worker"]
+    environment:
+      AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
+      AGENT_RAG_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AGENT_RAG_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      agent-db-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_healthy
+      embedding:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   web:
     build:
       context: ../..
@@ -493,6 +545,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  qdrant-data:
   agent-model-keys:
   mysql-data:
   redis-data:

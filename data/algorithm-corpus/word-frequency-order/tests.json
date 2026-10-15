@@ -1,0 +1,46 @@
+[
+  {
+    "input": "a b a c b a\n",
+    "output": "a 3\nb 2\nc 1\n"
+  },
+  {
+    "input": "z a\n",
+    "output": "a 1\nz 1\n"
+  },
+  {
+    "input": "hello\n",
+    "output": "hello 1\n"
+  },
+  {
+    "input": "banana cat banana apple banana apple apple cat cat dog cat banana banana apple cat apricot cat dog banana z\n",
+    "output": "banana 6\ncat 6\napple 4\ndog 2\napricot 1\nz 1\n"
+  },
+  {
+    "input": "cat banana cat cat apple apricot z banana apricot apple dog apricot apricot banana cat apricot cat banana banana apple\n",
+    "output": "apricot 5\nbanana 5\ncat 5\napple 3\ndog 1\nz 1\n"
+  },
+  {
+    "input": "z dog cat apple cat dog cat banana banana dog apple cat apple apple z z apple apricot apple apple\n",
+    "output": "apple 7\ncat 4\ndog 3\nz 3\nbanana 2\napricot 1\n"
+  },
+  {
+    "input": "z apple z cat apple dog apricot banana apple cat dog z z apricot banana z z apricot z dog\n",
+    "output": "z 7\napple 3\napricot 3\ndog 3\nbanana 2\ncat 2\n"
+  },
+  {
+    "input": "cat cat apricot apricot z apple apple z dog apple banana dog apricot apple apple dog z banana apple cat\n",
+    "output": "apple 6\napricot 3\ncat 3\ndog 3\nz 3\nbanana 2\n"
+  },
+  {
+    "input": "apple z banana z z apricot dog apricot dog dog banana apricot dog z apple z z z banana apple\n",
+    "output": "z 7\ndog 4\napple 3\napricot 3\nbanana 3\n"
+  },
+  {
+    "input": "apricot banana dog cat apricot z apricot z z apricot dog apricot dog apple z z dog banana z apple\n",
+    "output": "z 6\napricot 5\ndog 4\napple 2\nbanana 2\ncat 1\n"
+  },
+  {
+    "input": "banana apple apricot apricot dog cat z dog apple apricot apple apple apple cat apple banana z dog banana apple banana cat dog z cat apple z dog dog z cat banana cat cat apple banana cat apple dog z apple dog banana apricot apple apple apricot cat apple cat apricot z apple z banana dog dog cat z banana banana banana cat apple z dog z z apple apple z cat cat apple banana dog dog apricot apricot cat banana z apricot z apricot apricot cat z banana apple dog z z cat dog z dog dog dog banana apple apple apple z apricot dog banana dog dog apple banana cat dog dog apricot z z banana z z banana banana z apricot banana cat apple banana dog apricot apricot cat z banana z apple dog z apple apricot cat apple banana apricot cat banana apricot z z cat banana dog z z z z banana banana cat cat banana banana dog z z z apple z z apple apple z dog z z cat apricot apricot cat cat banana banana banana banana dog cat z z dog z apricot z banana apple z dog apple apricot z apple z dog apple dog cat apple apple z banana apple apple apricot apple dog banana banana z dog apple dog apricot z banana z apple banana z dog apricot banana apple banana z z apricot cat banana cat z z banana z cat apricot apple cat apple banana cat dog apple z apple banana banana cat cat cat banana dog apple dog apricot banana dog banana z z cat apricot apricot apple apple apricot apple z apple banana cat cat apple banana apple apple z apple banana apricot apricot z apricot cat cat apricot z cat apricot apricot dog cat apricot dog dog apple apricot apricot cat cat apricot banana banana cat dog apple banana apple banana apricot apricot apricot banana banana apple dog banana banana banana cat dog dog z dog dog dog banana apple dog apricot apple z cat banana dog apricot apple cat apple dog dog z z apricot dog cat apple z banana apricot dog z cat cat banana cat apricot apricot z cat banana apricot cat dog dog banana apple banana apricot cat z apricot z cat cat apricot banana z dog apple cat dog cat cat apple dog banana cat apple banana apricot apricot cat apple apple banana apricot banana apple apricot banana banana dog apricot apricot cat cat banana dog dog cat dog z banana cat z apple z dog banana apple cat dog banana dog apple dog banana apple dog banana apple apricot banana apricot banana cat apricot dog z apricot z z apple apple banana banana cat dog cat z apple banana z banana apple banana dog apricot banana apple dog z dog z cat z z apple apricot banana apricot apricot z dog apple banana z z dog z apricot apricot z cat apple z banana apple cat banana z apricot dog apple cat apple apple z z apple apple apple cat banana apple cat banana banana z apricot dog apple z apple banana z apricot z apricot apricot dog dog banana banana apricot apple apricot banana z cat banana banana banana dog apricot apricot dog dog cat cat dog banana banana banana banana dog apple banana apricot cat dog apple banana cat z dog banana banana banana dog apricot apricot apple apricot apricot dog apple banana dog dog z apricot apple z apricot z banana dog dog apricot apricot z z apple apricot dog apple apricot apple dog dog apple apricot dog apple z apricot banana dog banana dog z dog cat cat apricot z dog dog banana cat cat z cat apple apple z banana apricot cat banana dog z banana apple apricot apple dog apricot apricot apricot dog banana banana dog dog cat apricot apple z apple cat z cat apple cat z cat dog banana z cat apple cat apricot banana cat cat apple apricot cat apple apple apple banana cat dog z cat banana cat dog apple z z z apple banana banana apple z z z z dog apricot apricot apricot dog z z banana apricot banana z dog apricot apricot cat banana banana apricot banana cat z z apple apricot z cat cat banana apricot z dog apple cat banana banana dog apple apricot banana banana apricot apricot dog banana cat z dog dog apple apple apricot dog dog banana dog z z z apple z banana apple cat z dog z cat z apricot apple apple banana apple banana z z dog dog apple cat banana banana dog dog banana dog cat banana dog z z cat z z dog apple z banana z apple apple apple z banana apple apricot apple dog apple apple z apple banana cat banana cat banana dog apple cat dog apple cat z banana apricot cat apricot apple apple cat z apple apricot banana banana z apricot dog z dog banana apricot cat apricot banana banana z z cat dog banana cat z apricot dog z apple apple banana banana z cat dog apple cat banana apricot dog cat dog apple apple z apple apricot cat banana banana dog z cat dog apple dog apricot dog cat dog apple apricot z banana banana apricot dog dog cat cat z dog banana z apple cat banana z z z banana banana cat cat apricot banana z apricot z apricot cat apple dog apricot apple z apricot z apple apricot z apricot apple dog dog apricot apricot apple apricot z banana apricot dog dog apricot z banana apricot z banana apple banana dog apple z cat apple z dog apple dog apricot dog apple cat apricot apricot cat cat cat apricot banana cat banana apricot banana dog apricot dog dog cat apple apricot banana z dog cat apple apricot banana dog cat cat cat z cat z cat dog z cat z apple z cat z apricot dog\n",
+    "output": "z 185\nbanana 181\napple 168\ndog 165\napricot 151\ncat 150\n"
+  }
+]

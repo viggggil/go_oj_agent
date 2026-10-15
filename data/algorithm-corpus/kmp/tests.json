@@ -1,0 +1,46 @@
+[
+  {
+    "input": "ababcabc\nabc\n",
+    "output": "3\n"
+  },
+  {
+    "input": "aaaa\nb\n",
+    "output": "-1\n"
+  },
+  {
+    "input": "aaaaa\naaa\n",
+    "output": "1\n"
+  },
+  {
+    "input": "abfebaaafdbaefedaabd\nbeedffdeebdacdcfccaa\n",
+    "output": "-1\n"
+  },
+  {
+    "input": "dcadbbfdfdaecfacecff\ndcadbbfdfdaecfacecff\n",
+    "output": "1\n"
+  },
+  {
+    "input": "bcaacdccecdbaadbafae\nbdefefcfafccfaccaaba\n",
+    "output": "-1\n"
+  },
+  {
+    "input": "ffdfbfcbcdcdafccaeaa\nffdfbfcbcdcdafccaeaa\n",
+    "output": "1\n"
+  },
+  {
+    "input": "eacbfefdfcdaaedeedee\necdafdddfedbbdcabbaf\n",
+    "output": "-1\n"
+  },
+  {
+    "input": "ddccfbcadccfcfeebbad\nddccfbcadccfcfeebbad\n",
+    "output": "1\n"
+  },
+  {
+    "input": "cefcddefebccacbdecdc\ndfbebbbdaafeeaadcfea\n",
+    "output": "-1\n"
+  },
+  {
+    "input": "ddaaadaafbccffebcdfffdffafecfbcbedcacabfdccbcabeaaaaaaebecdedadacffafeaccdabfdeaaadeaeffceacdaedfeeebfbadbbebbdecffedfbbffcbdfffccdeaddebdfcdefbffcebddcadedcbdbffccdeffcebbbffefcdddbbfdbecbedacbcffebebdededcefacefcebeedcbeefebacebefdcbbadeecaebffbbccaaaebeebbaacdeeaeefccdcabddadbcefeafafbfcfbaddcbecabbaddaadecfdfdcfebedefcabdafbfdfdbbbabbabafdedbabeebdddaeccdeecdbaaceafefbfaacadcdbbcacbabeabbdbaebbedfdedeacabdebdcdffaaadfbdeeadeffafbdfafcddeddfcaaffbcbeaacfaadcedceaefeebccebecbbacddfabbcefdeadfcecddaccecbbddddeabfafacffecfacdcadedeebdeeabdddedddfbadfacddcafacbdeacabedffddfcdfbddacaecfafdbbabedbeeacfefefeccefccedbddcffcfdfadebbbeabbedbfdafecebfeaddcfbddeaebaefdceaaceeffafdcebddafddfbddaeecfccdafbbeeddbdaabccabacececfdbdbaccdadadddfbdadfdafdfacaabccfbdadefbaadbcabfbaeedfecdbcdbbadaebcacccadaeccdfabfcadefaebddfdfbeadfadacfadcdafcabfaeebcadceefbeefebdfbcaccdcdfdccfdabdaafffffeefdafbdfebfcaaccbdeceaddadcfdbcebbacfbcecaaafadabceeedaababcfffbcdfabdfffafdcbfeadcbfbcbededacecaddbeedeccadfcfdffb\ncaddbeedeccadfcfdffb\n",
+    "output": "981\n"
+  }
+]

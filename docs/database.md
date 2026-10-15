@@ -610,11 +610,29 @@ Provider 的不可变 JSON 保存协议、base URL、Credential ID、超时和�
 
 上线先迁移再部署/启用 model Runtime。旧 Fake Profile 正文仍可解析；旧应用不能使用新增 Provider kind，因此恢复旧应用前先停用真实模型。Down 迁移首先以原子 CHECK 变更拒绝仍有 Provider 配置的库；需要人工处理新配置及引用后才能回滚。Down 会删除加密凭据、凭据审计和模型摘要，不删除 Conversation/Message/Run；需要保留真实凭据/运行证据时应继续保留 expand Schema。主密钥/加密数据库备份分别保管，丢失 keyring 无法靠数据库恢复 Key。
 
-### `agent_knowledge_documents` / `agent_knowledge_versions`
+### RAG 自有知识表（PR1 / 000004）
 
-保存文档元数据、MinIO 对象引用、来源、算法、难度、语言、文档类型、版本、索引状态、
-切分配置和发布状态。原始文档不放入 MySQL 大字段；切分结果和 Embedding 由 RAG
-存储管理。索引任务必须可重复执行，并记录失败原因和索引版本。
+`agent_knowledge_bases` 保存知识库 UUID、管理员名称、创建者与时间；标识由后端生成。
+`agent_knowledge_documents` 保存所属知识库、当前待处理版本、完整发布的 `active_version` 及启用开关。
+`agent_knowledge_versions` 不可变，保存标题、类型、可空业务 `problem_id`、来源、标签、文件名、MinIO key、
+内容 SHA-256、字节数、固定模型 revision 与 splitter 版本、上传者及时间。业务题号不建立跨库外键。
+文档版本 UUID 同时作为文档索引 generation，Qdrant 点 UUID 由版本及 chunk 编号确定性生成。
+
+`agent_knowledge_tasks` 以版本 UUID 为主键，状态 PENDING/RUNNING/READY/FAILED，保存尝试次数、
+租约 token/到期时间、下一次执行时间、chunk 数与脱敏错误。worker SKIP LOCKED 领任务，15 秒心跳、
+60 秒租约、单次最多 240 秒，4 次尝试后失败。失租 worker 不能发布；完整 upsert 成功后同事务切换
+active_version，过时版本的晚到任务不能覆盖新 current_version。新版本失败保留旧 active_version。
+
+`agent_knowledge_requests` 以管理员请求 UUID 去重，保存 actor、操作/请求指纹、首次响应与时间。
+相同请求重放首次结果，身份或指纹不一致返回 409。上传对象在登记版本前写入，失败回滚不删除旧对象。
+对象键 `bases/{base_uuid}/versions/{version_uuid}/{sha256}.txt`，独立 `agent-knowledge` bucket。
+上传与孤立对象 GC 共用知识库行锁，GC 仅清理超过 24 小时且没有任何版本引用的对象，默认 dry-run，
+每次最多扫描 500 个，可用 start-after 继续。已引用旧版本和向量暂不物理删除，为后续 Run 快照保留。
+
+查询顺序为 created_at/id 稳定降序，分页最多 50；任务领取索引覆盖状态/重试时间/租约时间。
+无 Redis/MQ 新状态。迁移是增加 5 张自有表，不改已有聊天数据；部署先迁移再启用 RAG。
+旧应用可以忽略新表，新应用开启 RAG 时要求迁移。Down 删除知识元数据及审计，不删除 MinIO/Qdrant，
+是破坏性回滚，仅停用 RAG 并备份后执行，常规回退应保留扩展表。
 
 ## 8.4 Eval、运行和审计实体
 

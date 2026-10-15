@@ -23,6 +23,15 @@ class Settings(BaseSettings):
         allow_inf_nan=False,
     )
 
+    rag_enabled: bool = False
+    rag_embedding_url: str = "http://embedding:8001"
+    rag_qdrant_url: str = "http://qdrant:6333"
+    rag_minio_endpoint: str = "minio:9000"
+    rag_minio_access_key: SecretStr = SecretStr("minioadmin")
+    rag_minio_secret_key: SecretStr = SecretStr("minioadmin")
+    rag_minio_bucket: str = "agent-knowledge"
+    rag_minio_secure: bool = False
+
     environment: Literal["development", "test", "production"] = "development"
     host: str = Field(default="127.0.0.1", min_length=1)
     port: int = Field(default=8000, ge=1, le=65535)

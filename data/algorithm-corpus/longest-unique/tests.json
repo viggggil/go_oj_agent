@@ -1,0 +1,46 @@
+[
+  {
+    "input": "abcabcbb\n",
+    "output": "3\n"
+  },
+  {
+    "input": "bbbbb\n",
+    "output": "1\n"
+  },
+  {
+    "input": "abba\n",
+    "output": "2\n"
+  },
+  {
+    "input": "beeabddbedcececedaea\n",
+    "output": "4\n"
+  },
+  {
+    "input": "eebcebacadcadbeecbea\n",
+    "output": "5\n"
+  },
+  {
+    "input": "ceeacdecbccabcbbbead\n",
+    "output": "4\n"
+  },
+  {
+    "input": "edeebacdbeccdbcbacde\n",
+    "output": "5\n"
+  },
+  {
+    "input": "dacccdbccbcaeeacecbd\n",
+    "output": "4\n"
+  },
+  {
+    "input": "cadcddaaeabedbedebdc\n",
+    "output": "4\n"
+  },
+  {
+    "input": "caaebcadedadcadcadea\n",
+    "output": "5\n"
+  },
+  {
+    "input": "ebbdaedcddaceebcaadaaeadbdbbabcccceeaeadcdeabbdcccacdccdddebaccbbddabbceaceddcdabcbeebdaacabbddecbdadbceeaabdcebeceecbddbebcecdcccdebbdcdaadbbbbaaccbeddeebbdcecceacdddcbbebcdedddebeabaeeceaddbbadaacbcaaeaecedeebaceeceecabecabedbbddebaeceaeaecbacaedbaccbbecdedcaaadbdcabecbacbaecbacdbeccacddacdeacaaeababdcabeadbaaabdebedcdadadadaaebebbddcdeceacbecbddbdbbbddbbddbdcecaeccbcbabacbaccaaddbaaecaebcbceceeeccebbacdcabbbacddaecbaabdcdcbebbebddcbbeaebcabecbecaaacddcbcacdbeaadacbaeabcaebebdeaeacaecdbeacdcaaadecbbcabbcceeadcbdddbacbbabbccaedbbcdcaddaadbabedddebcabbaacebdebdabeadeabdaaebcdcaadbeececadebaeccbebaddabbcceadbececdadbbadabdddcabadabededcecceebcdebbcebaccecbbacabbcadeadaebaaaebacdcbcebacadeaacaadbbbbcbcebecabdcadacaadbdaeeecdcdcbecdeadccbdebbdcdbdacdccdcecadcedcdecaeacaecbacbadeddedbcebcccdbaeedebadbbceecbecadaeabecedbcdecbdedceccdecbddddeeceedbceeebaddedeeedcbccabebecbecdaeabbdceddadaaecbdebeedbcadcccbaaeebbcdaeceeedbdcdbaccdbadcccbbbdcacdbedbbcaedbbbbebebedaddcddebedacebdebdbbbbcbdabdeb\n",
+    "output": "5\n"
+  }
+]
