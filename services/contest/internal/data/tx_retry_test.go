@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"testing/synctest"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	mysql "github.com/go-sql-driver/mysql"
@@ -67,25 +68,29 @@ func TestWithContestTxBoundsLockTimeoutAttempts(t *testing.T) {
 }
 
 func TestWithContestTxCancellationInterruptsRetryBackoff(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE contests").WillReturnError(&mysql.MySQLError{Number: 1213})
-	mock.ExpectRollback()
-	err = withContestTx(ctx, db, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, "UPDATE contests SET title=?", "x")
-		cancel()
-		return err
+	synctest.Test(t, func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		mock.ExpectBegin()
+		mock.ExpectExec("UPDATE contests").WillReturnError(&mysql.MySQLError{Number: 1213})
+		mock.ExpectRollback()
+		err = withContestTx(ctx, db, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx, "UPDATE contests SET title=?", "x")
+			cancel()
+			return err
+		})
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("backoff cancellation=%v", err)
+		}
+		// database/sql 取消时可能异步回滚；等待同一 bubble 内的回滚完成，再验证驱动期望。
+		synctest.Wait()
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatal(err)
+		}
 	})
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("backoff cancellation=%v", err)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatal(err)
-	}
 }
