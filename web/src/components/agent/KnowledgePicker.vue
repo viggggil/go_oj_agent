@@ -52,7 +52,7 @@
   </fieldset>
 </template>
 <script setup lang="ts">
-  import { onBeforeUnmount, onMounted, ref } from 'vue'
+  import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { ragApi, type KnowledgeGroup } from '../../agent/rag'
   import { agentError } from '../../agent/api'
   const props = defineProps<{ modelValue: string[] }>()
@@ -63,6 +63,7 @@
     loading = ref(false),
     error = ref('')
   const page = ref({ page: 1, page_size: 20, total: 0 })
+  const pendingNames = new Set<string>()
   function toggle(id: string) {
     emit(
       'update:modelValue',
@@ -70,6 +71,19 @@
         ? props.modelValue.filter((value) => value !== id)
         : [...props.modelValue, id],
     )
+  }
+  async function loadSelectedNames() {
+    const ids = props.modelValue.filter((id) => !names.value[id] && !pendingNames.has(id))
+    for (const id of ids) pendingNames.add(id)
+    const selected = await Promise.allSettled(ids.map((id) => ragApi.group(id, controller.signal)))
+    for (const id of ids) pendingNames.delete(id)
+    if (controller.signal.aborted) return
+    for (const [index, item] of selected.entries()) {
+      if (item.status === 'fulfilled')
+        names.value[item.value.data.knowledge_base.id] = item.value.data.knowledge_base.name
+      else if (props.modelValue.includes(ids[index]!))
+        error.value = '部分绑定分组无法加载，请重试或移除后保存'
+    }
   }
   async function load(number = 1) {
     if (loading.value) return
@@ -81,23 +95,14 @@
       items.value = result.data.items
       page.value = result.data.page
       for (const item of items.value) names.value[item.id] = item.name
-      const selected = await Promise.allSettled(
-        props.modelValue
-          .filter((id) => !names.value[id])
-          .map((id) => ragApi.group(id, controller.signal)),
-      )
-      if (controller.signal.aborted) return
-      for (const item of selected) {
-        if (item.status === 'fulfilled')
-          names.value[item.value.data.knowledge_base.id] = item.value.data.knowledge_base.name
-        else error.value = '部分绑定分组无法加载，请重试或移除后保存'
-      }
+      await loadSelectedNames()
     } catch (cause) {
       if (!controller.signal.aborted) error.value = agentError(cause)
     } finally {
       if (!controller.signal.aborted) loading.value = false
     }
   }
+  watch(() => [...props.modelValue], loadSelectedNames, { immediate: true })
   onMounted(() => load())
   onBeforeUnmount(() => controller.abort())
 </script>

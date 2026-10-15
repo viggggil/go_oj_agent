@@ -30,6 +30,7 @@ async function mockManagement(page: Page, roles = ['admin']) {
     created_by: 7,
     created_at: new Date().toISOString(),
   }
+  const knowledgeGroups = [knowledgeGroup]
   const model = {
     id: randomUUID(),
     key: 'su8_flash',
@@ -99,10 +100,13 @@ async function mockManagement(page: Page, roles = ['admin']) {
         ? respond({ model_option: { ...model, archived: false, disabled: false, available: true } })
         : paged([model])
     if (kind === 'tools') return paged([])
-    if (kind === 'rag')
-      return parts[5] === 'knowledge-bases' && parts[6]
-        ? respond({ knowledge_base: knowledgeGroup })
-        : paged([knowledgeGroup])
+    if (kind === 'rag') {
+      if (parts[5] === 'knowledge-bases' && parts[6]) {
+        const group = knowledgeGroups.find((item) => item.id === parts[6])
+        return group ? respond({ knowledge_base: group }) : respond({}, 404)
+      }
+      return paged(knowledgeGroups)
+    }
     if (method !== 'GET') {
       writes.push(route.request().headers()['x-request-id'])
       if (failNext) {
@@ -187,6 +191,7 @@ async function mockManagement(page: Page, roles = ['admin']) {
     writes,
     model,
     knowledgeGroup,
+    knowledgeGroups,
     create,
     fail: (status: number) => {
       failNext = status
@@ -251,6 +256,58 @@ test('管理员通过嵌套创建保留表单，保存 test Agent，并查看历
   await expect(page.getByRole('navigation', { name: 'Agent 管理导航' })).toBeVisible()
   await page.getByRole('button', { name: '关闭菜单' }).click()
   await page.screenshot({ path: 'test-results/agent-mobile.png', fullPage: true })
+})
+
+test('恢复 Agent 历史配置后补取跨页分组名称，并支持分页选择', async ({ page }) => {
+  const state = await mockManagement(page)
+  for (let number = 1; number <= 20; number++)
+    state.knowledgeGroups.push({
+      ...state.knowledgeGroup,
+      id: randomUUID(),
+      name: '讲义 ' + number,
+    })
+  const lastGroup = state.knowledgeGroups.at(-1)!
+  const prompt = state.create('prompts', 'group_prompt', { text: '算法助手', variables: [] })
+  const skill = state.create('skills', 'group_skill', {
+    name: '算法讲解',
+    text: '解释算法思路和复杂度',
+    execution_mode: 'direct',
+    allowed_tools: [],
+    budget: defaultBudget(),
+  })
+  const content = {
+    name: '分组恢复助手',
+    prompt_id: prompt.id,
+    skill_ids: [skill.id],
+    default_skill_id: skill.id,
+    model_profile_id: state.model.id,
+    allowed_tools: [],
+    budget: defaultBudget(),
+    visibility: 'user',
+    is_test: false,
+    test_expires_at: null,
+    knowledge_scope: [lastGroup.id],
+  }
+  state.create('agents', 'group_agent', content)
+  state.create('agents', 'group_agent', { ...content, knowledge_scope: [] })
+  await page.goto('/agent/agents/group_agent/edit')
+  await expect(page.getByRole('checkbox', { name: '题解', exact: true })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: lastGroup.name, exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '从此版本恢复' }).last().click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  await expect(page.locator('.selected-bindings')).toContainText(lastGroup.name)
+  await expect(page.locator('.selected-bindings')).not.toContainText('分组信息未加载')
+  await page.getByRole('button', { name: '下一页分组' }).click()
+  const lastCheckbox = page.getByRole('checkbox', { name: lastGroup.name, exact: true })
+  await expect(lastCheckbox).toBeChecked()
+  await lastCheckbox.uncheck()
+  await page.getByRole('button', { name: '上一页分组' }).click()
+  await page.getByRole('checkbox', { name: '题解', exact: true }).check()
+  await page.getByRole('button', { name: '保存新版本' }).click()
+  await expect(page.getByRole('status')).toContainText('已保存版本')
+  await expect
+    .poll(() => state.current.get('agents/group_agent')!.content.knowledge_scope)
+    .toEqual([state.knowledgeGroup.id])
 })
 
 test('已停用工具仍可从历史绑定中取消后保存', async ({ page }) => {
