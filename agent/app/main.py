@@ -24,6 +24,7 @@ from app.core.provider_policy import ProviderPolicy
 from app.core.resources import AppResources
 from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
+from app.evals.api import router as eval_router
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
 from app.storage.configuration import ConfigurationStore
@@ -57,6 +58,8 @@ def create_app(
         model_client = None
         rag = None
         rag_clients = None
+        evals = None
+        eval_clients = None
         management = None
         verifier = None
         store = None
@@ -100,6 +103,17 @@ def create_app(
                     business_clients,
                     config,
                 ).register(business_tools)
+            if config.admin_enabled:
+                from app.evals.store import EvalStore
+
+                eval_clients = rag_clients
+                if eval_clients is None:
+                    from app.rag.clients import RagClients
+
+                    eval_clients = RagClients(config)
+                if not isinstance(database, DatabaseProbe) or database.engine is None:
+                    raise ConfigurationError("Eval requires an Agent database")
+                evals = EvalStore(database.engine, eval_clients)
             tool_executor = ToolExecutor(business_tools)
             if config.chat_enabled:
                 assert verifier is not None
@@ -168,6 +182,7 @@ def create_app(
                 verifier=verifier,
                 store=store,
                 rag=rag,
+                evals=evals,
             )
             logger.info("Agent service started")
             yield
@@ -180,6 +195,8 @@ def create_app(
                                 await controller.close()
                         if rag_clients is not None:
                             await rag_clients.close()
+                        if eval_clients is not None and eval_clients is not rag_clients:
+                            await eval_clients.close()
                     finally:
                         try:
                             if business_clients is not None:
@@ -232,6 +249,7 @@ def create_app(
     from app.rag.api import router as rag_router
 
     application.include_router(rag_router)
+    application.include_router(eval_router)
     application.include_router(management_router)
     application.include_router(history_router)
     if config.chat_enabled:

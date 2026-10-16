@@ -20,6 +20,7 @@ import AgentChat from './views/AgentChat.vue'
 import AgentList from './views/AgentList.vue'
 import AgentEditor from './views/AgentEditor.vue'
 import AgentRag from './views/AgentRag.vue'
+import AgentEval from './views/AgentEval.vue'
 import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
@@ -48,6 +49,7 @@ const router = createRouter({
         { path: '', redirect: '/agent/chat' },
         { path: 'chat', component: AgentChat },
         { path: 'rag', component: AgentRag, meta: { agentAdmin: true } },
+        { path: 'eval', component: AgentEval, meta: { agentAdmin: true } },
         {
           path: ':resource(agents|prompts|skills)',
           component: AgentList,

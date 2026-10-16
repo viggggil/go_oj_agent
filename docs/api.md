@@ -892,6 +892,21 @@ GET  /api/v1/admin/agent/runs/{run_id}
 GET  /api/v1/admin/agent/audits
 ```
 
+当前已接入的 Eval 数据集管理接口：
+
+```text
+GET  /api/v1/admin/agent/evals/datasets
+POST /api/v1/admin/agent/evals/datasets
+GET  /api/v1/admin/agent/evals/datasets/{dataset_id}
+GET  /api/v1/admin/agent/evals/datasets/{dataset_id}/cases
+```
+
+上传正文是受限 JSON 请求，包含 `name`、`description` 和 UTF-8 JSONL `content`。Agent
+服务逐行校验 Case，只接受 `user`/`assistant` 对话并拒绝重复 ID、system/tool 伪造消息和
+超限内容；原始 JSONL 以不可变对象写入 Agent 专用 MinIO，MySQL 保存哈希、元数据和
+校验后的 Case 投影。重复内容哈希返回已有数据集，不重复创建。上述接口均要求管理员角色，
+普通用户由 Gateway 和 Agent 双重拒绝。
+
 Eval 运行必须记录配置版本快照。运行详情默认返回脱敏的意图、Skill、Tool 调用、
 延迟、Token、证据引用、答案状态和评分；源码、凭据、完整 Prompt 和原始敏感 Tool
 Result 不直接返回浏览器。

@@ -7,6 +7,9 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasPrefix(path, "/api/v1/admin/agent/evals/") {
+		return validEvalEnvelope(method, path, payload)
+	}
 	if strings.HasPrefix(path, "/api/v1/admin/agent/rag/") {
 		return validRAGEnvelope(path, payload)
 	}
@@ -70,6 +73,78 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 			if !validAgentConfiguration(item, false, parts[5]) {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if method == "POST" {
+		if len(payload) != 2 {
+			return false
+		}
+		item, ok := agentJSONFields(payload["dataset"], "id name description format_version content_hash case_count created_by created_at status", "duplicate")
+		return ok && agentJSONTypes(item, "id name description format_version content_hash created_at status", "", "case_count created_by") && agentJSONRequired(payload["duplicate"], new(bool))
+	}
+	if strings.HasSuffix(path, "/datasets") {
+		if len(payload) != 2 {
+			return false
+		}
+		var items []json.RawMessage
+		if json.Unmarshal(payload["items"], &items) != nil || items == nil {
+			return false
+		}
+		page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+		if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+			return false
+		}
+		for _, value := range items {
+			item, valid := agentJSONFields(value, "id name description format_version content_hash case_count created_by created_at status", "")
+			if !valid || !agentJSONTypes(item, "id name description format_version content_hash created_at status", "", "case_count created_by") {
+				return false
+			}
+		}
+		return true
+	}
+	if strings.HasSuffix(path, "/cases") {
+		if len(payload) != 2 {
+			return false
+		}
+		var values []json.RawMessage
+		if json.Unmarshal(payload["items"], &values) != nil || values == nil {
+			return false
+		}
+		page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+		if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+			return false
+		}
+		for _, value := range values {
+			caseValue, valid := agentJSONFields(value, "id category title case", "")
+			if !valid || !agentJSONTypes(caseValue, "id category title", "", "") || !agentJSONObject(caseValue["case"]) {
+				return false
+			}
+		}
+		return true
+	}
+	if len(payload) == 1 {
+		item, ok := agentJSONFields(payload["dataset"], "id name description format_version content_hash case_count created_by created_at status", "")
+		return ok && agentJSONTypes(item, "id name description format_version content_hash created_at status", "", "case_count created_by")
+	}
+	if len(payload) != 2 {
+		return false
+	}
+	item, ok := agentJSONFields(payload["dataset"], "id name description format_version content_hash case_count created_by created_at status", "")
+	if !ok || !agentJSONTypes(item, "id name description format_version content_hash created_at status", "", "case_count created_by") {
+		return false
+	}
+	var values []json.RawMessage
+	if json.Unmarshal(payload["cases"], &values) != nil || values == nil {
+		return false
+	}
+	for _, value := range values {
+		caseValue, valid := agentJSONFields(value, "id category title case", "")
+		if !valid || !agentJSONTypes(caseValue, "id category title", "", "") || !agentJSONObject(caseValue["case"]) {
+			return false
 		}
 	}
 	return true

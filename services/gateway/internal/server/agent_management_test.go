@@ -197,6 +197,36 @@ func TestAgentOperationRejectsUnknownPathsAndRoles(t *testing.T) {
 			t.Fatal(role)
 		}
 	}
+	id := uuid.NewString()
+	if _, err := client.AgentOperation(http.MethodGet, "/api/v1/admin/agent/evals/datasets"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.AgentOperation(http.MethodPost, "/api/v1/admin/agent/evals/datasets"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.AgentOperation(http.MethodGet, "/api/v1/admin/agent/evals/datasets/"+id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEvalDatasetEnvelopeContract(t *testing.T) {
+	id := uuid.NewString()
+	dataset := map[string]any{"id": id, "name": "core", "description": "", "format_version": "v1", "content_hash": strings.Repeat("a", 64), "case_count": 1, "created_by": 7, "created_at": "now", "status": "READY"}
+	value := map[string]any{"dataset": dataset, "duplicate": false}
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(data, &payload); err != nil || !validEvalEnvelope(http.MethodPost, "/api/v1/admin/agent/evals/datasets", payload) {
+		t.Fatal("valid eval dataset rejected")
+	}
+	value["private"] = "must reject"
+	data, _ = json.Marshal(value)
+	_ = json.Unmarshal(data, &payload)
+	if validEvalEnvelope(http.MethodPost, "/api/v1/admin/agent/evals/datasets", payload) {
+		t.Fatal("private eval field accepted")
+	}
 }
 
 func TestRAGEvidenceRouteContractRejectsUnexpectedPrivateFields(t *testing.T) {

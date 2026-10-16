@@ -61,6 +61,10 @@ rag_present="$(table_count "$rag_tables")"
 rag_fk_present="$(query "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA='oj_agent' AND CONSTRAINT_NAME IN ('fk_knowledge_current','fk_knowledge_active')")"
 apply_migration 000004_create_knowledge "$((rag_present + rag_fk_present))" 7
 
+eval_tables="'agent_eval_datasets','agent_eval_cases'"
+eval_present="$(table_count "$eval_tables")"
+apply_migration 000005_create_eval "$eval_present" 2
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"

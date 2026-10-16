@@ -110,6 +110,9 @@ export function agentError(error: unknown): string {
     AGENT_CONFIGURATION_UNSUPPORTED: '模型或执行模式不受支持，请重新选择',
     AGENT_CONFIGURATION_TEST_EXPIRED: '测试 Agent 的到期时间必须在未来',
     AGENT_MODEL_ENDPOINT_DENIED: '模型地址不在部署允许范围内',
+    AGENT_EVAL_DATASET_INVALID: '数据集格式不正确，请检查 JSONL 内容',
+    AGENT_EVAL_NOT_FOUND: '评测数据集不存在或已被移除',
+    AGENT_EVAL_UNAVAILABLE: '评测数据集服务暂不可用',
   }
   const code = body?.reason || body?.code || ''
   if (messages[code]) return messages[code]

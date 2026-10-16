@@ -13,11 +13,20 @@ _SKILLS = re.compile(rf"/api/v1/agent/agents/({KEY_PATTERN})/skills")
 _MESSAGES = re.compile(r"/api/v1/agent/conversations/([0-9a-f-]{36})/messages")
 _MODEL = re.compile(r"/api/v1/admin/agent/model-options/([0-9a-f-]{36})")
 _VERSION = re.compile(r"/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})")
+_EVAL_DATASET = re.compile(r"/api/v1/admin/agent/evals/datasets(?:/([0-9a-f-]{36})(/cases)?)?")
 
 
 def operation(method: str, path: str) -> str:
     allowed = False
-    if path == "/api/v1/agent/chat":
+    if match := _EVAL_DATASET.fullmatch(path):
+        if match[1] is None:
+            allowed = method in {"GET", "POST"}
+        else:
+            try:
+                allowed = method == "GET" and str(UUID(match[1])) == match[1]
+            except ValueError:
+                pass
+    elif path == "/api/v1/agent/chat":
         allowed = method == "POST"
     elif path in {
         "/api/v1/agent/agents",

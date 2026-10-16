@@ -381,7 +381,7 @@ agent/
 │   ├── clients/           # User / Problem / Judge gRPC Client
 │   ├── rag/               # 摄取、检索、引用和可见性过滤
 │   ├── control_plane/     # 配置版本、替换、校验、审计
-│   ├── evals/             # 数据集、Runner、Graders
+│   ├── evals/             # 数据集、Runner、Graders（当前已接入 JSONL 数据集）
 │   ├── models/            # State、Event、Persistence
 │   └── core/              # Config、Budget、Trace、脱敏
 ├── evals/
@@ -637,4 +637,4 @@ Agent 绑定知识分组后，真实模型自动可用 retrieve_knowledge，无�
 
 默认 `AGENT_RAG_MAX_QUERIES_PER_RUN=4`、`AGENT_RAG_MIN_SCORE=0.35`，top_k 默认 3/上限 5，结果最多 24KB，仍消耗整体工具/时间/模型输入预算。停止取消 HTTP/gRPC，新对话无旧片段。无匹配、故障或预算耗尽必须明确说明证据不足。正文作为不可信参考，不得改变工具和安全规则。
 
-运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。`make agent-eval` 仍是未接线占位，PR4 将建设质量评测，不将普通测试宣称为评测完成。
+运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。当前已接入 Agent Eval JSONL 数据集上传、校验、去重和管理员浏览；批量 Runner、程序化评分及人工/评审 Agent 流程在 Issue #175 后续实现，`make agent-eval` 暂不作为质量评测命令。
