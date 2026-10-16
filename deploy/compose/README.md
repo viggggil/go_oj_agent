@@ -109,7 +109,7 @@ PR4 的业务 Tool 默认关闭。设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 后
 独立私钥调用 Problem/Judge 的只读 gRPC RPC；目标服务通过 `agent-public.pem` 和 RPC
 allowlist 验证调用。Agent 不会直接挂载业务数据库。
 
-`agent-db-init` 在 MySQL 健康后检查 Agent `000001`～`000003` 的表、增量列和约束，
+`agent-db-init` 在 MySQL 健康后检查 Agent `000001`～`000005` 的表、增量列和约束，
 按顺序应用尚未执行的迁移；完整的已执行迁移会跳过，保留已有会话、配置和凭据。
 它复用 `migrations/agent/` 的原始 SQL，并幂等执行 `agent-user.sql` 创建仅有 `oj_agent`
 表读写权限的账户，不覆盖已有账户密码。若发现迁移只完成了一部分，会明确失败并要求
@@ -127,7 +127,7 @@ make infra-down
 
 ## 配置
 
-Gateway Agent 路由、管理 API 和数据库配置目录默认开启。Agent 的 `000001`～`000003`
+Gateway Agent 路由、管理 API 和数据库配置目录默认开启。Agent 的 `000001`～`000005`
 migration 在启动时自动准备。设置 `AGENT_ADMIN_ENABLED=false` 可单独关闭管理功能。
 默认 `AGENT_ADMIN_PROVIDER_KEY=su8`；开发环境自动准备固定 Provider 和三个模型，
 其他部署或凭据轮换按 `agent/README.md` 使用本机 CLI，HTTP 不接收 API Key。Chat 关闭时管理仍可独立使用；
@@ -163,7 +163,7 @@ MySQL 官方镜像仅在数据目录为空时执行 `/docker-entrypoint-initdb.d
 
 Compose 不复制另一套数据库结构，schema 的唯一来源仍是 `migrations/`。
 
-MySQL 空数据卷初始化包含 Agent `000001`～`000003` 和开发账户 SQL。
+MySQL 空数据卷初始化包含 Agent `000001`～`000005` 和开发账户 SQL。
 `agent-db-init` 同时兼容这条已初始化路径，以及尚未包含 Agent 或只完成历史完整版本的旧数据卷。
 Agent 使用独立公钥卷和 Gateway Chat 路由。不要为迁移已有数据库而删除当前开发数据卷。
 

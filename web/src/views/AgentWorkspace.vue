@@ -33,6 +33,9 @@
           <RouterLink to="/agent/rag" @click="open = false"
             ><Database :size="17" />RAG 知识库</RouterLink
           >
+          <RouterLink to="/agent/eval" @click="open = false"
+            ><FileCheck :size="17" />Agent Eval</RouterLink
+          >
           <RouterLink to="/agent/agents" @click="open = false"><Bot :size="17" />Agent</RouterLink>
           <RouterLink to="/agent/prompts" @click="open = false"
             ><FileText :size="17" />Prompt</RouterLink
@@ -62,7 +65,7 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-  import { Bot, Database, FileText, Menu, MessageSquare, Puzzle, X } from '@lucide/vue'
+  import { Bot, Database, FileCheck, FileText, Menu, MessageSquare, Puzzle, X } from '@lucide/vue'
   import { useAuthStore } from '../stores/auth'
   import { agentAdministrator, clearAgentDrafts } from '../agent/state'
   const auth = useAuthStore(),

@@ -655,6 +655,12 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 整体指标；结果表保存每个 Case 的工具选择、参数、权限、引用、质量评分、失败原因
 和人工标注。
 
+当前数据集阶段已落地 `migrations/agent/000005_create_eval`：
+`agent_eval_datasets` 保存数据集元数据、内容哈希和 MinIO 原文对象键，
+`agent_eval_cases` 保存严格校验后的 Case 投影。原始 JSONL 不进入数据库；同一内容哈希
+重复上传只返回已有数据集。评测运行、结果和人工评审表在后续阶段增加，运行配置必须固定
+具体 Agent/Prompt/Skill/Model/知识版本。
+
 ### `agent_runs` / `agent_run_events`
 
 PR2 只实现上面列出的最小运行表，以下 Skill、模型、Token、延迟及事件表仍是后续规划。
