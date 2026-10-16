@@ -242,3 +242,20 @@ func validEvalError(payload map[string]json.RawMessage) bool {
 	}
 	return true
 }
+
+func validEvalError(payload map[string]json.RawMessage) bool {
+	if len(payload) < 2 || len(payload) > 3 {
+		return false
+	}
+	var message string
+	if json.Unmarshal(payload["message"], &message) != nil || len(message) == 0 || len(message) > 256 {
+		return false
+	}
+	if line, ok := payload["line"]; ok {
+		var value int
+		if json.Unmarshal(line, &value) != nil || value < 1 || value > 1001 {
+			return false
+		}
+	}
+	return true
+}
