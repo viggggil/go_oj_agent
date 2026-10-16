@@ -787,7 +787,7 @@ Skill 不设置预算时继承 Agent 和部署上限。兼容旧 Skill 的 promp
 用于旧模板字面括号转义），保存生成新版本并移除旧 Prompt 绑定/Skill 预算；旧版本继续有效。
 内置 variables 仅用于兼容迁移，声明时沿用 Prompt 模板校验。
 Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
-visibility/is_test/test_expires_at/knowledge_scope。知识范围必须为空，管理创建只支持 direct。
+visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；运行模式支持 direct/react。
 test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
 
 真实模式的模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
@@ -1634,3 +1634,19 @@ Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR
 不返回第三方原始正文。本阶段扩展管理员 REST 与 Agent knowledge_scope 校验，默认空范围兼容已有配置；Go Gateway allowlist/响应校验、Python 服务及 Web 客户端同步更新，不改变 gRPC/SSE，不新增 MQ 事件。
 
 管理员页面位于 `/agent/rag`，保留 Agent 左侧导航，仅管理角色可见；支持分组创建/改名、文档上传与版本编辑、状态刷新/失败重试、启用/归档、切分预览和当前分组检索。正文以纯文本显示，不执行上传 Markdown/HTML。文件在浏览器按 UTF-8 校验后作为受限 JSON 上传。Agent 编辑页按组多选；普通用户直接进入管理 URL 会返回对话页，后端仍独立拒绝管理 API。
+
+### RAG PR3：内部模型检索与管理员证据
+
+`retrieve_knowledge` 是内部只读工具，不是普通用户可调用的 REST 搜索接口。绑定分组且开启 RAG 的真实模型 Agent 自动获得该工具，仍消耗全局工具/模型预算。输入为 `query`（1–400 字符、非空白）、可空 `problem_id`（正 int64）、`top_k`（1–5，默认 3），拒绝其他字段；分组、版本和身份均取可信 Run 状态。默认每 Run 最多 4 次查询（`AGENT_RAG_MAX_QUERIES_PER_RUN` 可设 1–8）、`AGENT_RAG_MIN_SCORE=0.35`，匹配正文及元数据总计至多 24KB 并服从全局结果上限。
+
+内部结果包含 `matches`、`truncated`、不可信资料提示；匹配项为现有检索字段加程序生成的 `source_id`。失败沿用 ToolResult 的 `ok=false/error_code`：依赖不可用 `TOOL_DEPENDENCY_UNAVAILABLE`、超时 `TOOL_TIMEOUT`、授权拒绝 `TOOL_PERMISSION_DENIED`、查询超限 `TOOL_KNOWLEDGE_QUERY_LIMIT`；成功空匹配明确表示没有可用证据，不能把故障伪装成空匹配。结果只返回模型；普通 SSE 的字段和事件不变，不返回检索原文、证据对象、对象键或下载链接。Provider 流事件预算耗尽返回既有 `AGENT_MODEL_OUTPUT_LIMIT`，不再误报响应格式错误。
+
+新增管理员 **GET `/api/v1/admin/agent/rag/runs/{uuid}/evidence`**，不接受查询参数/正文，只允许 canonical UUID。双层管理员鉴权、具体 GET 路径委托、Cache-Control:no-store；普通用户 403、未知 Run 404。响应：
+
+```json
+{"evidence":{"run_id":"UUID","status":"COMPLETED","agent_key":"rag_agent","scope":["组UUID"],"versions":["版本UUID"],"attempts":[{"call_id":"call_1","ok":true,"error_code":null,"sources":[{"source_id":"UUID","base_id":"UUID","document_id":"UUID","version_id":"UUID","problem_id":22,"title":"单调队列","number":0,"section":"证明","start":0,"end":120,"score":0.8}]}]}}
+```
+
+attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源位置。运行中可查询固定清单，检索记录在终态持久化后出现；不返回完整 config_snapshot/model_summary、Provider 配置、query 或片段。无检索的旧 Run 兼容返回空清单和空 attempts。RAG 页支持输入 Run UUID 或管理员当前聊天的“查看本轮知识来源”链接。
+
+新增兼容性 gRPC：`contest.v1.ContestService/CheckKnowledgeAccess`，请求 `problem_ids` 为 1–100 个不重复正 int64，返回 `allowed_problem_ids` 子集，不返回比赛列表/身份。需可信内部主体；Contest 从自身数据库排除所有 `status != archived AND end_at > UTC_TIMESTAMP(3)` 的关联题目，管理员同样不豁免。该结果只确认比赛限制，Agent 还必须通过 Problem `BatchGetProblems` 确认题目 normal/可见；未知、归档及不可访问题目均排除。Python bindings、Go generated server/client、Agent RPC 白名单与部署配置同步更新；Gateway 不公开此 RPC。无新增事件/表/列，升级先部署业务 RPC 与白名单并重启加载配置，再部署 Agent；旧服务返回 Unimplemented 时检索失败关闭。

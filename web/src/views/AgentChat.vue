@@ -75,6 +75,12 @@
     <p v-if="status" class="chat-status" :class="{ error: statusError }" role="status">
       {{ status }}
     </p>
+    <RouterLink
+      v-if="lastRunId && !streaming && agentAdministrator(auth.user?.roles || [])"
+      :to="{ path: '/agent/rag', query: { run_id: lastRunId } }"
+      class="link"
+      >查看本轮知识来源</RouterLink
+    >
     <form class="chat-compose" @submit.prevent="send">
       <textarea
         v-model="draft"
@@ -161,6 +167,7 @@
     nextBefore = ref<number | null>(null)
   let historyAbort: AbortController | undefined, historyListAbort: AbortController | undefined
   const catalogError = ref(''),
+    lastRunId = ref(''),
     status = ref(''),
     statusError = ref(false)
   const scrollBox = ref<HTMLElement>(),
@@ -301,6 +308,7 @@
     nextBefore.value = null
     stop()
     conversationId = undefined
+    lastRunId.value = ''
     messages.value = []
     draft.value = ''
     status.value = ''
@@ -340,6 +348,7 @@
     messages.value.push({ id: crypto.randomUUID(), role: 'user', text }, assistant)
     draft.value = ''
     streaming.value = true
+    lastRunId.value = ''
     status.value = '正在连接…'
     statusError.value = false
     following.value = true
@@ -355,6 +364,7 @@
         (identity) => {
           if (current === generation && !abort.signal.aborted) {
             conversationId = identity.conversationId
+            lastRunId.value = identity.runId
             historySelection.value = conversationId
             void loadHistory()
           }

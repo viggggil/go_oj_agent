@@ -407,6 +407,65 @@ class KnowledgeStore:
                 raise ConfigError("AGENT_UNAVAILABLE", 503)
             return [dict(row) for row in rows]
 
+    async def pinned(
+        self, base_ids: list[str], version_ids: list[str], problem_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """旧 Run 可继续读取旧发布版本；停用覆盖快照，不能回退到当前全库。"""
+        if not base_ids or not version_ids:
+            return []
+        query = (
+            select(versions, documents.c.base_id)
+            .select_from(
+                documents.join(versions, documents.c.id == versions.c.document_id).join(
+                    tasks, tasks.c.version_id == versions.c.id
+                )
+            )
+            .where(
+                documents.c.enabled.is_(True),
+                documents.c.base_id.in_(base_ids),
+                versions.c.id.in_(version_ids),
+                tasks.c.state == "READY",
+            )
+        )
+        if problem_id is not None:
+            query = query.where(versions.c.problem_id == problem_id)
+        async with self.engine.connect() as conn:
+            return [dict(row) for row in (await conn.execute(query)).mappings()]
+
+    async def evidence(self, run_id: str) -> dict[str, Any]:
+        """仅管理员路由调用；严格投影，不能返回完整配置或模型输入。"""
+        from app.models.provider import KnowledgeAttempt
+        from app.storage.schema import agent_runs
+
+        async with self.engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        select(
+                            agent_runs.c.status,
+                            agent_runs.c.config_snapshot,
+                            agent_runs.c.model_summary,
+                        ).where(agent_runs.c.id == run_id)
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            raise ConfigError("AGENT_RAG_NOT_FOUND", 404)
+        snapshot, summary = row["config_snapshot"], row["model_summary"] or {}
+        return {
+            "run_id": run_id,
+            "status": row["status"],
+            "agent_key": snapshot.get("agent_key", "demo"),
+            "scope": snapshot.get("knowledge_scope", []),
+            "versions": snapshot.get("knowledge_versions", []),
+            "attempts": [
+                KnowledgeAttempt.model_validate(item).model_dump(mode="json")
+                for item in summary.get("knowledge", [])
+            ],
+        }
+
     async def claim(self) -> dict[str, Any] | None:
         async with self.engine.begin() as conn:
             row = (

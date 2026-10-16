@@ -20,6 +20,27 @@ func validRAGBase(raw json.RawMessage) bool {
 	return ok && agentJSONTypes(object, "id name created_at", "", "created_by")
 }
 func validRAGEnvelope(path string, payload map[string]json.RawMessage) bool {
+	if value, ok := payload["evidence"]; ok {
+		fields, valid := agentJSONFields(value, "run_id status agent_key scope versions attempts", "")
+		var attempts []json.RawMessage
+		if len(payload) != 1 || !strings.HasSuffix(path, "/evidence") || !valid || !agentJSONTypes(fields, "run_id status agent_key", "", "") || !agentJSONStrings(fields["scope"]) || !agentJSONStrings(fields["versions"]) || !agentJSONRequired(fields["attempts"], &attempts) || attempts == nil || len(attempts) > 32 {
+			return false
+		}
+		for _, attempt := range attempts {
+			item, valid := agentJSONFields(attempt, "call_id ok error_code sources", "")
+			var sources []json.RawMessage
+			if !valid || !agentJSONTypes(item, "call_id", "ok", "") || !agentJSONNullable(item["error_code"], new(string)) || !agentJSONRequired(item["sources"], &sources) || sources == nil || len(sources) > 5 {
+				return false
+			}
+			for _, source := range sources {
+				ref, valid := agentJSONFields(source, "source_id base_id document_id version_id problem_id title number section start end score", "")
+				if !valid || !agentJSONTypes(ref, "source_id base_id document_id version_id title section", "", "number start end") || !agentJSONNullable(ref["problem_id"], new(int64)) || !agentJSONRequired(ref["score"], new(float64)) {
+					return false
+				}
+			}
+		}
+		return true
+	}
 	if value, ok := payload["chunks"]; ok {
 		var chunks []json.RawMessage
 		page, valid := agentJSONFields(payload["page"], "page page_size total", "")

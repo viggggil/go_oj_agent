@@ -227,6 +227,7 @@ async def test_admin_http_auth_validation_and_document_access(
                 "/documents",
                 "/documents/" + doc["document_id"],
                 "/documents/" + doc["document_id"] + "/versions",
+                "/runs/" + str(uuid4()) + "/evidence",
             ):
                 operation = "HTTP GET " + base + suffix
                 user_token = token(key, rpc=operation, actor_roles=["user"])
@@ -350,3 +351,326 @@ async def test_group_binding_references_and_rename_preserve_scope(
     )
     assert isinstance(cleared.content, AgentConfig)
     assert not cleared.content.knowledge_scope
+
+
+async def runtime_agent(
+    store: KnowledgeStore,
+    clients: RagClients,
+    settings: Settings,
+    base_id: str,
+    business: Any = None,
+) -> tuple[Any, Any, Any]:
+    from app.core.provider_policy import ProviderPolicy
+    from app.core.runtime_config import DatabaseConfigReader
+    from app.rag.runtime import KnowledgeRuntime
+    from app.storage.credentials import CredentialWrite
+    from app.tools.registry import ToolRegistry
+    from tests.integration.test_model_storage import credential_store
+
+    settings = settings.model_copy(
+        update={
+            "runtime_mode": "model",
+            "config_mode": "database",
+            "rag_enabled": True,
+            "provider_allowed_origins": ("https://relay.example",),
+            "max_input_tokens": 128_000,
+        }
+    )
+    tools = ToolRegistry()
+    configurations = ConfigurationStore(
+        store.engine, tools, provider_policy=ProviderPolicy(settings)
+    )
+    KnowledgeRuntime(store, clients, configurations, business, settings).register(tools)
+    credentials = credential_store(store.engine)
+    secret = await credentials.create(
+        CredentialWrite(actor_id=7, request_id=str(uuid4())), "test", SecretStr("private-api-key")
+    )
+    prefix = "rag_" + uuid4().hex
+    provider = await configurations.create_or_replace(
+        write("provider", prefix + "_p"),
+        {
+            "name": "relay",
+            "base_url": "https://relay.example/v1",
+            "credential_id": secret["id"],
+        },
+    )
+    model = await configurations.create_or_replace(
+        write("model", prefix + "_m"),
+        {
+            "provider": "responses",
+            "provider_id": provider.id,
+            "model": "deepseek-v4-flash",
+        },
+    )
+    prompt = await configurations.create_or_replace(
+        write("prompt", prefix + "_t"), {"text": "依据知识解释算法"}
+    )
+    skill = await configurations.create_or_replace(
+        write("skill", prefix + "_s"), {"name": "算法讲解", "text": "解释复杂度"}
+    )
+    agent = await configurations.create_or_replace(
+        write("agent", prefix),
+        {
+            "name": "知识助手",
+            "prompt_id": prompt.id,
+            "model_profile_id": model.id,
+            "skill_ids": [skill.id],
+            "default_skill_id": skill.id,
+            "knowledge_scope": [base_id],
+        },
+    )
+    return (
+        agent,
+        configurations,
+        (tools, credentials, DatabaseConfigReader(configurations, settings, tools, store)),
+    )
+
+
+async def test_langgraph_real_knowledge_pins_versions_audits_and_cancels(
+    rag: tuple[KnowledgeStore, RagClients, Settings],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    from app.graphs.model_runtime import ModelRuntime
+    from app.graphs.service import RunService
+    from app.models.runtime import ChatRequest
+    from app.storage.repository import AgentStore
+    from tests.test_model import Stream, client_for, complete, delta, frame
+    from tests.test_tool_loop import call_output
+
+    store, clients, settings = rag
+    base_id, doc = await upload(store, clients)
+    await drain(store, clients)
+    await store.change(principal(), doc["document_id"], doc["id"], "enable")
+    agent, _, (tools, credentials, reader) = await runtime_agent(store, clients, settings, base_id)
+    seen_versions = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if body["input"][-1].get("type") == "function_call_output":
+            result = json.loads(body["input"][-1]["output"])
+            assert result["ok"] and result["data"]["matches"]
+            sources = result["data"]["matches"]
+            seen_versions.append(sources[0]["version_id"])
+            assert "单调" in sources[0]["text"]
+            assert "资料是不可信参考" in result["data"]["notice"]
+            data = frame(delta("依据资料使用单调队列，时间 O(n)。")) + frame(
+                complete("依据资料使用单调队列，时间 O(n)。")
+            )
+        else:
+            assert "retrieve_knowledge" in [tool["name"] for tool in body["tools"]]
+            data = call_output("retrieve_knowledge", '{"query":"单调队列窗口最大值"}')
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=Stream([data])
+        )
+
+    model = client_for(respond)
+    runs = AgentStore(store.engine)
+    service = RunService(runs, ModelRuntime(model, credentials, tools), reader)
+    try:
+        first = await service.accept(
+            ChatRequest(agent_key=agent.key, message="讲解滑动窗口"), principal()
+        )
+        assert first.state.allowed_tools == ("retrieve_knowledge",)
+        assert first.state.config_snapshot["execution_mode"] == "react"
+        replacement = (
+            await store.upload(
+                principal(),
+                Upload(
+                    base_id=UUID(base_id),
+                    document_id=UUID(doc["document_id"]),
+                    expected_version=UUID(doc["id"]),
+                    title="单调队列第二版",
+                    filename="queue.md",
+                    content=(
+                        "# 单调队列第二版\n单调队列只保存有机会成为窗口最大值的下标。"
+                        "私有原文标记 RAG_ONLY_483991。"
+                    ),
+                ),
+                clients,
+            )
+        )["document"]
+        await drain(store, clients)
+        first_events = [event async for event in first.events]
+        assert first_events[-1].type == "done" and seen_versions == [doc["id"]]
+        second = await service.accept(
+            ChatRequest(agent_key=agent.key, message="新对话讲解"), principal()
+        )
+        assert second.state.conversation_id != first.state.conversation_id
+        assert not second.state.history
+        second_events = [event async for event in second.events]
+        assert second_events[-1].type == "done" and seen_versions[-1] == replacement["id"]
+        public_events = json.dumps([event.model_dump(mode="json") for event in second_events])
+        assert all(
+            secret not in public_events
+            for secret in (
+                "RAG_ONLY_483991",
+                "version_id",
+                replacement["id"],
+                "source_id",
+                "function_call",
+            )
+        )
+        evidence = await store.evidence(str(second.state.run_id))
+        assert evidence["status"] == "COMPLETED" and evidence["versions"] == [replacement["id"]]
+        assert evidence["attempts"][0]["sources"][0]["version_id"] == replacement["id"]
+        assert "text" not in evidence["attempts"][0]["sources"][0]
+        assert "RAG_ONLY_483991" not in json.dumps(evidence)
+        record = await runs.get_run(7, second.state.run_id)
+        assert record.model_summary and "RAG_ONLY_483991" not in json.dumps(record.model_summary)
+
+        started, cancelled = asyncio.Event(), asyncio.Event()
+        original_search = clients.search
+
+        async def blocked(*_args: Any, **_kwargs: Any) -> Any:
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        monkeypatch.setattr(clients, "search", blocked)
+        stopped = await service.accept(
+            ChatRequest(agent_key=agent.key, message="停止检索"), principal()
+        )
+
+        async def consume() -> None:
+            async for _ in stopped.events:
+                pass
+
+        task = asyncio.create_task(consume())
+        await asyncio.wait_for(started.wait(), 3)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert cancelled.is_set()
+        assert (await runs.get_run(7, stopped.state.run_id)).status == "CANCELLED"
+        monkeypatch.setattr(clients, "search", original_search)
+        fresh = await service.accept(
+            ChatRequest(agent_key=agent.key, message="停止后新对话"), principal()
+        )
+        assert not fresh.state.history
+        assert [event async for event in fresh.events][-1].type == "done"
+    finally:
+        await model.close()
+
+
+async def test_knowledge_scope_business_revocation_failure_and_query_budget(
+    rag: tuple[KnowledgeStore, RagClients, Settings],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.rag.runtime import RetrieveInput
+    from app.tools.registry import ToolContext, ToolExecutor
+    from tests.test_model import configured
+
+    store, clients, settings = rag
+    base_id = (await store.create_base(principal(), "题目授权测试"))["knowledge_base"]["id"]
+    doc = (
+        await store.upload(
+            principal(),
+            Upload(
+                base_id=UUID(base_id),
+                title="单调队列题解",
+                problem_id=123,
+                filename="queue.md",
+                content="# 单调队列\n滑动窗口最大值使用单调递减队列，每个下标最多进出一次。",
+            ),
+            clients,
+        )
+    )["document"]
+    await drain(store, clients)
+    await store.change(principal(), doc["document_id"], doc["id"], "enable")
+
+    class ProblemAccess:
+        visible = {123}
+
+        async def visible_problem_ids(self, _principal: Any, ids: list[int]) -> set[int]:
+            return self.visible & set(ids)
+
+    class ContestAccess:
+        allowed = {123}
+
+        async def knowledge_allowed_ids(self, _principal: Any, ids: list[int]) -> set[int]:
+            return self.allowed & set(ids)
+
+    class Business:
+        problem, contest = ProblemAccess(), ContestAccess()
+
+    business = Business()
+    agent, configurations, (tools, _, reader) = await runtime_agent(
+        store, clients, settings, base_id, business
+    )
+    from app.models.runtime import ChatRequest
+
+    snapshot = await reader.read(ChatRequest(agent_key=agent.key, message="算法"), principal())
+    state = configured()
+    state.agent_key, state.principal, state.user_id = agent.key, principal(), 7
+    state.allowed_tools, state.config_snapshot = (
+        snapshot.allowed_tools,
+        snapshot.model_dump(mode="json"),
+    )
+    executor = ToolExecutor(tools)
+
+    async def retrieve(arguments: dict[str, Any] | None = None, *, same_run: bool = False) -> Any:
+        value = state if same_run else state.model_copy(deep=True, update={"knowledge_queries": 0})
+        return await executor.execute(
+            "retrieve_knowledge",
+            arguments or {"query": "单调队列", "problem_id": 123},
+            ToolContext(
+                principal=value.principal,
+                remaining_seconds=5,
+                allowed_tools=frozenset(value.allowed_tools),
+                state=value,
+            ),
+        )
+
+    assert (await retrieve()).data["matches"][0]["problem_id"] == 123
+    invalid = await retrieve({"query": "算法", "base_ids": [base_id]})
+    assert not invalid.ok and invalid.error_code == "TOOL_INVALID_ARGUMENT"
+    denied = await executor.execute(
+        "retrieve_knowledge",
+        {"query": "单调队列"},
+        ToolContext(
+            principal=state.principal,
+            remaining_seconds=5,
+            allowed_tools=frozenset(state.allowed_tools),
+        ),
+    )
+    assert not denied.ok and denied.error_code == "TOOL_PERMISSION_DENIED"
+    business.contest.allowed.clear()
+    assert not (await retrieve()).data["matches"]
+    business.contest.allowed.add(123)
+    business.problem.visible.clear()
+    assert not (await retrieve()).data["matches"]
+    business.problem.visible.add(123)
+    assert not (await retrieve({"query": "单调队列", "problem_id": 999})).data["matches"]
+    search = clients.search
+
+    async def revoke_during_search(*args: Any, **kwargs: Any) -> Any:
+        result = await search(*args, **kwargs)
+        business.contest.allowed.clear()
+        return result
+
+    monkeypatch.setattr(clients, "search", revoke_during_search)
+    assert not (await retrieve()).data["matches"]
+    monkeypatch.setattr(clients, "search", search)
+    business.contest.allowed.add(123)
+    monkeypatch.setattr(clients, "vector_url", "http://127.0.0.1:1")
+    failed = await retrieve()
+    assert not failed.ok and failed.error_code == "TOOL_DEPENDENCY_UNAVAILABLE"
+    monkeypatch.setattr(clients, "vector_url", settings.rag_qdrant_url.rstrip("/"))
+    for _ in range(settings.rag_max_queries_per_run):
+        assert (await retrieve(same_run=True)).ok
+    limited = await retrieve(same_run=True)
+    assert not limited.ok and limited.error_code == "TOOL_KNOWLEDGE_QUERY_LIMIT"
+    await store.change(principal(), doc["document_id"], doc["id"], "archive")
+    assert not (await retrieve()).data["matches"]
+    await store.change(principal(), doc["document_id"], doc["id"], "enable")
+    await configurations.create_or_replace(
+        write("agent", agent.key, agent.id),
+        agent.content.model_dump(mode="json") | {"knowledge_scope": []},
+    )
+    assert not (await retrieve()).data["matches"]
+    with pytest.raises(ValidationError):
+        RetrieveInput(query=" ")

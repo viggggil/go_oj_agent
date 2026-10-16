@@ -230,3 +230,59 @@ test('普通用户直接访问 RAG URL 回到对话，不请求管理文档', as
   await expect(page.getByRole('link', { name: 'RAG 知识库' })).toHaveCount(0)
   expect(state.calls()).toBe(0)
 })
+
+test('管理员通过运行链接查看来源版本，非法运行 ID 不发请求', async ({ page }) => {
+  await mockRag(page)
+  const runId = randomUUID(),
+    versionId = randomUUID()
+  let calls = 0
+  await page.route('**/api/v1/admin/agent/rag/runs/*/evidence', async (route) => {
+    calls++
+    return route.fulfill({
+      json: {
+        evidence: {
+          run_id: runId,
+          status: 'COMPLETED',
+          agent_key: 'rag_agent',
+          scope: [randomUUID()],
+          versions: [versionId],
+          attempts: [
+            {
+              call_id: 'call_1',
+              ok: true,
+              error_code: null,
+              sources: [
+                {
+                  source_id: randomUUID(),
+                  base_id: randomUUID(),
+                  document_id: randomUUID(),
+                  version_id: versionId,
+                  problem_id: 42,
+                  title: '单调队列 <img src=x onerror="window.XSS=true">',
+                  number: 0,
+                  section: '正确性证明',
+                  start: 5,
+                  end: 125,
+                  score: 0.8,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    })
+  })
+  await page.goto('/agent/rag?run_id=' + runId)
+  await expect(page.getByLabel('运行 ID')).toHaveValue(runId)
+  await expect(page.locator('.rag-evidence')).toContainText(versionId)
+  await expect(page.locator('.rag-evidence')).toContainText('正确性证明')
+  expect(await page.evaluate(() => (window as any).XSS)).toBeUndefined()
+  await page.getByLabel('运行 ID').fill('not-a-run')
+  await page.getByRole('button', { name: '查询知识来源' }).click()
+  await expect(page.getByRole('alert')).toContainText('完整的运行 UUID')
+  expect(calls).toBe(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true)
+})

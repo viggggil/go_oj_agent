@@ -3313,3 +3313,250 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CreateContestSubmissionReplyValidationError{}
+
+// Validate checks the field values on CheckKnowledgeAccessRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CheckKnowledgeAccessRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CheckKnowledgeAccessRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CheckKnowledgeAccessRequestMultiError, or nil if none found.
+func (m *CheckKnowledgeAccessRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CheckKnowledgeAccessRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetProblemIds()); l < 1 || l > 100 {
+		err := CheckKnowledgeAccessRequestValidationError{
+			field:  "ProblemIds",
+			reason: "value must contain between 1 and 100 items, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	_CheckKnowledgeAccessRequest_ProblemIds_Unique := make(map[int64]struct{}, len(m.GetProblemIds()))
+
+	for idx, item := range m.GetProblemIds() {
+		_, _ = idx, item
+
+		if _, exists := _CheckKnowledgeAccessRequest_ProblemIds_Unique[item]; exists {
+			err := CheckKnowledgeAccessRequestValidationError{
+				field:  fmt.Sprintf("ProblemIds[%v]", idx),
+				reason: "repeated value must contain unique items",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		} else {
+			_CheckKnowledgeAccessRequest_ProblemIds_Unique[item] = struct{}{}
+		}
+
+		if item <= 0 {
+			err := CheckKnowledgeAccessRequestValidationError{
+				field:  fmt.Sprintf("ProblemIds[%v]", idx),
+				reason: "value must be greater than 0",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return CheckKnowledgeAccessRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CheckKnowledgeAccessRequestMultiError is an error wrapping multiple
+// validation errors returned by CheckKnowledgeAccessRequest.ValidateAll() if
+// the designated constraints aren't met.
+type CheckKnowledgeAccessRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CheckKnowledgeAccessRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CheckKnowledgeAccessRequestMultiError) AllErrors() []error { return m }
+
+// CheckKnowledgeAccessRequestValidationError is the validation error returned
+// by CheckKnowledgeAccessRequest.Validate if the designated constraints
+// aren't met.
+type CheckKnowledgeAccessRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CheckKnowledgeAccessRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CheckKnowledgeAccessRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CheckKnowledgeAccessRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CheckKnowledgeAccessRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CheckKnowledgeAccessRequestValidationError) ErrorName() string {
+	return "CheckKnowledgeAccessRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CheckKnowledgeAccessRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCheckKnowledgeAccessRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CheckKnowledgeAccessRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CheckKnowledgeAccessRequestValidationError{}
+
+// Validate checks the field values on CheckKnowledgeAccessReply with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CheckKnowledgeAccessReply) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CheckKnowledgeAccessReply with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CheckKnowledgeAccessReplyMultiError, or nil if none found.
+func (m *CheckKnowledgeAccessReply) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CheckKnowledgeAccessReply) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return CheckKnowledgeAccessReplyMultiError(errors)
+	}
+
+	return nil
+}
+
+// CheckKnowledgeAccessReplyMultiError is an error wrapping multiple validation
+// errors returned by CheckKnowledgeAccessReply.ValidateAll() if the
+// designated constraints aren't met.
+type CheckKnowledgeAccessReplyMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CheckKnowledgeAccessReplyMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CheckKnowledgeAccessReplyMultiError) AllErrors() []error { return m }
+
+// CheckKnowledgeAccessReplyValidationError is the validation error returned by
+// CheckKnowledgeAccessReply.Validate if the designated constraints aren't met.
+type CheckKnowledgeAccessReplyValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CheckKnowledgeAccessReplyValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CheckKnowledgeAccessReplyValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CheckKnowledgeAccessReplyValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CheckKnowledgeAccessReplyValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CheckKnowledgeAccessReplyValidationError) ErrorName() string {
+	return "CheckKnowledgeAccessReplyValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CheckKnowledgeAccessReplyValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCheckKnowledgeAccessReply.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CheckKnowledgeAccessReplyValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CheckKnowledgeAccessReplyValidationError{}

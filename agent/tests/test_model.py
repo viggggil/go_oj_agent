@@ -17,6 +17,7 @@ from app.core.settings import Settings
 from app.graphs.model_runtime import ModelRuntime
 from app.graphs.service import RunService
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
+from app.models.provider import ModelFailure
 from app.models.runtime import AgentState, ChatRequest, HistoryMessage
 from tests.test_runtime import MemoryStore, Reader, state
 
@@ -81,6 +82,23 @@ class Credentials:
         if self.fail:
             raise ConfigError("AGENT_CREDENTIAL_UNAVAILABLE", 503)
         return SecretStr("private-api-key")
+
+
+async def test_provider_event_budget_reports_output_limit_not_malformed_response() -> None:
+    value = configured()
+    value.config_snapshot["budget"]["max_events"] = 3
+    payload = frame({"type": "response.created"}) * 4
+    client = client_for(
+        lambda _request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=Stream([payload])
+        )
+    )
+    try:
+        with pytest.raises(ModelFailure, match="AGENT_MODEL_OUTPUT_LIMIT"):
+            async for _ in ModelRuntime(client, Credentials()).run(value):
+                pass
+    finally:
+        await client.close()
 
 
 class Stream(httpx.AsyncByteStream):

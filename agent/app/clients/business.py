@@ -7,6 +7,7 @@ from app.clients.auth import JUDGE_AUDIENCE, PROBLEM_AUDIENCE, AgentTokenSigner
 from app.clients.grpc import AuthenticatedChannel
 from app.core.settings import Settings
 from app.grpcgen.api.common.v1 import common_pb2 as _common_pb2
+from app.grpcgen.api.contest.v1 import contest_pb2 as _contest_pb2
 from app.grpcgen.api.problem.v1 import problem_pb2 as _problem_pb2
 from app.grpcgen.api.submission.v1 import submission_pb2 as _submission_pb2
 from app.models.runtime import Principal
@@ -14,16 +15,20 @@ from app.models.runtime import Principal
 common_pb2: Any = _common_pb2
 problem_pb2: Any = _problem_pb2
 submission_pb2: Any = _submission_pb2
+contest_pb2: Any = _contest_pb2
 
 
 @dataclass(frozen=True)
 class BusinessClients:
     problem: "ProblemClient"
     judge: "JudgeClient"
+    contest: "ContestClient | None" = None
 
     async def close(self) -> None:
         await self.problem.close()
         await self.judge.close()
+        if self.contest is not None:
+            await self.contest.close()
 
 
 class ProblemClient:
@@ -58,6 +63,41 @@ class ProblemClient:
             problem_pb2.ListProblemsResponse,
             principal,
         )
+
+    async def visible_problem_ids(self, principal: Principal, ids: list[int]) -> set[int]:
+        response = await self._channel.unary(
+            "/problem.v1.ProblemService/BatchGetProblems",
+            problem_pb2.BatchGetProblemsRequest(problem_ids=ids),
+            problem_pb2.BatchGetProblemsResponse,
+            principal,
+        )
+        return {
+            item.id
+            for item in response.problems
+            if item.id in ids and item.status == problem_pb2.PROBLEM_STATUS_NORMAL
+        }
+
+
+class ContestClient:
+    def __init__(self, settings: Settings, signer: AgentTokenSigner) -> None:
+        self._channel = AuthenticatedChannel(
+            settings.contest_service_endpoint,
+            "contest-service",
+            signer,
+            settings.tool_timeout_seconds,
+        )
+
+    async def close(self) -> None:
+        await self._channel.close()
+
+    async def knowledge_allowed_ids(self, principal: Principal, ids: list[int]) -> set[int]:
+        response = await self._channel.unary(
+            "/contest.v1.ContestService/CheckKnowledgeAccess",
+            contest_pb2.CheckKnowledgeAccessRequest(problem_ids=ids),
+            contest_pb2.CheckKnowledgeAccessReply,
+            principal,
+        )
+        return set(response.allowed_problem_ids) & set(ids)
 
 
 class JudgeClient:
@@ -127,4 +167,8 @@ class JudgeClient:
 
 def build_business_clients(settings: Settings) -> BusinessClients:
     signer = AgentTokenSigner(settings)
-    return BusinessClients(ProblemClient(settings, signer), JudgeClient(settings, signer))
+    return BusinessClients(
+        ProblemClient(settings, signer),
+        JudgeClient(settings, signer),
+        ContestClient(settings, signer),
+    )

@@ -1,4 +1,4 @@
-"""知识库只暴露管理员 API；模型检索接入留给 PR3。"""
+"""知识库管理及运行证据仅对管理员开放；模型使用独立内部检索工具。"""
 
 import asyncio
 from typing import Any, cast
@@ -53,7 +53,11 @@ async def handle(request: Request) -> JSONResponse:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                 page = Page.model_validate(parameters)
                 doc_id = request.path_params.get("document_id")
-                if base_id := request.path_params.get("base_id"):
+                if run_id := request.path_params.get("run_id"):
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    result = {"evidence": await service.store.evidence(str(run_id))}
+                elif base_id := request.path_params.get("base_id"):
                     if parameters:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                     result = await service.store.base_detail(str(base_id))
@@ -139,3 +143,4 @@ for action in ("enable", "archive", "retry"):
     )
 router.add_api_route(f"{PREFIX}/search", handle, methods=["POST"])
 router.add_api_route(f"{PREFIX}/preview", handle, methods=["POST"])
+router.add_api_route(f"{PREFIX}/runs/{{run_id:uuid}}/evidence", handle, methods=["GET"])

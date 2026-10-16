@@ -47,6 +47,8 @@ def operation(method: str, path: str) -> str:
             allowed = method in {"GET", "POST"}
         elif tail in {"search", "preview"}:
             allowed = method == "POST"
+        elif run := re.fullmatch(r"runs/([0-9a-f-]{36})/evidence", tail):
+            allowed = method == "GET" and str(UUID(run[1])) == run[1]
         elif group := re.fullmatch(r"knowledge-bases/([0-9a-f-]{36})(/rename)?", tail):
             allowed = str(UUID(group[1])) == group[1] and method == ("POST" if group[2] else "GET")
         elif match_rag := re.fullmatch(

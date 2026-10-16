@@ -17,6 +17,7 @@ PROTOS = [
     ROOT / "api" / "common" / "v1" / "common.proto",
     ROOT / "api" / "problem" / "v1" / "problem.proto",
     ROOT / "api" / "submission" / "v1" / "submission.proto",
+    ROOT / "api" / "contest" / "v1" / "contest.proto",
 ]
 
 

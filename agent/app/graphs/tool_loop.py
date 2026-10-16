@@ -6,7 +6,13 @@ from datetime import UTC
 from typing import Any
 
 from app.graphs.direct_answer import PreparedAnswer
-from app.models.provider import FunctionCall, ModelFailure, ModelResponse
+from app.models.provider import (
+    FunctionCall,
+    KnowledgeAttempt,
+    KnowledgeSource,
+    ModelFailure,
+    ModelResponse,
+)
 from app.models.runtime import AgentState
 from app.storage.repository import utc_now
 from app.tools.registry import ToolContext, ToolExecutor, ToolPermissionDenied, ToolRegistry
@@ -101,8 +107,25 @@ class ToolSession:
                     principal=state.principal,
                     remaining_seconds=min(60, timeout_seconds, remaining),
                     allowed_tools=allowed,
+                    state=state,
                 ),
             )
+            if call.name == "retrieve_knowledge" and state.model_summary is not None:
+                state.model_summary.knowledge.append(
+                    KnowledgeAttempt(
+                        call_id=call.call_id,
+                        ok=result.ok,
+                        error_code=result.error_code,
+                        sources=[
+                            KnowledgeSource.model_validate(
+                                {key: value for key, value in source.items() if key != "text"}
+                            )
+                            for source in (result.data or {}).get("matches", [])
+                        ]
+                        if result.ok
+                        else [],
+                    )
+                )
             output = result.model_dump_json()
             if len(output.encode()) > maximum:
                 raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")

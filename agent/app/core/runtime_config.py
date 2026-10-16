@@ -17,6 +17,7 @@ from app.models.configuration import (
 )
 from app.models.configuration import RuntimeBudget as RuntimeBudget
 from app.models.runtime import ChatRequest, Principal
+from app.rag.store import KnowledgeStore
 from app.storage.configuration import ConfigurationStore
 from app.tools.registry import ToolRegistry
 
@@ -46,6 +47,8 @@ class ConfigSnapshot(BaseModel):
     provider_id: str | None = None
     model_profile: dict[str, object] | None = None
     provider_config: dict[str, object] | None = None
+    knowledge_scope: tuple[str, ...] = ()
+    knowledge_versions: tuple[str, ...] = ()
 
 
 class ConfigSnapshotReader(Protocol):
@@ -86,13 +89,18 @@ class DemoConfigReader:
 
 class DatabaseConfigReader:
     def __init__(
-        self, store: ConfigurationStore, settings: Settings, registry: ToolRegistry
+        self,
+        store: ConfigurationStore,
+        settings: Settings,
+        registry: ToolRegistry,
+        knowledge_store: KnowledgeStore | None = None,
     ) -> None:
         if settings.runtime_mode == "disabled":
             raise ValueError("Database runtime requires explicit activation")
         self._store = store
         self._settings = settings
         self._registry = registry
+        self._knowledge_store = knowledge_store
 
     async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot:
         from datetime import UTC, datetime
@@ -211,7 +219,18 @@ class DatabaseConfigReader:
             if not automatic or value.execution_mode == "react"
             for name in value.allowed_tools
         }
-        tools = tuple(sorted(system_tools & set(agent.allowed_tools) & skill_tools))
+        # 分组绑定本身授予知识工具；不要求用户同时修改每个 Skill 的工具列表。
+        system_tools.discard("retrieve_knowledge")
+        permitted_tools = system_tools & set(agent.allowed_tools) & skill_tools
+        scope = tuple(str(value) for value in agent.knowledge_scope)
+        knowledge_versions: tuple[str, ...] = ()
+        if real and scope and self._knowledge_store is not None:
+            knowledge_versions = tuple(
+                row["id"] for row in await self._knowledge_store.active(list(scope), None)
+            )
+            if "retrieve_knowledge" in self._registry.names():
+                permitted_tools.add("retrieve_knowledge")
+        tools = tuple(sorted(permitted_tools))
         configurations: dict[str, dict[str, object]] = {
             version.id: {
                 "kind": version.kind,
@@ -238,7 +257,9 @@ class DatabaseConfigReader:
             budget=budget,
             configurations=configurations,
             is_test=agent.is_test,
-            execution_mode=("react" if tools else "direct") if automatic else skill.execution_mode,
+            execution_mode=("react" if tools else "direct")
+            if automatic or "retrieve_knowledge" in tools
+            else skill.execution_mode,
             skill_selection="automatic" if automatic else "explicit",
             skill_references=tuple(references),
             provider_id=provider_version.id if provider_version is not None else None,
@@ -246,6 +267,8 @@ class DatabaseConfigReader:
             provider_config=provider_version.content.model_dump(mode="json")
             if provider_version is not None
             else None,
+            knowledge_scope=scope,
+            knowledge_versions=knowledge_versions,
         )
         return snapshot.model_copy(
             update={"config_hash": config_hash(snapshot.model_dump(mode="json"))}
