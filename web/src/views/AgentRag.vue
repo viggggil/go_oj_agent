@@ -9,6 +9,7 @@
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+    <KnowledgeEvidence />
     <div class="rag-layout">
       <aside class="rag-groups">
         <div class="section-head">
@@ -334,6 +335,7 @@
   } from '../agent/rag'
   import { useAuthStore } from '../stores/auth'
   import { agentAdministrator } from '../agent/state'
+  import KnowledgeEvidence from '../components/agent/KnowledgeEvidence.vue'
   const auth = useAuthStore(),
     owner = auth.user!.id,
     life = new AbortController(),

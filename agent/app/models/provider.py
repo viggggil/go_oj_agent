@@ -66,7 +66,33 @@ class ModelAttempt(BaseModel):
     error_code: str | None = Field(default=None, max_length=64)
 
 
+class KnowledgeSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    source_id: str = Field(max_length=36)
+    base_id: str = Field(max_length=36)
+    document_id: str = Field(max_length=36)
+    version_id: str = Field(max_length=36)
+    problem_id: int | None = None
+    title: str = Field(max_length=128)
+    number: int = Field(ge=0, le=1000)
+    section: str = Field(max_length=128)
+    start: int = Field(ge=0, le=120_000)
+    end: int = Field(ge=0, le=120_000)
+    score: float = Field(ge=-1, le=1)
+
+
+class KnowledgeAttempt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    call_id: str = Field(max_length=128)
+    ok: bool
+    error_code: str | None = Field(default=None, max_length=64)
+    sources: list[KnowledgeSource] = Field(default_factory=list, max_length=5)
+
+
 class ModelSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     attempts: list[ModelAttempt] = Field(default_factory=list, max_length=16)
     input_estimation: Literal["utf8_bytes_upper_bound_v1"] = "utf8_bytes_upper_bound_v1"
+    knowledge: list[KnowledgeAttempt] = Field(default_factory=list, max_length=32)

@@ -726,7 +726,7 @@ Issue #160 简化当前表单：后端生成稳定资源 key，管理员填写�
 
 PR7 的已实现接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
 
-普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。PR8/PR9 已交付管理页面和对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。RAG、多轮上下文和完整质量工程另行实现。
+普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。PR8/PR9 已交付管理页面和对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。多轮上下文及 RAG PR1–PR3 已实现；完整质量评测继续由后续阶段完成。
 
 Control Plane 管理以下可版本化资源：
 
@@ -813,7 +813,7 @@ language
 document_type
 ```
 
-开发与部署统一使用 Qdrant。中文向量化固定采用本地 `BAAI/bge-small-zh-v1.5`，与 su8 回答模型独立。PR1 的管理员摄取/检索 API、MySQL 租约 worker 和文档版本发布已实现；聊天工具在后续 PR 接入。选型与边界见 ADR-0002。
+开发与部署统一使用 Qdrant。中文向量化固定采用本地 `BAAI/bge-small-zh-v1.5`，与 su8 回答模型独立。PR1 的管理员摄取/检索 API、MySQL 租约 worker 和文档版本发布，PR2 的按组管理，以及 PR3 的 LangGraph retrieve_knowledge 已实现。Run 固定已发布版本；检索前后重新确认 Agent 分组交集、文档启用状态及 Problem/Contest 业务授权。Contest 的内部批量 RPC 排除未来或进行中的比赛题解，依赖故障失败关闭。检索片段只给模型，Run JSON 只记录有界来源元数据，管理员可追溯，普通 SSE 不透传工具结果。选型与边界见 ADR-0002。
 
 ---
 

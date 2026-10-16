@@ -224,3 +224,9 @@ docker compose -f deploy/compose/compose.yaml exec rag-worker python -m app.rag.
 50 题及题解通过 `scripts/import_algorithm_corpus.py` 显式导入；不在启动时自动写入业务题库。
 管理员令牌文件和导入/判题报告不提交仓库。操作说明见 `data/algorithm-corpus/README.md`。
 PR1 未提供管理页面和聊天检索工具，分别由后续 PR2 / PR3 完成。
+
+## RAG PR3 升级
+
+先部署新增 Contest CheckKnowledgeAccess RPC 和 Problem/Contest 的 Agent 调用白名单，再部署 Agent。现有容器不会因绑定挂载配置文件内容改变自动重启，更新 configs/problem.yaml、configs/contest.yaml 后执行 `docker compose -f deploy/compose/compose.yaml restart problem-service contest-service` 加载白名单。干净启动由 make infra-up 完成。Agent 地址为 AGENT_CONTEST_SERVICE_ENDPOINT=contest-service:9005；不授予 Agent 其他 Contest RPC，不向公网增加授权入口。旧业务服务未升级时检索失败关闭，不能以普通管理搜索绕过。
+
+管理员启用题解文档并在 Agent 表单绑定“题解”组后，可以正常聊天，由模型按需检索；RAG 页支持按 Run 查询来源版本。未关联题号的资料按分组授权使用，题解应填写真实题号，以便执行比赛与题目检查。现有 Agent/Contest 数据库迁移须按原说明先应用，PR3 没有新表/列。

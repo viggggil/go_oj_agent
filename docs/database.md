@@ -589,7 +589,7 @@ Prompt 变量、Skill 工具、Agent 绑定、模型类型和预算都在切换�
 共享 Prompt 或 Skill 更新不会自动修改其他 Agent；已有配置按 links 中的历史 UUID 继续读取。
 新配置不能引用归档或停用版本，依赖停用后新的 Agent Run 会被拒绝。
 
-PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Model Profile 与 Provider，API Key 独立加密保存。知识库范围仍必须为空。
+PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Model Profile 与 Provider，API Key 独立加密保存。RAG PR2 起知识范围扩展为分组 UUID。
 
 PR7 不改变表结构，管理 HTTP 复用这套事务与审计。当前资源查询按资源 `(created_at,id)` 稳定降序，历史按版本 `(created_at,id)` 降序；同一只读事务计算总数和分页结果。聊天目录在分页前使用版本 links、资源 disabled、凭据 revoked 和部署 Provider 策略过滤；依赖深度有界，不访问业务 Schema。资源 `kind/config_key`、版本 `resource_id` 和 links 索引复用既有 migration；搜索仅按稳定 key 子串匹配，分页上限见 API 文档。管理员 HTTP 仅暴露 Agent/Prompt/Skill 正文与模型选项，不暴露 Provider、Credential 数据。
 
@@ -633,6 +633,14 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 无 Redis/MQ 新状态。迁移是增加 5 张自有表，不改已有聊天数据；部署先迁移再启用 RAG。
 旧应用可以忽略新表，新应用开启 RAG 时要求迁移。Down 删除知识元数据及审计，不删除 MinIO/Qdrant，
 是破坏性回滚，仅停用 RAG 并备份后执行，常规回退应保留扩展表。
+
+### RAG PR3 的 Run 版本及证据持久化
+
+不新增 DDL、回填或跨服务外键。既有 `agent_runs.config_snapshot` 增加 knowledge_scope（最多 20 组）与 knowledge_versions（最多 2000 个当前启用/已发布版本）；创建 Run 的既有事务固定该清单。旧 Run 检索通过版本 document_id 联接文档和 READY 任务，允许旧发布版本而不跟随 active_version 切换；每次前后检查最新 enabled 与 Agent 范围。已引用旧版本及向量继续保留，现有 GC 不删除引用版本，不能随发布立即清理。
+
+`model_summary.knowledge` 保存最多 32 项检索记录，每项最多 5 个来源元数据，与完成/失败/取消终态一起写入；不保存检索 query、片段或原文。管理员按 Run 主键读取严格投影，不向本人历史消息 API 暴露快照或证据。旧代码可忽略新增 JSON 字段，旧记录缺失字段按空集合处理；代码回退无需数据库 down，旧版本仍保留。
+
+比赛题解授权只由 Contest 查询 `oj_contest.contest_problems/contests`，不跨库读取。当前查询使用 contest 主键联接与有界题号 IN；题目反向索引的成本在 PR4 按比赛规模评测，当前不为小语料额外引入迁移。
 
 ## 8.4 Eval、运行和审计实体
 

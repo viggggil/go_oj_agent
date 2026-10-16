@@ -172,7 +172,7 @@ class ResponsesClient:
                                 break
                             event_count += 1
                             if event_count > max_events:
-                                raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+                                raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
                             kind = event.get("type")
                             if not isinstance(kind, str) or (name is not None and name != kind):
                                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")

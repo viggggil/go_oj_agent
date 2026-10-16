@@ -24,6 +24,14 @@ internal_auth:
   subject: "gateway-service"
   max_token_ttl: "60s"
   clock_skew: "5s"
+  additional_callers:
+    - public_key_file: "/run/auth-keys/agent-public.pem"
+      key_id: "agent-internal-2026-10"
+      issuer: "go-oj-agent"
+      subject: "agent-service"
+      require_method_allowlist: true
+      allowed_rpcs:
+        - "/contest.v1.ContestService/CheckKnowledgeAccess"
 judge:
   name: judge-service
   endpoint: "judge-service:9003"

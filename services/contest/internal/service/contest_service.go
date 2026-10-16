@@ -19,6 +19,24 @@ type ContestService struct {
 
 func NewContestService(uc *biz.ContestUsecase) *ContestService { return &ContestService{uc: uc} }
 
+func (s *ContestService) CheckKnowledgeAccess(ctx context.Context, req *contestv1.CheckKnowledgeAccessRequest) (*contestv1.CheckKnowledgeAccessReply, error) {
+	if req == nil || s == nil || s.uc == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid knowledge access request")
+	}
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid problem ids")
+	}
+	actor, err := requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.uc.CheckKnowledgeAccess(ctx, actor, req.GetProblemIds())
+	if err != nil {
+		return nil, err
+	}
+	return &contestv1.CheckKnowledgeAccessReply{AllowedProblemIds: ids}, nil
+}
+
 func (s *ContestService) CreateContest(ctx context.Context, req *contestv1.CreateContestRequest) (*contestv1.CreateContestReply, error) {
 	if req == nil || s == nil || s.uc == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid create contest request")

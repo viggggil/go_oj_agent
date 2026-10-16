@@ -615,7 +615,7 @@ PR5 的 Agent、Prompt、Skill、Model 使用 `agent_config_resources`、`agent_
 ## RAG PR1：摄取与检索内核
 
 已实现 Qdrant + 本地 `BAAI/bge-small-zh-v1.5`（512 维、固定 revision）的管理员知识 API、
-MinIO 不可变文档、MySQL 租约索引 worker、幂等上传与版本发布。PR2 提供 `/agent/rag` 分组与文档管理页，Agent 按组选择可访问资料；模型检索工具留给 PR3，
+MinIO 不可变文档、MySQL 租约索引 worker、幂等上传与版本发布。PR2 提供 `/agent/rag` 分组与文档管理页，Agent 按组选择可访问资料；PR3 接入模型内部 retrieve_knowledge，
 不能把管理员检索 API 视为普通用户模型权限。完整契约见 `docs/api.md`，部署见 `deploy/compose/README.md`。
 
 `make infra-up` 包含 embedding、qdrant、rag-worker。Embedding 镜像构建时显式下载固定模型，
@@ -627,7 +627,14 @@ make rag-test-integration  # 隔离真实 MySQL / MinIO / Qdrant / BGE，退出�
 make rag-corpus-check     # 50 题参考程序与 550 组测试
 ```
 
-语料导入与真实判题验证见 `data/algorithm-corpus/README.md`。普通用户不能获取原文；PR3 接入模型时
-还必须通过业务 gRPC 验证题号权限并固定 Run 的版本清单，不能直接复用管理员搜索作为普通用户工具。
+语料导入与真实判题验证见 `data/algorithm-corpus/README.md`。普通用户不能获取原文；PR3 通过业务 gRPC 验证题号及比赛权限并固定 Run 的版本清单，不能直接复用管理员搜索作为普通用户工具。
 
 PR2 中知识库即分组：管理员可创建/改名分组，按分组上传题解、讲义和平台文档，查看正文与版本、预览切分、刷新索引状态、重试失败任务、启用/归档和测试检索。Agent `knowledge_scope` 绑定最多 20 个现有分组，空范围不访问知识库；改名不影响绑定。普通用户无法直接访问管理文档。
+
+## RAG PR3：LangGraph 按需检索
+
+Agent 绑定知识分组后，真实模型自动可用 retrieve_knowledge，无需普通用户选择文档或管理员逐个修改 Skill 工具。空范围不注册；模型自行判断是否检索。每 Run 固定最多 2000 个启用发布版本；后续新版只影响新 Run，停用和范围撤销每次检索立即再检查。关联题目必须 normal 且不在任何未结束非归档比赛中，授权由 Problem/Contest 的带身份 gRPC 执行，不依赖 Prompt。
+
+默认 `AGENT_RAG_MAX_QUERIES_PER_RUN=4`、`AGENT_RAG_MIN_SCORE=0.35`，top_k 默认 3/上限 5，结果最多 24KB，仍消耗整体工具/时间/模型输入预算。停止取消 HTTP/gRPC，新对话无旧片段。无匹配、故障或预算耗尽必须明确说明证据不足。正文作为不可信参考，不得改变工具和安全规则。
+
+运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。`make agent-eval` 仍是未接线占位，PR4 将建设质量评测，不将普通测试宣称为评测完成。

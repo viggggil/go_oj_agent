@@ -66,7 +66,7 @@ def create_app(
                 business_tools = build_business_tool_registry(
                     business_clients, config.tool_max_result_bytes, config.tool_max_page_size
                 )
-            tool_executor = ToolExecutor(business_tools) if business_tools is not None else None
+            business_tools = business_tools or ToolRegistry()
             if config.chat_enabled or config.admin_enabled:
                 verifier = DelegationVerifier(config)
             if config.admin_enabled or (config.chat_enabled and config.config_mode == "database"):
@@ -89,6 +89,18 @@ def create_app(
                     raise ConfigurationError("RAG requires an Agent database")
                 rag_clients = RagClients(config)
                 rag = KnowledgeService(KnowledgeStore(database.engine), rag_clients)
+                from app.rag.runtime import KnowledgeRuntime
+
+                KnowledgeRuntime(
+                    rag.store,
+                    rag_clients,
+                    ConfigurationStore(
+                        database.engine, business_tools, provider_policy=ProviderPolicy(config)
+                    ),
+                    business_clients,
+                    config,
+                ).register(business_tools)
+            tool_executor = ToolExecutor(business_tools)
             if config.chat_enabled:
                 assert verifier is not None
                 if run_service_factory is not None:
@@ -126,6 +138,7 @@ def create_app(
                             ConfigurationStore(database.engine, registry, provider_policy=policy),
                             config,
                             registry,
+                            knowledge_store=rag.store if rag is not None else None,
                         )
                         if config.config_mode == "database"
                         else DemoConfigReader(config)
@@ -162,11 +175,11 @@ def create_app(
             try:
                 try:
                     try:
-                        if rag_clients is not None:
-                            await rag_clients.close()
                         if controller is not None:
                             async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                                 await controller.close()
+                        if rag_clients is not None:
+                            await rag_clients.close()
                     finally:
                         try:
                             if business_clients is not None:

@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from app.models.runtime import Principal
+from app.models.runtime import AgentState, Principal
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ _STABLE_TOOL_ERRORS = frozenset(
         "TOOL_TIMEOUT",
         "TOOL_INVALID_ARGUMENT",
         "TOOL_DEPENDENCY_UNAVAILABLE",
+        "TOOL_KNOWLEDGE_QUERY_LIMIT",
     }
 )
 
@@ -66,6 +67,7 @@ class ToolDefinition:
     input_model: type[BaseModel]
     output_model: type[BaseModel]
     handler: Callable[[BaseModel, Principal], Awaitable[BaseModel]]
+    context_handler: Callable[[BaseModel, "ToolContext"], Awaitable[BaseModel]] | None = None
 
     def catalog(self) -> dict[str, Any]:
         return {
@@ -87,6 +89,7 @@ class ToolContext(BaseModel):
     remaining_seconds: float = Field(gt=0, le=60)
     confirmed: bool = False
     allowed_tools: frozenset[str] = frozenset()
+    state: AgentState | None = Field(default=None, exclude=True)
 
 
 class ToolRegistry:
@@ -129,7 +132,12 @@ class ToolExecutor:
             except ValidationError:
                 return ToolResult(tool_name=name, ok=False, error_code="TOOL_INVALID_ARGUMENT")
             timeout = min(definition.spec.timeout_seconds, context.remaining_seconds)
-            output = await asyncio.wait_for(definition.handler(parsed, context.principal), timeout)
+            pending = (
+                definition.context_handler(parsed, context)
+                if definition.context_handler is not None
+                else definition.handler(parsed, context.principal)
+            )
+            output = await asyncio.wait_for(pending, timeout)
             validated = definition.output_model.model_validate(output)
             return ToolResult(tool_name=name, ok=True, data=validated.model_dump())
         except ToolNotFound:

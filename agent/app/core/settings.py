@@ -64,6 +64,11 @@ class Settings(BaseSettings):
         default="problem-service:9002", min_length=1, max_length=255
     )
     judge_service_endpoint: str = Field(default="judge-service:9003", min_length=1, max_length=255)
+    contest_service_endpoint: str = Field(
+        default="contest-service:9005", min_length=1, max_length=255
+    )
+    rag_max_queries_per_run: int = Field(default=4, ge=1, le=8)
+    rag_min_score: float = Field(default=0.35, ge=0, le=1)
     tool_timeout_seconds: float = Field(default=5, gt=0, le=30)
     tool_max_page_size: int = Field(default=50, ge=1, le=100)
     tool_max_result_bytes: int = Field(default=256_000, ge=1024, le=1_048_576)

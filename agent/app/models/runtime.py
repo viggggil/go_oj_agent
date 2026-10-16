@@ -71,6 +71,7 @@ class AgentState(BaseModel):
     context: ChatContext = Field(default_factory=ChatContext)
     history: tuple[HistoryMessage, ...] = ()
     model_summary: ModelSummary | None = None
+    knowledge_queries: int = Field(default=0, ge=0)
     answer_draft: str = ""
     missing_information: tuple[str, ...] = ()
     started_at: datetime

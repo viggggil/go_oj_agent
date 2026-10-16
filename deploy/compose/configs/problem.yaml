@@ -41,3 +41,4 @@ internal_auth:
       allowed_rpcs:
         - "/problem.v1.ProblemService/GetProblem"
         - "/problem.v1.ProblemService/ListProblems"
+        - "/problem.v1.ProblemService/BatchGetProblems"

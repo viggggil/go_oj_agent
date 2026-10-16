@@ -57,6 +57,22 @@ export interface Match extends Chunk {
   title: string
   problem_id: number | null
 }
+export interface KnowledgeSource extends Omit<Match, 'text'> {
+  source_id: string
+}
+export interface RunEvidence {
+  run_id: string
+  status: string
+  agent_key: string
+  scope: string[]
+  versions: string[]
+  attempts: {
+    call_id: string
+    ok: boolean
+    error_code: string | null
+    sources: KnowledgeSource[]
+  }[]
+}
 const base = '/api/v1/admin/agent/rag'
 const options = (signal?: AbortSignal) => ({ timeout: 30_000, signal })
 const write = (requestId: string, signal?: AbortSignal) => ({
@@ -64,6 +80,8 @@ const write = (requestId: string, signal?: AbortSignal) => ({
   headers: { 'X-Request-ID': requestId },
 })
 export const ragApi = {
+  evidence: (id: string, signal?: AbortSignal) =>
+    api.get<{ evidence: RunEvidence }>(`${base}/runs/${id}/evidence`, options(signal)),
   groups: (page = 1, signal?: AbortSignal) =>
     api.get<PageResult<KnowledgeGroup>>(`${base}/knowledge-bases`, {
       ...options(signal),

@@ -199,6 +199,40 @@ func TestAgentOperationRejectsUnknownPathsAndRoles(t *testing.T) {
 	}
 }
 
+func TestRAGEvidenceRouteContractRejectsUnexpectedPrivateFields(t *testing.T) {
+	id := uuid.NewString()
+	path := "/api/v1/admin/agent/rag/runs/" + id + "/evidence"
+	if _, err := client.AgentOperation(http.MethodGet, path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.AgentOperation(http.MethodPost, path); err == nil {
+		t.Fatal("evidence write accepted")
+	}
+	source := map[string]any{"source_id": id, "base_id": id, "document_id": id, "version_id": id, "problem_id": 22, "title": "单调队列", "number": 0, "section": "证明", "start": 0, "end": 10, "score": 0.8}
+	envelope := map[string]any{"evidence": map[string]any{"run_id": id, "status": "COMPLETED", "agent_key": "rag_agent", "scope": []string{id}, "versions": []string{id}, "attempts": []any{map[string]any{"call_id": "call_1", "ok": true, "error_code": nil, "sources": []any{source}}}}}
+	encode := func() map[string]json.RawMessage {
+		data, err := json.Marshal(envelope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var payload map[string]json.RawMessage
+		if err := json.Unmarshal(data, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	if !validRAGEnvelope(path, encode()) {
+		t.Fatal("valid evidence rejected")
+	}
+	for _, field := range []string{"text", "object_key", "content", "provider_config"} {
+		source[field] = "private-content"
+		if validRAGEnvelope(path, encode()) {
+			t.Fatalf("private field %s accepted", field)
+		}
+		delete(source, field)
+	}
+}
+
 func TestAgentHistoricalLookupRoutesAndRedaction(t *testing.T) {
 	identifier := uuid.NewString()
 	for _, path := range []string{"/api/v1/admin/agent/model-options/" + identifier, "/api/v1/admin/agent/prompts/versions/" + identifier} {

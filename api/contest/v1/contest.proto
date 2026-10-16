@@ -19,6 +19,8 @@ service ContestService {
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardReply);
   rpc JoinContest(JoinContestRequest) returns (JoinContestReply);
   rpc CreateContestSubmission(CreateContestSubmissionRequest) returns (CreateContestSubmissionReply);
+  // 仅内部调用。未结束的非归档比赛题目不能提供知识题解，不返回比赛元数据。
+  rpc CheckKnowledgeAccess(CheckKnowledgeAccessRequest) returns (CheckKnowledgeAccessReply);
 }
 
 enum ContestStatus {
@@ -163,4 +165,12 @@ message CreateContestSubmissionRequest {
 message CreateContestSubmissionReply {
   int64 submission_id = 1;
   submission.v1.SubmissionStatus status = 2;
+}
+
+message CheckKnowledgeAccessRequest {
+  repeated int64 problem_ids = 1 [(validate.rules).repeated = {min_items: 1, max_items: 100, unique: true, items: {int64: {gt: 0}}}];
+}
+
+message CheckKnowledgeAccessReply {
+  repeated int64 allowed_problem_ids = 1;
 }
