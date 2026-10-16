@@ -174,7 +174,8 @@ func serveAgentJSON(ctx context.Context, httpCtx khttp.Context, agent *client.Ag
 	}
 	if response.StatusCode != 200 {
 		var code string
-		if len(payload) != 1 || json.Unmarshal(payload["code"], &code) != nil || !agentManagementErrors[code] {
+		if json.Unmarshal(payload["code"], &code) != nil || !agentManagementErrors[code] ||
+			(len(payload) != 1 && !(code == "AGENT_EVAL_DATASET_INVALID" && validEvalError(payload))) {
 			return invalidAgentJSON()
 		}
 		switch response.StatusCode {
@@ -216,4 +217,21 @@ var agentManagementErrors = map[string]bool{
 	"AGENT_MODEL_ENDPOINT_DENIED": true,
 	"AGENT_EVAL_DATASET_INVALID":  true, "AGENT_EVAL_NOT_FOUND": true,
 	"AGENT_EVAL_UNAVAILABLE": true,
+}
+
+func validEvalError(payload map[string]json.RawMessage) bool {
+	if len(payload) < 2 || len(payload) > 3 {
+		return false
+	}
+	var message string
+	if json.Unmarshal(payload["message"], &message) != nil || len(message) == 0 || len(message) > 256 {
+		return false
+	}
+	if line, ok := payload["line"]; ok {
+		var value int
+		if json.Unmarshal(line, &value) != nil || value < 1 || value > 1001 {
+			return false
+		}
+	}
+	return true
 }
