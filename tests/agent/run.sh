@@ -38,6 +38,7 @@ cleanup() {
 
 trap cleanup EXIT
 
+export AGENT_TEST_MINIO_PORT="${AGENT_TEST_MINIO_PORT:-$(pick_free_port)}"
 export AGENT_TEST_MYSQL_PORT="${AGENT_TEST_MYSQL_PORT:-$(pick_free_port)}"
 export AGENT_TEST_HTTP_PORT="${AGENT_TEST_HTTP_PORT:-$(pick_free_port)}"
 export AGENT_TEST_MOCK_PORT="${AGENT_TEST_MOCK_PORT:-$(pick_free_port)}"
@@ -48,6 +49,13 @@ export AGENT_TEST_GATEWAY_PORT="${AGENT_TEST_GATEWAY_PORT:-$(pick_free_port)}"
 
 compose down --volumes --remove-orphans
 compose up --build --detach --wait
+"${uv_command}" run --directory "${repository_root}/agent" --frozen python - <<'PY_BUCKET'
+import os
+from minio import Minio
+client = Minio("127.0.0.1:" + os.environ["AGENT_TEST_MINIO_PORT"], access_key="minioadmin", secret_key="minioadmin", secure=False)
+if not client.bucket_exists("agent-knowledge"):
+    client.make_bucket("agent-knowledge")
+PY_BUCKET
 
 AGENT_DATABASE_URL="mysql+asyncmy://agent:agent-password@127.0.0.1:${AGENT_TEST_MYSQL_PORT}/oj_agent" \
   "${uv_command}" run --directory "${repository_root}/agent" --frozen \
@@ -91,7 +99,7 @@ AGENT_TEST_GATEWAY_URL="http://127.0.0.1:${AGENT_TEST_GATEWAY_PORT}" \
 AGENT_TEST_MOCK_URL="http://127.0.0.1:${AGENT_TEST_MOCK_PORT}" \
 AGENT_TEST_MODEL_MODE=true \
 AGENT_TEST_USER_PRIVATE_KEY_FILE="${test_key_dir}/user-private.pem" \
-  "${uv_command}" run --directory agent --frozen pytest tests/integration/test_model_http.py tests/integration/test_management.py -m integration
+  "${uv_command}" run --directory agent --frozen pytest tests/integration/test_model_http.py tests/integration/test_management.py tests/integration/test_eval_runs.py -m integration
 
 # 可选真实浏览器管理链路；仅用户资料 fixture，配置通过 Gateway 写入上述隔离 MySQL。
 if [[ "${AGENT_TEST_WEB:-false}" == "true" ]]; then

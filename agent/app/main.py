@@ -60,6 +60,7 @@ def create_app(
         rag_clients = None
         evals = None
         eval_clients = None
+        eval_runner = None
         management = None
         verifier = None
         store = None
@@ -172,6 +173,19 @@ def create_app(
                     )
                     raise ConfigurationError("Agent Chat initialization failed") from None
                 controller = ChatController(config, verifier, service)
+                if evals is not None:
+                    assert isinstance(database, DatabaseProbe) and database.engine is not None
+                    from app.evals.runner import EvalRunner
+
+                    eval_runner = EvalRunner(
+                        evals,
+                        service.with_store(AgentStore(database.engine, purpose="eval")),
+                        service.config_reader,
+                        config.eval_principals,
+                        config.eval_max_pending_runs,
+                        config.max_concurrent_runs,
+                    )
+                    await eval_runner.initialize()
             application.state.resources = AppResources(
                 settings=config,
                 database=database,
@@ -183,6 +197,7 @@ def create_app(
                 store=store,
                 rag=rag,
                 evals=evals,
+                eval_runner=eval_runner,
             )
             logger.info("Agent service started")
             yield
@@ -193,6 +208,8 @@ def create_app(
                         if controller is not None:
                             async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                                 await controller.close()
+                        if eval_runner is not None:
+                            await eval_runner.close()
                         if rag_clients is not None:
                             await rag_clients.close()
                         if eval_clients is not None and eval_clients is not rag_clients:

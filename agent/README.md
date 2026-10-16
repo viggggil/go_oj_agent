@@ -381,7 +381,7 @@ agent/
 │   ├── clients/           # User / Problem / Judge gRPC Client
 │   ├── rag/               # 摄取、检索、引用和可见性过滤
 │   ├── control_plane/     # 配置版本、替换、校验、审计
-│   ├── evals/             # 数据集、Runner、Graders（当前已接入 JSONL 数据集）
+│   ├── evals/             # 数据集、Runner、程序化 Graders
 │   ├── models/            # State、Event、Persistence
 │   └── core/              # Config、Budget、Trace、脱敏
 ├── evals/
@@ -637,4 +637,38 @@ Agent 绑定知识分组后，真实模型自动可用 retrieve_knowledge，无�
 
 默认 `AGENT_RAG_MAX_QUERIES_PER_RUN=4`、`AGENT_RAG_MIN_SCORE=0.35`，top_k 默认 3/上限 5，结果最多 24KB，仍消耗整体工具/时间/模型输入预算。停止取消 HTTP/gRPC，新对话无旧片段。无匹配、故障或预算耗尽必须明确说明证据不足。正文作为不可信参考，不得改变工具和安全规则。
 
-运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。当前已接入 Agent Eval JSONL 数据集上传、校验、去重和管理员浏览；批量 Runner、程序化评分及人工/评审 Agent 流程在 Issue #175 后续实现，`make agent-eval` 暂不作为质量评测命令。
+运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。当前已接入 Agent Eval JSONL 数据集上传、校验、去重、管理员浏览，以及批量 Runner 和程序化评分；人工/评审 Agent 流程、运行管理页面和 CLI 报告在 Issue #175 后续实现，`make agent-eval` 暂不作为质量评测命令。
+
+### Eval 批量程序化运行
+
+启用管理和 Chat 后，管理员通过 `POST /api/v1/admin/agent/evals/runs` 指定数据集 UUID、
+被测 `agent_key`、`mode=programmatic`、`repeat_count`（1–3）和 `concurrency`（1–8）。
+`X-Request-ID` 为规范 UUID；相同管理员和相同正文重试返回已有运行，不同正文返回 409。
+运行/结果分页接口和取消版本参数见 `docs/api.md`。管理页面本阶段仍提供数据集管理，
+新建运行、进度、结果详情和人工评审会在下一阶段接入页面。
+
+部署必须显式指定专用普通评测账号，例如 `.env` 中的
+`AGENT_EVAL_PRINCIPALS={"student_a":123}`。账号应先通过正常用户服务创建，
+fixture 只填写 `{"principal":"student_a","problem_id":22}` 这样的受控别名和资源引用。
+Runner 固定 `roles=user`，未知别名记为 `AGENT_EVAL_PRINCIPAL_INVALID`，
+不能在 JSONL 中传入任意账号/管理员角色，也不会继承启动评测的管理员权限。
+评测使用这些专用账号的独立新会话，不应配置为真实用户的生产账号。
+会话的 purpose=eval 与普通 purpose=chat 分离，即使评测账号登录普通页面，
+也不能列出、读取或继续 Eval 会话。原始评测输入/回答仅管理员 Eval API 可读。
+
+创建时冻结 Agent/Prompt/Skill/Model/Provider/知识版本，逐 Case 重新渲染上下文。
+已创建批次不跟随配置替换/停用，新建批次仍校验最新停用状态；凭据撤销、业务 RPC 授权
+和 RAG 当前授权在实际调用时继续检查。结果列表只返回512字符预览和 pass/hard_fail，
+完整回答/检查/模型摘要通过单条结果详情读取。
+每个 Case/重复次数独立新会话；Case 中的 user 消息依序执行，同一 Case 的后续消息使用
+Runtime 实际生成的历史，上传的 assistant 消息仅作参考记录，不注入运行历史。
+评分扫描各轮实际回答：关键事实、禁止主张、禁止泄露使用大小写不敏感的字面包含检查，
+工具与证据要求使用实际执行摘要。当前分数是程序门禁，不代表语义正确性评审。
+单 Case 失败仍继续其他 Case；Run 的 COMPLETED 表示执行完成，须同时检查结果 pass、
+hard_failures 和 error_count，不能把运行完成等同于质量通过。
+
+Runner 与普通 Runtime 一样仅支持单实例。每个运行的并发受请求约束，所有 Eval 运行
+还共享 `AGENT_MAX_CONCURRENT_RUNS` 个槽位；`AGENT_EVAL_MAX_PENDING_RUNS` 默认 20，
+超过准入上限返回 503。取消会停止正在消费的 SSE 并关闭底层模型流，排队 Case 记录为
+CANCELLED。正常关闭会取消运行；异常重启时遗留 QUEUED/RUNNING 统一标记 FAILED，
+保留已完成结果。本阶段不跨重启续跑，不自动重试 Case，后续引入租约时再支持恢复。

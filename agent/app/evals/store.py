@@ -5,12 +5,21 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import and_, func, insert, select, update
+from sqlalchemy import case as sql_case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.evals.models import EvalDatasetInvalid, EvalDatasetUpload, EvalPage, parse_jsonl
-from app.evals.schema import cases, datasets
+from app.evals.models import (
+    EvalDatasetInvalid,
+    EvalDatasetUpload,
+    EvalPage,
+    EvalResultPage,
+    EvalRunCreate,
+    EvalRunPage,
+    parse_jsonl,
+)
+from app.evals.schema import cases, datasets, results, runs
 from app.models.configuration import ConfigError
 from app.models.runtime import Principal
 from app.rag.clients import RagClients
@@ -28,10 +37,44 @@ def public(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def run_public(row: dict[str, Any], *, summary: bool = False) -> dict[str, Any]:
+    value = public(row)
+    value.pop("fingerprint", None)
+    value.pop("cancel_request_id", None)
+    snapshot = value.get("config_snapshot")
+    if isinstance(snapshot, dict):
+        value["config_snapshot"] = {
+            key: snapshot[key]
+            for key in (
+                "source",
+                "version",
+                "agent_key",
+                "skill_key",
+                "model_profile_id",
+                "config_hash",
+                "knowledge_scope",
+                "knowledge_versions",
+                "budget",
+                "execution_mode",
+            )
+            if key in snapshot
+        }
+    if summary and isinstance(snapshot, dict):
+        value["config_snapshot"].pop("knowledge_versions", None)
+        value["config_snapshot"]["knowledge_version_count"] = len(
+            snapshot.get("knowledge_versions", [])
+        )
+    return value
+
+
 class EvalStore:
     def __init__(self, engine: AsyncEngine, clients: RagClients) -> None:
         self.engine = engine
         self.clients = clients
+
+    @staticmethod
+    def clock() -> datetime:
+        return now()
 
     async def upload(self, principal: Principal, body: EvalDatasetUpload) -> dict[str, Any]:
         try:
@@ -154,6 +197,285 @@ class EvalStore:
                     "case": item["case_json"],
                 }
                 for item in rows
+            ],
+            "page": {"page": page.page, "page_size": page.page_size, "total": total},
+        }
+
+    async def find_request(self, principal: Principal, fingerprint: str) -> dict[str, Any] | None:
+        async with self.engine.connect() as conn:
+            row = (
+                (await conn.execute(select(runs).where(runs.c.request_id == principal.request_id)))
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            return None
+        if row["fingerprint"] != fingerprint or row["created_by"] != principal.user_id:
+            raise ConfigError("AGENT_EVAL_REQUEST_CONFLICT", 409)
+        return run_public(dict(row))
+
+    async def create_run(
+        self,
+        body: EvalRunCreate,
+        principal: Principal,
+        snapshot: dict[str, Any],
+        request_id: str,
+        fingerprint: str,
+    ) -> dict[str, Any]:
+        dataset_id = str(body.dataset_id)
+        async with self.engine.connect() as conn:
+            dataset = (
+                (
+                    await conn.execute(
+                        select(datasets).where(
+                            and_(datasets.c.id == dataset_id, datasets.c.status == "READY")
+                        )
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if dataset is None:
+            raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+        total = int(dataset["case_count"]) * body.repeat_count
+        value = {
+            "id": str(uuid4()),
+            "dataset_id": dataset_id,
+            "agent_key": body.agent_key,
+            "mode": body.mode,
+            "repeat_count": body.repeat_count,
+            "concurrency": body.concurrency,
+            "status": "QUEUED",
+            "total_cases": total,
+            "completed_cases": 0,
+            "hard_failures": 0,
+            "error_count": 0,
+            "config_snapshot": snapshot,
+            "created_by": principal.user_id,
+            "request_id": request_id,
+            "fingerprint": fingerprint,
+            "cancel_request_id": None,
+            "cancel_requested": False,
+            "created_at": now(),
+            "started_at": None,
+            "finished_at": None,
+            "version": 1,
+        }
+        try:
+            async with self.engine.begin() as conn:
+                await conn.execute(insert(runs).values(**value))
+        except IntegrityError:
+            async with self.engine.connect() as conn:
+                existing = (
+                    (await conn.execute(select(runs).where(runs.c.request_id == request_id)))
+                    .mappings()
+                    .one_or_none()
+                )
+            if existing is None:
+                raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503) from None
+            if (
+                existing["fingerprint"] != fingerprint
+                or existing["created_by"] != principal.user_id
+            ):
+                raise ConfigError("AGENT_EVAL_REQUEST_CONFLICT", 409) from None
+            return {"run": run_public(dict(existing)), "duplicate": True}
+        return {"run": run_public(value), "duplicate": False}
+
+    async def cases_for_run(self, run_id: str) -> list[dict[str, Any]]:
+        async with self.engine.connect() as conn:
+            row = (
+                (await conn.execute(select(runs).where(runs.c.id == run_id)))
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+            values = (
+                (
+                    await conn.execute(
+                        select(cases.c.case_id, cases.c.case_json)
+                        .where(cases.c.dataset_id == row["dataset_id"])
+                        .order_by(cases.c.case_id)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [{"id": value["case_id"], "case": value["case_json"]} for value in values]
+
+    async def get_run(self, run_id: str) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            row = (
+                (await conn.execute(select(runs).where(runs.c.id == run_id)))
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+        return run_public(dict(row))
+
+    async def page_runs(self, page: EvalRunPage) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            query = select(runs).order_by(runs.c.created_at.desc(), runs.c.id.desc())
+            count = select(func.count()).select_from(runs)
+            if page.status:
+                query = query.where(runs.c.status == page.status)
+                count = count.where(runs.c.status == page.status)
+            total = int((await conn.execute(count)).scalar_one())
+            rows = (
+                (
+                    await conn.execute(
+                        query.offset((page.page - 1) * page.page_size).limit(page.page_size)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [run_public(dict(row), summary=True) for row in rows],
+            "page": {"page": page.page, "page_size": page.page_size, "total": total},
+        }
+
+    async def request_cancel(
+        self, run_id: str, expected_version: int, request_id: str
+    ) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            current = (
+                (await conn.execute(select(runs).where(runs.c.id == run_id)))
+                .mappings()
+                .one_or_none()
+            )
+        if current is None:
+            raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+        if current["cancel_request_id"] == request_id:
+            return run_public(dict(current))
+        values: dict[str, Any] = {
+            "cancel_requested": True,
+            "cancel_request_id": request_id,
+            "version": runs.c.version + 1,
+        }
+        condition = and_(runs.c.id == run_id, runs.c.status.in_(("QUEUED", "RUNNING")))
+        condition = and_(condition, runs.c.version == expected_version)
+        async with self.engine.begin() as conn:
+            result = await conn.execute(update(runs).where(condition).values(**values))
+        if result.rowcount != 1:
+            async with self.engine.connect() as conn:
+                retry = (
+                    (await conn.execute(select(runs).where(runs.c.id == run_id)))
+                    .mappings()
+                    .one_or_none()
+                )
+            if retry is not None and retry["cancel_request_id"] == request_id:
+                return run_public(dict(retry))
+            raise ConfigError("AGENT_EVAL_VERSION_CONFLICT", 409)
+        return await self.get_run(run_id)
+
+    async def mark_running(self, run_id: str) -> None:
+        async with self.engine.begin() as conn:
+            await conn.execute(
+                update(runs)
+                .where(and_(runs.c.id == run_id, runs.c.status == "QUEUED"))
+                .values(status="RUNNING", started_at=now(), version=runs.c.version + 1)
+            )
+
+    async def recover_orphaned_runs(self) -> int:
+        async with self.engine.begin() as conn:
+            result = await conn.execute(
+                update(runs)
+                .where(runs.c.status.in_(("QUEUED", "RUNNING")))
+                .values(
+                    status="FAILED",
+                    finished_at=now(),
+                    cancel_requested=True,
+                    version=runs.c.version + 1,
+                )
+            )
+        return int(result.rowcount or 0)
+
+    async def cancel_requested(self, run_id: str) -> bool:
+        async with self.engine.connect() as conn:
+            return bool(
+                await conn.scalar(select(runs.c.cancel_requested).where(runs.c.id == run_id))
+            )
+
+    async def add_result(self, run_id: str, value: dict[str, Any]) -> None:
+        async with self.engine.begin() as conn:
+            # 先锁父 Run，再插入子结果；否则并发外键共享锁升级计数写锁会死锁。
+            await conn.execute(select(runs.c.id).where(runs.c.id == run_id).with_for_update())
+            await conn.execute(insert(results).values(**value))
+            await conn.execute(
+                update(runs)
+                .where(runs.c.id == run_id)
+                .values(
+                    completed_cases=runs.c.completed_cases + 1,
+                    hard_failures=runs.c.hard_failures
+                    + int(value["checks"].get("hard_fail", False)),
+                    error_count=runs.c.error_count + int(value["status"] == "FAILED"),
+                    version=runs.c.version + 1,
+                )
+            )
+
+    async def finish_run(self, run_id: str, status: str) -> None:
+        async with self.engine.begin() as conn:
+            await conn.execute(
+                update(runs)
+                .where(and_(runs.c.id == run_id, runs.c.status.in_(("QUEUED", "RUNNING"))))
+                .values(
+                    status=sql_case((runs.c.cancel_requested.is_(True), "CANCELLED"), else_=status),
+                    finished_at=now(),
+                    version=runs.c.version + 1,
+                )
+            )
+
+    async def get_result(self, run_id: str, result_id: str) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        select(results).where(results.c.run_id == run_id, results.c.id == result_id)
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+        return public(dict(row))
+
+    async def results_page(self, run_id: str, page: EvalResultPage) -> dict[str, Any]:
+        await self.get_run(run_id)
+        condition = results.c.run_id == run_id
+        if page.status:
+            condition = and_(condition, results.c.status == page.status)
+        async with self.engine.connect() as conn:
+            total = int(
+                await conn.scalar(select(func.count()).select_from(results).where(condition)) or 0
+            )
+            rows = (
+                (
+                    await conn.execute(
+                        select(results)
+                        .where(condition)
+                        .order_by(results.c.case_id, results.c.attempt)
+                        .offset((page.page - 1) * page.page_size)
+                        .limit(page.page_size)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [
+                {
+                    **{
+                        key: value
+                        for key, value in public(dict(row)).items()
+                        if key not in {"answer", "checks", "model_summary"}
+                    },
+                    "answer_preview": (row["answer"] or "")[:512],
+                    "checks": {key: row["checks"][key] for key in ("pass", "hard_fail")},
+                }
+                for row in rows
             ],
             "page": {"page": page.page, "page_size": page.page_size, "total": total},
         }

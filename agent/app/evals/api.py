@@ -14,7 +14,15 @@ from app.api.management import read_body
 from app.core.auth import InvalidDelegation
 from app.core.operations import ADMIN_ROLES, operation
 from app.core.resources import get_resources
-from app.evals.models import EvalDatasetInvalid, EvalDatasetUpload, EvalPage
+from app.evals.models import (
+    EvalDatasetInvalid,
+    EvalDatasetUpload,
+    EvalPage,
+    EvalResultPage,
+    EvalRunCancel,
+    EvalRunCreate,
+    EvalRunPage,
+)
 from app.models.configuration import ConfigError
 
 router = APIRouter()
@@ -25,6 +33,7 @@ async def handle(request: Request) -> JSONResponse:
     resources = get_resources(request)
     try:
         service = getattr(resources, "evals", None)
+        runner = getattr(resources, "eval_runner", None)
         if not resources.settings.admin_enabled or service is None:
             raise ConfigError("AGENT_MANAGEMENT_DISABLED", 503)
         assert resources.verifier is not None
@@ -40,7 +49,25 @@ async def handle(request: Request) -> JSONResponse:
             if request.method == "GET":
                 if parameters.get("dataset_id"):
                     raise ConfigError("AGENT_INVALID_ARGUMENT")
-                if request.path_params.get("dataset_id"):
+                if request.path_params.get("run_id"):
+                    run_id = str(request.path_params["run_id"])
+                    if request.path_params.get("result_id"):
+                        if parameters:
+                            raise ConfigError("AGENT_INVALID_ARGUMENT")
+                        result = {
+                            "result": await service.get_result(
+                                run_id, str(request.path_params["result_id"])
+                            )
+                        }
+                    elif request.url.path.endswith("/results"):
+                        result = await service.results_page(
+                            run_id, EvalResultPage.model_validate(parameters)
+                        )
+                    elif parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    else:
+                        result = {"run": await service.get_run(run_id)}
+                elif request.path_params.get("dataset_id"):
                     if parameters and not request.url.path.endswith("/cases"):
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                     dataset_id = str(request.path_params["dataset_id"])
@@ -51,12 +78,49 @@ async def handle(request: Request) -> JSONResponse:
                     else:
                         result = await service.detail(dataset_id)
                 else:
-                    result = await service.page(EvalPage.model_validate(parameters))
+                    if request.url.path.endswith("/runs"):
+                        result = await service.page_runs(EvalRunPage.model_validate(parameters))
+                    else:
+                        result = await service.page(EvalPage.model_validate(parameters))
             else:
-                if parameters or str(UUID(principal.request_id)) != principal.request_id:
+                if str(UUID(principal.request_id)) != principal.request_id:
                     raise ConfigError("AGENT_INVALID_ARGUMENT")
-                body = cast(EvalDatasetUpload, await read_body(request, EvalDatasetUpload, 950_000))
-                result = await service.upload(principal, body)
+                if request.url.path.endswith("/runs"):
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    if runner is None:
+                        raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503)
+                    run_body = cast(EvalRunCreate, await read_body(request, EvalRunCreate, 32_000))
+                    result = await runner.create(run_body, principal)
+                elif request.path_params.get("run_id"):
+                    if not request.url.path.endswith("/cancel"):
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    if set(parameters) - {"version"} or len(parameters) > 1:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    if "version" not in parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    try:
+                        expected_version = EvalRunCancel(
+                            expected_version=int(parameters["version"])
+                        ).expected_version
+                    except ValueError:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT") from None
+                    if runner is None:
+                        raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503)
+                    result = {
+                        "run": await runner.cancel(
+                            str(request.path_params["run_id"]),
+                            expected_version,
+                            principal.request_id,
+                        )
+                    }
+                else:
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    dataset_body = cast(
+                        EvalDatasetUpload, await read_body(request, EvalDatasetUpload, 950_000)
+                    )
+                    result = await service.upload(principal, dataset_body)
         return JSONResponse(content=jsonable_encoder(result), headers={"Cache-Control": "no-store"})
     except InvalidDelegation:
         return JSONResponse(status_code=401, content={"code": "AGENT_UNAUTHENTICATED"})
@@ -80,3 +144,11 @@ async def handle(request: Request) -> JSONResponse:
 router.add_api_route(f"{PREFIX}/datasets", handle, methods=["GET", "POST"])
 router.add_api_route(f"{PREFIX}/datasets/{{dataset_id:uuid}}", handle, methods=["GET"])
 router.add_api_route(f"{PREFIX}/datasets/{{dataset_id:uuid}}/cases", handle, methods=["GET"])
+router.add_api_route(f"{PREFIX}/runs", handle, methods=["GET", "POST"])
+router.add_api_route(f"{PREFIX}/runs/{{run_id:uuid}}", handle, methods=["GET"])
+router.add_api_route(f"{PREFIX}/runs/{{run_id:uuid}}/cancel", handle, methods=["POST"])
+router.add_api_route(f"{PREFIX}/runs/{{run_id:uuid}}/results", handle, methods=["GET"])
+
+router.add_api_route(
+    f"{PREFIX}/runs/{{run_id:uuid}}/results/{{result_id:uuid}}", handle, methods=["GET"]
+)

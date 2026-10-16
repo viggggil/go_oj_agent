@@ -65,6 +65,11 @@ eval_tables="'agent_eval_datasets','agent_eval_cases'"
 eval_present="$(table_count "$eval_tables")"
 apply_migration 000005_create_eval "$eval_present" 2
 
+eval_run_tables="'agent_eval_runs','agent_eval_results'"
+eval_run_present="$(table_count "$eval_run_tables")"
+eval_purpose_present="$(column_count agent_conversations purpose)"
+apply_migration 000006_create_eval_runs "$((eval_run_present + eval_purpose_present))" 3
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"

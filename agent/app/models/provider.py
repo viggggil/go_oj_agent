@@ -94,5 +94,6 @@ class KnowledgeAttempt(BaseModel):
 class ModelSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     attempts: list[ModelAttempt] = Field(default_factory=list, max_length=16)
+    tools: list[str] = Field(default_factory=list, max_length=32)
     input_estimation: Literal["utf8_bytes_upper_bound_v1"] = "utf8_bytes_upper_bound_v1"
     knowledge: list[KnowledgeAttempt] = Field(default_factory=list, max_length=32)

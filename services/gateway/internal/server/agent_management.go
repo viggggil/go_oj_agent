@@ -39,6 +39,11 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/admin/agent/evals/datasets", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}/cases", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs", []string{http.MethodGet, http.MethodPost}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/cancel", []string{http.MethodPost}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/results", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/results/{result_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},
@@ -123,8 +128,10 @@ func serveAgentJSON(ctx context.Context, httpCtx khttp.Context, agent *client.Ag
 		deadline = end
 	}
 	_ = controller.SetReadDeadline(deadline)
-	defer controller.SetReadDeadline(time.Time{})
 	body, err := io.ReadAll(http.MaxBytesReader(httpCtx.Response(), r.Body, int64(limits.MaxRequestBytes)))
+	// 上传读取期限只约束请求体，后续上游响应由请求 context 控制。
+	// 留在入站连接上会与 context 截止时间竞争，提前触发普通取消。
+	_ = controller.SetReadDeadline(time.Time{})
 	if err != nil {
 		var maximum *http.MaxBytesError
 		if errors.As(err, &maximum) {
@@ -216,7 +223,9 @@ var agentManagementErrors = map[string]bool{
 	"AGENT_CONFIGURATION_TEST_EXPIRED": true, "AGENT_CREDENTIAL_UNAVAILABLE": true,
 	"AGENT_MODEL_ENDPOINT_DENIED": true,
 	"AGENT_EVAL_DATASET_INVALID":  true, "AGENT_EVAL_NOT_FOUND": true,
-	"AGENT_EVAL_UNAVAILABLE": true,
+	"AGENT_EVAL_UNAVAILABLE":      true,
+	"AGENT_EVAL_VERSION_CONFLICT": true,
+	"AGENT_EVAL_REQUEST_CONFLICT": true,
 }
 
 func validEvalError(payload map[string]json.RawMessage) bool {
