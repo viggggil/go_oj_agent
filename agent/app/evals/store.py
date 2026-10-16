@@ -9,7 +9,7 @@ from sqlalchemy import func, insert, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.evals.models import EvalDatasetUpload, EvalPage, parse_jsonl
+from app.evals.models import EvalDatasetInvalid, EvalDatasetUpload, EvalPage, parse_jsonl
 from app.evals.schema import cases, datasets
 from app.models.configuration import ConfigError
 from app.models.runtime import Principal
@@ -36,8 +36,8 @@ class EvalStore:
     async def upload(self, principal: Principal, body: EvalDatasetUpload) -> dict[str, Any]:
         try:
             parsed = parse_jsonl(body.content)
-        except ValueError as exc:
-            raise ConfigError("AGENT_EVAL_DATASET_INVALID") from exc
+        except EvalDatasetInvalid:
+            raise
         encoded = body.content.encode("utf-8")
         digest = hashlib.sha256(encoded).hexdigest()
         async with self.engine.connect() as conn:
@@ -88,8 +88,13 @@ class EvalStore:
                     .one_or_none()
                 )
             if existing is None:
+                await self.clients.remove(key)
                 raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503) from None
+            await self.clients.remove(key)
             return {"dataset": public(dict(existing)), "duplicate": True}
+        except Exception:
+            await self.clients.remove(key)
+            raise
         return {"dataset": public(value), "duplicate": False}
 
     async def page(self, page: EvalPage) -> dict[str, Any]:

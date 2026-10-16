@@ -5,6 +5,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class EvalDatasetInvalid(ValueError):
+    """带有界定位信息的数据集校验错误。"""
+
+    def __init__(self, message: str, *, line: int | None = None) -> None:
+        super().__init__(message)
+        self.line = line
+
+
 class EvalTurn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -71,22 +79,32 @@ def parse_jsonl(content: str) -> list[EvalCase]:
 
     cases: list[EvalCase] = []
     seen: set[str] = set()
+    # Agent 数据库默认使用大小写不敏感排序；上传前按同一规则拒绝冲突 ID。
+    seen_folded: set[str] = set()
     for line_number, line in enumerate(content.splitlines(), 1):
         if not line.strip():
             continue
         if len(line.encode("utf-8")) > 64_000:
-            raise ValueError(f"line {line_number} is too large")
+            raise EvalDatasetInvalid(f"line {line_number} is too large", line=line_number)
         try:
-            value = json.loads(line)
+            value = json.loads(
+                line, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value))
+            )
             case = EvalCase.model_validate(value)
         except (ValueError, TypeError) as exc:
-            raise ValueError(f"line {line_number} is invalid") from exc
+            raise EvalDatasetInvalid(f"line {line_number} is invalid", line=line_number) from exc
         if case.id in seen:
-            raise ValueError(f"duplicate case id: {case.id}")
+            raise EvalDatasetInvalid(f"duplicate case id: {case.id}", line=line_number)
+        folded = case.id.casefold()
+        if folded in seen_folded:
+            raise EvalDatasetInvalid(
+                f"case id conflicts ignoring case: {case.id}", line=line_number
+            )
         seen.add(case.id)
+        seen_folded.add(folded)
         cases.append(case)
         if len(cases) > 1_000:
-            raise ValueError("dataset contains too many cases")
+            raise EvalDatasetInvalid("dataset contains too many cases")
     if not cases:
-        raise ValueError("dataset must contain at least one case")
+        raise EvalDatasetInvalid("dataset must contain at least one case")
     return cases

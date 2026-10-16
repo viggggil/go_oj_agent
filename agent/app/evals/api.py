@@ -14,7 +14,7 @@ from app.api.management import read_body
 from app.core.auth import InvalidDelegation
 from app.core.operations import ADMIN_ROLES, operation
 from app.core.resources import get_resources
-from app.evals.models import EvalDatasetUpload, EvalPage
+from app.evals.models import EvalDatasetInvalid, EvalDatasetUpload, EvalPage
 from app.models.configuration import ConfigError
 
 router = APIRouter()
@@ -60,6 +60,15 @@ async def handle(request: Request) -> JSONResponse:
         return JSONResponse(content=jsonable_encoder(result), headers={"Cache-Control": "no-store"})
     except InvalidDelegation:
         return JSONResponse(status_code=401, content={"code": "AGENT_UNAUTHENTICATED"})
+    except EvalDatasetInvalid as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "code": "AGENT_EVAL_DATASET_INVALID",
+                "message": str(exc),
+                **({"line": exc.line} if exc.line is not None else {}),
+            },
+        )
     except ConfigError as exc:
         return JSONResponse(status_code=exc.status, content={"code": exc.code})
     except (ValidationError, ValueError):

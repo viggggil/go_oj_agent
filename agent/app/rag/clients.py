@@ -159,6 +159,13 @@ class RagClients:
         except (S3Error, HTTPError, OSError):
             raise ConfigError("AGENT_RAG_DEPENDENCY_UNAVAILABLE", 503) from None
 
+    async def remove(self, key: str) -> None:
+        try:
+            await asyncio.to_thread(self.objects.remove_object, self.bucket, key)
+        except (S3Error, HTTPError, OSError):
+            # 清理由于事务失败产生的临时对象；原始业务错误优先保留。
+            return
+
     async def get(self, key: str) -> str:
         def read() -> str:
             response = self.objects.get_object(self.bucket, key)
