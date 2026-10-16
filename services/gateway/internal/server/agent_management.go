@@ -39,6 +39,8 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/admin/agent/evals/datasets", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}/cases", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/results/{result_id:[0-9a-f-]{36}}/review", []string{http.MethodPost}},
+		{"/api/v1/admin/agent/evals/results/{result_id:[0-9a-f-]{36}}/reviews", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/runs", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/cancel", []string{http.MethodPost}},
@@ -225,6 +227,7 @@ var agentManagementErrors = map[string]bool{
 	"AGENT_EVAL_DATASET_INVALID":  true, "AGENT_EVAL_NOT_FOUND": true,
 	"AGENT_EVAL_UNAVAILABLE":      true,
 	"AGENT_EVAL_VERSION_CONFLICT": true,
+	"AGENT_EVAL_HARD_FAILURE":     true,
 	"AGENT_EVAL_REQUEST_CONFLICT": true,
 }
 

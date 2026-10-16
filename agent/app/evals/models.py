@@ -90,8 +90,52 @@ class EvalRunPage(EvalPage):
 
 
 class EvalResultPage(EvalPage):
+    verdict: Literal["", "pass", "fail", "hard_fail", "unreviewed"] = ""
+    category: str = Field(default="", max_length=64)
+    error_code: str = Field(default="", max_length=64)
     status: Literal["", "COMPLETED", "FAILED", "CANCELLED"] = ""
     page_size: int = Field(default=20, ge=1, le=100)
+
+
+class EvalScores(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    task_completion: int = Field(ge=0, le=4)
+    technical_correctness: int = Field(ge=0, le=4)
+    evidence_support: int = Field(ge=0, le=4)
+    instruction_following: int = Field(ge=0, le=4)
+    clarity: int = Field(ge=0, le=4)
+
+
+class EvalReviewWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_version: int = Field(ge=0)
+    scores: EvalScores
+    passed: bool = Field(alias="pass")
+    tags: list[str] = Field(default_factory=list, max_length=10)
+    note: str = Field(default="", max_length=2000)
+    reason: str = Field(min_length=1, max_length=512)
+
+    @field_validator("reason")
+    @classmethod
+    def meaningful_reason(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Review reason cannot be blank")
+        return value
+
+    @field_validator("tags")
+    @classmethod
+    def valid_tags(cls, values: list[str]) -> list[str]:
+        if any(not value.strip() or len(value) > 32 for value in values):
+            raise ValueError("Invalid review tag")
+        if len(set(values)) != len(values):
+            raise ValueError("Duplicate review tags")
+        return values
+
+
+class EvalReviewPage(EvalPage):
+    page_size: int = Field(default=10, ge=1, le=20)
 
 
 class EvalRunCancel(BaseModel):

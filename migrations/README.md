@@ -60,3 +60,10 @@ Down 首先拒绝仍有 Provider 配置的库，避免孤立 Model 引用。清�
 回滚会先删除 Eval 的普通 Runtime 会话/消息/Run，再删除用途列，避免评测内容进入普通历史。
 因此新版/旧 schema 不兼容，迁移先于应用升级；回滚代码也应在应用停止后配合迁移执行。
 仅单实例启动时将遗留 QUEUED/RUNNING 标为 FAILED，尚无跨实例租约或自动续跑。
+
+### Agent Eval 人工评审
+
+`agent/000007_create_eval_reviews` 增加结果 `review_version`（默认 0）/`manual_review` 与追加式审计表。
+审计 `(result_id,version)`、request UUID 均唯一，操作者、旧值、新值、原因和当前评分在同一事务保存。
+迁移先于 Agent/Gateway/Web 部署；Compose 升级入口检测新表和两列，遇到部分结构拒绝继续。
+已有运行/结果保留，旧应用可忽略新列。down 删除人工评分和审计，不删除数据集、运行结果、程序检查或普通聊天；审计数据无法由 down 恢复。

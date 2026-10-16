@@ -19,6 +19,8 @@ from app.evals.models import (
     EvalDatasetUpload,
     EvalPage,
     EvalResultPage,
+    EvalReviewPage,
+    EvalReviewWrite,
     EvalRunCancel,
     EvalRunCreate,
     EvalRunPage,
@@ -49,7 +51,12 @@ async def handle(request: Request) -> JSONResponse:
             if request.method == "GET":
                 if parameters.get("dataset_id"):
                     raise ConfigError("AGENT_INVALID_ARGUMENT")
-                if request.path_params.get("run_id"):
+                if request.url.path.endswith("/reviews"):
+                    result = await service.reviews_page(
+                        str(request.path_params["result_id"]),
+                        EvalReviewPage.model_validate(parameters),
+                    )
+                elif request.path_params.get("run_id"):
                     run_id = str(request.path_params["run_id"])
                     if request.path_params.get("result_id"):
                         if parameters:
@@ -66,7 +73,10 @@ async def handle(request: Request) -> JSONResponse:
                     elif parameters:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                     else:
-                        result = {"run": await service.get_run(run_id)}
+                        result = {
+                            "run": await service.get_run(run_id),
+                            "metrics": await service.run_metrics(run_id),
+                        }
                 elif request.path_params.get("dataset_id"):
                     if parameters and not request.url.path.endswith("/cases"):
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
@@ -85,7 +95,16 @@ async def handle(request: Request) -> JSONResponse:
             else:
                 if str(UUID(principal.request_id)) != principal.request_id:
                     raise ConfigError("AGENT_INVALID_ARGUMENT")
-                if request.url.path.endswith("/runs"):
+                if request.url.path.endswith("/review"):
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    review_body = cast(
+                        EvalReviewWrite, await read_body(request, EvalReviewWrite, 32_000)
+                    )
+                    result = await service.save_review(
+                        str(request.path_params["result_id"]), review_body, principal
+                    )
+                elif request.url.path.endswith("/runs"):
                     if parameters:
                         raise ConfigError("AGENT_INVALID_ARGUMENT")
                     if runner is None:
@@ -152,3 +171,6 @@ router.add_api_route(f"{PREFIX}/runs/{{run_id:uuid}}/results", handle, methods=[
 router.add_api_route(
     f"{PREFIX}/runs/{{run_id:uuid}}/results/{{result_id:uuid}}", handle, methods=["GET"]
 )
+
+router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/review", handle, methods=["POST"])
+router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/reviews", handle, methods=["GET"])

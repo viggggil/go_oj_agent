@@ -906,6 +906,8 @@ GET  /api/v1/admin/agent/evals/runs/{run_id}
 POST /api/v1/admin/agent/evals/runs/{run_id}/cancel
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
+POST /api/v1/admin/agent/evals/results/{result_id}/review
+GET  /api/v1/admin/agent/evals/results/{result_id}/reviews
 ```
 
 上传正文是受限 JSON 请求，包含 `name`、`description` 和 UTF-8 JSONL `content`。Agent
@@ -934,18 +936,21 @@ Run 冻结后，配置替换/停用不改变该批次的固定内容；新建 Ru
 凭据撤销、业务 RPC 权限与 RAG 当前授权仍由原 Runtime 在实际调用时检查，不因快照豁免。
 
 Run 列表使用 page/page_size（最多 100），可选 status，按 created_at/id 倒序；
-结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序，
-未知 Run 返回 404。列表只返回基础元数据、512 字符 `answer_preview` 和 checks 的 pass/hard_fail，
+结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序。
+支持 `verdict=pass|fail|hard_fail|unreviewed`、精确 `category`、精确 `error_code` 及字面包含 `search`（Case ID），筛选发生在分页前。
+pass/fail 按有效结论，unreviewed 按 review_version=0。
+未知 Run 返回 404。列表只返回基础元数据、类别/标题、512 字符 `answer_preview`、checks 的 pass/hard_fail、
+`review_version`、`manual_review: null | {pass}` 和 `effective_pass`，
 避免完整回答与检查在一页聚合后超出 Gateway 的 1 MiB 响应上限。
 `GET /runs/{run_id}/results/{result_id}` 返回 `{result}`，包含各轮回答（至多 32000 字符）、
-完整程序化检查与有界模型/工具/知识摘要；未知结果或 run/result 不属于同一批次返回 404。
+完整程序化检查、有界模型/工具/知识摘要及不可变数据集 `case`、完整 `manual_review`；未知结果或 run/result 不属于同一批次返回 404。
 不保存 Provider 原始响应、内部推理、工具原文和凭据。
 required_facts/forbidden_claims/must_not_leak 是对实际回答的大小写不敏感字面检查，
 required_tools/forbidden_tools 使用实际调用名称，required_evidence 使用实际来源题号/标题/章节。
 
 同一管理员和同一正文使用相同 `X-Request-ID` 创建只返回已有运行，正文或创建者不同返回
 409 AGENT_EVAL_REQUEST_CONFLICT；重试不重新解析活动配置。达到部署准入上限返回
-503 AGENT_EVAL_UNAVAILABLE。创建响应 `{run,duplicate}`，运行详情/取消响应 `{run}`，
+503 AGENT_EVAL_UNAVAILABLE。创建响应 `{run,duplicate}`，运行详情响应 `{run,metrics}`，取消响应 `{run}`，
 列表响应 `{items,page:{page,page_size,total}}`。公开 run.config_snapshot 只含配置 UUID/hash、
 知识范围/版本、执行模式和预算，不含 Prompt/Skill 正文、Provider 地址或凭据配置。
 运行列表的快照进一步将 knowledge_versions 列表替换为 knowledge_version_count；
@@ -1709,3 +1714,48 @@ Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR
 attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源位置。运行中可查询固定清单，检索记录在终态持久化后出现；不返回完整 config_snapshot/model_summary、Provider 配置、query 或片段。无检索的旧 Run 兼容返回空清单和空 attempts。RAG 页支持输入 Run UUID 或管理员当前聊天的“查看本轮知识来源”链接。
 
 新增兼容性 gRPC：`contest.v1.ContestService/CheckKnowledgeAccess`，请求 `problem_ids` 为 1–100 个不重复正 int64，返回 `allowed_problem_ids` 子集，不返回比赛列表/身份。需可信内部主体；Contest 从自身数据库排除所有 `status != archived AND end_at > UTC_TIMESTAMP(3)` 的关联题目，管理员同样不豁免。该结果只确认比赛限制，Agent 还必须通过 Problem `BatchGetProblems` 确认题目 normal/可见；未知、归档及不可访问题目均排除。Python bindings、Go generated server/client、Agent RPC 白名单与部署配置同步更新；Gateway 不公开此 RPC。无新增事件/表/列，升级先部署业务 RPC 与白名单并重启加载配置，再部署 Agent；旧服务返回 Unimplemented 时检索失败关闭。
+
+### Eval PR3：运行页面与人工评审
+
+管理员 `/agent/eval` 页面保留左侧导航，支持分页数据集与样例、上传 UTF-8 JSONL 文件或文本、选择 Agent/数据集/并发/重复次数、运行进度和取消、结果筛选/详情、人工评分与修改记录。
+`?tab=runs&run={uuid}` 可恢复运行详情；轮询在离开页面时停止，切换批次不复用旧结果。
+本阶段只开放 programmatic，评审 Agent、导出和 CLI 在后续阶段。
+
+运行详情增加 `metrics`：`recorded_cases`、`check_passes`、`effective_passes`、`reviewed_cases`、
+`average_latency_ms`（无结果时为 null）。统计按已落库结果计算，不因结果分页或当前筛选变化。
+`effective_pass` 只在执行 COMPLETED 且无 hard_fail 时可能为 true：有人工评审则取最新人工 pass，否则取程序 checks.pass。
+硬失败和非 COMPLETED 结果始终不通过。COMPLETED 状态只表示执行结束。
+
+`POST /evals/results/{result_id}/review` 正文：
+
+```json
+{
+  "expected_version": 0,
+  "scores": {
+    "task_completion": 4,
+    "technical_correctness": 4,
+    "evidence_support": 3,
+    "instruction_following": 4,
+    "clarity": 4
+  },
+  "pass": true,
+  "tags": ["人工复核"],
+  "note": "关键事实语义一致。",
+  "reason": "依据题面和实际回答复核。"
+}
+```
+
+五维分数必须是 0–4 整数，不接受布尔；tags 最多 10 个不同非空标签，每个 32 字符，note 最多 2000 字符，reason 必填且最多 512 字符。
+请求要求规范 UUID `X-Request-ID`；`expected_version=0` 表示首次评审，之后按详情 review_version 保存。
+成功响应 `{review,review_version,duplicate}`；review 包含 pass/scores/tags/note/reviewed_by/reviewed_at。
+保存结果当前评分和追加审计在 Agent 自有数据库同一事务完成，result 行锁防止并发丢失。
+版本冲突返回 409 AGENT_EVAL_VERSION_CONFLICT；试图将 hard_fail 或非 COMPLETED 结果改为通过返回 409 AGENT_EVAL_HARD_FAILURE。
+人工结论不修改 checks，不删除原始程序失败。相同 request ID/操作者/结果/正文重放返回原审计版本（duplicate=true），即使后续已有更新也不覆盖当前评分；异正文、操作者或结果返回 409 AGENT_EVAL_REQUEST_CONFLICT。
+
+`GET /evals/results/{result_id}/reviews` 使用 page/page_size（默认 10，最多 20），按 version 倒序，返回 `{items,page}`。
+每条含 id/result_id/version/reviewed_by/old_value/new_value/reason/created_at，不公开指纹或请求 ID。
+普通用户两层授权均拒绝，未知结果返回 404。
+网页在保存结果不确定时保留草稿与 request ID；409 保留草稿，要求显式加载最新评分后再次提交。
+
+兼容发布：先执行 `000007_create_eval_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
+新 Gateway 采用扩展后的严格结果契约，不能长期与旧 Agent 混用。

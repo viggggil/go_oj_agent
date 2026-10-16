@@ -356,9 +356,9 @@ func TestAgentHistoricalLookupRoutesAndRedaction(t *testing.T) {
 }
 
 func TestEvalResultListAndDetailHaveSeparateBoundedContracts(t *testing.T) {
-	common := `"id":"id","run_id":"run","case_id":"case","attempt":1,"status":"COMPLETED","checks":{"pass":true,"hard_fail":false},"created_at":"2026-10-16T00:00:00Z","error_code":null,"latency_ms":10,"finished_at":null`
+	common := `"id":"id","run_id":"run","case_id":"case","attempt":1,"status":"COMPLETED","checks":{"pass":true,"hard_fail":false},"created_at":"2026-10-16T00:00:00Z","error_code":null,"latency_ms":10,"finished_at":null,"review_version":0,"manual_review":null,"effective_pass":true,"category":"basic","title":"例子"`
 	preview := json.RawMessage(`{` + common + `,"answer_preview":"预览"}`)
-	detail := json.RawMessage(`{` + common + `,"answer":"完整回答","model_summary":null}`)
+	detail := json.RawMessage(`{` + common + `,"answer":"完整回答","model_summary":null,"case":{}}`)
 	if !validEvalResult(preview, false) || !validEvalResult(detail, true) {
 		t.Fatal("valid list/detail response rejected")
 	}

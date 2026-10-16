@@ -65,6 +65,8 @@ results = Table(
     Column("case_id", String(128, collation="utf8mb4_bin"), nullable=False),
     Column("attempt", Integer, nullable=False),
     Column("status", String(16), nullable=False),
+    Column("review_version", Integer, nullable=False, server_default="0"),
+    Column("manual_review", JSON),
     Column("answer", MEDIUMTEXT, nullable=True),
     Column("checks", JSON, nullable=False),
     Column("model_summary", JSON),
@@ -72,4 +74,20 @@ results = Table(
     Column("latency_ms", Integer),
     Column("created_at", DATETIME(fsp=3), nullable=False),
     Column("finished_at", DATETIME(fsp=3)),
+)
+
+
+reviews = Table(
+    "agent_eval_reviews",
+    metadata,
+    Column("id", CHAR(36), primary_key=True),
+    Column("result_id", CHAR(36), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("reviewed_by", BigInteger, nullable=False),
+    Column("request_id", CHAR(36), nullable=False, unique=True),
+    Column("fingerprint", CHAR(64), nullable=False),
+    Column("old_value", JSON),
+    Column("new_value", JSON, nullable=False),
+    Column("reason", String(512), nullable=False),
+    Column("created_at", DATETIME(fsp=3), nullable=False),
 )

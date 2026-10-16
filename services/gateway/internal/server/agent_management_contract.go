@@ -79,6 +79,12 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 }
 
 func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasSuffix(path, "/review") {
+		return len(payload) == 3 && validEvalManualReview(payload["review"], true) && agentJSONRequired(payload["review_version"], new(int64)) && agentJSONRequired(payload["duplicate"], new(bool))
+	}
+	if strings.HasSuffix(path, "/reviews") {
+		return validEvalReviewsPage(payload)
+	}
 	if strings.Contains(path, "/runs") {
 		if strings.Contains(path, "/results/") {
 			return len(payload) == 1 && validEvalResult(payload["result"], true)
@@ -89,8 +95,11 @@ func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) 
 		if method == "POST" && strings.HasSuffix(path, "/runs") {
 			return len(payload) == 2 && validEvalRun(payload["run"]) && agentJSONRequired(payload["duplicate"], new(bool))
 		}
-		if strings.HasSuffix(path, "/cancel") || strings.Count(path, "/") == 7 {
+		if strings.HasSuffix(path, "/cancel") {
 			return len(payload) == 1 && validEvalRun(payload["run"])
+		}
+		if strings.Count(path, "/") == 7 {
+			return len(payload) == 2 && validEvalRun(payload["run"]) && validEvalMetrics(payload["metrics"])
 		}
 		if strings.HasSuffix(path, "/runs") {
 			return validEvalRunsPage(payload)
@@ -217,17 +226,23 @@ func validEvalResultsPage(payload map[string]json.RawMessage) bool {
 }
 
 func validEvalResult(value json.RawMessage, detail bool) bool {
-	fields := "id run_id case_id attempt status checks created_at error_code latency_ms finished_at"
+	fields := "id run_id case_id attempt status checks created_at error_code latency_ms finished_at review_version manual_review effective_pass category title"
 	if detail {
-		fields += " answer model_summary"
+		fields += " answer model_summary case"
 	} else {
 		fields += " answer_preview"
 	}
 	object, valid := agentJSONFields(value, fields, "")
-	if !valid || !agentJSONTypes(object, "id run_id case_id status created_at", "", "attempt") || !agentJSONObject(object["checks"]) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["latency_ms"], new(int64)) || !agentJSONNullable(object["finished_at"], new(string)) {
+	if !valid || !agentJSONTypes(object, "id run_id case_id status created_at category title", "effective_pass", "attempt review_version") || !agentJSONObject(object["checks"]) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["latency_ms"], new(int64)) || !agentJSONNullable(object["finished_at"], new(string)) {
+		return false
+	}
+	if string(object["manual_review"]) != "null" && !validEvalManualReview(object["manual_review"], detail) {
 		return false
 	}
 	if detail {
+		if !agentJSONObject(object["case"]) {
+			return false
+		}
 		return agentJSONNullable(object["answer"], new(string)) && agentJSONNullable(object["model_summary"], &map[string]any{})
 	}
 	return agentJSONRequired(object["answer_preview"], new(string))
@@ -416,4 +431,65 @@ func agentJSONStrings(value json.RawMessage) bool {
 func agentJSONObject(value json.RawMessage) bool {
 	var object map[string]json.RawMessage
 	return agentJSONRequired(value, &object) && object != nil
+}
+
+func validEvalMetrics(value json.RawMessage) bool {
+	object, ok := agentJSONFields(value, "recorded_cases check_passes effective_passes reviewed_cases average_latency_ms", "")
+	return ok && agentJSONTypes(object, "", "", "recorded_cases check_passes effective_passes reviewed_cases") && agentJSONNullable(object["average_latency_ms"], new(int64))
+}
+
+func validEvalManualReview(value json.RawMessage, full bool) bool {
+	fields := "pass"
+	if full {
+		fields += " scores tags note reviewed_by reviewed_at"
+	}
+	object, ok := agentJSONFields(value, fields, "")
+	if !ok || !agentJSONRequired(object["pass"], new(bool)) {
+		return false
+	}
+	if !full {
+		return true
+	}
+	if !agentJSONTypes(object, "note reviewed_at", "", "reviewed_by") {
+		return false
+	}
+	scores, ok := agentJSONFields(object["scores"], "task_completion technical_correctness evidence_support instruction_following clarity", "")
+	if !ok {
+		return false
+	}
+	for _, value := range scores {
+		var score int
+		if !agentJSONRequired(value, &score) || score < 0 || score > 4 {
+			return false
+		}
+	}
+	var tags []string
+	if json.Unmarshal(object["tags"], &tags) != nil || tags == nil || len(tags) > 10 {
+		return false
+	}
+	return true
+}
+
+func validEvalReviewsPage(payload map[string]json.RawMessage) bool {
+	if len(payload) != 2 {
+		return false
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(payload["items"], &items) != nil || items == nil || len(items) > 20 {
+		return false
+	}
+	page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+	if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+		return false
+	}
+	for _, value := range items {
+		object, ok := agentJSONFields(value, "id result_id version reviewed_by old_value new_value reason created_at", "")
+		if !ok || !agentJSONTypes(object, "id result_id reason created_at", "", "version reviewed_by") || !validEvalManualReview(object["new_value"], true) {
+			return false
+		}
+		if string(object["old_value"]) != "null" && !validEvalManualReview(object["old_value"], true) {
+			return false
+		}
+	}
+	return true
 }

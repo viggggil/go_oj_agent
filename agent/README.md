@@ -637,15 +637,14 @@ Agent 绑定知识分组后，真实模型自动可用 retrieve_knowledge，无�
 
 默认 `AGENT_RAG_MAX_QUERIES_PER_RUN=4`、`AGENT_RAG_MIN_SCORE=0.35`，top_k 默认 3/上限 5，结果最多 24KB，仍消耗整体工具/时间/模型输入预算。停止取消 HTTP/gRPC，新对话无旧片段。无匹配、故障或预算耗尽必须明确说明证据不足。正文作为不可信参考，不得改变工具和安全规则。
 
-运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。当前已接入 Agent Eval JSONL 数据集上传、校验、去重、管理员浏览，以及批量 Runner 和程序化评分；人工/评审 Agent 流程、运行管理页面和 CLI 报告在 Issue #175 后续实现，`make agent-eval` 暂不作为质量评测命令。
+运行结束后，管理员可从当前聊天“查看本轮知识来源”进入 RAG 页，或输入 Run UUID，查看来源文档/版本/章节和位置；不保存检索片段或 query，不向普通 SSE 透传证据。完整接口和升级顺序见 docs/api.md。`make rag-test-integration` 已包括真实组件的 LangGraph、版本固定、停止/新对话、权限撤销及故障预算场景；Contest 的真实数据库授权由 `make test-integration` 覆盖。当前已接入 Agent Eval JSONL 数据集上传、校验、去重、管理员浏览，以及批量 Runner 和程序化评分；运行管理页面和人工评审已接入，评审 Agent 和 CLI 报告在 Issue #175 后续实现，`make agent-eval` 暂不作为质量评测命令。
 
 ### Eval 批量程序化运行
 
 启用管理和 Chat 后，管理员通过 `POST /api/v1/admin/agent/evals/runs` 指定数据集 UUID、
 被测 `agent_key`、`mode=programmatic`、`repeat_count`（1–3）和 `concurrency`（1–8）。
 `X-Request-ID` 为规范 UUID；相同管理员和相同正文重试返回已有运行，不同正文返回 409。
-运行/结果分页接口和取消版本参数见 `docs/api.md`。管理页面本阶段仍提供数据集管理，
-新建运行、进度、结果详情和人工评审会在下一阶段接入页面。
+运行/结果分页接口和取消版本参数见 `docs/api.md`。管理页面已支持数据集、新建运行、进度、取消、结果详情和人工评审。
 
 部署必须显式指定专用普通评测账号，例如 `.env` 中的
 `AGENT_EVAL_PRINCIPALS={"student_a":123}`。账号应先通过正常用户服务创建，
@@ -672,3 +671,16 @@ Runner 与普通 Runtime 一样仅支持单实例。每个运行的并发受请�
 超过准入上限返回 503。取消会停止正在消费的 SSE 并关闭底层模型流，排队 Case 记录为
 CANCELLED。正常关闭会取消运行；异常重启时遗留 QUEUED/RUNNING 统一标记 FAILED，
 保留已完成结果。本阶段不跨重启续跑，不自动重试 Case，后续引入租约时再支持恢复。
+
+### Eval 页面与人工评审
+
+先应用 `000007_create_eval_reviews.up.sql` 再部署新版 Agent/Gateway/Web。管理员进入 `/agent/eval`，
+上传或选择数据集，选择普通用户可用的 Agent 启动程序化评测；通过“评测运行”查看固定版本、进度、质量汇总、错误和结果。
+待测 Agent 应设置为普通用户可见，fixture.principal 仍由部署别名解析，管理员不能在页面给模型额外权限。
+运行执行完成不等于质量通过。结果可按有效结论、执行状态、类别、错误码和样例 ID 筛选。
+
+“查看与评分”展示样例各轮输入/参考回答、实际回答、程序门禁、工具/知识摘要。五维评分各 0–4，填写结论、标签、备注和修改原因后保存。
+有硬失败或执行不成功时不能改为通过；语义人工结论与程序 checks 分开保留。
+每次修改保留操作者、时间、前后值和原因；并发冲突保留草稿，需显式加载最新评分再提交。
+网络响应丢失时相同内容重试复用 request UUID，避免新增审计版本。
+专用评审 Agent、自动语义评分、CLI/报告导出仍在 #175 后续阶段。

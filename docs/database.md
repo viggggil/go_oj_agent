@@ -663,8 +663,7 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 并保存程序化硬门禁检查、回答摘要、延迟和错误码。`agent_conversations.purpose` 默认 chat，
 历史数据保留为 chat；Eval 使用 eval，普通仓储统一在列表、详情、Run 查询和写入锁检查用途，
 避免评测账号通过普通历史 API 读取原始评测内容。索引 `(user_id,purpose,updated_at,id)` 支持
-隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审与评审 Agent
-结果仍由后续迁移增加。单实例重启中断遗留批次并保留已完成结果，尚无跨实例续跑。
+隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审由 000007 增加；评审 Agent 结果仍由后续迁移增加。单实例重启中断遗留批次并保留已完成结果，尚无跨实例续跑。
 
 ### `agent_runs` / `agent_run_events`
 
@@ -891,3 +890,15 @@ Compose su8 默认助手增加只读 get_problem/list_problems 与 react「题�
 仅当前版本 ID 等于 `compose.su8.v1.agent.{key}` 审计创建的版本且无工具时进行 v2 版本化升级；
 管理员另存版本、停用/归档状态完整保留，expected_id 防止并发覆盖。新版本及审计均保留，
 回滚需要明确重绑保留的旧 Agent 版本，不删除历史记录或凭据。
+
+
+### Eval 人工评审迁移 000007
+
+Agent 拥有 `agent_eval_results.review_version`（默认 0）和可空 `manual_review`，旧结果无需回填。
+追加表 `agent_eval_reviews` 保存结果 ID、递增评分版本、操作者、正文指纹、全局唯一 request UUID、旧值、新值、修改原因和时间。
+`(result_id,version)` 唯一索引同时支持按结果版本倒序的审计分页。事务先锁结果行，检查版本及硬失败，再更新当前评分并追加审计；任一失败全部回滚。
+请求 UUID 唯一约束处理跨结果/并发重放，重放比较操作者和正文指纹，不重新写评分。无 MQ、Redis 或 MinIO 新状态。
+
+结果详情只联接 Agent 自有运行/样例表读取不可变 Case；结果筛选和聚合以结果 review_version 明确选择人工或程序结论，避免 MySQL JSON 缺失键布尔转换改变默认值。
+聚合按每个 Run 结果计算；现有 `(run_id,case_id,attempt)` 索引限制每批最多 3000 条记录，不为当前规模新增 JSON 索引。
+000007 是 expand：旧应用可忽略新列/表，新应用要求先迁移；down 删除全部人工评分和审计，不删除数据集、运行、回答、程序检查或聊天。

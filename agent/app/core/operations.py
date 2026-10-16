@@ -18,10 +18,17 @@ _EVAL_RUN = re.compile(r"/api/v1/admin/agent/evals/runs(?:/([0-9a-f-]{36})(/(can
 
 _EVAL_RESULT = re.compile(r"/api/v1/admin/agent/evals/runs/([0-9a-f-]{36})/results/([0-9a-f-]{36})")
 
+_EVAL_REVIEW = re.compile(r"/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(review|reviews)")
+
 
 def operation(method: str, path: str) -> str:
     allowed = False
-    if match := _EVAL_RESULT.fullmatch(path):
+    if match := _EVAL_REVIEW.fullmatch(path):
+        allowed = (
+            method == ("POST" if match[2] == "review" else "GET")
+            and str(UUID(match[1])) == match[1]
+        )
+    elif match := _EVAL_RESULT.fullmatch(path):
         allowed = method == "GET" and all(str(UUID(value)) == value for value in match.groups())
     elif match := _EVAL_RUN.fullmatch(path):
         if match[1] is None:
