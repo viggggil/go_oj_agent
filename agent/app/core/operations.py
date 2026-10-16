@@ -14,11 +14,24 @@ _MESSAGES = re.compile(r"/api/v1/agent/conversations/([0-9a-f-]{36})/messages")
 _MODEL = re.compile(r"/api/v1/admin/agent/model-options/([0-9a-f-]{36})")
 _VERSION = re.compile(r"/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})")
 _EVAL_DATASET = re.compile(r"/api/v1/admin/agent/evals/datasets(?:/([0-9a-f-]{36})(/cases)?)?")
+_EVAL_RUN = re.compile(r"/api/v1/admin/agent/evals/runs(?:/([0-9a-f-]{36})(/(cancel|results))?)?")
 
 
 def operation(method: str, path: str) -> str:
     allowed = False
-    if match := _EVAL_DATASET.fullmatch(path):
+    if match := _EVAL_RUN.fullmatch(path):
+        if match[1] is None:
+            allowed = method in {"GET", "POST"}
+        else:
+            try:
+                action = match[2]
+                allowed = (
+                    method == ("POST" if action == "/cancel" else "GET")
+                    and str(UUID(match[1])) == match[1]
+                )
+            except ValueError:
+                pass
+    elif match := _EVAL_DATASET.fullmatch(path):
         if match[1] is None:
             allowed = method in {"GET", "POST"}
         else:

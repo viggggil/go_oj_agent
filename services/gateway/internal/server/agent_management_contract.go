@@ -79,6 +79,21 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 }
 
 func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.Contains(path, "/runs") {
+		if strings.HasSuffix(path, "/results") {
+			return validEvalResultsPage(payload)
+		}
+		if method == "POST" && strings.HasSuffix(path, "/runs") {
+			return len(payload) == 2 && validEvalRun(payload["run"]) && agentJSONRequired(payload["duplicate"], new(bool))
+		}
+		if strings.HasSuffix(path, "/cancel") || strings.Count(path, "/") == 7 {
+			return len(payload) == 1 && validEvalRun(payload["run"])
+		}
+		if strings.HasSuffix(path, "/runs") {
+			return validEvalRunsPage(payload)
+		}
+		return false
+	}
 	if method == "POST" {
 		if len(payload) != 2 {
 			return false
@@ -144,6 +159,55 @@ func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) 
 	for _, value := range values {
 		caseValue, valid := agentJSONFields(value, "id category title case", "")
 		if !valid || !agentJSONTypes(caseValue, "id category title", "", "") || !agentJSONObject(caseValue["case"]) {
+			return false
+		}
+	}
+	return true
+}
+
+func validEvalRun(value json.RawMessage) bool {
+	object, ok := agentJSONFields(value, "id dataset_id agent_key mode repeat_count concurrency status total_cases completed_cases hard_failures error_count config_snapshot created_by request_id cancel_requested created_at version", "started_at finished_at")
+	if !ok || !agentJSONTypes(object, "id dataset_id agent_key mode status request_id created_at", "cancel_requested", "repeat_count concurrency total_cases completed_cases hard_failures error_count created_by version") || !agentJSONObject(object["config_snapshot"]) || !agentJSONNullable(object["started_at"], new(string)) || !agentJSONNullable(object["finished_at"], new(string)) {
+		return false
+	}
+	return true
+}
+
+func validEvalRunsPage(payload map[string]json.RawMessage) bool {
+	if len(payload) != 2 {
+		return false
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(payload["items"], &items) != nil || items == nil || len(items) > 100 {
+		return false
+	}
+	page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+	if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+		return false
+	}
+	for _, item := range items {
+		if !validEvalRun(item) {
+			return false
+		}
+	}
+	return true
+}
+
+func validEvalResultsPage(payload map[string]json.RawMessage) bool {
+	if len(payload) != 2 {
+		return false
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(payload["items"], &items) != nil || items == nil || len(items) > 100 {
+		return false
+	}
+	page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+	if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+		return false
+	}
+	for _, value := range items {
+		object, valid := agentJSONFields(value, "id run_id case_id attempt status checks created_at", "answer model_summary error_code latency_ms finished_at")
+		if !valid || !agentJSONTypes(object, "id run_id case_id status created_at", "", "attempt") || !agentJSONObject(object["checks"]) || !agentJSONNullable(object["answer"], new(string)) || !agentJSONNullable(object["model_summary"], &map[string]any{}) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["latency_ms"], new(int64)) || !agentJSONNullable(object["finished_at"], new(string)) {
 			return false
 		}
 	}

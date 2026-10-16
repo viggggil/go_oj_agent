@@ -207,6 +207,15 @@ func TestAgentOperationRejectsUnknownPathsAndRoles(t *testing.T) {
 	if _, err := client.AgentOperation(http.MethodGet, "/api/v1/admin/agent/evals/datasets/"+id); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := client.AgentOperation(http.MethodPost, "/api/v1/admin/agent/evals/runs"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.AgentOperation(http.MethodGet, "/api/v1/admin/agent/evals/runs/"+id+"/results"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.AgentOperation(http.MethodPost, "/api/v1/admin/agent/evals/runs/"+id+"/cancel"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestEvalDatasetEnvelopeContract(t *testing.T) {
@@ -226,6 +235,21 @@ func TestEvalDatasetEnvelopeContract(t *testing.T) {
 	_ = json.Unmarshal(data, &payload)
 	if validEvalEnvelope(http.MethodPost, "/api/v1/admin/agent/evals/datasets", payload) {
 		t.Fatal("private eval field accepted")
+	}
+}
+
+func TestEvalDatasetErrorEnvelopeIncludesBoundedLine(t *testing.T) {
+	data := map[string]json.RawMessage{
+		"code":    json.RawMessage(`"AGENT_EVAL_DATASET_INVALID"`),
+		"message": json.RawMessage(`"line 2 is invalid"`),
+		"line":    json.RawMessage(`2`),
+	}
+	if !validEvalError(data) {
+		t.Fatal("valid eval error rejected")
+	}
+	data["private"] = json.RawMessage(`"reject"`)
+	if validEvalError(data) {
+		t.Fatal("private eval error field accepted")
 	}
 }
 

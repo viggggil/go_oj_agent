@@ -39,6 +39,10 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/admin/agent/evals/datasets", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/datasets/{dataset_id:[0-9a-f-]{36}}/cases", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs", []string{http.MethodGet, http.MethodPost}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/cancel", []string{http.MethodPost}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/results", []string{http.MethodGet}},
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},
@@ -174,7 +178,8 @@ func serveAgentJSON(ctx context.Context, httpCtx khttp.Context, agent *client.Ag
 	}
 	if response.StatusCode != 200 {
 		var code string
-		if len(payload) != 1 || json.Unmarshal(payload["code"], &code) != nil || !agentManagementErrors[code] {
+		if json.Unmarshal(payload["code"], &code) != nil || !agentManagementErrors[code] ||
+			(len(payload) != 1 && !(code == "AGENT_EVAL_DATASET_INVALID" && validEvalError(payload))) {
 			return invalidAgentJSON()
 		}
 		switch response.StatusCode {
@@ -215,5 +220,23 @@ var agentManagementErrors = map[string]bool{
 	"AGENT_CONFIGURATION_TEST_EXPIRED": true, "AGENT_CREDENTIAL_UNAVAILABLE": true,
 	"AGENT_MODEL_ENDPOINT_DENIED": true,
 	"AGENT_EVAL_DATASET_INVALID":  true, "AGENT_EVAL_NOT_FOUND": true,
-	"AGENT_EVAL_UNAVAILABLE": true,
+	"AGENT_EVAL_UNAVAILABLE":      true,
+	"AGENT_EVAL_VERSION_CONFLICT": true,
+}
+
+func validEvalError(payload map[string]json.RawMessage) bool {
+	if len(payload) < 2 || len(payload) > 3 {
+		return false
+	}
+	var message string
+	if json.Unmarshal(payload["message"], &message) != nil || len(message) == 0 || len(message) > 256 {
+		return false
+	}
+	if line, ok := payload["line"]; ok {
+		var value int
+		if json.Unmarshal(line, &value) != nil || value < 1 || value > 1001 {
+			return false
+		}
+	}
+	return true
 }
