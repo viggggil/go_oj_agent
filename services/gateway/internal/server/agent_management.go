@@ -128,8 +128,10 @@ func serveAgentJSON(ctx context.Context, httpCtx khttp.Context, agent *client.Ag
 		deadline = end
 	}
 	_ = controller.SetReadDeadline(deadline)
-	defer controller.SetReadDeadline(time.Time{})
 	body, err := io.ReadAll(http.MaxBytesReader(httpCtx.Response(), r.Body, int64(limits.MaxRequestBytes)))
+	// 上传读取期限只约束请求体，后续上游响应由请求 context 控制。
+	// 留在入站连接上会与 context 截止时间竞争，提前触发普通取消。
+	_ = controller.SetReadDeadline(time.Time{})
 	if err != nil {
 		var maximum *http.MaxBytesError
 		if errors.As(err, &maximum) {
