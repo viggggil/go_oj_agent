@@ -1,6 +1,7 @@
 """评测数据集的严格输入模型；样例内容视为不可信数据。"""
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -72,6 +73,31 @@ class EvalPage(BaseModel):
     page: int = Field(default=1, ge=1, le=501)
     page_size: int = Field(default=20, ge=1, le=100)
     search: str = Field(default="", max_length=64)
+
+
+class EvalRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    dataset_id: UUID
+    agent_key: str = Field(min_length=2, max_length=64, pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    mode: Literal["programmatic"] = "programmatic"
+    repeat_count: int = Field(default=1, ge=1, le=3, strict=True)
+    concurrency: int = Field(default=1, ge=1, le=8, strict=True)
+
+
+class EvalRunPage(EvalPage):
+    status: Literal["", "QUEUED", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"] = ""
+
+
+class EvalResultPage(EvalPage):
+    status: Literal["", "COMPLETED", "FAILED", "CANCELLED"] = ""
+    page_size: int = Field(default=20, ge=1, le=100)
+
+
+class EvalRunCancel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_version: int = Field(ge=1)
 
 
 def parse_jsonl(content: str) -> list[EvalCase]:

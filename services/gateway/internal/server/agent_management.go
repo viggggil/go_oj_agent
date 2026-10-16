@@ -43,6 +43,7 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/cancel", []string{http.MethodPost}},
 		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/results", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/evals/runs/{run_id:[0-9a-f-]{36}}/results/{result_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/agent/agents", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations", []string{http.MethodGet}},
 		{"/api/v1/agent/conversations/{conversation_id:[0-9a-f-]{36}}/messages", []string{http.MethodGet}},
@@ -222,6 +223,7 @@ var agentManagementErrors = map[string]bool{
 	"AGENT_EVAL_DATASET_INVALID":  true, "AGENT_EVAL_NOT_FOUND": true,
 	"AGENT_EVAL_UNAVAILABLE":      true,
 	"AGENT_EVAL_VERSION_CONFLICT": true,
+	"AGENT_EVAL_REQUEST_CONFLICT": true,
 }
 
 func validEvalError(payload map[string]json.RawMessage) bool {

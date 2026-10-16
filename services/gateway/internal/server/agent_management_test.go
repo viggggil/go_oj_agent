@@ -354,3 +354,15 @@ func TestAgentHistoricalLookupRoutesAndRedaction(t *testing.T) {
 		t.Fatal("credential data accepted")
 	}
 }
+
+func TestEvalResultListAndDetailHaveSeparateBoundedContracts(t *testing.T) {
+	common := `"id":"id","run_id":"run","case_id":"case","attempt":1,"status":"COMPLETED","checks":{"pass":true,"hard_fail":false},"created_at":"2026-10-16T00:00:00Z","error_code":null,"latency_ms":10,"finished_at":null`
+	preview := json.RawMessage(`{` + common + `,"answer_preview":"预览"}`)
+	detail := json.RawMessage(`{` + common + `,"answer":"完整回答","model_summary":null}`)
+	if !validEvalResult(preview, false) || !validEvalResult(detail, true) {
+		t.Fatal("valid list/detail response rejected")
+	}
+	if validEvalResult(detail, false) || validEvalResult(preview, true) {
+		t.Fatal("list/detail response contracts must not be interchanged")
+	}
+}

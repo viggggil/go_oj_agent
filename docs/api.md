@@ -886,19 +886,26 @@ GET  /api/v1/admin/agent/evals/datasets
 POST /api/v1/admin/agent/evals/runs
 GET  /api/v1/admin/agent/evals/runs/{run_id}
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results
+GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
 GET  /api/v1/admin/agent/metrics
 GET  /api/v1/admin/agent/runs
 GET  /api/v1/admin/agent/runs/{run_id}
 GET  /api/v1/admin/agent/audits
 ```
 
-当前已接入的 Eval 数据集管理接口：
+当前已接入的 Eval 数据集和程序化评测接口：
 
 ```text
 GET  /api/v1/admin/agent/evals/datasets
 POST /api/v1/admin/agent/evals/datasets
 GET  /api/v1/admin/agent/evals/datasets/{dataset_id}
 GET  /api/v1/admin/agent/evals/datasets/{dataset_id}/cases
+GET  /api/v1/admin/agent/evals/runs
+POST /api/v1/admin/agent/evals/runs
+GET  /api/v1/admin/agent/evals/runs/{run_id}
+POST /api/v1/admin/agent/evals/runs/{run_id}/cancel
+GET  /api/v1/admin/agent/evals/runs/{run_id}/results
+GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
 ```
 
 上传正文是受限 JSON 请求，包含 `name`、`description` 和 UTF-8 JSONL `content`。Agent
@@ -906,6 +913,43 @@ GET  /api/v1/admin/agent/evals/datasets/{dataset_id}/cases
 超限内容；原始 JSONL 以不可变对象写入 Agent 专用 MinIO，MySQL 保存哈希、元数据和
 校验后的 Case 投影。重复内容哈希返回已有数据集，不重复创建。上述接口均要求管理员角色，
 普通用户由 Gateway 和 Agent 双重拒绝。
+
+运行创建请求包含 `dataset_id`（UUID）、`agent_key`、`mode=programmatic`、
+`repeat_count`（默认 1，范围 1–3）和 `concurrency`（默认 1，范围 1–8）。
+只支持程序化模式，未实现的 manual/programmatic_review 返回 400。
+服务在创建时固定 Agent/Prompt/Skill/Model/Provider/知识版本；每个 Case 的 user turn
+通过普通 Runtime 按真实生成历史执行，assistant turn 仅保留为参考。
+fixture.principal 必须是部署 `AGENT_EVAL_PRINCIPALS` 中配置的专用账号别名，执行角色固定 user，
+未知别名只使该 Case 失败（AGENT_EVAL_PRINCIPAL_INVALID），不能继承创建者的管理员角色。
+评测会话在数据库标为 purpose=eval，普通历史列表、详情、Run 查询及聊天续聊仅允许 purpose=chat；
+即使用评测账号本身的普通 JWT，也不能读取或继续 Eval 会话。
+
+运行状态为 `QUEUED`、`RUNNING`、`COMPLETED`、`FAILED` 或 `CANCELLED`。
+COMPLETED 表示调度执行完成，质量结论看每条 checks.pass 以及 hard_failures/error_count。
+取消使用 `POST /runs/{uuid}/cancel?version={正整数}` 与规范 UUID `X-Request-ID`，
+JSON 正文为 `{}`。version 不匹配或已终态返回 409 AGENT_EVAL_VERSION_CONFLICT；同一取消 request ID
+即使 version 已过期仍幂等返回当前状态。取消停止活跃 SSE/模型流并将排队 Case 记为 CANCELLED。
+单实例服务重启时遗留运行标记 FAILED，保留已保存结果，本阶段不自动续跑。
+Run 冻结后，配置替换/停用不改变该批次的固定内容；新建 Run 会重新校验停用状态。
+凭据撤销、业务 RPC 权限与 RAG 当前授权仍由原 Runtime 在实际调用时检查，不因快照豁免。
+
+Run 列表使用 page/page_size（最多 100），可选 status，按 created_at/id 倒序；
+结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序，
+未知 Run 返回 404。列表只返回基础元数据、512 字符 `answer_preview` 和 checks 的 pass/hard_fail，
+避免完整回答与检查在一页聚合后超出 Gateway 的 1 MiB 响应上限。
+`GET /runs/{run_id}/results/{result_id}` 返回 `{result}`，包含各轮回答（至多 32000 字符）、
+完整程序化检查与有界模型/工具/知识摘要；未知结果或 run/result 不属于同一批次返回 404。
+不保存 Provider 原始响应、内部推理、工具原文和凭据。
+required_facts/forbidden_claims/must_not_leak 是对实际回答的大小写不敏感字面检查，
+required_tools/forbidden_tools 使用实际调用名称，required_evidence 使用实际来源题号/标题/章节。
+
+同一管理员和同一正文使用相同 `X-Request-ID` 创建只返回已有运行，正文或创建者不同返回
+409 AGENT_EVAL_REQUEST_CONFLICT；重试不重新解析活动配置。达到部署准入上限返回
+503 AGENT_EVAL_UNAVAILABLE。创建响应 `{run,duplicate}`，运行详情/取消响应 `{run}`，
+列表响应 `{items,page:{page,page_size,total}}`。公开 run.config_snapshot 只含配置 UUID/hash、
+知识范围/版本、执行模式和预算，不含 Prompt/Skill 正文、Provider 地址或凭据配置。
+运行列表的快照进一步将 knowledge_versions 列表替换为 knowledge_version_count；
+完整版本清单通过单条运行详情读取，保证一页多条大知识范围的运行仍有界。
 
 Eval 运行必须记录配置版本快照。运行详情默认返回脱敏的意图、Skill、Tool 调用、
 延迟、Token、证据引用、答案状态和评分；源码、凭据、完整 Prompt 和原始敏感 Tool

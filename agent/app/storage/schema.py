@@ -23,6 +23,7 @@ agent_conversations = Table(
     Column("id", CHAR(36), primary_key=True),
     Column("user_id", BigInteger, nullable=False),
     Column("title", String(255)),
+    Column("purpose", String(16), nullable=False, server_default="chat"),
     Column("agent_key", String(64)),
     Column("created_at", DATETIME(fsp=3), nullable=False),
     Column("updated_at", DATETIME(fsp=3), nullable=False),

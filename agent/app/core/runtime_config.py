@@ -9,16 +9,18 @@ from app.core.settings import Settings
 from app.models.configuration import (
     AgentConfig,
     ConfigError,
+    ConfigKind,
     ModelProfileConfig,
     PromptConfig,
     ProviderConfig,
     SkillConfig,
     config_hash,
+    parse_config,
 )
 from app.models.configuration import RuntimeBudget as RuntimeBudget
 from app.models.runtime import ChatRequest, Principal
 from app.rag.store import KnowledgeStore
-from app.storage.configuration import ConfigurationStore
+from app.storage.configuration import ConfigurationStore, ConfigVersion
 from app.tools.registry import ToolRegistry
 
 
@@ -102,11 +104,34 @@ class DatabaseConfigReader:
         self._registry = registry
         self._knowledge_store = knowledge_store
 
-    async def read(self, request: ChatRequest, principal: Principal) -> ConfigSnapshot:
+    async def read(
+        self,
+        request: ChatRequest,
+        principal: Principal,
+        *,
+        pinned: ConfigSnapshot | None = None,
+        render_prompts: bool = True,
+    ) -> ConfigSnapshot:
         from datetime import UTC, datetime
 
         agent_key = request.agent_key or self._settings.default_agent_key
-        root, graph = await self._store.load_graph(agent_key)
+        if pinned is None:
+            root, graph = await self._store.load_graph(agent_key)
+        else:
+            if agent_key != pinned.agent_key:
+                raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+            graph = {
+                identifier: ConfigVersion(
+                    id=identifier,
+                    kind=cast(ConfigKind, value["kind"]),
+                    key=str(value["key"]),
+                    content=parse_config(cast(ConfigKind, value["kind"]), value["content"]),
+                )
+                for identifier, value in pinned.configurations.items()
+            }
+            if pinned.version not in graph:
+                raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
+            root = graph[pinned.version]
         agent = root.content
         if not isinstance(agent, AgentConfig):
             raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
@@ -151,6 +176,8 @@ class DatabaseConfigReader:
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
 
         def render(prompt: PromptConfig) -> str:
+            if not render_prompts:
+                return prompt.text
             values = request.context.model_dump()
             if any(values[name] is None for name in prompt.variables):
                 raise ConfigError("AGENT_PROMPT_CONTEXT_REQUIRED")
@@ -225,8 +252,12 @@ class DatabaseConfigReader:
         scope = tuple(str(value) for value in agent.knowledge_scope)
         knowledge_versions: tuple[str, ...] = ()
         if real and scope and self._knowledge_store is not None:
-            knowledge_versions = tuple(
-                row["id"] for row in await self._knowledge_store.active(list(scope), None)
+            knowledge_versions = (
+                pinned.knowledge_versions
+                if pinned is not None
+                else tuple(
+                    row["id"] for row in await self._knowledge_store.active(list(scope), None)
+                )
             )
             if "retrieve_knowledge" in self._registry.names():
                 permitted_tools.add("retrieve_knowledge")

@@ -13,8 +13,27 @@ services:
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
       - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/502_create_agent_configuration.sql:ro
       - ../../migrations/agent/000003_create_model_provider.up.sql:/docker-entrypoint-initdb.d/503_create_model_provider.sql:ro
+      - ../../migrations/agent/000004_create_knowledge.up.sql:/docker-entrypoint-initdb.d/504_create_knowledge.sql:ro
+      - ../../migrations/agent/000005_create_eval.up.sql:/docker-entrypoint-initdb.d/505_create_eval_datasets.sql:ro
+      - ../../migrations/agent/000006_create_eval_runs.up.sql:/docker-entrypoint-initdb.d/506_create_eval_runs.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/minio.Dockerfile
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "127.0.0.1:${AGENT_TEST_MINIO_PORT}:9000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -33,6 +52,8 @@ services:
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
       AGENT_ADMIN_ENABLED: true
+      AGENT_EVAL_PRINCIPALS: '{"student_a":88501}'
+      AGENT_RAG_MINIO_ENDPOINT: minio:9000
       AGENT_RUNTIME_MODE: "${AGENT_TEST_RUNTIME_MODE:-langgraph_fake}"
       AGENT_CONFIG_MODE: database
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/keys/gateway-public.pem

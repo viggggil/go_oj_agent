@@ -8,7 +8,7 @@ from time import monotonic
 from typing import Any, Protocol
 from uuid import UUID
 
-from app.core.runtime_config import ConfigSnapshotReader
+from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader
 from app.graphs.runtime import AgentRuntime
 from app.models.provider import MODEL_ERROR_CODES, ModelFailure
 from app.models.runtime import (
@@ -114,12 +114,31 @@ class RunService:
         self._reader = config_reader
         self._cleanup_timeout = cleanup_timeout_seconds
 
+    def with_store(self, store: RuntimeStore) -> "RunService":
+        """共享 Runtime 和配置解析器，使用独立用途的持久化边界。"""
+        return RunService(
+            store,
+            self._runtime,
+            self._reader,
+            cleanup_timeout_seconds=self._cleanup_timeout,
+        )
+
+    @property
+    def config_reader(self) -> ConfigSnapshotReader:
+        return self._reader
+
     async def initialize(self) -> int:
         """仅允许单实例，在开始接受运行前中断旧进程遗留的 RUNNING。"""
         return await self._store.interrupt_running_runs()
 
-    async def accept(self, request: ChatRequest, principal: Principal) -> AcceptedRun:
-        snapshot = await self._reader.read(request, principal)
+    async def accept(
+        self,
+        request: ChatRequest,
+        principal: Principal,
+        *,
+        snapshot: ConfigSnapshot | None = None,
+    ) -> AcceptedRun:
+        snapshot = snapshot or await self._reader.read(request, principal)
         # 上次终态持久化失败的 Run 会在 deadline 之后释放活动关联。
         await self._store.expire_running_runs()
         now = utc_now()
@@ -212,6 +231,7 @@ class RunService:
                 elif event.type == "done":
                     if not answer.strip():
                         raise RuntimeFailure("AGENT_RUNTIME_INCOMPLETE")
+                    state.model_summary = runtime_state.model_summary
                     await asyncio.wait_for(
                         self._store.finish_run(
                             user_id=state.user_id,

@@ -80,6 +80,9 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 
 func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) bool {
 	if strings.Contains(path, "/runs") {
+		if strings.Contains(path, "/results/") {
+			return len(payload) == 1 && validEvalResult(payload["result"], true)
+		}
 		if strings.HasSuffix(path, "/results") {
 			return validEvalResultsPage(payload)
 		}
@@ -206,12 +209,28 @@ func validEvalResultsPage(payload map[string]json.RawMessage) bool {
 		return false
 	}
 	for _, value := range items {
-		object, valid := agentJSONFields(value, "id run_id case_id attempt status checks created_at", "answer model_summary error_code latency_ms finished_at")
-		if !valid || !agentJSONTypes(object, "id run_id case_id status created_at", "", "attempt") || !agentJSONObject(object["checks"]) || !agentJSONNullable(object["answer"], new(string)) || !agentJSONNullable(object["model_summary"], &map[string]any{}) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["latency_ms"], new(int64)) || !agentJSONNullable(object["finished_at"], new(string)) {
+		if !validEvalResult(value, false) {
 			return false
 		}
 	}
 	return true
+}
+
+func validEvalResult(value json.RawMessage, detail bool) bool {
+	fields := "id run_id case_id attempt status checks created_at error_code latency_ms finished_at"
+	if detail {
+		fields += " answer model_summary"
+	} else {
+		fields += " answer_preview"
+	}
+	object, valid := agentJSONFields(value, fields, "")
+	if !valid || !agentJSONTypes(object, "id run_id case_id status created_at", "", "attempt") || !agentJSONObject(object["checks"]) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["latency_ms"], new(int64)) || !agentJSONNullable(object["finished_at"], new(string)) {
+		return false
+	}
+	if detail {
+		return agentJSONNullable(object["answer"], new(string)) && agentJSONNullable(object["model_summary"], &map[string]any{})
+	}
+	return agentJSONRequired(object["answer_preview"], new(string))
 }
 
 func validAgentHistory(path string, payload map[string]json.RawMessage) bool {

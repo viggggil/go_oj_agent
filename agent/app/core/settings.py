@@ -24,6 +24,22 @@ class Settings(BaseSettings):
     )
 
     rag_enabled: bool = False
+    # 仅由部署配置提供账号别名；请求正文不能声明任意用户 ID 或管理员角色。
+    eval_principals: dict[str, int] = Field(default_factory=dict, max_length=20)
+    eval_max_pending_runs: int = Field(default=20, ge=1, le=100)
+
+    @field_validator("eval_principals")
+    @classmethod
+    def validate_eval_principals(cls, value: dict[str, int]) -> dict[str, int]:
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", key) or user_id <= 0
+            for key, user_id in value.items()
+        ):
+            raise ValueError("Invalid eval principal aliases")
+        return value
+
     rag_embedding_url: str = "http://embedding:8001"
     rag_qdrant_url: str = "http://qdrant:6333"
     rag_minio_endpoint: str = "minio:9000"

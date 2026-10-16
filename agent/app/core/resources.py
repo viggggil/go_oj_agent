@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.chat import ChatController
     from app.core.auth import DelegationVerifier
     from app.core.management import ManagementService
+    from app.evals.runner import EvalRunner
     from app.evals.store import EvalStore
     from app.rag.service import KnowledgeService
     from app.storage.repository import AgentStore
@@ -31,6 +32,7 @@ class AppResources:
     store: "AgentStore | None" = None
     rag: "KnowledgeService | None" = None
     evals: "EvalStore | None" = None
+    eval_runner: "EvalRunner | None" = None
 
 
 def get_resources(request: Request) -> AppResources:

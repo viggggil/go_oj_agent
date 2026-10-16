@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import Select, and_, func, insert, select, update
@@ -46,6 +46,7 @@ class ConversationRecord:
     agent_key: str | None
     created_at: datetime
     updated_at: datetime
+    purpose: str = "chat"
 
 
 @dataclass(frozen=True)
@@ -83,9 +84,16 @@ def utc_now() -> datetime:
 
 
 class AgentStore:
-    def __init__(self, engine: AsyncEngine, *, clock: Callable[[], datetime] = utc_now) -> None:
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        *,
+        clock: Callable[[], datetime] = utc_now,
+        purpose: Literal["chat", "eval"] = "chat",
+    ) -> None:
         if engine.url.database != "oj_agent" or engine.url.drivername != "mysql+asyncmy":
             raise ValueError("Agent store requires its own oj_agent MySQL schema")
+        self._purpose = purpose
         self._engine = engine
         self._clock = clock
 
@@ -107,11 +115,14 @@ class AgentStore:
                     user_id=user_id,
                     title=title,
                     agent_key=agent_key,
+                    purpose=self._purpose,
                     created_at=now,
                     updated_at=now,
                 )
             )
-        return ConversationRecord(conversation_id, user_id, title, agent_key, now, now)
+        return ConversationRecord(
+            conversation_id, user_id, title, agent_key, now, now, self._purpose
+        )
 
     async def get_conversation(
         self, user_id: int, conversation_id: str | UUID
@@ -124,6 +135,7 @@ class AgentStore:
                             and_(
                                 agent_conversations.c.id == str(conversation_id),
                                 agent_conversations.c.user_id == user_id,
+                                agent_conversations.c.purpose == self._purpose,
                             )
                         )
                     )
@@ -167,7 +179,10 @@ class AgentStore:
             total = await connection.scalar(
                 select(func.count())
                 .select_from(agent_conversations)
-                .where(agent_conversations.c.user_id == user_id)
+                .where(
+                    agent_conversations.c.user_id == user_id,
+                    agent_conversations.c.purpose == self._purpose,
+                )
             )
             rows = (
                 (
@@ -180,7 +195,10 @@ class AgentStore:
                             ).label("title"),
                             agent_conversations.c.updated_at,
                         )
-                        .where(agent_conversations.c.user_id == user_id)
+                        .where(
+                            agent_conversations.c.user_id == user_id,
+                            agent_conversations.c.purpose == self._purpose,
+                        )
                         .order_by(
                             agent_conversations.c.updated_at.desc(), agent_conversations.c.id.desc()
                         )
@@ -300,6 +318,7 @@ class AgentStore:
                         user_id=user_id,
                         agent_key=agent_key,
                         title=content.strip()[:80],
+                        purpose=self._purpose,
                         created_at=now,
                         updated_at=now,
                     )
@@ -457,8 +476,15 @@ class AgentStore:
             row = (
                 (
                     await connection.execute(
-                        select(*_RUN_COLUMNS).where(
-                            and_(agent_runs.c.id == str(run_id), agent_runs.c.user_id == user_id)
+                        select(*_RUN_COLUMNS)
+                        .join(
+                            agent_conversations,
+                            agent_conversations.c.id == agent_runs.c.conversation_id,
+                        )
+                        .where(
+                            agent_runs.c.id == str(run_id),
+                            agent_runs.c.user_id == user_id,
+                            agent_conversations.c.purpose == self._purpose,
                         )
                     )
                 )
@@ -499,6 +525,7 @@ class AgentStore:
                     and_(
                         agent_conversations.c.id == str(conversation_id),
                         agent_conversations.c.user_id == user_id,
+                        agent_conversations.c.purpose == self._purpose,
                     )
                 )
                 .with_for_update()

@@ -100,6 +100,8 @@ class ToolSession:
                 raise ModelFailure("AGENT_MODEL_TIMEOUT")
             self.tool_calls += 1
             self.seen_call_ids.add(call.call_id)
+            if state.model_summary is not None and call.name not in state.model_summary.tools:
+                state.model_summary.tools.append(call.name)
             result = await executor.execute(
                 call.name,
                 parsed,

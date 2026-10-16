@@ -658,8 +658,13 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 当前数据集阶段已落地 `migrations/agent/000005_create_eval`：
 `agent_eval_datasets` 保存数据集元数据、内容哈希和 MinIO 原文对象键，
 `agent_eval_cases` 保存严格校验后的 Case 投影。原始 JSONL 不进入数据库；同一内容哈希
-重复上传只返回已有数据集。评测运行、结果和人工评审表在后续阶段增加，运行配置必须固定
-具体 Agent/Prompt/Skill/Model/知识版本。
+重复上传只返回已有数据集。`migrations/agent/000006_create_eval_runs` 增加运行和结果表；
+运行配置固定具体 Agent/Prompt/Skill/Model/知识版本，Runner 通过普通 Runtime 执行每个 Case，
+并保存程序化硬门禁检查、回答摘要、延迟和错误码。`agent_conversations.purpose` 默认 chat，
+历史数据保留为 chat；Eval 使用 eval，普通仓储统一在列表、详情、Run 查询和写入锁检查用途，
+避免评测账号通过普通历史 API 读取原始评测内容。索引 `(user_id,purpose,updated_at,id)` 支持
+隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审与评审 Agent
+结果仍由后续迁移增加。单实例重启中断遗留批次并保留已完成结果，尚无跨实例续跑。
 
 ### `agent_runs` / `agent_run_events`
 

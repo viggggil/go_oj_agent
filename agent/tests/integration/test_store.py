@@ -324,12 +324,18 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000006_create_eval_runs", "down"),
+            ("000005_create_eval", "down"),
+            ("000004_create_knowledge", "down"),
             ("000003_create_model_provider", "down"),
             ("000002_create_agent_configuration", "down"),
             ("000001_create_agent_runtime", "down"),
             ("000001_create_agent_runtime", "up"),
             ("000002_create_agent_configuration", "up"),
             ("000003_create_model_provider", "up"),
+            ("000004_create_knowledge", "up"),
+            ("000005_create_eval", "up"),
+            ("000006_create_eval_runs", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):
