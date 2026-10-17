@@ -173,9 +173,9 @@ test('真实 Gateway 与 MySQL 保存页面配置，历史绑定可查并用于 
   await page.getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.getByRole('status')).toHaveText('回答完成')
   await expect(page.locator('.assistant')).toContainText('中文算法回答')
-  // 页面配置只读模式，真实 Gateway → Responses mock → 带身份的 gRPC → 模型回答。
+  // 统一 ReAct 下只需授权工具，真实 Gateway → Responses mock → 带身份的 gRPC → 模型回答。
   await page.goto('/agent/skills/' + skillKey + '/edit')
-  await page.getByRole('combobox', { name: '回答方式', exact: true }).selectOption('react')
+  await expect(page.getByRole('combobox', { name: '回答方式', exact: true })).toHaveCount(0)
   await page.getByText('高级设置', { exact: true }).click()
   await page.getByRole('checkbox', { name: /^get_problem/ }).check()
   await page.getByRole('button', { name: '保存新版本', exact: true }).click()
