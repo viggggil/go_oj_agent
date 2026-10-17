@@ -10,6 +10,12 @@ from uuid import uuid4
 
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader, DatabaseConfigReader
 from app.evals.models import EvalCase, EvalRunCreate
+from app.evals.reviewer import (
+    REVIEWER_AGENT_KEY,
+    parse_reviewer_output,
+    reviewer_input,
+    validate_reviewer_snapshot,
+)
 from app.evals.store import EvalStore
 from app.graphs.service import RunService
 from app.models.configuration import ConfigError
@@ -36,11 +42,15 @@ class EvalRunner:
         self.max_pending_runs = max_pending_runs
         self._create_lock = asyncio.Lock()
         self._case_slots = asyncio.Semaphore(max_concurrent_cases)
+        self._review_slots = asyncio.Semaphore(max_concurrent_cases)
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._review_tasks: dict[str, asyncio.Task[None]] = {}
         self._cancel_events: dict[str, asyncio.Event] = {}
 
     async def initialize(self) -> int:
-        return await self.store.recover_orphaned_runs()
+        recovered = await self.store.recover_orphaned_runs()
+        await self.store.recover_orphaned_model_reviews()
+        return recovered
 
     async def close(self) -> None:
         tasks = list(self._tasks.values())
@@ -49,6 +59,12 @@ class EvalRunner:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
+        review_tasks = list(self._review_tasks.values())
+        for task in review_tasks:
+            task.cancel()
+        if review_tasks:
+            await asyncio.gather(*review_tasks, return_exceptions=True)
+        self._review_tasks.clear()
 
     async def create(self, body: EvalRunCreate, principal: Principal) -> dict[str, Any]:
         fingerprint = hashlib.sha256(
@@ -66,15 +82,83 @@ class EvalRunner:
                 snapshot = await self.reader.read(request, principal, render_prompts=False)
             else:
                 snapshot = await self.reader.read(request, principal)
+            reviewer_snapshot = None
+            if body.mode == "programmatic_review":
+                if (
+                    not isinstance(self.reader, DatabaseConfigReader)
+                    or body.reviewer_agent_key != REVIEWER_AGENT_KEY
+                ):
+                    raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
+                reviewer_request = ChatRequest(
+                    agent_key=REVIEWER_AGENT_KEY,
+                    message="离线评审配置校验",
+                )
+                reviewer_snapshot = await self.reader.read(reviewer_request, principal)
+                validate_reviewer_snapshot(reviewer_snapshot)
             result = await self.store.create_run(
-                body, principal, snapshot.model_dump(mode="json"), principal.request_id, fingerprint
+                body,
+                principal,
+                snapshot.model_dump(mode="json"),
+                principal.request_id,
+                fingerprint,
+                reviewer_snapshot.model_dump(mode="json") if reviewer_snapshot else None,
             )
             if not result["duplicate"]:
                 run_id = result["run"]["id"]
                 self._cancel_events[run_id] = asyncio.Event()
                 self._tasks[run_id] = asyncio.create_task(
-                    self._run(run_id, body, snapshot, principal)
+                    self._run(run_id, body, snapshot, principal, reviewer_snapshot)
                 )
+            return result
+
+    async def retry_model_review(
+        self, result_id: str, expected_attempt: int, principal: Principal
+    ) -> dict[str, Any]:
+        async with self._create_lock:
+            if len(self._review_tasks) >= self.max_pending_runs:
+                raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503)
+            result = await self.store.begin_model_review(
+                result_id, principal, expected_attempt, retry=True
+            )
+            if result["duplicate"]:
+                return result
+            attempt = int(result["attempt"]["attempt"])
+            try:
+                context = await self.store.review_context(result_id)
+                snapshot_data = context.get("reviewer_config_snapshot")
+                if context.get("mode") != "programmatic_review" or not isinstance(
+                    snapshot_data, dict
+                ):
+                    raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
+                reviewer_snapshot = ConfigSnapshot.model_validate(snapshot_data)
+                validate_reviewer_snapshot(reviewer_snapshot)
+                coroutine = self._execute_model_review(
+                    result_id,
+                    attempt,
+                    EvalCase.model_validate(context["case"]),
+                    str(context["answer"] or ""),
+                    context["checks"],
+                    ModelSummary.model_validate(context["model_summary"])
+                    if context["model_summary"]
+                    else None,
+                    reviewer_snapshot,
+                    principal.model_copy(update={"request_id": str(uuid4())}),
+                )
+                try:
+                    task = asyncio.create_task(coroutine)
+                except BaseException:
+                    coroutine.close()
+                    raise
+                key = f"{result_id}:{attempt}"
+                self._review_tasks[key] = task
+                task.add_done_callback(lambda _task: self._review_tasks.pop(key, None))
+            except BaseException:
+                await asyncio.shield(
+                    self.store.finish_model_review(
+                        result_id, attempt, None, "AGENT_EVAL_REVIEW_UNAVAILABLE"
+                    )
+                )
+                raise
             return result
 
     async def cancel(self, run_id: str, expected_version: int, request_id: str) -> dict[str, Any]:
@@ -103,6 +187,7 @@ class EvalRunner:
         body: EvalRunCreate,
         snapshot: ConfigSnapshot,
         principal: Principal,
+        reviewer_snapshot: ConfigSnapshot | None,
     ) -> None:
         try:
             await self.store.mark_running(run_id)
@@ -119,6 +204,7 @@ class EvalRunner:
                         snapshot,
                         principal,
                         self._cancel_events[run_id],
+                        reviewer_snapshot,
                     )
 
             tasks = [
@@ -166,6 +252,7 @@ class EvalRunner:
         snapshot: ConfigSnapshot,
         principal: Principal,
         cancel_event: asyncio.Event,
+        reviewer_snapshot: ConfigSnapshot | None,
     ) -> None:
         started = monotonic()
         answer: list[str] = []
@@ -256,14 +343,20 @@ class EvalRunner:
             error_code = "AGENT_EVAL_CASE_FAILED"
         text = "\n\n".join(answer)
         checks = self._grade(case, text, status, error_code, summary)
+        result_id = str(uuid4())
         await self.store.add_result(
             run_id,
             {
-                "id": str(uuid4()),
+                "id": result_id,
                 "run_id": run_id,
                 "case_id": case.id,
                 "attempt": attempt,
                 "status": status,
+                "model_review_status": (
+                    "SKIPPED" if status != "COMPLETED" or checks.get("hard_fail") else "PENDING"
+                )
+                if reviewer_snapshot is not None
+                else "NOT_REQUESTED",
                 "answer": text[:32_000] or None,
                 "checks": checks,
                 "model_summary": summary.model_dump(mode="json") if summary is not None else None,
@@ -273,6 +366,125 @@ class EvalRunner:
                 "finished_at": self.store.clock(),
             },
         )
+        if reviewer_snapshot is not None:
+            if status != "COMPLETED" or checks.get("hard_fail"):
+                return
+            review_principal = principal.model_copy(update={"request_id": str(uuid4())})
+            started_review = await self.store.begin_model_review(
+                result_id, review_principal, 0, retry=False
+            )
+            await self._execute_model_review(
+                result_id,
+                int(started_review["attempt"]["attempt"]),
+                case,
+                text[:32_000],
+                checks,
+                summary,
+                reviewer_snapshot,
+                review_principal,
+                cancel_event,
+            )
+
+    async def _execute_model_review(
+        self,
+        result_id: str,
+        attempt: int,
+        case: EvalCase,
+        answer: str,
+        checks: dict[str, Any],
+        summary: ModelSummary | None,
+        reviewer_snapshot: ConfigSnapshot,
+        principal: Principal,
+        cancel_event: asyncio.Event | None = None,
+    ) -> None:
+        review: dict[str, Any] | None = None
+        error_code: str | None = None
+        try:
+            async with (
+                self._review_slots,
+                asyncio.timeout(reviewer_snapshot.budget.max_run_seconds),
+            ):
+                review = await self._call_reviewer(
+                    case, answer, checks, summary, reviewer_snapshot, principal, cancel_event
+                )
+        except asyncio.CancelledError:
+            error_code = "AGENT_EVAL_REVIEW_UNAVAILABLE"
+            raise
+        except Exception as exc:
+            error_code = (
+                exc.code
+                if isinstance(exc, ConfigError)
+                and exc.code in {"AGENT_EVAL_REVIEW_INVALID", "AGENT_EVAL_REVIEW_INPUT_INVALID"}
+                else "AGENT_EVAL_REVIEW_UNAVAILABLE"
+            )
+            logger.info(
+                "Eval model review unavailable",
+                extra={
+                    "result_id": result_id,
+                    "attempt": attempt,
+                    "error_type": type(exc).__name__,
+                },
+            )
+        finally:
+            finish = asyncio.create_task(
+                self.store.finish_model_review(result_id, attempt, review, error_code)
+            )
+            await asyncio.shield(finish)
+
+    async def _call_reviewer(
+        self,
+        case: EvalCase,
+        answer: str,
+        checks: dict[str, Any],
+        summary: ModelSummary | None,
+        reviewer_snapshot: ConfigSnapshot,
+        principal: Principal,
+        cancel_event: asyncio.Event | None,
+    ) -> dict[str, Any]:
+        request = ChatRequest(
+            agent_key=REVIEWER_AGENT_KEY,
+            message=reviewer_input(case, answer, checks, summary),
+        )
+        turn_snapshot = reviewer_snapshot
+        if isinstance(self.reader, DatabaseConfigReader):
+            turn_snapshot = await self.reader.read(request, principal, pinned=reviewer_snapshot)
+        accepted = await self.service.accept(request, principal, snapshot=turn_snapshot)
+        output: list[str] = []
+        completed = False
+        async with accepted:
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise ConfigError("AGENT_EVAL_REVIEW_UNAVAILABLE", 503)
+                next_event = asyncio.ensure_future(anext(accepted.events))
+                cancelled = asyncio.create_task(cancel_event.wait()) if cancel_event else None
+                try:
+                    if cancelled is not None:
+                        done, _ = await asyncio.wait(
+                            {next_event, cancelled}, return_when=asyncio.FIRST_COMPLETED
+                        )
+                        if cancelled in done:
+                            raise ConfigError("AGENT_EVAL_REVIEW_UNAVAILABLE", 503)
+                    event = await next_event
+                except StopAsyncIteration:
+                    break
+                finally:
+                    pending = [next_event] + ([cancelled] if cancelled else [])
+                    for task in pending:
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                if event.type == "token":
+                    output.append(str(event.data.get("text", "")))
+                elif event.type == "error":
+                    raise ConfigError(
+                        str(event.data.get("code", "AGENT_EVAL_REVIEW_UNAVAILABLE")), 503
+                    )
+                elif event.type == "done":
+                    completed = True
+                    break
+        if not completed:
+            raise ConfigError("AGENT_EVAL_REVIEW_UNAVAILABLE", 503)
+        return parse_reviewer_output("".join(output), case.id)
 
     @staticmethod
     def _grade(

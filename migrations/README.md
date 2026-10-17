@@ -67,3 +67,9 @@ Down 首先拒绝仍有 Provider 配置的库，避免孤立 Model 引用。清�
 审计 `(result_id,version)`、request UUID 均唯一，操作者、旧值、新值、原因和当前评分在同一事务保存。
 迁移先于 Agent/Gateway/Web 部署；Compose 升级入口检测新表和两列，遇到部分结构拒绝继续。
 已有运行/结果保留，旧应用可忽略新列。down 删除人工评分和审计，不删除数据集、运行结果、程序检查或普通聊天；审计数据无法由 down 恢复。
+
+### Agent Eval 模型评审
+
+`agent/000008_create_eval_model_reviews` 为运行保存评审 Agent 快照，为结果保存模型评审状态、
+严格 JSON 评分和错误码，并以追加表记录每次尝试。迁移必须在新版 Agent/Gateway/Web 部署前执行；
+旧应用可以忽略新增列和表。`down` 会清空运行中的评审绑定并删除模型评审结果，保留运行、回答和程序检查。

@@ -3,7 +3,7 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EvalDatasetInvalid(ValueError):
@@ -80,9 +80,16 @@ class EvalRunCreate(BaseModel):
 
     dataset_id: UUID
     agent_key: str = Field(min_length=2, max_length=64, pattern=r"^[a-z][a-z0-9_]{1,63}$")
-    mode: Literal["programmatic"] = "programmatic"
+    mode: Literal["programmatic", "programmatic_review"] = "programmatic"
+    reviewer_agent_key: Literal["eval_reviewer"] | None = None
     repeat_count: int = Field(default=1, ge=1, le=3, strict=True)
     concurrency: int = Field(default=1, ge=1, le=8, strict=True)
+
+    @model_validator(mode="after")
+    def reviewer_mode_binding(self) -> "EvalRunCreate":
+        if (self.mode == "programmatic_review") != (self.reviewer_agent_key is not None):
+            raise ValueError("Reviewer Agent is required only for programmatic_review")
+        return self
 
 
 class EvalRunPage(EvalPage):
@@ -135,6 +142,48 @@ class EvalReviewWrite(BaseModel):
 
 
 class EvalReviewPage(EvalPage):
+    page_size: int = Field(default=10, ge=1, le=20)
+
+
+class EvalModelReview(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    case_id: str = Field(min_length=1, max_length=128)
+    passed: bool = Field(alias="pass")
+    scores: EvalScores
+    hard_fail: bool
+    violations: list[str] = Field(max_length=32)
+    missing_facts: list[str] = Field(max_length=64)
+    reason: str = Field(min_length=1, max_length=1024)
+
+    @field_validator("violations", "missing_facts")
+    @classmethod
+    def bounded_review_items(cls, values: list[str]) -> list[str]:
+        if any(not item.strip() or len(item) > 256 for item in values):
+            raise ValueError("Invalid review item")
+        return values
+
+    @field_validator("reason")
+    @classmethod
+    def meaningful_review_reason(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Review reason cannot be blank")
+        return value
+
+    @model_validator(mode="after")
+    def hard_failure_cannot_pass(self) -> "EvalModelReview":
+        if self.hard_fail and self.passed:
+            raise ValueError("A hard failure cannot pass")
+        return self
+
+
+class EvalModelReviewRetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_attempt: int = Field(ge=0, strict=True)
+
+
+class EvalModelReviewPage(EvalPage):
     page_size: int = Field(default=10, ge=1, le=20)
 
 

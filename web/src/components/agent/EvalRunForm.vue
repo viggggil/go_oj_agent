@@ -51,10 +51,23 @@
           没有普通用户可用的 Agent，请先在 Agent 管理中配置。
         </p>
         <label
-          >评测模式<select disabled>
-            <option>程序化评测</option>
+          >评测模式<select v-model="form.mode" aria-label="评测模式">
+            <option value="programmatic">程序化评测</option>
+            <option value="programmatic_review">程序化评测 + 评审 Agent</option>
           </select></label
         >
+        <label v-if="form.mode === 'programmatic_review'"
+          >评审 Agent<select v-model="form.reviewer_agent_key" aria-label="评审 Agent" required>
+            <option v-if="reviewerReady" value="eval_reviewer">
+              Eval 专用评审员（deepseek-v4-pro）
+            </option>
+          </select></label
+        >
+        <p v-if="reviewerLoading" class="muted">正在检查评审 Agent 配置…</p>
+        <p v-if="reviewerError" class="error" role="alert">{{ reviewerError }}</p>
+        <p v-if="form.mode === 'programmatic_review'" class="muted">
+          评审配置在本批次启动时固定；每个结果只传入有界回答摘要，不含题目参考回答或凭据。
+        </p>
         <div class="eval-score-grid">
           <label
             >并发度<input
@@ -86,7 +99,15 @@
       <div class="agent-form-actions">
         <button type="button" class="secondary" :disabled="saving" @click="$emit('close')">
           取消创建</button
-        ><button :disabled="saving || !form.dataset_id || !form.agent_key">
+        ><button
+          :disabled="
+            saving ||
+            reviewerLoading ||
+            !form.dataset_id ||
+            !form.agent_key ||
+            (form.mode === 'programmatic_review' && (!form.reviewer_agent_key || !reviewerReady))
+          "
+        >
           {{ saving ? '创建中…' : '启动评测' }}
         </button>
       </div>
@@ -94,7 +115,7 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+  import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
   import { agentApi, agentError, agentStatus } from '../../agent/api'
   import { evalApi, type EvalDataset, type EvalRunWrite } from '../../agent/evals'
   import type { AgentContent, Summary } from '../../agent/types'
@@ -107,6 +128,7 @@
     dataset_id: props.datasetId || '',
     agent_key: '',
     mode: 'programmatic',
+    reviewer_agent_key: undefined,
     concurrency: 1,
     repeat_count: 1,
   })
@@ -121,6 +143,9 @@
     error = ref(''),
     agentPreview = ref<Record<string, unknown>>()
   const chosenDataset = computed(() => datasets.value.find((item) => item.id === form.dataset_id))
+  const reviewerReady = ref(false),
+    reviewerLoading = ref(false),
+    reviewerError = ref('')
   let pending: { fingerprint: string; id: string } | undefined
   let previewGeneration = 0
   async function failed(cause: unknown) {
@@ -183,6 +208,41 @@
       if (generation === previewGeneration) await failed(cause)
     }
   }
+  async function loadReviewer() {
+    reviewerReady.value = false
+    form.reviewer_agent_key = undefined
+    reviewerError.value = ''
+    reviewerLoading.value = true
+    try {
+      const { data } = await agentApi.detail(
+        'agents',
+        'eval_reviewer',
+        undefined,
+        controller.signal,
+      )
+      if (controller.signal.aborted || form.mode !== 'programmatic_review') return
+      const config = data.configuration.content as AgentContent
+      if (
+        data.configuration.disabled ||
+        config.visibility !== 'admin' ||
+        config.is_test ||
+        config.allowed_tools.length > 0 ||
+        config.knowledge_scope.length > 0
+      ) {
+        reviewerError.value = 'Eval 专用评审 Agent 配置不满足无工具、无知识库的限制。'
+        return
+      }
+      reviewerReady.value = true
+      form.reviewer_agent_key = 'eval_reviewer'
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        reviewerError.value = agentError(cause)
+        if (agentStatus(cause) === 403) await failed(cause)
+      }
+    } finally {
+      reviewerLoading.value = false
+    }
+  }
   async function create() {
     if (saving.value) return
     saving.value = true
@@ -210,5 +270,16 @@
       }
     }
   })
+  watch(
+    () => form.mode,
+    (mode) => {
+      if (mode === 'programmatic_review') void loadReviewer()
+      else {
+        reviewerReady.value = false
+        reviewerError.value = ''
+        form.reviewer_agent_key = undefined
+      }
+    },
+  )
   onBeforeUnmount(() => controller.abort())
 </script>

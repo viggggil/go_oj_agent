@@ -382,6 +382,49 @@ test('Eval 页面创建运行、保留冲突草稿、重放丢失响应的评分
   await expect(
     page.getByLabel('人工结论', { exact: true }).getByRole('option', { name: '通过', exact: true }),
   ).toHaveJSProperty('disabled', true)
+  const modelDataset = await request.post(gateway! + base + '/datasets', {
+    headers: { ...headers, 'X-Request-ID': randomUUID() },
+    data: {
+      name: name + '_model',
+      content: JSON.stringify({
+        ...sample,
+        id: 'browser_model_' + randomUUID(),
+        turns: [{ role: 'user', content: 'review-invalid-once' }],
+        expectations: {},
+      }),
+    },
+  })
+  expect(modelDataset.ok()).toBe(true)
+  await page.goto('/agent/eval?tab=runs&dataset=' + (await modelDataset.json()).dataset.id)
+  await page.getByLabel('被测 Agent', { exact: true }).selectOption('learning_assistant')
+  await page.getByLabel('评测模式', { exact: true }).selectOption('programmatic_review')
+  await expect(page.getByLabel('评审 Agent', { exact: true })).toHaveValue('eval_reviewer')
+  await page.getByRole('button', { name: '启动评测', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'learning_assistant · 执行完成', exact: true }),
+  ).toBeVisible({ timeout: 20_000 })
+  await page.getByRole('button', { name: '查看与评分', exact: true }).click()
+  await expect(result).toContainText('AGENT_EVAL_REVIEW_INVALID')
+  await page.getByLabel('评审备注', { exact: true }).fill('模型重跑时保留我的人工草稿')
+  let retrySubmitted = false,
+    pollFailed = false
+  await page.route('**/evals/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/review-agent')) retrySubmitted = true
+    if (retrySubmitted && !pollFailed && /\/runs\/[^/]+\/results\/[^/]+$/.test(path)) {
+      pollFailed = true
+      return route.fulfill({ status: 503, json: { reason: 'AGENT_UNAVAILABLE' } })
+    }
+    return route.fallback()
+  })
+  await page.getByRole('button', { name: '重跑评审 Agent', exact: true }).click()
+  await expect(result).toContainText('模型通过', { timeout: 15_000 })
+  expect(pollFailed).toBe(true)
+  await expect(page.getByLabel('评审备注', { exact: true })).toHaveValue(
+    '模型重跑时保留我的人工草稿',
+  )
+  await result.getByText('评审尝试记录', { exact: true }).click()
+  await expect(result).toContainText('第 2 次 · COMPLETED')
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

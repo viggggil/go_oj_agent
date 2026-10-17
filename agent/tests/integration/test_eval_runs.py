@@ -179,6 +179,127 @@ async def test_gateway_eval_multiturn_isolation_idempotency_and_permissions(
         await engine.dispose()
 
 
+async def test_model_review_strict_json_unavailable_and_retry(http: httpx.AsyncClient) -> None:
+    if os.environ.get("AGENT_TEST_MODEL_MODE") != "true":
+        pytest.skip("Requires the Responses model phase")
+    dataset_id = await upload(http, [sample("review_retry", "review-invalid-once")])
+    response = await http.post(
+        BASE + "/runs",
+        json={
+            "dataset_id": dataset_id,
+            "agent_key": "learning_assistant",
+            "mode": "programmatic_review",
+            "reviewer_agent_key": "eval_reviewer",
+        },
+        headers={"X-Request-ID": str(uuid4())},
+    )
+    assert response.status_code == 200, response.text
+    run = await finished(http, response.json()["run"]["id"])
+    assert run["status"] == "COMPLETED"
+    result = (await http.get(BASE + f"/runs/{run['id']}/results")).json()["items"][0]
+    detail = (await http.get(BASE + f"/runs/{run['id']}/results/{result['id']}")).json()["result"]
+    assert detail["model_review_status"] == "UNAVAILABLE"
+    assert detail["effective_pass"] is False
+    retry_request_id = str(uuid4())
+    retry = await http.post(
+        BASE + f"/results/{result['id']}/review-agent",
+        json={"expected_attempt": 1},
+        headers={"X-Request-ID": retry_request_id},
+    )
+    assert retry.status_code == 200, retry.text
+    async with asyncio.timeout(10):
+        while True:
+            detail = await http.get(BASE + f"/runs/{run['id']}/results/{result['id']}")
+            value = detail.json()["result"]
+            if value["model_review_status"] not in {"RUNNING", "PENDING"}:
+                break
+            await asyncio.sleep(0.05)
+    assert value["model_review_status"] == "COMPLETED", value
+    assert value["model_review"]["case_id"] == "review_retry"
+    assert value["effective_pass"] is True
+    attempts = await http.get(BASE + f"/results/{result['id']}/model-reviews")
+    assert attempts.status_code == 200
+    assert [item["attempt"] for item in attempts.json()["items"]] == [2, 1]
+    replay = await http.post(
+        BASE + f"/results/{result['id']}/review-agent",
+        json={"expected_attempt": 1},
+        headers={"X-Request-ID": retry_request_id},
+    )
+    assert replay.status_code == 200 and replay.json()["duplicate"]
+
+
+async def test_model_reviews_reject_bad_schema_skip_hard_failure_and_enforce_permissions(
+    http: httpx.AsyncClient,
+) -> None:
+    if os.environ.get("AGENT_TEST_MODEL_MODE") != "true":
+        pytest.skip("Requires the Responses model phase")
+    suffix = uuid4().hex
+    dataset_id = await upload(
+        http,
+        [
+            sample("review_good_" + suffix, "review-success"),
+            sample("review_wrong_" + suffix, "review-wrong-id"),
+            sample("review_extra_" + suffix, "review-extra-key"),
+            sample("review_error_" + suffix, "review-error-once"),
+            sample("review_hard_" + suffix, fixture={"principal": "missing"}),
+        ],
+    )
+    body = {
+        "dataset_id": dataset_id,
+        "agent_key": "learning_assistant",
+        "mode": "programmatic_review",
+        "reviewer_agent_key": "eval_reviewer",
+        "concurrency": 2,
+    }
+    response = await http.post(BASE + "/runs", json=body, headers={"X-Request-ID": str(uuid4())})
+    assert response.status_code == 200, response.text
+    run = await finished(http, response.json()["run"]["id"])
+    rows = (await http.get(BASE + f"/runs/{run['id']}/results")).json()["items"]
+    by_case = {row["case_id"].removesuffix("_" + suffix): row for row in rows}
+    assert by_case["review_good"]["model_review_status"] == "COMPLETED"
+    assert by_case["review_good"]["effective_pass"]
+    for name in ("review_wrong", "review_extra", "review_error"):
+        assert by_case[name]["model_review_status"] == "UNAVAILABLE", by_case[name]
+        assert not by_case[name]["effective_pass"]
+    hard = by_case["review_hard"]
+    assert hard["model_review_status"] == "SKIPPED" and hard["model_review_attempt"] == 0
+    assert (await http.get(BASE + f"/results/{hard['id']}/model-reviews")).json()["items"] == []
+    rejected = await http.post(
+        BASE + f"/results/{hard['id']}/review-agent",
+        json={"expected_attempt": 0},
+        headers={"X-Request-ID": str(uuid4())},
+    )
+    assert (
+        rejected.status_code == 409 and rejected.json()["reason"] == "AGENT_EVAL_REVIEW_NOT_READY"
+    )
+    result_id = by_case["review_error"]["id"]
+    attempts = await asyncio.gather(
+        *[
+            http.post(
+                BASE + f"/results/{result_id}/review-agent",
+                json={"expected_attempt": 1},
+                headers={"X-Request-ID": str(uuid4())},
+            )
+            for _ in range(2)
+        ]
+    )
+    assert sorted(item.status_code for item in attempts) == [200, 409], [r.text for r in attempts]
+    user_headers = {"Authorization": "Bearer " + user_token(88501)}
+    assert (
+        await http.get(BASE + f"/results/{result_id}/model-reviews", headers=user_headers)
+    ).status_code == 403
+    assert (
+        await http.post(
+            BASE + f"/results/{result_id}/review-agent",
+            json={"expected_attempt": 1},
+            headers={**user_headers, "X-Request-ID": str(uuid4())},
+        )
+    ).status_code == 403
+    directory = await http.get("/api/v1/agent/agents", headers=user_headers)
+    assert directory.status_code == 200
+    assert "eval_reviewer" not in {item["key"] for item in directory.json()["items"]}
+
+
 async def test_model_eval_cancel_closes_provider_and_preserves_terminal_state(
     http: httpx.AsyncClient,
 ) -> None:
