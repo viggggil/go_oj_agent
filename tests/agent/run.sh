@@ -91,8 +91,11 @@ body['provider']['content']['credential_id'] = json.loads((directory / 'credenti
 PY_CONFIG
 "${uv_command}" run --directory agent --frozen python -m app.config_cli bootstrap \
   --file "${test_key_dir}/model-config.json" --actor-id 7 --request-id model-integration-bootstrap
+# Compose 测试挂载对容器用户可读；部署 bootstrap 仍使用 0600 的独立副本。
+cp "${AGENT_CREDENTIAL_KEYRING_FILE}" "${test_key_dir}/bootstrap-keyring.json"
+chmod 600 "${test_key_dir}/bootstrap-keyring.json"
 AGENT_RUNTIME_MODE=model AGENT_CONFIG_MODE=database AGENT_DEFAULT_AGENT_KEY=learning_assistant \
-AGENT_ENVIRONMENT=test AGENT_CREDENTIAL_KEYRING_FILE="${AGENT_CREDENTIAL_KEYRING_FILE}" \
+AGENT_ENVIRONMENT=test AGENT_CREDENTIAL_KEYRING_FILE="${test_key_dir}/bootstrap-keyring.json" \
 AGENT_DATABASE_URL="${AGENT_DATABASE_URL}" AGENT_PROVIDER_ALLOWED_ORIGINS='["http://mock-provider:8001"]' \
   "${uv_command}" run --directory agent --frozen python - <<'PY_REVIEWER'
 import asyncio
