@@ -1714,6 +1714,21 @@ dd {
 .agent-eval {
   min-width: 0;
 }
+.agent-eval .agent-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.agent-eval table {
+  width: 100%;
+  min-width: 640px;
+}
+.agent-eval th,
+.agent-eval td {
+  padding: 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
 .eval-tabs,
 .eval-actions,
 .eval-pagination,
@@ -1748,6 +1763,7 @@ dd {
   padding: 20px;
   margin: 18px 0;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .eval-form {
   display: grid;
