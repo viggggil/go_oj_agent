@@ -16,6 +16,8 @@ services:
       - ../../migrations/agent/000004_create_knowledge.up.sql:/docker-entrypoint-initdb.d/504_create_knowledge.sql:ro
       - ../../migrations/agent/000005_create_eval.up.sql:/docker-entrypoint-initdb.d/505_create_eval_datasets.sql:ro
       - ../../migrations/agent/000006_create_eval_runs.up.sql:/docker-entrypoint-initdb.d/506_create_eval_runs.sql:ro
+      - ../../migrations/agent/000007_create_eval_reviews.up.sql:/docker-entrypoint-initdb.d/507_create_eval_reviews.sql:ro
+      - ../../migrations/agent/000008_create_eval_model_reviews.up.sql:/docker-entrypoint-initdb.d/508_create_eval_model_reviews.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s
@@ -51,6 +53,7 @@ services:
       AGENT_READINESS_TIMEOUT_SECONDS: 2
       AGENT_SHUTDOWN_TIMEOUT_SECONDS: 10
       AGENT_CHAT_ENABLED: true
+      AGENT_MAX_RUN_EVENTS: 10000
       AGENT_ADMIN_ENABLED: true
       AGENT_EVAL_PRINCIPALS: '{"student_a":88501}'
       AGENT_RAG_MINIO_ENDPOINT: minio:9000

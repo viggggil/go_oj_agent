@@ -529,7 +529,10 @@ async def test_automatic_skill_references_binding_context_and_authority(
     snapshot = await reader.read(ChatRequest(message="解释算法"), principal)
     assert snapshot.skill_selection == "automatic" and snapshot.execution_mode == "react"
     assert [item["id"] for item in snapshot.skill_references] == [explain.id, hints.id]
-    assert snapshot.allowed_tools == ("read_second",) and snapshot.budget.max_tool_calls == 2
+    assert (
+        snapshot.allowed_tools == ("read_second", "read_third")
+        and snapshot.budget.max_tool_calls == 2
+    )
     with_context = await reader.read(
         ChatRequest(message="诊断", context=ChatContext(submission_id=1)), principal
     )
@@ -539,6 +542,4 @@ async def test_automatic_skill_references_binding_context_and_authority(
     )
     explicit = await reader.read(ChatRequest(message="解释", skill_key=explain.key), principal)
     assert explicit.skill_selection == "explicit" and not explicit.skill_references
-    assert (
-        explicit.skill_prompt_text == "算法讲解的专属说明" and explicit.execution_mode == "direct"
-    )
+    assert explicit.skill_prompt_text == "算法讲解的专属说明" and explicit.execution_mode == "react"

@@ -158,6 +158,42 @@ async def test_model_history_pairs_only_completed_runs_and_caps_recent_turns(
     assert await store.list_completed_turns(7, other.id) == []
 
 
+async def test_failed_run_restores_only_safe_tool_trace(engine: AsyncEngine) -> None:
+    store = AgentStore(engine)
+    run = await new_run(store)
+    trace = {
+        "run_id": run.id,
+        "step": 1,
+        "call_id": "call_problem",
+        "tool_name": "get_problem",
+        "status": "succeeded",
+        "parameter_validation": "valid",
+        "duration_ms": 12,
+        "summary": "已读取题目",
+        "evidence_refs": ["internal-evidence"],
+    }
+    await store.finish_run(
+        user_id=7,
+        run_id=run.id,
+        status="FAILED",
+        error_code="AGENT_MODEL_TIMEOUT",
+        model_summary={"tool_steps": [trace]},
+    )
+    history = await store.conversation_messages(7, run.conversation_id)
+    assert len(history["items"]) == 1
+    message = history["items"][0]
+    assert message["role"] == "user" and message["status"] == "FAILED"
+    assert message["tool_steps"] == [
+        {
+            key: trace[key]
+            for key in ("step", "call_id", "tool_name", "status", "duration_ms", "summary")
+        }
+    ]
+    assert await store.list_completed_turns(7, run.conversation_id) == []
+    with pytest.raises(ConversationNotFound):
+        await store.conversation_messages(8, run.conversation_id)
+
+
 async def test_same_conversation_concurrent_run_is_unique(engine: AsyncEngine) -> None:
     store = AgentStore(engine)
     conversation = await store.create_conversation(7)
@@ -324,6 +360,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000008_create_eval_model_reviews", "down"),
+            ("000007_create_eval_reviews", "down"),
             ("000006_create_eval_runs", "down"),
             ("000005_create_eval", "down"),
             ("000004_create_knowledge", "down"),
@@ -336,6 +374,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
             ("000004_create_knowledge", "up"),
             ("000005_create_eval", "up"),
             ("000006_create_eval_runs", "up"),
+            ("000007_create_eval_reviews", "up"),
+            ("000008_create_eval_model_reviews", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):

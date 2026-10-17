@@ -1709,3 +1709,150 @@ dd {
     grid-template-columns: 1fr;
   }
 }
+
+/* Eval：沿用 Agent 工作区导航，长回答和审计内容在卡片内换行。 */
+.agent-eval {
+  min-width: 0;
+}
+.agent-eval .agent-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.agent-eval table {
+  width: 100%;
+  min-width: 640px;
+}
+.agent-eval th,
+.agent-eval td {
+  padding: 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.eval-tabs,
+.eval-actions,
+.eval-pagination,
+.eval-section-header,
+.eval-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.eval-tabs {
+  border-bottom: 1px solid #dfe4ed;
+  margin-bottom: 22px;
+  padding-bottom: 12px;
+}
+.eval-tabs button:not([aria-current='page']) {
+  color: #354159;
+  background: #edf0f5;
+}
+.eval-section-header {
+  justify-content: space-between;
+  margin: 18px 0;
+}
+.eval-section-header h2 {
+  margin: 0;
+}
+.eval-panel,
+.eval-result {
+  background: #fff;
+  border: 1px solid #dfe4ed;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 18px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.eval-form {
+  display: grid;
+  gap: 16px;
+}
+.eval-form label,
+.eval-filters label,
+.eval-filter {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.eval-form fieldset {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dfe4ed;
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+.eval-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+.eval-filters input {
+  width: 160px;
+}
+.eval-score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+.eval-score-grid input {
+  width: 100%;
+}
+.eval-pagination {
+  justify-content: center;
+  margin: 18px 0;
+  font-size: 14px;
+}
+.agent-eval pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  background: #f5f7fb;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.agent-eval details {
+  margin: 16px 0;
+}
+.agent-eval summary {
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.agent-eval small,
+.eval-panel > p {
+  overflow-wrap: anywhere;
+}
+.eval-metrics span {
+  padding: 10px 12px;
+  background: #f2f5fc;
+  border-radius: 6px;
+}
+.eval-review {
+  border-top: 1px solid #dfe4ed;
+  padding-top: 16px;
+  margin-top: 24px;
+}
+.agent-eval progress {
+  width: min(100%, 520px);
+  height: 14px;
+}
+@media (max-width: 760px) {
+  .eval-panel,
+  .eval-result {
+    padding: 14px;
+  }
+  .eval-filters label,
+  .eval-filters input {
+    width: 100%;
+  }
+  .eval-section-header {
+    align-items: flex-start;
+  }
+}

@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -133,10 +134,17 @@ func agentStatusError(status int) error {
 	return kerrors.New(code, reason, "Agent could not accept the request")
 }
 
+type agentToolIdentity struct {
+	Tool     string
+	Step     int
+	Finished bool
+}
+
 type agentStreamIdentity struct {
-	RunID          string `json:"run_id"`
-	ConversationID string `json:"conversation_id"`
-	Sequence       int    `json:"sequence"`
+	ToolCalls      map[string]agentToolIdentity `json:"-"`
+	RunID          string                       `json:"run_id"`
+	ConversationID string                       `json:"conversation_id"`
+	Sequence       int                          `json:"sequence"`
 }
 
 type agentFrame struct {
@@ -312,7 +320,16 @@ func validateAgentFrame(frame []byte, identity *agentStreamIdentity) (bool, erro
 		if len(payload.Data) != 1 || len(raw) == 0 || raw[0] != '"' || json.Unmarshal(raw, &text) != nil || utf8.RuneCountInString(text) > 32000 || event == "thinking" && utf8.RuneCountInString(text) > 256 {
 			return false, invalid
 		}
+	case "progress", "reasoning_summary", "tool_call", "tool_result":
+		if !validateAgentActivity(event, payload.Data, identity) {
+			return false, invalid
+		}
 	case "done":
+		for _, call := range identity.ToolCalls {
+			if !call.Finished {
+				return false, invalid
+			}
+		}
 		if len(payload.Data) != 0 {
 			return false, invalid
 		}
@@ -344,4 +361,62 @@ func writeAgentFrame(w http.ResponseWriter, frame []byte, timeout time.Duration)
 		}
 	}
 	return controller.Flush()
+}
+
+var agentToolName = regexp.MustCompile(`^[a-z][a-z0-9_]{1,127}$`)
+var agentCallID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+
+func validateAgentActivity(kind string, data map[string]json.RawMessage, identity *agentStreamIdentity) bool {
+	text := func(key string, limit int) (string, bool) {
+		var value string
+		raw := data[key]
+		ok := len(raw) > 0 && raw[0] == '"' && json.Unmarshal(raw, &value) == nil && utf8.RuneCountInString(value) <= limit && value != ""
+		return value, ok
+	}
+	integer := func(key string, min, max int) (int, bool) {
+		var value int
+		raw := data[key]
+		ok := len(raw) > 0 && raw[0] != 'n' && json.Unmarshal(raw, &value) == nil && value >= min && value <= max
+		return value, ok
+	}
+	if kind == "progress" {
+		phase, p := text("phase", 32)
+		_, m := text("message", 256)
+		return len(data) == 2 && p && m && (phase == "preparing" || phase == "analyzing" || phase == "executing_tool" || phase == "answering")
+	}
+	if kind == "reasoning_summary" {
+		_, step := integer("step", 1, 128)
+		_, summary := text("text", 400)
+		return len(data) == 2 && step && summary
+	}
+	step, validStep := integer("step", 1, 128)
+	callID, validID := text("call_id", 128)
+	tool, validTool := text("tool", 128)
+	status, validStatus := text("status", 32)
+	if !validStep || !validID || !validTool || !validStatus || !agentCallID.MatchString(callID) || !agentToolName.MatchString(tool) {
+		return false
+	}
+	if kind == "tool_call" {
+		_, label := text("label", 128)
+		if len(data) != 5 || !label || status != "started" {
+			return false
+		}
+		if identity.ToolCalls == nil {
+			identity.ToolCalls = make(map[string]agentToolIdentity)
+		}
+		if _, found := identity.ToolCalls[callID]; found || len(identity.ToolCalls) >= 128 {
+			return false
+		}
+		identity.ToolCalls[callID] = agentToolIdentity{Tool: tool, Step: step}
+		return true
+	}
+	_, duration := integer("duration_ms", 0, 300000)
+	_, summary := text("summary", 256)
+	call, found := identity.ToolCalls[callID]
+	if len(data) != 6 || !duration || !summary || !found || call.Finished || call.Tool != tool || call.Step != step || (status != "succeeded" && status != "failed" && status != "rejected") {
+		return false
+	}
+	call.Finished = true
+	identity.ToolCalls[callID] = call
+	return true
 }

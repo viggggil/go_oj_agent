@@ -64,7 +64,8 @@ class SkillConfig(ImmutableConfig):
     variables: tuple[PromptVariable, ...] | None = None
     # 兼容旧不可变版本；新表单直接保存任务说明，不再创建 Prompt 依赖。
     prompt_id: UUID | None = None
-    execution_mode: Literal["direct", "react"] = "direct"
+    # 仅解析历史不可变版本；V2 Runtime 忽略此字段。
+    execution_mode: Literal["direct", "react"] | None = None
     allowed_tools: tuple[ToolName, ...] = Field(default=(), max_length=32)
     budget: RuntimeBudget | None = None
 
@@ -114,6 +115,7 @@ class ProviderConfig(ImmutableConfig):
     base_url: str = Field(min_length=1, max_length=512)
     credential_id: UUID
     text_verbosity_supported: bool | None = Field(default=None, strict=True)
+    reasoning_summary_supported: bool = Field(default=False, strict=True)
 
     @property
     def supports_text_verbosity(self) -> bool:

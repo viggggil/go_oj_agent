@@ -126,7 +126,7 @@ async def test_tool_loop_keeps_trusted_identity_and_bounded_protocol(failure: st
                 "".join(event.data.get("text", "") for event in events if event.type == "token")
                 == "739216"
             )
-        assert len(invoked) == (0 if failure in {"unknown", "arguments", "output_budget"} else 1)
+        assert len(invoked) == (0 if failure in {"unknown", "arguments"} else 1)
         assert all(principal == value.principal for principal in invoked)
         assert "hidden-reasoning" not in repr(events) and "function_call_output" not in repr(events)
         assert len(requests) <= 2
@@ -163,8 +163,10 @@ async def test_cancellation_closes_pending_tool_and_never_starts_next_model_roun
     value.allowed_tools = ("read_number",)
     iterator = ModelRuntime(client, Credentials(), registry(waiting)).run(value)
     try:
-        assert (await anext(iterator)).type == "thinking"
-        assert (await anext(iterator)).data["text"] == "正在读取相关信息"
+        assert (await anext(iterator)).data["phase"] == "preparing"
+        assert (await anext(iterator)).data["phase"] == "analyzing"
+        assert (await anext(iterator)).data["phase"] == "executing_tool"
+        assert (await anext(iterator)).type == "tool_call"
         task = asyncio.create_task(anext(iterator))
         await asyncio.wait_for(started.wait(), 1)
         task.cancel()
@@ -219,5 +221,154 @@ async def test_tool_argument_progress_switches_first_output_timeout_to_idle_time
         ]
         assert events[-1].type == "done" and requests == 2
         assert value.model_summary and value.model_summary.attempts[0].first_token_ms is not None
+    finally:
+        await client.close()
+
+
+@pytest.mark.parametrize(
+    "scenario", ["multi", "failed_tool", "repeat", "duplicate_id", "schema", "json", "mixed"]
+)
+async def test_unified_react_decisions_and_rejected_calls(scenario: str) -> None:
+    class Input(BaseModel):
+        model_config = ConfigDict(extra="forbid", strict=True)
+        number: int
+
+    invoked: list[int] = []
+    requests: list[dict[str, Any]] = []
+
+    async def read(parsed: BaseModel, principal: Principal) -> BaseModel:
+        assert isinstance(parsed, Input)
+        invoked.append(parsed.number)
+        if scenario == "failed_tool":
+            raise TimeoutError
+        return Evidence(number=parsed.number)
+
+    tools = ToolRegistry()
+    tools.register(
+        ToolDefinition(
+            spec=ToolSpec(name="read_number", description="读取数字", read_scope="current_user"),
+            input_model=Input,
+            output_model=Evidence,
+            handler=read,
+        )
+    )
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        count = len(requests)
+        if count == 1:
+            arguments = (
+                '{"number":"bad"}'
+                if scenario == "schema"
+                else "{"
+                if scenario == "json"
+                else '{"number":1}'
+            )
+            payload = call_output(arguments=arguments)
+            if scenario == "mixed":
+                event = json.loads(payload.decode().split("data: ")[1].strip())
+                event["response"]["output"].append(
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "unconfirmed-private-text"}],
+                    }
+                )
+                payload = frame(delta("unconfirmed-private-text")) + frame(event)
+        elif scenario in {"multi", "repeat", "duplicate_id"} and count == 2:
+            payload = call_output(
+                arguments='{"number":2}' if scenario != "repeat" else '{"number":1}',
+                call_id="call_1" if scenario == "duplicate_id" else "call_2",
+            )
+        else:
+            observation = json.loads(body["input"][-1]["output"])
+            assert observation["ok"] is (scenario != "failed_tool")
+            if scenario == "failed_tool":
+                assert observation["error_code"] == "TOOL_TIMEOUT"
+            payload = frame(delta("已依据实际观察回答")) + frame(complete("已依据实际观察回答"))
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=Stream([payload])
+        )
+
+    client = client_for(respond)
+    value = configured()
+    # A historical Direct snapshot now uses the same graph and authorized tools.
+    value.allowed_tools = ("read_number",)
+    events = []
+    try:
+        if scenario in {"multi", "failed_tool"}:
+            events = [
+                event async for event in ModelRuntime(client, Credentials(), tools).run(value)
+            ]
+            assert events[-1].type == "done"
+            assert invoked == ([1, 2] if scenario == "multi" else [1])
+            assert value.model_summary is not None
+            assert len(value.model_summary.tool_steps) == len(invoked)
+            assert value.model_summary.tool_steps[-1].status == (
+                "failed" if scenario == "failed_tool" else "succeeded"
+            )
+            assert not any("number" in event.data or "output" in event.data for event in events)
+        else:
+            with pytest.raises(ModelFailure):
+                async for event in ModelRuntime(client, Credentials(), tools).run(value):
+                    events.append(event)
+            assert invoked == ([1] if scenario in {"repeat", "duplicate_id"} else [])
+            assert not any(event.type in {"token", "done"} for event in events)
+            if scenario != "mixed":
+                assert (
+                    value.model_summary and value.model_summary.tool_steps[-1].status == "rejected"
+                )
+    finally:
+        await client.close()
+
+
+@pytest.mark.parametrize("supported", [False, True])
+async def test_public_summary_and_opaque_continuation_are_separate(supported: bool) -> None:
+    requests = []
+
+    async def read(_: BaseModel, principal: Principal) -> BaseModel:
+        return Evidence(number=1)
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if supported:
+            assert body["reasoning"] == {"summary": "auto"}
+            assert body["include"] == ["reasoning.encrypted_content"]
+        else:
+            assert "reasoning" not in body and "include" not in body
+        if len(requests) == 1:
+            event = json.loads(call_output().decode().split("data: ")[1].strip())
+            event["response"]["output"][0] = {
+                "type": "reasoning",
+                "id": "rs_1",
+                "text": "secret-internal-reasoning",
+                "encrypted_content": "opaque-secret",
+                "summary": [{"type": "summary_text", "text": "需要读取授权信息"}],
+            }
+            payload = frame(event)
+        else:
+            assert "secret-internal-reasoning" not in json.dumps(body)
+            payload = frame(delta("完成")) + frame(complete("完成"))
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=Stream([payload])
+        )
+
+    client = client_for(respond)
+    value = configured()
+    value.allowed_tools = ("read_number",)
+    value.config_snapshot["provider_config"]["reasoning_summary_supported"] = supported
+    try:
+        events = [
+            event async for event in ModelRuntime(client, Credentials(), registry(read)).run(value)
+        ]
+        assert "secret-internal-reasoning" not in repr(events)
+        assert value.model_summary is not None
+        assert (
+            "opaque-secret" not in repr(events)
+            and "opaque-secret" not in value.model_summary.model_dump_json()
+        )
+        assert any(event.type == "reasoning_summary" for event in events) is supported
     finally:
         await client.close()

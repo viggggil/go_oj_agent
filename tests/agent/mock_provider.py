@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 app = FastAPI()
 completed = asyncio.Event()
 cancelled = asyncio.Event()
+review_attempts = {}
 
 
 def frame(kind, **values):
@@ -41,11 +42,47 @@ async def responses(request: Request):
     body = await request.json()
     if request.headers.get('authorization') != 'Bearer integration-model-key':
         return JSONResponse({'error': 'unauthorized'}, status_code=401)
-    if body.get('store') is not False or body.get('model') != 'deepseek-v4-flash':
+    if body.get('store') is not False or body.get('model') not in {'deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-v4.1-flash'}:
         return JSONResponse({'error': 'invalid config'}, status_code=400)
     completed.clear()
     last = body['input'][-1]
     message = last.get('content', '')
+    if message.startswith('输出必须是单个 JSON'):
+        if body['model'] != 'deepseek-v4-pro' or body.get('tools') or len(body['input']) != 1:
+            return JSONResponse({'error': 'reviewer must be isolated without tools'}, status_code=400)
+        if '离线质量评审员' not in body.get('instructions', '') or '评审流程' not in body.get('instructions', ''):
+            return JSONResponse({'error': 'wrong reviewer prompt binding'}, status_code=400)
+        payload = json.loads(message.rsplit('\n', 1)[-1])
+        if '参考答案不传评审' in message or 'private-source-id' in message:
+            return JSONResponse({'error': 'private review context leaked'}, status_code=400)
+        case_id = payload['case_id']
+        review_attempts[case_id] = review_attempts.get(case_id, 0) + 1
+        turns = ' '.join(payload['user_turns'])
+        if 'review-error-once' in turns and review_attempts[case_id] == 1:
+            return JSONResponse({'error': 'mock reviewer unavailable'}, status_code=503)
+        value = {
+            'case_id': case_id,
+            'pass': 'review-semantic-fail' not in turns,
+            'hard_fail': False,
+            'scores': {name: 3 for name in ('task_completion', 'technical_correctness', 'evidence_support', 'instruction_following', 'clarity')},
+            'violations': [], 'missing_facts': [], 'reason': '回答包含“中文算法回答”，完成主要任务。',
+        }
+        if 'review-wrong-id' in turns:
+            value['case_id'] = 'wrong_case'
+        if 'review-extra-key' in turns:
+            value['internal_thoughts'] = 'rejected'
+        if 'review-invalid-once' in turns and review_attempts[case_id] == 1:
+            text = '```json\n' + json.dumps(value, ensure_ascii=False) + '\n```'
+        else:
+            text = json.dumps(value, ensure_ascii=False)
+        async def review_events():
+            if 'review-wait' in turns:
+                await completed.wait()
+            yield frame('response.output_text.delta', delta=text, output_index=0)
+            yield frame('response.completed', response={'status': 'completed', 'model': body['model'], 'output': [
+                {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': text}]}],
+                'usage': {'input_tokens': 1000, 'output_tokens': 100}})
+        return StreamingResponse(review_events(), media_type='text/event-stream')
     if message in {'PR3 read problem', 'PR3 denied problem'} or last.get('type') == 'function_call_output':
         if body.get('parallel_tool_calls') is not False or [tool['name'] for tool in body.get('tools', [])] != ['get_problem']:
             return JSONResponse({'error': 'wrong tools'}, status_code=400)

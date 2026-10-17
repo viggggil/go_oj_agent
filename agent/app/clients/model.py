@@ -121,6 +121,9 @@ class ResponsesClient:
             body["temperature"] = profile.temperature
         if profile.verbosity is not None and provider.supports_text_verbosity:
             body["text"] = {"verbosity": profile.verbosity}
+        if provider.reasoning_summary_supported:
+            body["reasoning"] = {"summary": "auto"}
+            body["include"] = ["reasoning.encrypted_content"]
         if input_items is not None:
             body["input"] = input_items
         if tools:
@@ -197,7 +200,12 @@ class ResponsesClient:
                                     yield text
                             elif kind == "response.completed":
                                 calls = self._complete(
-                                    event, attempt, answer, allow_tools=bool(tools)
+                                    event,
+                                    attempt,
+                                    answer,
+                                    allow_tools=bool(tools),
+                                    result=result,
+                                    public_summary=provider.reasoning_summary_supported,
                                 )
                                 if result is not None:
                                     result.calls = calls
@@ -224,6 +232,10 @@ class ResponsesClient:
                                 )
                                 if not isinstance(item, dict) or item.get("type") not in allowed:
                                     raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                                if item.get("type") == "reasoning" and result is not None:
+                                    summary = self._public_reasoning_summary(item)
+                                    if summary:
+                                        result.reasoning_summary = summary
                             elif tools and kind in {
                                 "response.function_call_arguments.delta",
                                 "response.function_call_arguments.done",
@@ -258,7 +270,13 @@ class ResponsesClient:
 
     @staticmethod
     def _complete(
-        event: dict[str, Any], attempt: ModelAttempt, answer: str, *, allow_tools: bool = False
+        event: dict[str, Any],
+        attempt: ModelAttempt,
+        answer: str,
+        *,
+        allow_tools: bool = False,
+        result: ModelResponse | None = None,
+        public_summary: bool = False,
     ) -> tuple[FunctionCall, ...]:
         response = event.get("response")
         if not isinstance(response, dict) or response.get("status") != "completed":
@@ -268,10 +286,17 @@ class ResponsesClient:
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         texts: list[str] = []
         calls: list[FunctionCall] = []
+        reasoning_summary: str | None = None
+        continuation_items: list[dict[str, Any]] = []
         for item in output:
             if not isinstance(item, dict):
                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
             if item.get("type") == "reasoning":
+                if public_summary:
+                    reasoning_summary = ResponsesClient._public_reasoning_summary(item)
+                continuation = ResponsesClient._reasoning_continuation_item(item)
+                if continuation is not None:
+                    continuation_items.append(continuation)
                 continue
             if item.get("type") == "function_call" and allow_tools:
                 if item.get("status", "completed") != "completed":
@@ -285,6 +310,7 @@ class ResponsesClient:
                 if len(call.arguments.encode()) > 8192 or len(calls) >= 32:
                     raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
                 calls.append(call)
+                continuation_items.append(call.input_item())
                 continue
             if item.get("type") != "message" or item.get("role") != "assistant":
                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
@@ -325,4 +351,54 @@ class ResponsesClient:
                 attempt.output_tokens = cast(int, values[1])
                 attempt.usage_source = "provider"
         attempt.finish_reason = "completed"
+        if result is not None:
+            result.reasoning_summary = reasoning_summary
+            result.continuation_items = tuple(continuation_items) if calls else ()
         return tuple(calls)
+
+    @staticmethod
+    def _public_reasoning_summary(item: dict[str, Any]) -> str | None:
+        """只读取 Provider 明确公开的简短摘要。"""
+        raw = item.get("summary")
+        if not isinstance(raw, list):
+            return None
+        parts: list[str] = []
+        for entry in raw:
+            if not isinstance(entry, dict) or entry.get("type") not in {"summary_text"}:
+                continue
+            text = entry.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+        value = " ".join(parts)
+        if not value:
+            return None
+        return value[:400]
+
+    @staticmethod
+    def _reasoning_continuation_item(item: dict[str, Any]) -> dict[str, Any] | None:
+        """只保留 Responses 续接字段，不保存原始推理文本。"""
+        identifier = item.get("id")
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", identifier):
+            return None
+        encrypted = item.get("encrypted_content")
+        if not isinstance(encrypted, str) or not encrypted or len(encrypted.encode()) > 131_072:
+            return None
+        continuation: dict[str, Any] = {
+            "type": "reasoning",
+            "id": identifier,
+            "encrypted_content": encrypted,
+            "summary": [],
+        }
+        summary = item.get("summary")
+        if isinstance(summary, list):
+            safe_summary = [
+                {"type": "summary_text", "text": text[:400]}
+                for entry in summary
+                if isinstance(entry, dict)
+                and entry.get("type") in {"summary_text"}
+                and isinstance((text := entry.get("text")), str)
+                and text.strip()
+            ][:8]
+            if safe_summary:
+                continuation["summary"] = safe_summary
+        return continuation

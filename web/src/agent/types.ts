@@ -29,7 +29,7 @@ export interface SkillContent {
   text?: string | null
   variables?: string[] | null
   prompt_id?: string | null
-  execution_mode: 'direct' | 'react'
+  execution_mode?: 'direct' | 'react'
   allowed_tools: string[]
   budget?: Budget | null
 }
@@ -128,7 +128,6 @@ export function emptyContent(resource: Resource): Content {
       name: '',
       description: '',
       text: '',
-      execution_mode: 'direct',
       allowed_tools: [],
     }
   return {

@@ -1,6 +1,7 @@
 """评测数据集持久化；只保存校验后的 Case 投影并把原始 JSONL 放入 MinIO。"""
 
 import hashlib
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -13,13 +14,16 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.evals.models import (
     EvalDatasetInvalid,
     EvalDatasetUpload,
+    EvalModelReviewPage,
     EvalPage,
     EvalResultPage,
+    EvalReviewPage,
+    EvalReviewWrite,
     EvalRunCreate,
     EvalRunPage,
     parse_jsonl,
 )
-from app.evals.schema import cases, datasets, results, runs
+from app.evals.schema import cases, datasets, model_reviews, results, reviews, runs
 from app.models.configuration import ConfigError
 from app.models.runtime import Principal
 from app.rag.clients import RagClients
@@ -50,6 +54,9 @@ def run_public(row: dict[str, Any], *, summary: bool = False) -> dict[str, Any]:
                 "version",
                 "agent_key",
                 "skill_key",
+                "prompt_id",
+                "skill_id",
+                "provider_id",
                 "model_profile_id",
                 "config_hash",
                 "knowledge_scope",
@@ -59,6 +66,23 @@ def run_public(row: dict[str, Any], *, summary: bool = False) -> dict[str, Any]:
             )
             if key in snapshot
         }
+    reviewer = value.pop("reviewer_config_snapshot", None)
+    if isinstance(reviewer, dict):
+        value["reviewer_snapshot"] = {
+            key: reviewer[key]
+            for key in (
+                "version",
+                "agent_key",
+                "prompt_id",
+                "skill_id",
+                "provider_id",
+                "model_profile_id",
+                "config_hash",
+            )
+            if key in reviewer
+        }
+    else:
+        value["reviewer_snapshot"] = None
     if summary and isinstance(snapshot, dict):
         value["config_snapshot"].pop("knowledge_versions", None)
         value["config_snapshot"]["knowledge_version_count"] = len(
@@ -221,6 +245,7 @@ class EvalStore:
         snapshot: dict[str, Any],
         request_id: str,
         fingerprint: str,
+        reviewer_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         dataset_id = str(body.dataset_id)
         async with self.engine.connect() as conn:
@@ -243,6 +268,8 @@ class EvalStore:
             "dataset_id": dataset_id,
             "agent_key": body.agent_key,
             "mode": body.mode,
+            "reviewer_agent_key": body.reviewer_agent_key,
+            "reviewer_config_snapshot": reviewer_snapshot,
             "repeat_count": body.repeat_count,
             "concurrency": body.concurrency,
             "status": "QUEUED",
@@ -392,6 +419,52 @@ class EvalStore:
             )
         return int(result.rowcount or 0)
 
+    async def recover_orphaned_model_reviews(self) -> int:
+        timestamp = now()
+        async with self.engine.begin() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        select(model_reviews.c.result_id, model_reviews.c.attempt).where(
+                            model_reviews.c.status == "RUNNING"
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            pending = await conn.execute(
+                update(results)
+                .where(results.c.model_review_status == "PENDING")
+                .values(
+                    model_review_status="UNAVAILABLE",
+                    model_review_error_code="AGENT_EVAL_REVIEW_INTERRUPTED",
+                )
+            )
+            await conn.execute(
+                update(model_reviews)
+                .where(model_reviews.c.status == "RUNNING")
+                .values(
+                    status="UNAVAILABLE",
+                    error_code="AGENT_EVAL_REVIEW_INTERRUPTED",
+                    finished_at=timestamp,
+                )
+            )
+            for row in rows:
+                await conn.execute(
+                    update(results)
+                    .where(
+                        results.c.id == row["result_id"],
+                        results.c.model_review_attempt == row["attempt"],
+                        results.c.model_review_status == "RUNNING",
+                    )
+                    .values(
+                        model_review_status="UNAVAILABLE",
+                        model_review_error_code="AGENT_EVAL_REVIEW_INTERRUPTED",
+                    )
+                )
+        return len(rows) + pending.rowcount
+
     async def cancel_requested(self, run_id: str) -> bool:
         async with self.engine.connect() as conn:
             return bool(
@@ -427,12 +500,122 @@ class EvalStore:
                 )
             )
 
+    @staticmethod
+    def _effective_pass() -> Any:
+        return and_(
+            results.c.status == "COMPLETED",
+            results.c.checks["hard_fail"].as_boolean().is_(False),
+            sql_case(
+                (results.c.review_version > 0, results.c.manual_review["pass"].as_boolean()),
+                (
+                    results.c.model_review_status != "NOT_REQUESTED",
+                    and_(
+                        results.c.model_review_status == "COMPLETED",
+                        results.c.model_review["pass"].as_boolean().is_(True),
+                        results.c.model_review["hard_fail"].as_boolean().is_(False),
+                    ),
+                ),
+                else_=results.c.checks["pass"].as_boolean(),
+            ).is_(True),
+        )
+
+    async def run_metrics(self, run_id: str) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        select(
+                            func.count().label("recorded_cases"),
+                            func.sum(
+                                sql_case(
+                                    (results.c.checks["pass"].as_boolean().is_(True), 1), else_=0
+                                )
+                            ).label("check_passes"),
+                            func.sum(sql_case((self._effective_pass(), 1), else_=0)).label(
+                                "effective_passes"
+                            ),
+                            func.sum(sql_case((results.c.review_version > 0, 1), else_=0)).label(
+                                "reviewed_cases"
+                            ),
+                            func.sum(
+                                sql_case((results.c.model_review_status == "COMPLETED", 1), else_=0)
+                            ).label("model_reviewed_cases"),
+                            func.sum(
+                                sql_case(
+                                    (results.c.model_review_status == "UNAVAILABLE", 1), else_=0
+                                )
+                            ).label("model_review_unavailable"),
+                            func.sum(
+                                sql_case(
+                                    (results.c.model_review["pass"].as_boolean().is_(True), 1),
+                                    else_=0,
+                                )
+                            ).label("model_passes"),
+                            func.avg(results.c.latency_ms).label("average_latency_ms"),
+                        ).where(results.c.run_id == run_id)
+                    )
+                )
+                .mappings()
+                .one()
+            )
+        return {
+            key: (int(value) if value is not None else (None if key == "average_latency_ms" else 0))
+            for key, value in row.items()
+        }
+
+    @staticmethod
+    def result_public(row: dict[str, Any], *, detail: bool) -> dict[str, Any]:
+        value = public(row)
+        manual = value.get("manual_review")
+        if value.get("model_review_status") not in (None, "NOT_REQUESTED"):
+            semantic_pass = bool(
+                value.get("model_review_status") == "COMPLETED"
+                and isinstance(value.get("model_review"), dict)
+                and value["model_review"].get("pass") is True
+                and value["model_review"].get("hard_fail") is False
+            )
+        else:
+            semantic_pass = bool(value["checks"].get("pass", False))
+        value["effective_pass"] = bool(
+            value["status"] == "COMPLETED"
+            and not value["checks"].get("hard_fail", True)
+            and (manual["pass"] if isinstance(manual, dict) else semantic_pass)
+        )
+        if not detail:
+            value["answer_preview"] = (value.pop("answer", None) or "")[:512]
+            value.pop("model_summary", None)
+            value["checks"] = {key: value["checks"][key] for key in ("pass", "hard_fail")}
+            value["manual_review"] = {"pass": manual["pass"]} if isinstance(manual, dict) else None
+            value["model_review"] = (
+                {
+                    "pass": value["model_review"].get("pass"),
+                    "hard_fail": value["model_review"].get("hard_fail"),
+                }
+                if isinstance(value.get("model_review"), dict)
+                else None
+            )
+        return value
+
     async def get_result(self, run_id: str, result_id: str) -> dict[str, Any]:
         async with self.engine.connect() as conn:
             row = (
                 (
                     await conn.execute(
-                        select(results).where(results.c.run_id == run_id, results.c.id == result_id)
+                        select(
+                            results,
+                            cases.c.case_json.label("case"),
+                            cases.c.category,
+                            cases.c.title,
+                        )
+                        .join(runs, results.c.run_id == runs.c.id)
+                        .join(
+                            cases,
+                            and_(
+                                cases.c.dataset_id == runs.c.dataset_id,
+                                cases.c.case_id == results.c.case_id,
+                            ),
+                        )
+                        .where(results.c.run_id == run_id, results.c.id == result_id)
                     )
                 )
                 .mappings()
@@ -440,21 +623,40 @@ class EvalStore:
             )
         if row is None:
             raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
-        return public(dict(row))
+        return self.result_public(dict(row), detail=True)
 
     async def results_page(self, run_id: str, page: EvalResultPage) -> dict[str, Any]:
         await self.get_run(run_id)
         condition = results.c.run_id == run_id
         if page.status:
             condition = and_(condition, results.c.status == page.status)
+        if page.error_code:
+            condition = and_(condition, results.c.error_code == page.error_code)
+        if page.category:
+            condition = and_(condition, cases.c.category == page.category)
+        if page.search:
+            condition = and_(condition, results.c.case_id.contains(page.search, autoescape=True))
+        if page.verdict == "pass":
+            condition = and_(condition, self._effective_pass())
+        elif page.verdict == "fail":
+            condition = and_(condition, ~self._effective_pass())
+        elif page.verdict == "hard_fail":
+            condition = and_(condition, results.c.checks["hard_fail"].as_boolean().is_(True))
+        elif page.verdict == "unreviewed":
+            condition = and_(condition, results.c.review_version == 0)
+        joined = results.join(runs, results.c.run_id == runs.c.id).join(
+            cases,
+            and_(cases.c.dataset_id == runs.c.dataset_id, cases.c.case_id == results.c.case_id),
+        )
         async with self.engine.connect() as conn:
             total = int(
-                await conn.scalar(select(func.count()).select_from(results).where(condition)) or 0
+                await conn.scalar(select(func.count()).select_from(joined).where(condition)) or 0
             )
             rows = (
                 (
                     await conn.execute(
-                        select(results)
+                        select(results, cases.c.category, cases.c.title)
+                        .select_from(joined)
                         .where(condition)
                         .order_by(results.c.case_id, results.c.attempt)
                         .offset((page.page - 1) * page.page_size)
@@ -465,17 +667,341 @@ class EvalStore:
                 .all()
             )
         return {
-            "items": [
-                {
-                    **{
-                        key: value
-                        for key, value in public(dict(row)).items()
-                        if key not in {"answer", "checks", "model_summary"}
-                    },
-                    "answer_preview": (row["answer"] or "")[:512],
-                    "checks": {key: row["checks"][key] for key in ("pass", "hard_fail")},
+            "items": [self.result_public(dict(row), detail=False) for row in rows],
+            "page": {"page": page.page, "page_size": page.page_size, "total": total},
+        }
+
+    @staticmethod
+    def _review_replay(
+        row: dict[str, Any], principal: Principal, fingerprint: str
+    ) -> dict[str, Any]:
+        if row["reviewed_by"] != principal.user_id or row["fingerprint"] != fingerprint:
+            raise ConfigError("AGENT_EVAL_REQUEST_CONFLICT", 409)
+        return {"review": row["new_value"], "review_version": row["version"], "duplicate": True}
+
+    async def save_review(
+        self, result_id: str, body: EvalReviewWrite, principal: Principal
+    ) -> dict[str, Any]:
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {"result_id": result_id, **body.model_dump(mode="json", by_alias=True)},
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        try:
+            async with self.engine.begin() as conn:
+                current = (
+                    (
+                        await conn.execute(
+                            select(results).where(results.c.id == result_id).with_for_update()
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if current is None:
+                    raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+                replay = (
+                    (
+                        await conn.execute(
+                            select(reviews).where(reviews.c.request_id == principal.request_id)
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if replay is not None:
+                    return self._review_replay(dict(replay), principal, fingerprint)
+                if current["review_version"] != body.expected_version:
+                    raise ConfigError("AGENT_EVAL_VERSION_CONFLICT", 409)
+                if body.passed and (
+                    current["status"] != "COMPLETED" or current["checks"].get("hard_fail", True)
+                ):
+                    raise ConfigError("AGENT_EVAL_HARD_FAILURE", 409)
+                version = body.expected_version + 1
+                timestamp = now()
+                value = {
+                    **body.model_dump(
+                        mode="json", by_alias=True, exclude={"expected_version", "reason"}
+                    ),
+                    "reviewed_by": principal.user_id,
+                    "reviewed_at": timestamp.isoformat() + "Z",
                 }
+                await conn.execute(
+                    update(results)
+                    .where(results.c.id == result_id)
+                    .values(manual_review=value, review_version=version)
+                )
+                await conn.execute(
+                    insert(reviews).values(
+                        id=str(uuid4()),
+                        result_id=result_id,
+                        version=version,
+                        reviewed_by=principal.user_id,
+                        request_id=principal.request_id,
+                        fingerprint=fingerprint,
+                        old_value=current["manual_review"],
+                        new_value=value,
+                        reason=body.reason,
+                        created_at=timestamp,
+                    )
+                )
+        except IntegrityError:
+            async with self.engine.connect() as conn:
+                replay = (
+                    (
+                        await conn.execute(
+                            select(reviews).where(reviews.c.request_id == principal.request_id)
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+            if replay is None:
+                raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503) from None
+            return self._review_replay(dict(replay), principal, fingerprint)
+        return {"review": value, "review_version": version, "duplicate": False}
+
+    async def reviews_page(self, result_id: str, page: EvalReviewPage) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            if await conn.scalar(select(results.c.id).where(results.c.id == result_id)) is None:
+                raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+            total = int(
+                await conn.scalar(
+                    select(func.count())
+                    .select_from(reviews)
+                    .where(reviews.c.result_id == result_id)
+                )
+                or 0
+            )
+            rows = (
+                (
+                    await conn.execute(
+                        select(reviews)
+                        .where(reviews.c.result_id == result_id)
+                        .order_by(reviews.c.version.desc())
+                        .offset((page.page - 1) * page.page_size)
+                        .limit(page.page_size)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [
+                public(
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"fingerprint", "request_id"}
+                    }
+                )
                 for row in rows
             ],
+            "page": {"page": page.page, "page_size": page.page_size, "total": total},
+        }
+
+    @staticmethod
+    def _model_attempt_public(value: dict[str, Any]) -> dict[str, Any]:
+        return public(
+            {key: item for key, item in value.items() if key not in {"fingerprint", "request_id"}}
+        )
+
+    async def begin_model_review(
+        self,
+        result_id: str,
+        principal: Principal,
+        expected_attempt: int,
+        *,
+        retry: bool,
+    ) -> dict[str, Any]:
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {"result_id": result_id, "expected_attempt": expected_attempt, "retry": retry},
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        try:
+            async with self.engine.begin() as conn:
+                current = (
+                    (
+                        await conn.execute(
+                            select(results, runs.c.mode, runs.c.reviewer_agent_key)
+                            .join(runs, runs.c.id == results.c.run_id)
+                            .where(results.c.id == result_id)
+                            .with_for_update(of=results)
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if current is None:
+                    raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+                replay = (
+                    (
+                        await conn.execute(
+                            select(model_reviews).where(
+                                model_reviews.c.request_id == principal.request_id
+                            )
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if replay is not None:
+                    if (
+                        replay["requested_by"] != principal.user_id
+                        or replay["fingerprint"] != fingerprint
+                    ):
+                        raise ConfigError("AGENT_EVAL_REQUEST_CONFLICT", 409)
+                    return {"attempt": self._model_attempt_public(dict(replay)), "duplicate": True}
+                if (
+                    current["mode"] != "programmatic_review"
+                    or current["reviewer_agent_key"] != "eval_reviewer"
+                ):
+                    raise ConfigError("AGENT_EVAL_REVIEW_NOT_ENABLED", 409)
+                if current["status"] != "COMPLETED" or current["checks"].get("hard_fail", True):
+                    raise ConfigError("AGENT_EVAL_REVIEW_NOT_READY", 409)
+                attempt = int(current["model_review_attempt"])
+                if retry:
+                    if (
+                        attempt != expected_attempt
+                        or current["model_review_status"] != "UNAVAILABLE"
+                    ):
+                        raise ConfigError("AGENT_EVAL_VERSION_CONFLICT", 409)
+                elif attempt != 0 or expected_attempt != 0:
+                    raise ConfigError("AGENT_EVAL_VERSION_CONFLICT", 409)
+                timestamp = now()
+                value = {
+                    "id": str(uuid4()),
+                    "result_id": result_id,
+                    "attempt": attempt + 1,
+                    "requested_by": principal.user_id,
+                    "request_id": principal.request_id,
+                    "fingerprint": fingerprint,
+                    "status": "RUNNING",
+                    "review": None,
+                    "error_code": None,
+                    "created_at": timestamp,
+                    "finished_at": None,
+                }
+                await conn.execute(insert(model_reviews).values(**value))
+                await conn.execute(
+                    update(results)
+                    .where(results.c.id == result_id)
+                    .values(
+                        model_review_status="RUNNING",
+                        model_review_attempt=value["attempt"],
+                        model_review=None,
+                        model_review_error_code=None,
+                    )
+                )
+        except IntegrityError:
+            async with self.engine.connect() as conn:
+                replay = (
+                    (
+                        await conn.execute(
+                            select(model_reviews).where(
+                                model_reviews.c.request_id == principal.request_id
+                            )
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+            if replay is None:
+                raise ConfigError("AGENT_EVAL_VERSION_CONFLICT", 409) from None
+            if replay["requested_by"] != principal.user_id or replay["fingerprint"] != fingerprint:
+                raise ConfigError("AGENT_EVAL_REQUEST_CONFLICT", 409) from None
+            return {"attempt": self._model_attempt_public(dict(replay)), "duplicate": True}
+        return {"attempt": self._model_attempt_public(value), "duplicate": False}
+
+    async def finish_model_review(
+        self,
+        result_id: str,
+        attempt: int,
+        review: dict[str, Any] | None,
+        error_code: str | None,
+    ) -> None:
+        status = "COMPLETED" if review is not None else "UNAVAILABLE"
+        timestamp = now()
+        async with self.engine.begin() as conn:
+            changed = await conn.execute(
+                update(results)
+                .where(
+                    results.c.id == result_id,
+                    results.c.model_review_attempt == attempt,
+                    results.c.model_review_status == "RUNNING",
+                )
+                .values(
+                    model_review_status=status,
+                    model_review=review,
+                    model_review_error_code=error_code,
+                )
+            )
+            if changed.rowcount != 1:
+                return
+            await conn.execute(
+                update(model_reviews)
+                .where(model_reviews.c.result_id == result_id, model_reviews.c.attempt == attempt)
+                .values(status=status, review=review, error_code=error_code, finished_at=timestamp)
+            )
+
+    async def review_context(self, result_id: str) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        select(
+                            results,
+                            cases.c.case_json.label("case"),
+                            runs.c.reviewer_config_snapshot,
+                            runs.c.mode,
+                        )
+                        .join(runs, runs.c.id == results.c.run_id)
+                        .join(
+                            cases,
+                            and_(
+                                cases.c.dataset_id == runs.c.dataset_id,
+                                cases.c.case_id == results.c.case_id,
+                            ),
+                        )
+                        .where(results.c.id == result_id)
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+        return dict(row)
+
+    async def model_reviews_page(self, result_id: str, page: EvalModelReviewPage) -> dict[str, Any]:
+        async with self.engine.connect() as conn:
+            if await conn.scalar(select(results.c.id).where(results.c.id == result_id)) is None:
+                raise ConfigError("AGENT_EVAL_NOT_FOUND", 404)
+            total = int(
+                await conn.scalar(
+                    select(func.count())
+                    .select_from(model_reviews)
+                    .where(model_reviews.c.result_id == result_id)
+                )
+                or 0
+            )
+            rows = (
+                (
+                    await conn.execute(
+                        select(model_reviews)
+                        .where(model_reviews.c.result_id == result_id)
+                        .order_by(model_reviews.c.attempt.desc())
+                        .offset((page.page - 1) * page.page_size)
+                        .limit(page.page_size)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [self._model_attempt_public(dict(row)) for row in rows],
             "page": {"page": page.page, "page_size": page.page_size, "total": total},
         }

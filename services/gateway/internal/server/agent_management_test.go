@@ -356,13 +356,38 @@ func TestAgentHistoricalLookupRoutesAndRedaction(t *testing.T) {
 }
 
 func TestEvalResultListAndDetailHaveSeparateBoundedContracts(t *testing.T) {
-	common := `"id":"id","run_id":"run","case_id":"case","attempt":1,"status":"COMPLETED","checks":{"pass":true,"hard_fail":false},"created_at":"2026-10-16T00:00:00Z","error_code":null,"latency_ms":10,"finished_at":null`
+	common := `"id":"id","run_id":"run","case_id":"case","attempt":1,"status":"COMPLETED","checks":{"pass":true,"hard_fail":false},"created_at":"2026-10-16T00:00:00Z","error_code":null,"latency_ms":10,"finished_at":null,"review_version":0,"manual_review":null,"effective_pass":true,"model_review_status":"NOT_REQUESTED","model_review_attempt":0,"model_review":null,"model_review_error_code":null,"category":"basic","title":"例子"`
 	preview := json.RawMessage(`{` + common + `,"answer_preview":"预览"}`)
-	detail := json.RawMessage(`{` + common + `,"answer":"完整回答","model_summary":null}`)
+	detail := json.RawMessage(`{` + common + `,"answer":"完整回答","model_summary":null,"case":{}}`)
 	if !validEvalResult(preview, false) || !validEvalResult(detail, true) {
 		t.Fatal("valid list/detail response rejected")
 	}
 	if validEvalResult(detail, false) || validEvalResult(preview, true) {
 		t.Fatal("list/detail response contracts must not be interchanged")
+	}
+}
+
+func TestAgentHistorySanitizedToolTraceContract(t *testing.T) {
+	path := "/api/v1/agent/conversations/" + testConversationID + "/messages"
+	trace := `{"step":1,"call_id":"call_1","tool_name":"get_problem","status":"succeeded","duration_ms":4,"summary":"已获取授权信息"}`
+	makePayload := func(steps string) map[string]json.RawMessage {
+		var payload map[string]json.RawMessage
+		_ = json.Unmarshal([]byte(`{"conversation":{"id":"`+testConversationID+`","agent_key":"assistant","title":"历史"},"items":[{"id":1,"role":"user","content":"问题","status":"FAILED","error_code":"AGENT_MODEL_TIMEOUT","tool_steps":[`+steps+`]}],"next_before":null}`), &payload)
+		return payload
+	}
+	if !validAgentJSONEnvelope("GET", path, makePayload(trace)) {
+		t.Fatal("sanitized failed-run trace rejected")
+	}
+	for _, bad := range []string{strings.Replace(trace, `"step":1`, `"step":true`, 1), strings.Replace(trace, `"summary":`, `"output":"private","summary":`, 1), strings.Replace(trace, `"status":"succeeded"`, `"status":"invented"`, 1)} {
+		if validAgentJSONEnvelope("GET", path, makePayload(bad)) {
+			t.Fatal("unsafe trace accepted")
+		}
+	}
+	for _, content := range []string{`{"key":"assistant","name":"助手","default":true}`, `{"key":"assistant","name":"助手","default":true,"execution_mode":"direct"}`} {
+		var payload map[string]json.RawMessage
+		_ = json.Unmarshal([]byte(`{"items":[`+content+`],"default_skill_key":"assistant"}`), &payload)
+		if !validAgentJSONEnvelope("GET", "/api/v1/agent/agents/assistant/skills", payload) {
+			t.Fatal("old/new skill directory rejected")
+		}
 	}
 }

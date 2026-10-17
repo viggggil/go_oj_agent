@@ -61,7 +61,7 @@ export function validateConfiguration(kind: Resource, key: string, body: Content
       })
       if (error) return error
     }
-    return ['direct', 'react'].includes(skill.execution_mode) ? null : '请选择支持的回答方式'
+    return null
   }
   const agent = body as AgentContent
   if (

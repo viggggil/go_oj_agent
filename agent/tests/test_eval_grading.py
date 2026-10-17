@@ -64,9 +64,20 @@ def test_programmatic_checks_use_actual_tools_evidence_and_all_hard_failures() -
 
 
 def test_unimplemented_review_modes_are_rejected() -> None:
-    for mode in ("manual", "programmatic_review"):
+    for mode in ("manual",):
         with pytest.raises(ValidationError):
             EvalRunCreate.model_validate_json(
                 '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
                 '"agent_key":"learning_assistant","mode":"' + mode + '"}'
             )
+    with pytest.raises(ValidationError):
+        EvalRunCreate.model_validate_json(
+            '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
+            '"agent_key":"learning_assistant","mode":"programmatic_review"}'
+        )
+    value = EvalRunCreate.model_validate_json(
+        '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
+        '"agent_key":"learning_assistant","mode":"programmatic_review",'
+        '"reviewer_agent_key":"eval_reviewer"}'
+    )
+    assert value.reviewer_agent_key == "eval_reviewer"

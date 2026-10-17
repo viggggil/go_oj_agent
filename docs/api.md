@@ -667,11 +667,21 @@ event: done
 data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":{}}
 ```
 
-当前运行时只生成 `thinking`、`token`、`done`、`error` 四类事件；`thinking` 是短状态，
-不表示思维链，也不暴露工具内部数据。`error` 的 `data` 只有稳定错误码，`done` 的
-`data` 必须为空，并表示答案及 `COMPLETED` 状态已经持久化。事件序号在一个 Run 内严格
-递增，Gateway 会校验 UTF-8、UUID、事件类型、公开错误码、帧大小和序号后再转发；中间
-帧可能是 SSE 注释形式的 `: heartbeat`。不提供 SSE 续传或 `Last-Event-ID` 语义。
+真实 Runtime 使用统一 ReAct Graph，保留 `token/done/error`，新增以下严格 payload：
+
+| type | data 字段及限制 |
+| --- | --- |
+| progress | phase 为 preparing/analyzing/executing_tool/answering；message 为 1–256 字符 |
+| reasoning_summary | step 为 1–128 整数；text 为 1–400 字符，仅来自配置启用的 Provider 官方公开摘要 |
+| tool_call | step 为 1–128；call_id 为 1–128 字母数字/下划线/横线；tool 为合法工具名；status=started；label 为 1–128 字符 |
+| tool_result | 同一 step/call_id/tool；status=succeeded/failed/rejected；duration_ms 为 0–300000 整数；summary 为 1–256 字符 |
+| token | text 最多 32,000 字符；只有该事件参与答案正文拼接 |
+| done | 空 data；表示答案及 COMPLETED 已成功持久化 |
+| error | 仅包含公开稳定 code |
+
+保留历史 `thinking`（text 最多 256 字符）读取兼容；它不代表内部推理。Provider 不支持公开摘要时省略 reasoning_summary。进度不提供虚构百分比；工具事件不返回参数、原始结果、源码、私有片段或证据内部标识。
+
+同一 Run 的 sequence 严格递增，Gateway 和 Web 严格拒绝额外 payload 字段、错身份、重复调用开始、未关联/重复的结果以及含未完成工具的 done。错误终态允许中断尚未完成的工具。保持 UTF-8、UUID、公开错误码、帧大小、事件预算、背压和超时约束。心跳仍使用 SSE 注释，不提供 Last-Event-ID 续传。
 
 客户端断开、Gateway 总时限/空闲时限、上游 EOF 或写入失败都会取消 Run 或发送稳定的
 `error` 事件；没有收到 `done` 的 EOF 不能视为成功。一次接受请求创建新 Run，不按
@@ -684,7 +694,7 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 模型配置与选定 Skill 不兼容时，建流前返回 409 `AGENT_CONFIGURATION_UNSUPPORTED`；凭据引用不存在或撤销时返回 503。Gateway 使用已有状态映射，不透传内部错误正文。建流后的模型失败由 SSE error 表示，即使已有部分 token，也不能当成成功答案；done 仍表示最终持久化成功。
 
-内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；direct 模式不传 tools。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
+内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；没有授权工具时不传 tools，仍使用同一 ReAct Graph。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
 
 同会话续聊自动取本人最近最多 20 个成功完整轮次（候选最多 64,000 字符），再为本轮必需输入和输出预留预算，按 UTF-8 字节上界与逐消息开销裁剪最旧整轮。失败、取消、中断、RUNNING 和残缺消息不进入模型输入。历史被裁剪不会新增 SSE 事件；必需输入本身超限仍返回已有 AGENT_MODEL_INPUT_LIMIT。新对话没有历史。外部 Chat 请求、响应、错误码、Gateway 委托和 SSE envelope 不变，无需前端传递历史正文或供应商会话 ID。
 
@@ -692,12 +702,12 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 ### Issue #162 PR3：只读工具循环
 
-Skill 的 execution_mode 支持 direct 与 react；页面“回答方式”可选择直接回答或读取业务信息后回答。
-react 使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
+Issue #180 后 Skill 不再选择回答方式，所有真实 Run 使用统一 ReAct Graph。
+授权目录使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
 Responses 请求携带 function schema、parallel_tool_calls=false；校验 completed 中的 function_call 后，
 通过现有带 Agent 委托身份的 gRPC 执行工具，再按 call_id 回传 function_call_output。
-只回传校验后的 name/call_id/arguments，不重放供应商 reasoning、ID、状态或原始错误。
-工具结果仅进入本次模型输入，SSE 不新增工具参数/结果事件；允许模型最终答案引用已授权业务证据。
+只回传校验后的 name/call_id/arguments；明确启用 Provider 摘要能力时请求 reasoning.summary=auto 与 reasoning.encrypted_content，只有有界 encrypted_content 及官方 summary 字段可在本次请求局部续接。原始推理、未知字段及错误正文不重放、不落库或发给浏览器。
+工具结果仅进入本次模型输入；SSE 工具事件仅返回安全执行元数据，模型最终答案可以引用已授权证据。
 工具失败回传稳定 Tool 错误，拥有数据的 Go 服务仍校验授权；未读取成功不得声称已获取证据。
 
 每次模型尝试（含重试）累计消耗模型次数、输入和输出预算；工具批次累计限制 max_tool_calls。
@@ -780,14 +790,15 @@ Gateway 只返回允许的稳定错误码，不透传异常正文。请求体默
 1 MiB，均不接受压缩请求；管理请求使用普通 HTTP deadline，不占用 Chat 的长时间预算。
 
 Agent/Prompt/Skill content 使用严格配置 Schema。Prompt 为 name/text/variables，变量仅
-language/problem_id/submission_id。新 Skill 为 name/description/text/execution_mode/allowed_tools，
+language/problem_id/submission_id。新 Skill 为 name/description/text/allowed_tools，
 text 是 1–32,000 字符的任务说明，description 最多 512 字符；文本默认是普通正文，花括号不展开。
 Skill 不设置预算时继承 Agent 和部署上限。兼容旧 Skill 的 prompt_id/budget；text 与 prompt_id
 必须二选一。前端编辑旧 Skill 时复制历史 Prompt 正文为内置文本，保留 variables（包括空列表，
 用于旧模板字面括号转义），保存生成新版本并移除旧 Prompt 绑定/Skill 预算；旧版本继续有效。
 内置 variables 仅用于兼容迁移，声明时沿用 Prompt 模板校验。
+新 Skill 管理写请求出现 execution_mode 返回 409 AGENT_CONFIGURATION_UNSUPPORTED；历史不可变版本和 Run/Eval 快照仍可读取该字段，但它不参与图选择。复制旧版恢复使用历史解析，不改写原版本及其哈希。新 Run 带 runtime_version=react_v2。
 Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
-visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；运行模式支持 direct/react。
+visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；所有真实 Run 统一使用 ReAct。
 test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
 
 真实模式的模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
@@ -801,7 +812,7 @@ Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 
 禁用或部署网络策略不允许时仍可查元数据，available=false；响应严格禁止 Provider/凭据字段。
 
 Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调用/统计/编辑接口。
-普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/description/execution_mode/default
+普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/description/default
 及 default_skill_key。权限/可运行条件在 SQL 分页前过滤，普通用户看不到 test/admin Agent，
 不可访问 Skill 子目录统一 404；目录不返回 Prompt、模型、Provider 或预算。Chat 每次重新
 校验权限。Chat 关闭、demo 配置或 Runtime disabled 时目录为空，不将数据库配置伪装为可运行。
@@ -906,7 +917,19 @@ GET  /api/v1/admin/agent/evals/runs/{run_id}
 POST /api/v1/admin/agent/evals/runs/{run_id}/cancel
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
+POST /api/v1/admin/agent/evals/results/{result_id}/review
+GET  /api/v1/admin/agent/evals/results/{result_id}/reviews
+POST /api/v1/admin/agent/evals/results/{result_id}/review-agent
+GET  /api/v1/admin/agent/evals/results/{result_id}/model-reviews
 ```
+
+`POST /results/{result_id}/review-agent` 只允许对当前 `UNAVAILABLE` 的模型评审重跑，
+请求体为 `{ "expected_attempt": 1 }`，需要管理员权限和 `X-Request-ID` UUID。评审配置在
+创建运行时固定为管理员专用的 `eval_reviewer` Agent（无工具、无知识库、
+`deepseek-v4-pro`、单次模型调用），请求返回 `{attempt,duplicate}`。评审输出必须是单个严格
+JSON，包含五个 0–4 分维度；调用失败、超时、身份不匹配或 JSON 不合格都记为
+`UNAVAILABLE`，不能计为通过。`GET /model-reviews` 返回按 attempt 倒序的有界审计记录。
+人工结论优先于模型结论，程序化硬失败不可被任何评审覆盖。
 
 上传正文是受限 JSON 请求，包含 `name`、`description` 和 UTF-8 JSONL `content`。Agent
 服务逐行校验 Case，只接受 `user`/`assistant` 对话并拒绝重复 ID、system/tool 伪造消息和
@@ -916,7 +939,7 @@ GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
 
 运行创建请求包含 `dataset_id`（UUID）、`agent_key`、`mode=programmatic`、
 `repeat_count`（默认 1，范围 1–3）和 `concurrency`（默认 1，范围 1–8）。
-只支持程序化模式，未实现的 manual/programmatic_review 返回 400。
+支持 `programmatic` 和 `programmatic_review`；后者在创建时固定专用评审 Agent 配置。
 服务在创建时固定 Agent/Prompt/Skill/Model/Provider/知识版本；每个 Case 的 user turn
 通过普通 Runtime 按真实生成历史执行，assistant turn 仅保留为参考。
 fixture.principal 必须是部署 `AGENT_EVAL_PRINCIPALS` 中配置的专用账号别名，执行角色固定 user，
@@ -934,18 +957,21 @@ Run 冻结后，配置替换/停用不改变该批次的固定内容；新建 Ru
 凭据撤销、业务 RPC 权限与 RAG 当前授权仍由原 Runtime 在实际调用时检查，不因快照豁免。
 
 Run 列表使用 page/page_size（最多 100），可选 status，按 created_at/id 倒序；
-结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序，
-未知 Run 返回 404。列表只返回基础元数据、512 字符 `answer_preview` 和 checks 的 pass/hard_fail，
+结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序。
+支持 `verdict=pass|fail|hard_fail|unreviewed`、精确 `category`、精确 `error_code` 及字面包含 `search`（Case ID），筛选发生在分页前。
+pass/fail 按有效结论，unreviewed 按 review_version=0。
+未知 Run 返回 404。列表只返回基础元数据、类别/标题、512 字符 `answer_preview`、checks 的 pass/hard_fail、
+`review_version`、`manual_review: null | {pass}` 和 `effective_pass`，
 避免完整回答与检查在一页聚合后超出 Gateway 的 1 MiB 响应上限。
 `GET /runs/{run_id}/results/{result_id}` 返回 `{result}`，包含各轮回答（至多 32000 字符）、
-完整程序化检查与有界模型/工具/知识摘要；未知结果或 run/result 不属于同一批次返回 404。
+完整程序化检查、有界模型/工具/知识摘要及不可变数据集 `case`、完整 `manual_review`；未知结果或 run/result 不属于同一批次返回 404。
 不保存 Provider 原始响应、内部推理、工具原文和凭据。
 required_facts/forbidden_claims/must_not_leak 是对实际回答的大小写不敏感字面检查，
 required_tools/forbidden_tools 使用实际调用名称，required_evidence 使用实际来源题号/标题/章节。
 
 同一管理员和同一正文使用相同 `X-Request-ID` 创建只返回已有运行，正文或创建者不同返回
 409 AGENT_EVAL_REQUEST_CONFLICT；重试不重新解析活动配置。达到部署准入上限返回
-503 AGENT_EVAL_UNAVAILABLE。创建响应 `{run,duplicate}`，运行详情/取消响应 `{run}`，
+503 AGENT_EVAL_UNAVAILABLE。创建响应 `{run,duplicate}`，运行详情响应 `{run,metrics}`，取消响应 `{run}`，
 列表响应 `{items,page:{page,page_size,total}}`。公开 run.config_snapshot 只含配置 UUID/hash、
 知识范围/版本、执行模式和预算，不含 Prompt/Skill 正文、Provider 地址或凭据配置。
 运行列表的快照进一步将 knowledge_versions 列表替换为 knowledge_version_count；
@@ -1709,3 +1735,64 @@ Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR
 attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源位置。运行中可查询固定清单，检索记录在终态持久化后出现；不返回完整 config_snapshot/model_summary、Provider 配置、query 或片段。无检索的旧 Run 兼容返回空清单和空 attempts。RAG 页支持输入 Run UUID 或管理员当前聊天的“查看本轮知识来源”链接。
 
 新增兼容性 gRPC：`contest.v1.ContestService/CheckKnowledgeAccess`，请求 `problem_ids` 为 1–100 个不重复正 int64，返回 `allowed_problem_ids` 子集，不返回比赛列表/身份。需可信内部主体；Contest 从自身数据库排除所有 `status != archived AND end_at > UTC_TIMESTAMP(3)` 的关联题目，管理员同样不豁免。该结果只确认比赛限制，Agent 还必须通过 Problem `BatchGetProblems` 确认题目 normal/可见；未知、归档及不可访问题目均排除。Python bindings、Go generated server/client、Agent RPC 白名单与部署配置同步更新；Gateway 不公开此 RPC。无新增事件/表/列，升级先部署业务 RPC 与白名单并重启加载配置，再部署 Agent；旧服务返回 Unimplemented 时检索失败关闭。
+
+### Eval PR3：运行页面与人工评审
+
+管理员 `/agent/eval` 页面保留左侧导航，支持分页数据集与样例、上传 UTF-8 JSONL 文件或文本、选择 Agent/数据集/并发/重复次数、运行进度和取消、结果筛选/详情、人工评分与修改记录。
+`?tab=runs&run={uuid}` 可恢复运行详情；轮询在离开页面时停止，切换批次不复用旧结果。
+支持 `programmatic` 与 `programmatic_review` 两种运行模式；后者使用固定的管理员专用评审 Agent。
+导出和 CLI 仍在后续阶段。
+
+运行详情增加 `metrics`：`recorded_cases`、`check_passes`、`effective_passes`、`reviewed_cases`、
+`model_reviewed_cases`、`model_review_unavailable`、`model_passes`、`average_latency_ms`（无结果时为 null）。
+统计按已落库结果计算，不因结果分页或当前筛选变化。
+`effective_pass` 只在执行 COMPLETED 且无 hard_fail 时可能为 true：有人工评审则取最新人工 pass，
+否则启用模型评审时取可用模型 pass，否则取程序 checks.pass；启用模型评审但不可用时不通过。
+硬失败和非 COMPLETED 结果始终不通过。COMPLETED 状态只表示执行结束。
+
+`POST /evals/results/{result_id}/review` 正文：
+
+```json
+{
+  "expected_version": 0,
+  "scores": {
+    "task_completion": 4,
+    "technical_correctness": 4,
+    "evidence_support": 3,
+    "instruction_following": 4,
+    "clarity": 4
+  },
+  "pass": true,
+  "tags": ["人工复核"],
+  "note": "关键事实语义一致。",
+  "reason": "依据题面和实际回答复核。"
+}
+```
+
+五维分数必须是 0–4 整数，不接受布尔；tags 最多 10 个不同非空标签，每个 32 字符，note 最多 2000 字符，reason 必填且最多 512 字符。
+请求要求规范 UUID `X-Request-ID`；`expected_version=0` 表示首次评审，之后按详情 review_version 保存。
+成功响应 `{review,review_version,duplicate}`；review 包含 pass/scores/tags/note/reviewed_by/reviewed_at。
+保存结果当前评分和追加审计在 Agent 自有数据库同一事务完成，result 行锁防止并发丢失。
+版本冲突返回 409 AGENT_EVAL_VERSION_CONFLICT；试图将 hard_fail 或非 COMPLETED 结果改为通过返回 409 AGENT_EVAL_HARD_FAILURE。
+人工结论不修改 checks，不删除原始程序失败。相同 request ID/操作者/结果/正文重放返回原审计版本（duplicate=true），即使后续已有更新也不覆盖当前评分；异正文、操作者或结果返回 409 AGENT_EVAL_REQUEST_CONFLICT。
+
+`GET /evals/results/{result_id}/reviews` 使用 page/page_size（默认 10，最多 20），按 version 倒序，返回 `{items,page}`。
+每条含 id/result_id/version/reviewed_by/old_value/new_value/reason/created_at，不公开指纹或请求 ID。
+普通用户两层授权均拒绝，未知结果返回 404。
+网页在保存结果不确定时保留草稿与 request ID；409 保留草稿，要求显式加载最新评分后再次提交。
+
+模型评审模式的运行请求额外包含 `reviewer_agent_key: "eval_reviewer"`。专用 Agent 必须是管理员可见、
+无工具、无知识库、`deepseek-v4-pro` 且最多一次模型调用；运行快照保存其版本元数据，不公开 Prompt 正文和 Provider 凭据。
+评审结果严格校验 `case_id`、五个 0–4 整数分数、`hard_fail` 与 `pass` 的关系；任何调用/解析失败为 `UNAVAILABLE`，
+不会计为通过。管理员可通过 `review-agent` 重跑单条不可用评审，审计记录按 attempt 保存。
+
+兼容发布：先执行 `000007_create_eval_reviews` 和 `000008_create_eval_model_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
+新 Gateway 采用扩展后的严格结果契约，不能长期与旧 Agent 混用。
+
+### Issue #180：脱敏工具轨迹与历史兼容
+
+ModelSummary 保留 tools/attempts/knowledge，并增加最多 128 条 tool_steps：step、call_id、tool_name、parameter_validation（valid/invalid/rejected）、status（succeeded/failed/rejected）、error_code、duration_ms、summary、evidence_refs。仅存稳定安全元数据，不存原始参数/结果、源码或内部推理。旧 JSON 没有 tool_steps 时按空列表解析。
+
+GET /api/v1/agent/conversations/{id}/messages 在会话归属验证后，为 assistant 消息增加 tool_steps，仅包含 step/call_id/tool_name/status/duration_ms/summary；用户消息为空列表。旧消息为空列表。浏览器刷新可恢复工具时间线；进度、公开摘要不作为聊天正文或后续历史输入持久化。
+
+Eval Reviewer 取消对 Direct Mode 的依赖，仍固定管理员可见、deepseek-v4-pro、无工具/知识范围、单模型调用、最多 60 秒、严格 JSON；评分输出 token 上限提高到 8,000，兼容旧 2,000 上限快照。

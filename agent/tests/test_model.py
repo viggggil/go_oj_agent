@@ -3,7 +3,7 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import httpx
@@ -18,8 +18,16 @@ from app.graphs.model_runtime import ModelRuntime
 from app.graphs.service import RunService
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
 from app.models.provider import ModelFailure
-from app.models.runtime import AgentState, ChatRequest, HistoryMessage
+from app.models.runtime import AgentState, ChatRequest, HistoryMessage, StreamEvent
 from tests.test_runtime import MemoryStore, Reader, state
+
+
+async def next_type(iterator: Any, kind: str) -> StreamEvent:
+    while True:
+        event = await anext(iterator)
+        if event.type == kind:
+            return cast(StreamEvent, event)
+        assert event.type == "progress"
 
 
 def frame(event: dict[str, Any]) -> bytes:
@@ -144,8 +152,8 @@ async def test_first_token_precedes_completion_and_incomplete_history_is_exclude
     value.config_snapshot["model_profile"]["verbosity"] = "high"
     iterator = ModelRuntime(client, Credentials()).run(value)
     try:
-        assert (await anext(iterator)).type == "thinking"
-        token = await asyncio.wait_for(anext(iterator), 1)
+        assert (await anext(iterator)).type == "progress"
+        token = await asyncio.wait_for(next_type(iterator, "token"), 1)
         assert token.type == "token" and not gate.is_set()
         if native_verbosity:
             assert calls[0]["text"] == {"verbosity": "high"}
@@ -412,8 +420,8 @@ async def test_cancel_closes_upstream_and_persists_cancelled_run() -> None:
     service = RunService(store, ModelRuntime(client, Credentials()), reader)
     accepted = await service.accept(ChatRequest(message="hello"), state().principal)
     try:
-        assert (await anext(accepted.events)).type == "thinking"
-        assert (await anext(accepted.events)).type == "token"
+        assert (await anext(accepted.events)).type == "progress"
+        assert (await next_type(accepted.events, "token")).type == "token"
         await accepted.aclose()
         assert stream.closed and store.record is not None and store.record.status == "CANCELLED"
         assert not store.answers
@@ -563,10 +571,10 @@ async def test_graph_backpressure_and_tracing_stay_local(monkeypatch: pytest.Mon
     prepare = DirectAnswer.prepare
     validate = DirectAnswer.validate_answer
 
-    def traced_prepare(self: DirectAnswer, value: AgentState) -> Any:
+    def traced_prepare(self: DirectAnswer, value: AgentState, **kwargs: Any) -> Any:
         assert get_tracing_context()["enabled"] is False
         stages.append("prepare")
-        return prepare(self, value)
+        return prepare(self, value, **kwargs)
 
     def traced_validate(self: DirectAnswer, value: AgentState, answer: str) -> None:
         assert get_tracing_context()["enabled"] is False
@@ -592,13 +600,13 @@ async def test_graph_backpressure_and_tracing_stay_local(monkeypatch: pytest.Mon
     iterator = ModelRuntime(client, Credentials()).run(configured())
     try:
         with tracing_context(enabled=True):
-            assert (await anext(iterator)).type == "thinking"
+            assert (await anext(iterator)).type == "progress"
             # 消费者还没请求下一事件，不能读取供应商。
             assert stages == ["prepare"]
-            assert (await anext(iterator)).data["text"] == "前"
+            assert (await next_type(iterator, "token")).data["text"] == "前"
             await asyncio.sleep(0)
             assert stages == ["prepare", "read"]
-            assert (await anext(iterator)).data["text"] == "后"
+            assert (await next_type(iterator, "token")).data["text"] == "后"
             assert (await anext(iterator)).type == "done"
             assert stages == ["prepare", "read", "read", "read", "validate"]
             assert get_tracing_context()["enabled"] is True
@@ -623,13 +631,17 @@ async def test_shared_graph_keeps_concurrent_runs_isolated() -> None:
     first.user_message, second.user_message = "第一轮", "第二轮"
     iterator = runtime.run(first)
     try:
-        assert (await anext(iterator)).type == "thinking"
-        assert (await anext(iterator)).data["text"] == "第一轮"
+        assert (await anext(iterator)).type == "progress"
+        assert (await next_type(iterator, "token")).data["text"] == "第一轮"
         # 第一条流暂停时，同一个编译图上的另一条流可以独立完成。
         events = [event async for event in runtime.run(second)]
-        assert [event.sequence for event in events] == [1, 2, 3]
+        assert [event.sequence for event in events] == list(range(1, len(events) + 1))
         assert all(event.run_id == second.run_id for event in events)
-        assert events[1].data["text"] == "第二轮" and streams["第二轮"].closed
+        assert (
+            "".join(event.data.get("text", "") for event in events if event.type == "token")
+            == "第二轮"
+            and streams["第二轮"].closed
+        )
         assert not streams["第一轮"].closed
         await iterator.aclose()
         assert streams["第一轮"].closed
@@ -669,7 +681,8 @@ async def test_deadline_and_cancel_close_graph_waiting_for_first_token(cancel: b
     accepted = await service.accept(ChatRequest(message="算法"), state().principal)
     try:
         async with accepted:
-            assert (await anext(accepted.events)).type == "thinking"
+            assert (await anext(accepted.events)).type == "progress"
+            assert (await anext(accepted.events)).data["phase"] == "analyzing"
             task = asyncio.ensure_future(anext(accepted.events))
             await asyncio.wait_for(started.wait(), 1)
             if cancel:
@@ -709,8 +722,8 @@ async def test_provider_timeout_while_token_is_paused_keeps_failure_classificati
     accepted = await service.accept(ChatRequest(message="算法"), state().principal)
     try:
         async with accepted:
-            assert (await anext(accepted.events)).type == "thinking"
-            assert (await anext(accepted.events)).type == "token"
+            assert (await anext(accepted.events)).type == "progress"
+            assert (await next_type(accepted.events, "token")).type == "token"
             # 不确认 token，等 Provider 总超时主动关闭上游，再继续消费。
             await asyncio.wait_for(closed.wait(), 2)
             event = await anext(accepted.events)

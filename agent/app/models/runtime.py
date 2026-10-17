@@ -10,7 +10,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.provider import ModelSummary
 
 RunStatus = Literal["RUNNING", "COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"]
-EventType = Literal["thinking", "token", "done", "error"]
+EventType = Literal[
+    "thinking",
+    "progress",
+    "reasoning_summary",
+    "tool_call",
+    "tool_result",
+    "token",
+    "done",
+    "error",
+]
+_TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{1,127}$")
+_CALL_ID = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
+_ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 
 
 class Principal(BaseModel):
@@ -99,15 +111,66 @@ class StreamEvent(BaseModel):
     def validate_payload(self) -> "StreamEvent":
         if self.type in {"thinking", "token"}:
             text = self.data.get("text")
-            maximum = 256 if self.type == "thinking" else 32_000
+            maximum = {"thinking": 256, "reasoning_summary": 400, "token": 32_000}[self.type]
             if set(self.data) != {"text"} or not isinstance(text, str) or len(text) > maximum:
                 raise ValueError("Invalid event text")
+        elif self.type == "reasoning_summary":
+            if (
+                set(self.data) != {"step", "text"}
+                or type(self.data.get("step")) is not int
+                or not 1 <= self.data["step"] <= 128
+                or not isinstance(self.data.get("text"), str)
+                or not 1 <= len(self.data["text"]) <= 400
+            ):
+                raise ValueError("Invalid reasoning summary")
+        elif self.type == "progress":
+            phase, message = self.data.get("phase"), self.data.get("message")
+            if (
+                set(self.data) != {"phase", "message"}
+                or phase not in {"preparing", "analyzing", "executing_tool", "answering"}
+                or not isinstance(message, str)
+                or not 1 <= len(message) <= 256
+            ):
+                raise ValueError("Invalid progress event")
+        elif self.type == "tool_call":
+            if (
+                set(self.data) != {"step", "call_id", "tool", "status", "label"}
+                or not isinstance(self.data.get("step"), int)
+                or isinstance(self.data.get("step"), bool)
+                or not 1 <= self.data["step"] <= 128
+                or not isinstance(self.data.get("call_id"), str)
+                or not _CALL_ID.fullmatch(self.data["call_id"])
+                or not isinstance(self.data.get("tool"), str)
+                or not _TOOL_NAME.fullmatch(self.data["tool"])
+                or self.data.get("status") != "started"
+                or not isinstance(self.data.get("label"), str)
+                or not 1 <= len(self.data["label"]) <= 128
+            ):
+                raise ValueError("Invalid tool call event")
+        elif self.type == "tool_result":
+            if (
+                set(self.data) != {"step", "call_id", "tool", "status", "duration_ms", "summary"}
+                or not isinstance(self.data.get("step"), int)
+                or isinstance(self.data.get("step"), bool)
+                or not 1 <= self.data["step"] <= 128
+                or not isinstance(self.data.get("call_id"), str)
+                or not _CALL_ID.fullmatch(self.data["call_id"])
+                or not isinstance(self.data.get("tool"), str)
+                or not _TOOL_NAME.fullmatch(self.data["tool"])
+                or self.data.get("status") not in {"succeeded", "failed", "rejected"}
+                or not isinstance(self.data.get("duration_ms"), int)
+                or isinstance(self.data.get("duration_ms"), bool)
+                or not 0 <= self.data["duration_ms"] <= 300_000
+                or not isinstance(self.data.get("summary"), str)
+                or len(self.data["summary"]) > 256
+            ):
+                raise ValueError("Invalid tool result event")
         elif self.type == "error":
             code = self.data.get("code")
             if (
                 set(self.data) != {"code"}
                 or not isinstance(code, str)
-                or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", code)
+                or not _ERROR_CODE.fullmatch(code)
             ):
                 raise ValueError("Invalid public error code")
         elif self.data:
@@ -121,6 +184,74 @@ class StreamEvent(BaseModel):
             run_id=state.run_id,
             conversation_id=state.conversation_id,
             data={"text": text},
+            sequence=sequence,
+        )
+
+    @classmethod
+    def progress(cls, state: AgentState, phase: str, message: str, sequence: int) -> "StreamEvent":
+        return cls(
+            type="progress",
+            run_id=state.run_id,
+            conversation_id=state.conversation_id,
+            data={"phase": phase, "message": message},
+            sequence=sequence,
+        )
+
+    @classmethod
+    def reasoning_summary(
+        cls, state: AgentState, text: str, sequence: int, *, step: int = 1
+    ) -> "StreamEvent":
+        return cls(
+            type="reasoning_summary",
+            run_id=state.run_id,
+            conversation_id=state.conversation_id,
+            data={"step": step, "text": text},
+            sequence=sequence,
+        )
+
+    @classmethod
+    def tool_call(
+        cls, state: AgentState, *, step: int, call_id: str, tool: str, label: str, sequence: int
+    ) -> "StreamEvent":
+        return cls(
+            type="tool_call",
+            run_id=state.run_id,
+            conversation_id=state.conversation_id,
+            data={
+                "step": step,
+                "call_id": call_id,
+                "tool": tool,
+                "status": "started",
+                "label": label,
+            },
+            sequence=sequence,
+        )
+
+    @classmethod
+    def tool_result(
+        cls,
+        state: AgentState,
+        *,
+        step: int,
+        call_id: str,
+        tool: str,
+        status: str,
+        duration_ms: int,
+        summary: str,
+        sequence: int,
+    ) -> "StreamEvent":
+        return cls(
+            type="tool_result",
+            run_id=state.run_id,
+            conversation_id=state.conversation_id,
+            data={
+                "step": step,
+                "call_id": call_id,
+                "tool": tool,
+                "status": status,
+                "duration_ms": duration_ms,
+                "summary": summary,
+            },
             sequence=sequence,
         )
 

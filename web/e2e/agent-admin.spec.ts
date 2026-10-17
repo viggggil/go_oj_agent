@@ -407,6 +407,9 @@ test('普通用户管理 URL 转到对话，不读取管理正文；失败详情
   await expect(page).toHaveURL(/\/agent\/chat$/)
   expect(requests.some((url) => url.includes('/api/v1/admin/agent/'))).toBe(false)
   await expect(page.getByRole('link', { name: 'Prompt', exact: true })).toHaveCount(0)
+  await page.goto('/agent/eval')
+  await expect(page).toHaveURL(/\/agent\/chat$/)
+  expect(requests.some((url) => url.includes('/api/v1/admin/agent/'))).toBe(false)
 })
 
 test('管理员详情 404 可重试，正文作为纯文本显示', async ({ page }) => {

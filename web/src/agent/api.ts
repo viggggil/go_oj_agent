@@ -53,12 +53,12 @@ export const agentApi = {
     expected
       ? api.put<{ configuration: Configuration }>(
           `${base}/${kind}/${key}`,
-          { expected_id: expected, content },
+          { expected_id: expected, content: writableContent(kind, content) },
           { ...bounded, signal, headers: { 'X-Request-ID': requestId } },
         )
       : api.post<{ configuration: Configuration }>(
           `${base}/${kind}`,
-          { ...(key ? { key } : {}), content },
+          { ...(key ? { key } : {}), content: writableContent(kind, content) },
           { ...bounded, signal, headers: { 'X-Request-ID': requestId } },
         ),
   action: (
@@ -107,12 +107,15 @@ export function agentError(error: unknown): string {
     AGENT_CONFIGURATION_REQUEST_CONFLICT: '请求编号已用于其他操作，请重新确认本次内容',
     AGENT_CONFIGURATION_REFERENCE_INVALID: '绑定版本不存在、已归档或已停用，请检查依赖',
     AGENT_CONFIGURATION_TOOL_INVALID: '工具不存在或未启用，请检查工具选择',
-    AGENT_CONFIGURATION_UNSUPPORTED: '模型或执行模式不受支持，请重新选择',
+    AGENT_CONFIGURATION_UNSUPPORTED: '模型或配置字段不受支持，请检查配置',
     AGENT_CONFIGURATION_TEST_EXPIRED: '测试 Agent 的到期时间必须在未来',
     AGENT_MODEL_ENDPOINT_DENIED: '模型地址不在部署允许范围内',
     AGENT_EVAL_DATASET_INVALID: '数据集格式不正确，请检查 JSONL 内容',
-    AGENT_EVAL_NOT_FOUND: '评测数据集不存在或已被移除',
-    AGENT_EVAL_UNAVAILABLE: '评测数据集服务暂不可用',
+    AGENT_EVAL_NOT_FOUND: '评测数据集、运行或结果不存在',
+    AGENT_EVAL_VERSION_CONFLICT: '内容已有变化，请加载最新版本后确认操作',
+    AGENT_EVAL_REQUEST_CONFLICT: '请求编号已用于其他内容，请重新确认本次操作',
+    AGENT_EVAL_HARD_FAILURE: '硬失败或执行未成功的样例不能标记为通过',
+    AGENT_EVAL_UNAVAILABLE: '评测服务暂不可用或排队已满，请稍后重试',
   }
   const code = body?.reason || body?.code || ''
   if (messages[code]) return messages[code]
@@ -130,4 +133,10 @@ export function agentError(error: unknown): string {
       } as Record<number, string>
     )[error.response.status] || '服务暂时不可用，请稍后重试'
   )
+}
+
+function writableContent(kind: Resource, content: Content): Content {
+  const value = { ...content }
+  if (kind === 'skills' && 'execution_mode' in value) delete value.execution_mode
+  return value
 }

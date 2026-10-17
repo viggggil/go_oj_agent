@@ -225,6 +225,7 @@ class AgentStore:
                 agent_messages.c.content,
                 agent_runs.c.status,
                 agent_runs.c.error_code,
+                agent_runs.c.model_summary,
             )
             .select_from(
                 agent_messages.outerjoin(agent_runs, agent_messages.c.run_id == agent_runs.c.id)
@@ -241,7 +242,31 @@ class AgentStore:
         async with self._engine.connect() as connection:
             rows = (await connection.execute(query)).mappings().all()
         # 四条完整消息，即使 JSON 转义达到每字符六字节，也小于 Gateway 的 1 MiB 上限。
-        items = [dict(row) for row in reversed(rows[:4])]
+        items = []
+        for row in reversed(rows[:4]):
+            item = dict(row)
+            summary = item.pop("model_summary", None)
+            item["tool_steps"] = []
+            if (item["role"] == "assistant" or item["status"] != "COMPLETED") and isinstance(
+                summary, dict
+            ):
+                # 上方会话归属校验同时保护持久化的脱敏工具轨迹。
+                for raw in summary.get("tool_steps", [])[:32]:
+                    item["tool_steps"].append(
+                        {
+                            key: raw[key]
+                            for key in (
+                                "step",
+                                "call_id",
+                                "tool_name",
+                                "status",
+                                "duration_ms",
+                                "summary",
+                            )
+                            if key in raw
+                        }
+                    )
+            items.append(item)
         return {
             "conversation": {
                 "id": conversation.id,

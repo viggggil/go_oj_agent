@@ -13,7 +13,7 @@
   },
   "skill": {
     "key": "algorithm_explain",
-    "content": {"name": "算法讲解", "execution_mode": "direct", "allowed_tools": []}
+    "content": {"name": "算法讲解", "allowed_tools": []}
   },
   "agent": {
     "key": "learning_assistant",

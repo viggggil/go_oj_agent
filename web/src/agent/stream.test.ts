@@ -90,3 +90,58 @@ it('done 后不接受额外业务帧或不完整尾帧', () => {
   other.push(encode.encode(frame(event('done', 1)) + 'data: tail'))
   expect(() => other.finish()).toThrow()
 })
+
+it('公开过程与工具时间线关联校验，拒绝原始结果、错配、重复和未完成终态', () => {
+  const call = {
+    step: 1,
+    call_id: 'call_1',
+    tool: 'get_problem',
+    status: 'started',
+    label: '查询题目',
+  }
+  const result = {
+    step: 1,
+    call_id: 'call_1',
+    tool: 'get_problem',
+    status: 'succeeded',
+    duration_ms: 12,
+    summary: '已获取授权信息',
+  }
+  const seen: ChatEvent[] = []
+  const parser = new AgentStreamParser(identity, (value) => seen.push(value))
+  const events = [
+    event('progress', 1, { phase: 'preparing', message: '准备上下文' }),
+    event('reasoning_summary', 2, { step: 1, text: '需要确认授权信息' }),
+    event('tool_call', 3, call),
+    event('tool_result', 4, result),
+    event('token', 5, { text: '最终答案' }),
+    event('done', 6),
+  ]
+  for (const value of events) parser.push(encode.encode(frame(value)))
+  parser.finish()
+  expect(
+    seen
+      .filter((value) => value.type === 'token')
+      .map((value) => value.data.text)
+      .join(''),
+  ).toBe('最终答案')
+  for (const invalid of [
+    event('tool_result', 2, result),
+    event('tool_result', 2, { ...result, output: 'private' }),
+    event('reasoning_summary', 2, { step: 1, text: 'x'.repeat(401) }),
+    event('progress', 2, { phase: 'invented', message: 'x' }),
+  ]) {
+    const other = new AgentStreamParser(identity, () => {})
+    expect(() => other.push(encode.encode(frame(invalid)))).toThrow()
+  }
+  for (const invalid of [
+    event('tool_call', 2, call),
+    event('tool_result', 2, { ...result, call_id: 'other' }),
+    event('tool_result', 2, { ...result, tool: 'other_tool' }),
+    event('done', 2),
+  ]) {
+    const other = new AgentStreamParser(identity, () => {})
+    other.push(encode.encode(frame(event('tool_call', 1, call))))
+    expect(() => other.push(encode.encode(frame(invalid)))).toThrow()
+  }
+})

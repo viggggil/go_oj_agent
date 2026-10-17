@@ -56,11 +56,27 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
     return route.fulfill({
       headers,
       body:
-        frame('thinking', 1, { text: '整理中' }) +
-        frame('token', 2, {
+        frame('progress', 1, { phase: 'analyzing', message: '正在分析任务' }) +
+        frame('reasoning_summary', 2, { step: 1, text: '先读取授权题目。' }) +
+        frame('tool_call', 3, {
+          step: 1,
+          call_id: 'call_problem',
+          tool: 'get_problem',
+          status: 'started',
+          label: '读取题目',
+        }) +
+        frame('tool_result', 4, {
+          step: 1,
+          call_id: 'call_problem',
+          tool: 'get_problem',
+          status: 'succeeded',
+          duration_ms: 12,
+          summary: '已获取授权信息',
+        }) +
+        frame('token', 5, {
           text: '中文回答\n\n```cpp\nint x = 1;\n```\n\n<script>window.chatXSS=1</script>\n[jump](javascript:alert(1))',
         }) +
-        frame('done', 3),
+        frame('done', 6),
     })
   })
   await page.goto('/agent/chat')
@@ -75,6 +91,10 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
   await page.getByLabel('消息', { exact: true }).press('Control+Enter')
   await expect(page.getByRole('status')).toHaveText('回答完成')
   await expect(page.locator('.assistant')).toContainText('中文回答')
+  await page.locator('.chat-activity summary').click()
+  await expect(page.locator('.chat-activity')).toContainText('先读取授权题目。')
+  await expect(page.locator('.chat-activity .succeeded')).toContainText('get_problem：成功')
+  await expect(page.locator('.chat-content.markdown')).not.toContainText('已获取授权信息')
   await expect(page.locator('.assistant script, .assistant a[href^="javascript:"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '复制代码' })).toBeVisible()
   await expect(page.getByRole('button', { name: '复制', exact: true })).toBeVisible()

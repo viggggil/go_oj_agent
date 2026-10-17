@@ -491,3 +491,55 @@ func TestAgentFrameAcceptsStableModelErrorsOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentActivityContractAndCorrelation(t *testing.T) {
+	call := map[string]any{"step": 1, "call_id": "call_1", "tool": "get_problem", "status": "started", "label": "查询题目"}
+	result := map[string]any{"step": 1, "call_id": "call_1", "tool": "get_problem", "status": "succeeded", "duration_ms": 12, "summary": "已获取授权信息"}
+	identity := &agentStreamIdentity{RunID: testRunID, ConversationID: testConversationID}
+	for index, event := range []struct {
+		kind string
+		data any
+	}{
+		{"progress", map[string]any{"phase": "preparing", "message": "准备上下文"}},
+		{"reasoning_summary", map[string]any{"step": 1, "text": "需要确认授权信息"}},
+		{"tool_call", call}, {"tool_result", result}, {"token", map[string]string{"text": "最终答案"}}, {"done", map[string]string{}},
+	} {
+		if _, err := validateAgentFrame([]byte(testAgentFrame(event.kind, index+1, event.data)), identity); err != nil {
+			t.Fatalf("%s: %v", event.kind, err)
+		}
+	}
+	for _, scenario := range []string{"orphan", "duplicate_start", "wrong_tool", "private_result", "incomplete_done", "duplicate_result"} {
+		t.Run(scenario, func(t *testing.T) {
+			identity := &agentStreamIdentity{RunID: testRunID, ConversationID: testConversationID}
+			if scenario != "orphan" {
+				if _, err := validateAgentFrame([]byte(testAgentFrame("tool_call", 1, call)), identity); err != nil {
+					t.Fatal(err)
+				}
+			}
+			data := map[string]any{}
+			for key, value := range result {
+				data[key] = value
+			}
+			kind := "tool_result"
+			switch scenario {
+			case "duplicate_start":
+				kind = "tool_call"
+				data = call
+			case "wrong_tool":
+				data["tool"] = "other_tool"
+			case "private_result":
+				data["output"] = "private business output"
+			case "incomplete_done":
+				kind = "done"
+				data = map[string]any{}
+			case "duplicate_result":
+				if _, err := validateAgentFrame([]byte(testAgentFrame("tool_result", 2, result)), identity); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := validateAgentFrame([]byte(testAgentFrame(kind, 3, data)), identity); err == nil {
+				t.Fatal("invalid activity was forwarded")
+			}
+		})
+	}
+}
