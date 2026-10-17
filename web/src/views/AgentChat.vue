@@ -52,6 +52,15 @@
         :class="message.role"
       >
         <div class="chat-role">{{ message.role === 'user' ? '我' : 'Agent' }}</div>
+        <details v-if="message.activity?.length" class="chat-activity">
+          <summary>思路与执行过程（{{ message.activity.length }}）</summary>
+          <ol>
+            <li v-for="(item, index) in message.activity" :key="index" :class="item.status">
+              <span>{{ item.text }}</span>
+              <small v-if="item.duration !== undefined"> · {{ item.duration }} ms</small>
+            </li>
+          </ol>
+        </details>
         <div
           v-if="message.role === 'assistant'"
           class="chat-content markdown"
@@ -146,6 +155,7 @@
     text: string
     incomplete?: boolean
     failure?: string
+    activity?: { text: string; status?: string; duration?: number; callId?: string }[]
   }
   const route = useRoute(),
     router = useRouter(),
@@ -372,6 +382,32 @@
         (event) => {
           if (current !== generation || abort.signal.aborted) return
           if (event.type === 'thinking') status.value = event.data.text || '正在回答…'
+          if (event.type === 'progress' || event.type === 'reasoning_summary') {
+            const text = event.data.message || event.data.text || ''
+            status.value = text
+            ;(assistant.activity ||= []).push({ text })
+          }
+          if (event.type === 'tool_call') {
+            ;(assistant.activity ||= []).push({
+              text: `${event.data.label}：执行中`,
+              status: 'started',
+              callId: event.data.call_id,
+            })
+          }
+          if (event.type === 'tool_result') {
+            const item = assistant.activity?.find((value) => value.callId === event.data.call_id)
+            if (item) {
+              const state =
+                event.data.status === 'succeeded'
+                  ? '成功'
+                  : event.data.status === 'rejected'
+                    ? '已拒绝'
+                    : '失败'
+              item.text = `${event.data.tool}：${state} · ${event.data.summary}`
+              item.status = event.data.status
+              item.duration = event.data.duration_ms
+            }
+          }
           if (event.type === 'token') {
             const delta = event.data.text || ''
             if ([...assistant.text].length + [...delta].length > 32000)
@@ -427,10 +463,31 @@
     items: Awaited<ReturnType<typeof chatHistory.messages>>['data']['items'],
   ): Message[] {
     return items.flatMap((item) => {
-      const result: Message[] = [{ id: String(item.id), role: item.role, text: item.content }]
+      const result: Message[] = [
+        {
+          id: String(item.id),
+          role: item.role,
+          text: item.content,
+          activity:
+            item.role === 'assistant'
+              ? item.tool_steps?.map((step) => ({
+                  text: `${step.tool_name}：${step.status === 'succeeded' ? '成功' : step.status === 'rejected' ? '已拒绝' : '失败'} · ${step.summary}`,
+                  status: step.status,
+                  duration: step.duration_ms,
+                  callId: step.call_id,
+                }))
+              : undefined,
+        },
+      ]
       if (item.role === 'user' && item.status && item.status !== 'COMPLETED') {
         result.push({
           id: 'failure-' + item.id,
+          activity: item.tool_steps?.map((step) => ({
+            text: `${step.tool_name}：${step.status === 'succeeded' ? '成功' : step.status === 'rejected' ? '已拒绝' : '失败'} · ${step.summary}`,
+            status: step.status,
+            duration: step.duration_ms,
+            callId: step.call_id,
+          })),
           role: 'assistant',
           text: '',
           incomplete: true,
@@ -591,3 +648,27 @@
   })
   void initialize()
 </script>
+
+<style scoped>
+  .chat-activity {
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    border: 1px solid var(--border, #dbe1e8);
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+  }
+  .chat-activity summary {
+    cursor: pointer;
+  }
+  .chat-activity ol {
+    padding-left: 1.5rem;
+    line-height: 1.8;
+  }
+  .chat-activity .failed,
+  .chat-activity .rejected {
+    color: #b42318;
+  }
+  .chat-activity .succeeded {
+    color: #187043;
+  }
+</style>

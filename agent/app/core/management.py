@@ -112,6 +112,8 @@ class ManagementService:
         expected_id: UUID | None = None,
         source_id: UUID | None = None,
     ) -> dict[str, Any]:
+        if kind == "skill" and source_id is None and "execution_mode" in content:
+            raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         # 同一操作者/资源类型/请求 UUID 的创建重试获得同一 key；仓储检查正文冲突。
         if key is None:
             if not isinstance(content.get("name"), str) or not content["name"].strip():
@@ -135,8 +137,6 @@ class ManagementService:
         return {"configuration": summary(value, full=True)}
 
     async def _validate(self, connection: AsyncConnection, body: ConfigBody) -> None:
-        if isinstance(body, SkillConfig) and body.execution_mode not in {"direct", "react"}:
-            raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         if isinstance(body, AgentConfig):
             if body.knowledge_scope and not self.settings.rag_enabled:
                 raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
@@ -155,9 +155,7 @@ class ManagementService:
             for skill in await self.query._by_ids(
                 connection, [str(identifier) for identifier in body.skill_ids]
             ):
-                if not isinstance(
-                    skill.content, SkillConfig
-                ) or skill.content.execution_mode not in {"direct", "react"}:
+                if not isinstance(skill.content, SkillConfig):
                     raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
 
     async def models(self, query: PageQuery) -> dict[str, Any]:
@@ -319,12 +317,7 @@ class ManagementService:
                 values = [
                     self._skill_summary(item, config)
                     for item in skills
-                    if isinstance(item.content, SkillConfig)
-                    and not item.disabled
-                    and (
-                        self.settings.runtime_mode != "model"
-                        or item.content.execution_mode in {"direct", "react"}
-                    )
+                    if isinstance(item.content, SkillConfig) and not item.disabled
                 ]
                 default = next((value["key"] for value in values if value["default"]), None)
                 if default is None:
@@ -350,7 +343,6 @@ class ManagementService:
         return {
             "key": item.key,
             "name": item.content.name,
-            "execution_mode": item.content.execution_mode,
             "description": item.content.description,
             "default": item.id == str(config.default_skill_id),
         }

@@ -4,11 +4,31 @@ export interface StreamIdentity {
   conversationId: string
 }
 export interface ChatEvent {
-  type: 'thinking' | 'token' | 'done' | 'error'
+  type:
+    | 'thinking'
+    | 'progress'
+    | 'reasoning_summary'
+    | 'tool_call'
+    | 'tool_result'
+    | 'token'
+    | 'done'
+    | 'error'
   run_id: string
   conversation_id: string
   sequence: number
-  data: { text?: string; code?: string }
+  data: {
+    text?: string
+    code?: string
+    step?: number
+    phase?: string
+    message?: string
+    call_id?: string
+    tool?: string
+    status?: string
+    label?: string
+    duration_ms?: number
+    summary?: string
+  }
 }
 export class ChatFailure extends Error {}
 export const canonicalUUID = (value: string) =>
@@ -33,6 +53,7 @@ const publicErrors = new Set([
   'AGENT_MODEL_INPUT_LIMIT',
   'AGENT_MODEL_OUTPUT_LIMIT',
   'AGENT_MODEL_CALL_LIMIT',
+  'AGENT_TOOL_CALL_LIMIT',
   'AGENT_MODEL_BLOCKED',
   'AGENT_MODEL_UNSUPPORTED_OUTPUT',
   'AGENT_MODEL_ENDPOINT_DENIED',
@@ -51,6 +72,7 @@ export class AgentStreamParser {
   private frameSize = 0
   private total = 0
   private sequence = 0
+  private toolCalls = new Map<string, { tool: string; step: number; finished: boolean }>()
   terminal = false
   constructor(
     private identity: StreamIdentity,
@@ -131,8 +153,14 @@ export class AgentStreamParser {
         [...payload.text].length > (kind === 'thinking' ? 256 : 32000)
       )
         return this.invalid()
+    } else if (['progress', 'reasoning_summary', 'tool_call', 'tool_result'].includes(kind)) {
+      if (!this.activity(kind, payload)) return this.invalid()
     } else if (kind === 'done') {
-      if (Object.keys(payload).length) return this.invalid()
+      if (
+        Object.keys(payload).length ||
+        [...this.toolCalls.values()].some((call) => !call.finished)
+      )
+        return this.invalid()
     } else if (kind === 'error') {
       if (
         Object.keys(payload).join(',') !== 'code' ||
@@ -144,6 +172,67 @@ export class AgentStreamParser {
     this.sequence = event.sequence as number
     this.terminal = kind === 'done' || kind === 'error'
     this.onEvent(event as unknown as ChatEvent)
+  }
+  private activity(kind: string, payload: Record<string, unknown>): boolean {
+    const keys = (...names: string[]) =>
+      Object.keys(payload).sort().join(',') === names.sort().join(',')
+    const text = (key: string, max: number) =>
+      typeof payload[key] === 'string' &&
+      [...(payload[key] as string)].length > 0 &&
+      [...(payload[key] as string)].length <= max
+    const integer = (key: string, min: number, max: number) =>
+      Number.isSafeInteger(payload[key]) &&
+      (payload[key] as number) >= min &&
+      (payload[key] as number) <= max
+    if (kind === 'progress')
+      return (
+        keys('phase', 'message') &&
+        ['preparing', 'analyzing', 'executing_tool', 'answering'].includes(
+          payload.phase as string,
+        ) &&
+        text('message', 256)
+      )
+    if (kind === 'reasoning_summary')
+      return keys('step', 'text') && integer('step', 1, 128) && text('text', 400)
+    if (
+      !integer('step', 1, 128) ||
+      !text('call_id', 128) ||
+      !/^[a-zA-Z0-9_-]+$/.test(payload.call_id as string) ||
+      !text('tool', 128) ||
+      !/^[a-z][a-z0-9_]{1,127}$/.test(payload.tool as string)
+    )
+      return false
+    const callId = payload.call_id as string
+    if (kind === 'tool_call') {
+      if (
+        !keys('step', 'call_id', 'tool', 'status', 'label') ||
+        payload.status !== 'started' ||
+        !text('label', 128) ||
+        this.toolCalls.has(callId) ||
+        this.toolCalls.size >= 128
+      )
+        return false
+      this.toolCalls.set(callId, {
+        tool: payload.tool as string,
+        step: payload.step as number,
+        finished: false,
+      })
+      return true
+    }
+    const call = this.toolCalls.get(callId)
+    if (
+      !keys('step', 'call_id', 'tool', 'status', 'duration_ms', 'summary') ||
+      !integer('duration_ms', 0, 300000) ||
+      !text('summary', 256) ||
+      !['succeeded', 'failed', 'rejected'].includes(payload.status as string) ||
+      !call ||
+      call.finished ||
+      call.tool !== payload.tool ||
+      call.step !== payload.step
+    )
+      return false
+    call.finished = true
+    return true
   }
   private invalid(): never {
     throw new ChatFailure('回答流格式异常，未完成')

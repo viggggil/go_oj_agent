@@ -196,6 +196,19 @@ async def test_model_review_strict_json_unavailable_and_retry(http: httpx.AsyncC
     assert response.status_code == 200, response.text
     run = await finished(http, response.json()["run"]["id"])
     assert run["status"] == "COMPLETED"
+    engine = create_async_engine(os.environ["AGENT_TEST_DATABASE_URL"])
+    try:
+        async with engine.connect() as connection:
+            reviewer = await connection.scalar(
+                select(agent_runs.c.config_snapshot)
+                .where(agent_runs.c.config_snapshot["agent_key"].as_string() == "eval_reviewer")
+                .order_by(agent_runs.c.started_at.desc())
+                .limit(1)
+            )
+        # 验证部署天花板没有把 Reviewer 的独立事件预算再次夹回 1,000。
+        assert reviewer["budget"]["max_events"] == 10000
+    finally:
+        await engine.dispose()
     result = (await http.get(BASE + f"/runs/{run['id']}/results")).json()["items"][0]
     detail = (await http.get(BASE + f"/runs/{run['id']}/results/{result['id']}")).json()["result"]
     assert detail["model_review_status"] == "UNAVAILABLE"

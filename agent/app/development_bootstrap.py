@@ -13,7 +13,13 @@ from app.core.credentials import CredentialCipher
 from app.core.database import DatabaseProbe
 from app.core.provider_policy import ProviderPolicy
 from app.core.settings import Settings
-from app.models.configuration import ConfigError, ConfigKind, ConfigWrite, ProviderConfig
+from app.models.configuration import (
+    AgentConfig,
+    ConfigError,
+    ConfigKind,
+    ConfigWrite,
+    ProviderConfig,
+)
 from app.storage.configuration import ConfigurationStore, ConfigVersion
 from app.storage.credentials import CredentialStore, CredentialWrite
 from app.storage.schema import agent_config_audits as audits
@@ -168,7 +174,6 @@ async def bootstrap_su8(
                     {
                         "name": "题目讲解",
                         "description": "按题号读取公开题目，解释题意、算法与复杂度。",
-                        "execution_mode": "react",
                         "allowed_tools": tools,
                         "text": (
                             "用户提到题号时，先通过 get_problem 读取真实题目，再根据题意回答。"
@@ -235,6 +240,36 @@ async def bootstrap_su8(
                 "text": REVIEWER_SKILL,
             },
         )
+
+        async def upgrade_initial_reviewer(
+            value: ConfigVersion, content: dict[str, Any]
+        ) -> ConfigVersion:
+            # 仅升级未被管理员修改的 Compose 初始配置或本次自动升级版本。
+            async with engine.connect() as connection:
+                seeds = await connection.scalars(
+                    select(audits.c.new_id).where(
+                        audits.c.request_id.in_(
+                            [
+                                f"compose.su8.v1.{value.kind}.{value.key}",
+                                f"compose.su8.v3.{value.kind}.{value.key}",
+                            ]
+                        )
+                    )
+                )
+                is_seed = value.id in set(seeds)
+            if not is_seed:
+                return value
+            return await store.create_or_replace(
+                ConfigWrite(
+                    kind=value.kind,
+                    key=value.key,
+                    actor_id=1,
+                    request_id=f"compose.su8.v4.{value.kind}.{value.key}",
+                    expected_id=UUID(value.id),
+                ),
+                content,
+            )
+
         reviewer_model = await existing("model", REVIEWER_MODEL_KEY)
         if reviewer_model is None:
             reviewer_model = await ensure(
@@ -245,8 +280,16 @@ async def bootstrap_su8(
                     "provider_id": provider.id,
                     "model": "deepseek-v4-pro",
                     "verbosity": "high",
-                    "max_output_tokens": 2000,
+                    "max_output_tokens": 8000,
                     "context_window_tokens": 24000,
+                },
+            )
+        elif getattr(reviewer_model.content, "max_output_tokens", None) == 2000:
+            reviewer_model = await upgrade_initial_reviewer(
+                reviewer_model,
+                {
+                    **reviewer_model.content.model_dump(mode="json"),
+                    "max_output_tokens": 8000,
                 },
             )
         reviewer_agent = await existing("agent", REVIEWER_AGENT_KEY)
@@ -264,15 +307,27 @@ async def bootstrap_su8(
                     "budget": {
                         "max_run_seconds": 60,
                         "max_output_chars": 8000,
-                        "max_events": 64,
+                        "max_events": 10000,
                         "max_tool_calls": 0,
                         "max_model_calls": 1,
                         "max_input_tokens": 16000,
-                        "max_output_tokens": 2000,
+                        "max_output_tokens": 8000,
                     },
                     "visibility": "admin",
                 },
             )
+        elif isinstance(reviewer_agent.content, AgentConfig) and (
+            reviewer_agent.content.budget.max_output_tokens == 2000
+            or reviewer_agent.content.budget.max_events < 10000
+        ):
+            content = reviewer_agent.content.model_dump(mode="json")
+            content["model_profile_id"] = reviewer_model.id
+            content["budget"] = {
+                **reviewer_agent.content.budget.model_dump(),
+                "max_output_tokens": 8000,
+                "max_events": 10000,
+            }
+            await upgrade_initial_reviewer(reviewer_agent, content)
         print(
             "su8 Provider、三个真实模型及 Eval 专用评审 Agent 已准备，保留所有已有配置。",
             flush=True,

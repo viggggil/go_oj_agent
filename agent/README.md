@@ -16,14 +16,18 @@ PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Respons
 
 会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；长期记忆、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
-Issue #162 的 PR1 将 `AGENT_RUNTIME_MODE=model` 接入真实 LangGraph：
-`START → prepare → check_budget → generate → validate_answer → END`。
-`DirectAnswer` 复用 Responses 调用与有限重试，`ModelRuntime` 负责图调度；不需要新环境开关。
-生成节点通过 custom stream 即时输出既有 thinking/token，每个事件等待消费者继续消费，
-避免图内部提前读取供应商流并积压回答。图到达 END 后才给出完成信号，RunService 成功
-保存回答和终态后才对外发送 done。停止、断连与 deadline 关闭图和上游 HTTP 流；
-不启用图节点自动重试、checkpointer、恢复执行或外部 LangSmith tracing。
-PR2 在 prepare 中接入有界多轮上下文；只读工具循环在后续 PR 交付。
+Issue #180 将真实模型统一为 ReAct Graph：
+`START → prepare → check_budget → reason → validate_action → act → observe → check_budget`，
+Finish 走 `validate_answer → finalize → END`。所有真实 Run 使用同一个编译图，
+没有 Direct Mode 分支，空工具目录也可直接完成。
+
+ReActState 显式保存动作、观察、成功证据、预算、重复调用保护和安全工具轨迹；
+Provider 续接信息在每次调用独立的 ReActContext 中短暂存在，不启用 checkpoint 或外部 tracing。
+SSE 提供 progress、可选公开 reasoning_summary、tool_call/tool_result 和既有 token/done/error，
+保留历史 thinking 读取兼容。工具轮次先缓冲文本，确认 Finish 后输出；无工具的 Finish 保持即时流式。
+每个公开事件等待消费者继续消费，保留取消、deadline 和背压。只有 RunService 成功落库后才发送 done。
+前端将过程与最终 Markdown 分开，刷新可恢复已持久化的安全工具摘要。细节与前后评测见
+[重构说明](../docs/agent/react-refactor.md)。
 
 Issue #162 的 PR2 自动读取当前用户、同一会话最近最多 20 个 COMPLETED Run 的完整问答，
 最多 64,000 历史字符，不使用失败、取消、中断、活动 Run、tool 或无 Run 的消息。
@@ -107,9 +111,9 @@ Docker 中密钥文件必须对 Agent 的 UID/GID 10001 可读，keyring 与 API
 
 ### PR6 运行与验证边界
 
-文本增量沿 `Provider → Agent → Gateway → 客户端` 传递，沿用 `thinking/token/done/error` 契约；`thinking` 只是状态。推理内容、工具事件和上游错误正文不透传。成功完成事件的最终文本必须与已输出文本一致；异常 EOF、拒绝、direct 的工具输出和上限截断会使 Run 失败。答案和 COMPLETED 在本地事务中成功保存后才发 done；半途失败/取消不保存成功的 assistant 消息。断连、超时、关闭会关闭上游 HTTP stream。
+文本增量沿 `Provider → Agent → Gateway → 客户端` 传递；只有 token 参与正文，进度、可选公开摘要与安全工具时间线独立展示。原始推理、工具参数/结果和上游错误正文不透传。成功完成事件的最终文本必须与已输出文本一致；异常 EOF、拒绝、非法工具输出和上限截断会使 Run 失败。答案和 COMPLETED 在本地事务中成功保存后才发 done；半途失败/取消不保存成功的 assistant 消息。断连、超时、关闭会关闭上游 HTTP stream。
 
-真实 Runtime 支持 `direct` 和只读工具循环 `react`；绑定 Fake Profile 或未实现的执行模式明确拒绝。不同 Runtime 不静默降级。默认没有重试；设置 `max_retries` 后仅对输出前的 429/部分 5xx 在同一 Provider 有限重试，所有尝试受调用次数、输入预算和 Run deadline 限制。401/403、余额不足、配置错误、网络结果不确定及输出后的失败均不自动重试。外部模型调用可能重复计费，不承诺 exactly-once；Chat POST 本身不幂等。
+真实 Runtime 统一使用 ReAct 图，支持零工具回答与有界只读工具循环；绑定 Fake Profile 明确拒绝。不同 Runtime 不静默降级。默认没有重试；设置 `max_retries` 后仅对输出前的 429/部分 5xx 在同一 Provider 有限重试，所有尝试受调用次数、输入预算和 Run deadline 限制。401/403、余额不足、配置错误、网络结果不确定及输出后的失败均不自动重试。外部模型调用可能重复计费，不承诺 exactly-once；Chat POST 本身不幂等。
 
 输入使用 `utf8_bytes_upper_bound_v1` 保守预检并保留协议开销；输出有本地字节上界、字符/事件限额及 Provider `max_output_tokens`。预算可比真实 tokenizer 更严格；Provider 返回 usage 时记录精确报告值，否则明确标为 estimated。Run 的 `model_summary` 保存有界尝试列表、配置 ID、请求/返回模型、usage 来源、延迟、完成原因和公开错误码，不保存凭据、原始 HTTP 响应或推理。
 
@@ -215,7 +219,7 @@ agent/
 `app/graphs/service.py` 的 `RunService` 接收 typed `ChatRequest` 和由可信入口创建的
 `Principal`。Context 只保存题目/提交 ID 与语言，不自动读取业务数据。Runtime/ModelClient
 是可注入协议，`langgraph_fake` 仍运行 `thinking → response` 两个节点并调用 FakeModelClient；
-真实 `model` 模式使用上文四节点 Direct Answer 图。ReAct、计划执行和 Reflection 尚未实现。
+真实 `model` 模式统一使用上文 ReAct 图。计划执行和 Reflection 尚未实现。
 Fake 回答带明确的演示标识，不伪称算法答案。
 
 `ToolRegistry` 支持重复名称检查和 JSON Schema 导出；`ToolExecutor` 检查 Run allowlist、
@@ -340,9 +344,7 @@ HTTP / SSE
   → Policy Resolver
   → Immutable Agent / Prompt / Skill Config
   → Agent Runtime
-       ├─ Direct Answer
-       ├─ ReAct Tool Loop
-       └─ Plan-and-Solve
+       └─ Unified ReAct Graph（零工具或多轮工具）
   → Tool Executor
   → Typed gRPC Clients / RAG
   → Evidence / Safety / Quality Check
@@ -516,7 +518,7 @@ tool_call_count, remaining_tokens, deadline, reflection_count
 answer_draft, final_answer
 ~~~
 
-执行模式包括 direct、react、plan_execute 和 reflection。所有模式都有 deadline、最大 Tool 次数、最大计划步数和最大 Reflection 次数。
+执行统一 ReAct 图，所有 Run 受 deadline、模型调用次数、Tool 次数和累计 token 预算约束。
 
 ## 9. SSE、观测和质量评估
 

@@ -16,7 +16,7 @@ export interface ChatSkill {
   description?: string
   key: string
   name: string
-  execution_mode: string
+  execution_mode?: string
   default: boolean
 }
 export const chatCatalog = {
@@ -59,6 +59,14 @@ export const chatHistory = {
         content: string
         status: string | null
         error_code: string | null
+        tool_steps?: {
+          step: number
+          call_id: string
+          tool_name: string
+          status: string
+          duration_ms: number
+          summary: string
+        }[]
       }[]
       next_before: number | null
     }>(`/api/v1/agent/conversations/${encodeURIComponent(id)}/messages`, {

@@ -42,8 +42,14 @@ async def test_gateway_receives_first_token_before_provider_completion_and_persi
                 if event["type"] == "token":
                     assert (await http.get(mock + "/completed")).json()["completed"] is False
                     assert (await http.post(mock + "/release")).status_code == 200
-        assert [event["type"] for event in received] == ["thinking", "token", "done"]
-        assert received[1]["data"]["text"] == "中文算法回答"
+        assert [event["type"] for event in received] == [
+            "progress",
+            "progress",
+            "progress",
+            "token",
+            "done",
+        ]
+        assert received[3]["data"]["text"] == "中文算法回答"
     engine = create_async_engine(os.environ["AGENT_TEST_DATABASE_URL"])
     try:
         async with engine.connect() as connection:
@@ -76,7 +82,13 @@ async def test_gateway_partial_failure_has_no_done_or_successful_answer() -> Non
         events = [
             json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")
         ]
-        assert [event["type"] for event in events] == ["thinking", "token", "error"]
+        assert [event["type"] for event in events] == [
+            "progress",
+            "progress",
+            "progress",
+            "token",
+            "error",
+        ]
         assert "private-api-key" not in response.text
     engine = create_async_engine(os.environ["AGENT_TEST_DATABASE_URL"])
     try:
@@ -205,7 +217,6 @@ async def test_configured_react_skill_reads_signed_grpc_evidence_and_maps_denial
             {
                 "name": "PR3 读取题目",
                 "text": "先读取题目再回答",
-                "execution_mode": "react",
                 "allowed_tools": ["get_problem"],
             },
         )
@@ -225,10 +236,7 @@ async def test_configured_react_skill_reads_signed_grpc_evidence_and_maps_denial
         directory = await http.get(
             gateway + "/api/v1/agent/agents/" + str(agent["key"]) + "/skills", headers=headers
         )
-        assert (
-            directory.status_code == 200
-            and directory.json()["items"][0]["execution_mode"] == "react"
-        )
+        assert directory.status_code == 200 and "execution_mode" not in directory.json()["items"][0]
         for message, expected in [
             ("PR3 read problem", "证据数字 739216"),
             ("PR3 denied problem", "无权读取题目"),
@@ -246,11 +254,35 @@ async def test_configured_react_skill_reads_signed_grpc_evidence_and_maps_denial
             ]
             assert events[-1]["type"] == "done", response.text
             assert expected in response.text
-            assert all(event["type"] in {"thinking", "token", "done"} for event in events)
+            assert all(
+                event["type"] in {"progress", "tool_call", "tool_result", "token", "done"}
+                for event in events
+            )
+            assert [event["type"] for event in events].count("tool_call") == 1
+            assert [event["type"] for event in events].count("tool_result") == 1
             assert (
                 "function_call" not in response.text
                 and "private business detail" not in response.text
             )
+            history = await http.get(
+                gateway
+                + "/api/v1/agent/conversations/"
+                + response.headers["x-agent-conversation-id"]
+                + "/messages",
+                headers=headers,
+            )
+            assert history.status_code == 200
+            trace = history.json()["items"][-1]["tool_steps"]
+            assert len(trace) == 1 and trace[0]["tool_name"] == "get_problem"
+            assert trace[0]["status"] == ("failed" if "denied" in message else "succeeded")
+            assert set(trace[0]) == {
+                "step",
+                "call_id",
+                "tool_name",
+                "status",
+                "duration_ms",
+                "summary",
+            }
             engine = create_async_engine(os.environ["AGENT_TEST_DATABASE_URL"])
             try:
                 async with engine.connect() as connection:
@@ -266,3 +298,42 @@ async def test_configured_react_skill_reads_signed_grpc_evidence_and_maps_denial
                     )
             finally:
                 await engine.dispose()
+
+        # 同一 Provider call_id 在不同轮次复用时，Eval 仍保留两条真实轨迹及 Run 归属。
+        from tests.integration.test_eval_runs import finished, sample, upload
+
+        http.base_url = gateway
+        http.headers.update(headers)
+        dataset_id = await upload(
+            http,
+            [
+                sample(
+                    "trace_multiturn",
+                    turns=[
+                        {"role": "user", "content": "PR3 read problem"},
+                        {"role": "user", "content": "PR3 read problem"},
+                    ],
+                )
+            ],
+        )
+        response = await http.post(
+            "/api/v1/admin/agent/evals/runs",
+            headers={**headers, "X-Request-ID": str(uuid4())},
+            json={"dataset_id": dataset_id, "agent_key": agent["key"]},
+        )
+        assert response.status_code == 200, response.text
+        run = await finished(http, response.json()["run"]["id"])
+        rows = (
+            await http.get(f"/api/v1/admin/agent/evals/runs/{run['id']}/results", headers=headers)
+        ).json()["items"]
+        result = (
+            await http.get(
+                f"/api/v1/admin/agent/evals/runs/{run['id']}/results/{rows[0]['id']}",
+                headers=headers,
+            )
+        ).json()["result"]
+        assert result["status"] == "COMPLETED", result
+        steps = result["model_summary"]["tool_steps"]
+        assert len(steps) == 2
+        assert {step["call_id"] for step in steps} == {"call_read_problem"}
+        assert len({step["run_id"] for step in steps}) == 2

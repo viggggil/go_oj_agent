@@ -502,9 +502,13 @@ async def test_gateway_create_test_agent_then_real_direct_chat() -> None:
             assert listing.status_code == 200 and listing.json()["items"], listing.text
             detail = await http.get(detail_path)
             assert detail.status_code == 200, detail.text
+            content = dict(resource["content"])
+            if kind == "skills":
+                # 与管理表单相同：历史模式可读取，新版本不再提交该字段。
+                content.pop("execution_mode", None)
             updated = await http.put(
                 detail_path,
-                json={"expected_id": resource["id"], "content": resource["content"]},
+                json={"expected_id": resource["id"], "content": content},
                 headers={"X-Request-ID": str(uuid4())},
             )
             assert updated.status_code == 200, updated.text

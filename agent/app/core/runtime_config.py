@@ -43,7 +43,9 @@ class ConfigSnapshot(BaseModel):
     config_hash: str | None = None
     configurations: dict[str, dict[str, object]] = {}
     is_test: bool = False
-    execution_mode: str = "direct"
+    # Read-only compatibility for historical snapshots; never selects a graph.
+    execution_mode: str = "react"
+    runtime_version: str = "react_v2"
     skill_selection: Literal["explicit", "automatic"] = "explicit"
     skill_references: tuple[dict[str, object], ...] = ()
     provider_id: str | None = None
@@ -158,9 +160,7 @@ class DatabaseConfigReader:
         if not isinstance(profile, ModelProfileConfig):
             raise ConfigError("AGENT_CONFIGURATION_INVALID", 409)
         real = self._settings.runtime_mode == "model"
-        if real != (profile.provider == "responses") or (
-            real and skill.execution_mode not in {"direct", "react"}
-        ):
+        if real != (profile.provider == "responses"):
             raise ConfigError("AGENT_CONFIGURATION_UNSUPPORTED", 409)
         provider_version = graph[str(profile.provider_id)] if real else None
         if provider_version is not None and not isinstance(
@@ -240,12 +240,7 @@ class DatabaseConfigReader:
             if self._registry.get(name).spec.enabled
             and self._registry.get(name).spec.side_effect == "read"
         }
-        skill_tools = {
-            name
-            for value in active_skills
-            if not automatic or value.execution_mode == "react"
-            for name in value.allowed_tools
-        }
+        skill_tools = {name for value in active_skills for name in value.allowed_tools}
         # 分组绑定本身授予知识工具；不要求用户同时修改每个 Skill 的工具列表。
         system_tools.discard("retrieve_knowledge")
         permitted_tools = system_tools & set(agent.allowed_tools) & skill_tools
@@ -288,9 +283,7 @@ class DatabaseConfigReader:
             budget=budget,
             configurations=configurations,
             is_test=agent.is_test,
-            execution_mode=("react" if tools else "direct")
-            if automatic or "retrieve_knowledge" in tools
-            else skill.execution_mode,
+            execution_mode="react",
             skill_selection="automatic" if automatic else "explicit",
             skill_references=tuple(references),
             provider_id=provider_version.id if provider_version is not None else None,

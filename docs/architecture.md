@@ -553,21 +553,17 @@ flowchart TB
     Session --> Intent["Intent + Entity Parser"]
     Intent --> Policy["Tool / Skill Policy"]
     Policy --> Config["Immutable Agent / Prompt / Skill Config"]
-    Config --> Runtime{"Execution Mode"}
+    Config --> Runtime["统一 ReAct Runtime"]
 
-    Runtime --> Direct["Direct Answer"]
-    Runtime --> React["ReAct Tool Loop"]
-    Runtime --> Plan["Plan-and-Solve"]
+    Runtime --> React["Reason / Decide"]
+    React -->|Finish| Verify["Evidence / Safety Check"]
     React --> Executor["Typed Tool Executor"]
-    Plan --> Executor
     Executor --> Problem["Problem Tools"]
     Executor --> Submission["Submission Tools"]
     Executor --> Knowledge["Knowledge Tools"]
     Executor --> Profile["Learning Tools"]
 
-    Direct --> Verify["Evidence / Safety Check"]
     React --> Verify
-    Plan --> Verify
     Verify --> Response["Response Generator"]
 
     Admin["Admin Console"] --> Control["Agent Control Plane"]
@@ -615,14 +611,7 @@ tool_call_count / remaining_tokens / deadline / reflection_count
 answer_draft / final_answer
 ```
 
-执行模式包括：
-
-```text
-direct
-react
-plan_execute
-reflection
-```
+真实模型统一执行 ReAct 图；历史 execution_mode 仅用于兼容旧配置读取，不再决定运行分支。
 
 每次 Agent Run 开始时固定 Agent、Prompt、Skill、Tool Catalog、模型和知识库索引的具体配置 UUID 快照。一次回答执行期间不得切换配置；PR5 的替换会创建新 UUID，已开始的 Run 继续使用原快照。
 
@@ -634,27 +623,21 @@ reflection
 
 Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
 
-### Issue #162 PR1：真实 LangGraph Direct Answer
+### Issue #180：统一真实 ReAct 工作流
 
-`model` 模式由 `ModelRuntime` 编译并执行固定图：
+所有真实 Run 经过 ModelRuntime 构建的同一张 ReAct Graph：
 
 ```text
-START → prepare → check_budget → generate → validate_answer → END
+START → prepare → check_budget → reason
+                                ├ Finish → validate_answer → finalize → END
+                                └ Action → validate_action → act → observe → check_budget
 ```
 
-prepare 解析本次配置快照并组合提示词；check_budget 校验保守输入估算与输出预留；
-generate 通过可注入 DirectAnswer/ResponsesClient 流式生成，保留同 Provider 的有限重试；
-validate_answer 检查非空答案与供应商完成状态。图状态仅在本次运行内存在，明文凭据仅在
-调用客户端时短暂读取，不进入图状态。共享编译图的每次调用独立保存状态和流消费确认。
+Skill 只声明任务说明与授权工具，不再配置执行模式；历史 execution_mode 可读取但不决定图选择。ReActState 显式记录决策、预算、观察、成功证据和脱敏工具轨迹；Provider 的加密续接信息、工具结果输入留在请求局部 ReActContext，不启用 checkpointer 或外部 tracing。
 
-custom 流桥接采用逐事件消费确认：消费者继续请求下一事件后，生成节点才继续读取
-供应商，避免慢速客户端造成图内无界文本积压。取消传播到正在读取或等待消费确认的节点，
-节点 finally 关闭模型生成器与上游 HTTP 流。外层 RunService 继续统一检查总 deadline、
-事件/字符预算、ID/序号与终态，成功事务保存后才发 done；失败/取消不保存部分 assistant。
+工具执行前整批校验 JSON、Schema、call_id、相同参数重复调用、权限和预算；ToolExecutor 与拥有数据的 Go 服务仍做最终授权。失败返回 Observation，只有成功结果成为 Evidence。有工具的轮次确认 Finish 后才发正文，无工具的 Finish 保留实时 token 流和消费确认。进度、官方公开摘要和安全工具时间线与正文分离，摘要能力未启用时不生成虚构摘要。
 
-图不配置自动重试、checkpointer、持久化恢复或外部 tracing；进程重启仍由现有单实例
-初始化把遗留 RUNNING 收敛为 INTERRUPTED。对外 HTTP/SSE、配置 JSON、数据库表不变。
-Fake 两节点图保留；PR2 在现有 prepare 节点增加上下文，不改变图拓扑。
+取消、deadline、背压及唯一终态继续由 RunService 协调；答案与 COMPLETED 在本地事务提交后才发 done。ModelSummary JSON 保存有界工具摘要（含 Run 归属），历史会话在归属校验后可恢复，失败/取消 Run 也保留已有工具轨迹。新配置、历史兼容、前后评测方案见 [重构说明](agent/react-refactor.md)。
 
 ### Issue #162 PR2：有界多轮上下文
 
@@ -674,21 +657,9 @@ Responses input 按 user/assistant 角色传递历史，当前问题只追加一
 是上下文来源，不引入供应商托管会话、持久化 checkpointer 或长期记忆。
 配置版本仍由当前 Run 固定，新对话历史为空；同会话 Agent key 归属规则不变。
 
-### Issue #162 PR3：有界只读工具循环
+### 只读工具边界
 
-react 图沿 generate → tools → check_budget → generate 循环，最终回答经过 validate_answer → END。
-direct 路径保持不调用工具。prepare 固定可用 schema 与会话输入；工具是 Agent/Skill 白名单、
-Registry enabled/read 及可信角色策略的交集，执行器再次校验，业务数据仅经带委托 JWT 的 gRPC 访问。
-
-每个 Run 独立持有有界 ToolSession。模型函数调用与结果只在本次会话内按 call_id 成对保存，
-不进入长期历史；供应商 reasoning 不回传、不持久化。输入估算包含工具 schema、调用与结果开销，
-模型尝试和工具次数累计限制；没有统一节点重试、写工具、自动 Skill 路由或 checkpointer。
-工具结果视为不可信证据，模型最终回答可引用业务内容，SSE 仅提供短状态与回答文本。
-取消沿节点传播关闭上游与工具等待，RunService 仍管理持久化和唯一终态。
-
-开发 Compose 默认启用业务只读工具（可设置 AGENT_BUSINESS_TOOLS_ENABLED=false），
-页面必须给 Agent 和 react Skill 同时勾选工具。完整数据集 Eval/质量观测仍待后续实现；
-当前以协议/授权/预算/取消回归和三个 su8 模型 smoke 验证最小行为。
+模型从授权 Function Schema 中自主决定调用顺序；不把自然语言当作动作。工具集合由 Agent/Skill 白名单、Registry enabled/read 和可信角色策略取交集。业务数据只经带委托 JWT 的 gRPC 访问。工具调用与结果只在本 Run 的 Provider 输入中续接，不进入长期对话正文。所有模型尝试、工具次数和结果大小都受预算限制；没有写工具或自动恢复。RAG 分组授权与离线 Eval 使用相同 Runtime，评审 Agent 独立使用无工具、无知识、单模型调用配置。
 
 ### 10.2 Tool Registry 与策略
 

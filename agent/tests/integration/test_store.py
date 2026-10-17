@@ -158,6 +158,42 @@ async def test_model_history_pairs_only_completed_runs_and_caps_recent_turns(
     assert await store.list_completed_turns(7, other.id) == []
 
 
+async def test_failed_run_restores_only_safe_tool_trace(engine: AsyncEngine) -> None:
+    store = AgentStore(engine)
+    run = await new_run(store)
+    trace = {
+        "run_id": run.id,
+        "step": 1,
+        "call_id": "call_problem",
+        "tool_name": "get_problem",
+        "status": "succeeded",
+        "parameter_validation": "valid",
+        "duration_ms": 12,
+        "summary": "已读取题目",
+        "evidence_refs": ["internal-evidence"],
+    }
+    await store.finish_run(
+        user_id=7,
+        run_id=run.id,
+        status="FAILED",
+        error_code="AGENT_MODEL_TIMEOUT",
+        model_summary={"tool_steps": [trace]},
+    )
+    history = await store.conversation_messages(7, run.conversation_id)
+    assert len(history["items"]) == 1
+    message = history["items"][0]
+    assert message["role"] == "user" and message["status"] == "FAILED"
+    assert message["tool_steps"] == [
+        {
+            key: trace[key]
+            for key in ("step", "call_id", "tool_name", "status", "duration_ms", "summary")
+        }
+    ]
+    assert await store.list_completed_turns(7, run.conversation_id) == []
+    with pytest.raises(ConversationNotFound):
+        await store.conversation_messages(8, run.conversation_id)
+
+
 async def test_same_conversation_concurrent_run_is_unique(engine: AsyncEngine) -> None:
     store = AgentStore(engine)
     conversation = await store.create_conversation(7)

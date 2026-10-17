@@ -46,15 +46,14 @@ def validate_reviewer_snapshot(snapshot: ConfigSnapshot) -> None:
     ):
         raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
     if (
-        snapshot.execution_mode != "direct"
-        or snapshot.allowed_tools
+        snapshot.allowed_tools
         or snapshot.knowledge_scope
         or snapshot.knowledge_versions
         or snapshot.is_test
         or snapshot.budget.max_run_seconds > 60
         or snapshot.budget.max_model_calls != 1
         or snapshot.budget.max_tool_calls != 0
-        or snapshot.budget.max_output_tokens > 2000
+        or snapshot.budget.max_output_tokens > 8000
     ):
         raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
     try:

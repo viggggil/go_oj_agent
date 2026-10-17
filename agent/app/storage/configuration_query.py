@@ -117,11 +117,6 @@ def agent_available(admin: bool, runtime: str, provider_urls: list[str] | None =
         exists(
             select(1).where(
                 skill.c.id == json_text(versions, "default_skill_id"),
-                *(
-                    [json_text(skill, "execution_mode").in_(("direct", "react"))]
-                    if runtime == "model"
-                    else []
-                ),
             )
         ),
     )

@@ -667,11 +667,21 @@ event: done
 data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":{}}
 ```
 
-当前运行时只生成 `thinking`、`token`、`done`、`error` 四类事件；`thinking` 是短状态，
-不表示思维链，也不暴露工具内部数据。`error` 的 `data` 只有稳定错误码，`done` 的
-`data` 必须为空，并表示答案及 `COMPLETED` 状态已经持久化。事件序号在一个 Run 内严格
-递增，Gateway 会校验 UTF-8、UUID、事件类型、公开错误码、帧大小和序号后再转发；中间
-帧可能是 SSE 注释形式的 `: heartbeat`。不提供 SSE 续传或 `Last-Event-ID` 语义。
+真实 Runtime 使用统一 ReAct Graph，保留 `token/done/error`，新增以下严格 payload：
+
+| type | data 字段及限制 |
+| --- | --- |
+| progress | phase 为 preparing/analyzing/executing_tool/answering；message 为 1–256 字符 |
+| reasoning_summary | step 为 1–128 整数；text 为 1–400 字符，仅来自配置启用的 Provider 官方公开摘要 |
+| tool_call | step 为 1–128；call_id 为 1–128 字母数字/下划线/横线；tool 为合法工具名；status=started；label 为 1–128 字符 |
+| tool_result | 同一 step/call_id/tool；status=succeeded/failed/rejected；duration_ms 为 0–300000 整数；summary 为 1–256 字符 |
+| token | text 最多 32,000 字符；只有该事件参与答案正文拼接 |
+| done | 空 data；表示答案及 COMPLETED 已成功持久化 |
+| error | 仅包含公开稳定 code |
+
+保留历史 `thinking`（text 最多 256 字符）读取兼容；它不代表内部推理。Provider 不支持公开摘要时省略 reasoning_summary。进度不提供虚构百分比；工具事件不返回参数、原始结果、源码、私有片段或证据内部标识。
+
+同一 Run 的 sequence 严格递增，Gateway 和 Web 严格拒绝额外 payload 字段、错身份、重复调用开始、未关联/重复的结果以及含未完成工具的 done。错误终态允许中断尚未完成的工具。保持 UTF-8、UUID、公开错误码、帧大小、事件预算、背压和超时约束。心跳仍使用 SSE 注释，不提供 Last-Event-ID 续传。
 
 客户端断开、Gateway 总时限/空闲时限、上游 EOF 或写入失败都会取消 Run 或发送稳定的
 `error` 事件；没有收到 `done` 的 EOF 不能视为成功。一次接受请求创建新 Run，不按
@@ -684,7 +694,7 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 模型配置与选定 Skill 不兼容时，建流前返回 409 `AGENT_CONFIGURATION_UNSUPPORTED`；凭据引用不存在或撤销时返回 503。Gateway 使用已有状态映射，不透传内部错误正文。建流后的模型失败由 SSE error 表示，即使已有部分 token，也不能当成成功答案；done 仍表示最终持久化成功。
 
-内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；direct 模式不传 tools。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
+内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；没有授权工具时不传 tools，仍使用同一 ReAct Graph。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
 
 同会话续聊自动取本人最近最多 20 个成功完整轮次（候选最多 64,000 字符），再为本轮必需输入和输出预留预算，按 UTF-8 字节上界与逐消息开销裁剪最旧整轮。失败、取消、中断、RUNNING 和残缺消息不进入模型输入。历史被裁剪不会新增 SSE 事件；必需输入本身超限仍返回已有 AGENT_MODEL_INPUT_LIMIT。新对话没有历史。外部 Chat 请求、响应、错误码、Gateway 委托和 SSE envelope 不变，无需前端传递历史正文或供应商会话 ID。
 
@@ -692,12 +702,12 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 ### Issue #162 PR3：只读工具循环
 
-Skill 的 execution_mode 支持 direct 与 react；页面“回答方式”可选择直接回答或读取业务信息后回答。
-react 使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
+Issue #180 后 Skill 不再选择回答方式，所有真实 Run 使用统一 ReAct Graph。
+授权目录使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
 Responses 请求携带 function schema、parallel_tool_calls=false；校验 completed 中的 function_call 后，
 通过现有带 Agent 委托身份的 gRPC 执行工具，再按 call_id 回传 function_call_output。
-只回传校验后的 name/call_id/arguments，不重放供应商 reasoning、ID、状态或原始错误。
-工具结果仅进入本次模型输入，SSE 不新增工具参数/结果事件；允许模型最终答案引用已授权业务证据。
+只回传校验后的 name/call_id/arguments；明确启用 Provider 摘要能力时请求 reasoning.summary=auto 与 reasoning.encrypted_content，只有有界 encrypted_content 及官方 summary 字段可在本次请求局部续接。原始推理、未知字段及错误正文不重放、不落库或发给浏览器。
+工具结果仅进入本次模型输入；SSE 工具事件仅返回安全执行元数据，模型最终答案可以引用已授权证据。
 工具失败回传稳定 Tool 错误，拥有数据的 Go 服务仍校验授权；未读取成功不得声称已获取证据。
 
 每次模型尝试（含重试）累计消耗模型次数、输入和输出预算；工具批次累计限制 max_tool_calls。
@@ -780,14 +790,15 @@ Gateway 只返回允许的稳定错误码，不透传异常正文。请求体默
 1 MiB，均不接受压缩请求；管理请求使用普通 HTTP deadline，不占用 Chat 的长时间预算。
 
 Agent/Prompt/Skill content 使用严格配置 Schema。Prompt 为 name/text/variables，变量仅
-language/problem_id/submission_id。新 Skill 为 name/description/text/execution_mode/allowed_tools，
+language/problem_id/submission_id。新 Skill 为 name/description/text/allowed_tools，
 text 是 1–32,000 字符的任务说明，description 最多 512 字符；文本默认是普通正文，花括号不展开。
 Skill 不设置预算时继承 Agent 和部署上限。兼容旧 Skill 的 prompt_id/budget；text 与 prompt_id
 必须二选一。前端编辑旧 Skill 时复制历史 Prompt 正文为内置文本，保留 variables（包括空列表，
 用于旧模板字面括号转义），保存生成新版本并移除旧 Prompt 绑定/Skill 预算；旧版本继续有效。
 内置 variables 仅用于兼容迁移，声明时沿用 Prompt 模板校验。
+新 Skill 管理写请求出现 execution_mode 返回 409 AGENT_CONFIGURATION_UNSUPPORTED；历史不可变版本和 Run/Eval 快照仍可读取该字段，但它不参与图选择。复制旧版恢复使用历史解析，不改写原版本及其哈希。新 Run 带 runtime_version=react_v2。
 Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
-visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；运行模式支持 direct/react。
+visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；所有真实 Run 统一使用 ReAct。
 test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
 
 真实模式的模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
@@ -801,7 +812,7 @@ Provider/模型/Key 的管理仍使用本机 CLI，没有新建 Provider/凭据 
 禁用或部署网络策略不允许时仍可查元数据，available=false；响应严格禁止 Provider/凭据字段。
 
 Tools 仅返回 Registry 的只读元数据和输入输出 Schema，不提供调用/统计/编辑接口。
-普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/description/execution_mode/default
+普通 Agent 目录只返回 key/name/is_default，绑定 Skill 返回 key/name/description/default
 及 default_skill_key。权限/可运行条件在 SQL 分页前过滤，普通用户看不到 test/admin Agent，
 不可访问 Skill 子目录统一 404；目录不返回 Prompt、模型、Provider 或预算。Chat 每次重新
 校验权限。Chat 关闭、demo 配置或 Runtime disabled 时目录为空，不将数据库配置伪装为可运行。
@@ -1777,3 +1788,11 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 
 兼容发布：先执行 `000007_create_eval_reviews` 和 `000008_create_eval_model_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
 新 Gateway 采用扩展后的严格结果契约，不能长期与旧 Agent 混用。
+
+### Issue #180：脱敏工具轨迹与历史兼容
+
+ModelSummary 保留 tools/attempts/knowledge，并增加最多 128 条 tool_steps：step、call_id、tool_name、parameter_validation（valid/invalid/rejected）、status（succeeded/failed/rejected）、error_code、duration_ms、summary、evidence_refs。仅存稳定安全元数据，不存原始参数/结果、源码或内部推理。旧 JSON 没有 tool_steps 时按空列表解析。
+
+GET /api/v1/agent/conversations/{id}/messages 在会话归属验证后，为 assistant 消息增加 tool_steps，仅包含 step/call_id/tool_name/status/duration_ms/summary；用户消息为空列表。旧消息为空列表。浏览器刷新可恢复工具时间线；进度、公开摘要不作为聊天正文或后续历史输入持久化。
+
+Eval Reviewer 取消对 Direct Mode 的依赖，仍固定管理员可见、deepseek-v4-pro、无工具/知识范围、单模型调用、最多 60 秒、严格 JSON；评分输出 token 上限提高到 8,000，兼容旧 2,000 上限快照。

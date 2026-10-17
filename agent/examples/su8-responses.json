@@ -35,7 +35,6 @@
     "key": "direct_answer",
     "content": {
       "name": "直接回答",
-      "execution_mode": "direct",
       "allowed_tools": []
     }
   },

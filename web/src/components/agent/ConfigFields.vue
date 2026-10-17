@@ -25,12 +25,6 @@
     <template v-if="resource === 'skills'">
       <label>简短描述<input v-model="skill.description" maxlength="512" /></label>
       <label
-        >回答方式<select v-model="skill.execution_mode">
-          <option value="direct">直接回答</option>
-          <option value="react">读取业务信息后回答</option>
-        </select></label
-      >
-      <label
         >任务说明<textarea
           v-model="skill.text"
           class="agent-prompt"

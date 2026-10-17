@@ -328,6 +328,8 @@ class EvalRunner:
                         if value not in summary.tools
                     )
                     summary.knowledge.extend(accepted.state.model_summary.knowledge)
+                    summary.tool_steps.extend(accepted.state.model_summary.tool_steps)
+                    summary.tool_steps = summary.tool_steps[-128:]
                     summary.attempts = summary.attempts[-16:]
                     summary.tools = summary.tools[-32:]
                     summary.knowledge = summary.knowledge[-32:]

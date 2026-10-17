@@ -45,10 +45,29 @@ class FunctionCall(BaseModel):
 
 @dataclass
 class ModelResponse:
-    # 仅持有校验后的函数调用，不保存推理、Provider 原始响应或凭据。
+    # 只在当前请求内短暂持有已校验动作及 Responses 后续请求所需的 opaque items。
     calls: tuple[FunctionCall, ...] = field(default_factory=tuple)
+    continuation_items: tuple[dict[str, Any], ...] = ()
+    reasoning_summary: str | None = None
     spent_input: int = 0
     spent_output: int = 0
+
+
+class ToolTraceStep(BaseModel):
+    """可持久化的脱敏 Tool 轨迹；不包含原始参数或工具返回正文。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
+    step: int = Field(ge=1, le=128)
+    call_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    tool_name: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]{1,127}$")
+    parameter_validation: Literal["valid", "invalid", "rejected"]
+    status: Literal["succeeded", "failed", "rejected"]
+    error_code: str | None = Field(default=None, max_length=64)
+    duration_ms: int = Field(ge=0, le=300_000)
+    summary: str = Field(max_length=256)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=16)
 
 
 class ModelAttempt(BaseModel):
@@ -95,5 +114,6 @@ class ModelSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     attempts: list[ModelAttempt] = Field(default_factory=list, max_length=16)
     tools: list[str] = Field(default_factory=list, max_length=32)
+    tool_steps: list[ToolTraceStep] = Field(default_factory=list, max_length=128)
     input_estimation: Literal["utf8_bytes_upper_bound_v1"] = "utf8_bytes_upper_bound_v1"
     knowledge: list[KnowledgeAttempt] = Field(default_factory=list, max_length=32)

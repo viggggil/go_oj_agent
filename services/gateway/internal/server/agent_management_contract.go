@@ -53,7 +53,9 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 	for _, item := range items {
 		switch {
 		case skills:
-			if object, ok := agentJSONFields(item, "key name execution_mode default", "description"); !ok || !agentJSONTypes(object, "key name execution_mode", "default", "") {
+			if object, ok := agentJSONFields(item, "key name default", "description execution_mode"); !ok || !agentJSONTypes(object, "key name", "default", "") {
+				return false
+			} else if mode, exists := object["execution_mode"]; exists && !agentJSONRequired(mode, new(string)) {
 				return false
 			}
 		case !admin:
@@ -270,7 +272,7 @@ func validAgentHistory(path string, payload map[string]json.RawMessage) bool {
 			return false
 		}
 		for _, item := range items {
-			object, ok := agentJSONFields(item, "id role content status error_code", "")
+			object, ok := agentJSONFields(item, "id role content status error_code", "tool_steps")
 			if !ok || !agentJSONTypes(object, "role content", "", "id") ||
 				!agentJSONNullable(object["status"], new(string)) || !agentJSONNullable(object["error_code"], new(string)) {
 				return false
@@ -278,6 +280,9 @@ func validAgentHistory(path string, payload map[string]json.RawMessage) bool {
 			var role string
 			_ = json.Unmarshal(object["role"], &role)
 			if role != "user" && role != "assistant" {
+				return false
+			}
+			if steps, exists := object["tool_steps"]; exists && !validAgentToolHistory(steps) {
 				return false
 			}
 		}
@@ -349,12 +354,12 @@ func validAgentConfiguration(value json.RawMessage, full bool, resource string) 
 	}
 	fields := map[string]string{
 		"prompt": "text variables",
-		"skill":  "name prompt_id execution_mode allowed_tools budget",
+		"skill":  "name prompt_id allowed_tools budget",
 		"agent":  "name prompt_id skill_ids default_skill_id model_profile_id allowed_tools budget visibility is_test test_expires_at knowledge_scope",
 	}
 	optionalContent := map[string]string{
 		"prompt": "name",
-		"skill":  "description text variables",
+		"skill":  "description text variables execution_mode",
 	}
 	content, ok := agentJSONFields(object["content"], fields[kind], optionalContent[kind])
 	if !ok {
@@ -369,7 +374,10 @@ func validAgentConfiguration(value json.RawMessage, full bool, resource string) 
 			return false
 		}
 	case "skill":
-		if !agentJSONTypes(content, "name execution_mode", "", "") || !agentJSONStrings(content["allowed_tools"]) || !agentJSONNullable(content["prompt_id"], new(string)) {
+		if mode, exists := content["execution_mode"]; exists && !agentJSONNullable(mode, new(string)) {
+			return false
+		}
+		if !agentJSONTypes(content, "name", "", "") || !agentJSONStrings(content["allowed_tools"]) || !agentJSONNullable(content["prompt_id"], new(string)) {
 			return false
 		}
 		if text, exists := content["text"]; exists && !agentJSONNullable(text, new(string)) {
@@ -564,6 +572,36 @@ func validEvalReviewsPage(payload map[string]json.RawMessage) bool {
 			return false
 		}
 		if string(object["old_value"]) != "null" && !validEvalManualReview(object["old_value"], true) {
+			return false
+		}
+	}
+	return true
+}
+
+func validAgentToolHistory(value json.RawMessage) bool {
+	var steps []json.RawMessage
+	if !agentJSONRequired(value, &steps) || steps == nil || len(steps) > 32 {
+		return false
+	}
+	for _, step := range steps {
+		object, ok := agentJSONFields(step, "step call_id tool_name status duration_ms summary", "")
+		if !ok || !agentJSONTypes(object, "call_id tool_name status summary", "", "step duration_ms") {
+			return false
+		}
+		data := map[string]json.RawMessage{}
+		for key, raw := range object {
+			data[key] = raw
+		}
+		data["tool"] = data["tool_name"]
+		delete(data, "tool_name")
+		// Reuse the SSE payload validator with a synthetic already-started call.
+		var callID, tool string
+		var number int
+		_ = json.Unmarshal(data["call_id"], &callID)
+		_ = json.Unmarshal(data["tool"], &tool)
+		_ = json.Unmarshal(data["step"], &number)
+		identity := &agentStreamIdentity{ToolCalls: map[string]agentToolIdentity{callID: {Tool: tool, Step: number}}}
+		if !validateAgentActivity("tool_result", data, identity) {
 			return false
 		}
 	}
