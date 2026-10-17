@@ -908,7 +908,17 @@ GET  /api/v1/admin/agent/evals/runs/{run_id}/results
 GET  /api/v1/admin/agent/evals/runs/{run_id}/results/{result_id}
 POST /api/v1/admin/agent/evals/results/{result_id}/review
 GET  /api/v1/admin/agent/evals/results/{result_id}/reviews
+POST /api/v1/admin/agent/evals/results/{result_id}/review-agent
+GET  /api/v1/admin/agent/evals/results/{result_id}/model-reviews
 ```
+
+`POST /results/{result_id}/review-agent` 只允许对当前 `UNAVAILABLE` 的模型评审重跑，
+请求体为 `{ "expected_attempt": 1 }`，需要管理员权限和 `X-Request-ID` UUID。评审配置在
+创建运行时固定为管理员专用的 `eval_reviewer` Agent（无工具、无知识库、
+`deepseek-v4-pro`、单次模型调用），请求返回 `{attempt,duplicate}`。评审输出必须是单个严格
+JSON，包含五个 0–4 分维度；调用失败、超时、身份不匹配或 JSON 不合格都记为
+`UNAVAILABLE`，不能计为通过。`GET /model-reviews` 返回按 attempt 倒序的有界审计记录。
+人工结论优先于模型结论，程序化硬失败不可被任何评审覆盖。
 
 上传正文是受限 JSON 请求，包含 `name`、`description` 和 UTF-8 JSONL `content`。Agent
 服务逐行校验 Case，只接受 `user`/`assistant` 对话并拒绝重复 ID、system/tool 伪造消息和
@@ -918,7 +928,7 @@ GET  /api/v1/admin/agent/evals/results/{result_id}/reviews
 
 运行创建请求包含 `dataset_id`（UUID）、`agent_key`、`mode=programmatic`、
 `repeat_count`（默认 1，范围 1–3）和 `concurrency`（默认 1，范围 1–8）。
-只支持程序化模式，未实现的 manual/programmatic_review 返回 400。
+支持 `programmatic` 和 `programmatic_review`；后者在创建时固定专用评审 Agent 配置。
 服务在创建时固定 Agent/Prompt/Skill/Model/Provider/知识版本；每个 Case 的 user turn
 通过普通 Runtime 按真实生成历史执行，assistant turn 仅保留为参考。
 fixture.principal 必须是部署 `AGENT_EVAL_PRINCIPALS` 中配置的专用账号别名，执行角色固定 user，
@@ -1719,11 +1729,14 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 
 管理员 `/agent/eval` 页面保留左侧导航，支持分页数据集与样例、上传 UTF-8 JSONL 文件或文本、选择 Agent/数据集/并发/重复次数、运行进度和取消、结果筛选/详情、人工评分与修改记录。
 `?tab=runs&run={uuid}` 可恢复运行详情；轮询在离开页面时停止，切换批次不复用旧结果。
-本阶段只开放 programmatic，评审 Agent、导出和 CLI 在后续阶段。
+支持 `programmatic` 与 `programmatic_review` 两种运行模式；后者使用固定的管理员专用评审 Agent。
+导出和 CLI 仍在后续阶段。
 
 运行详情增加 `metrics`：`recorded_cases`、`check_passes`、`effective_passes`、`reviewed_cases`、
-`average_latency_ms`（无结果时为 null）。统计按已落库结果计算，不因结果分页或当前筛选变化。
-`effective_pass` 只在执行 COMPLETED 且无 hard_fail 时可能为 true：有人工评审则取最新人工 pass，否则取程序 checks.pass。
+`model_reviewed_cases`、`model_review_unavailable`、`model_passes`、`average_latency_ms`（无结果时为 null）。
+统计按已落库结果计算，不因结果分页或当前筛选变化。
+`effective_pass` 只在执行 COMPLETED 且无 hard_fail 时可能为 true：有人工评审则取最新人工 pass，
+否则启用模型评审时取可用模型 pass，否则取程序 checks.pass；启用模型评审但不可用时不通过。
 硬失败和非 COMPLETED 结果始终不通过。COMPLETED 状态只表示执行结束。
 
 `POST /evals/results/{result_id}/review` 正文：
@@ -1757,5 +1770,10 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 普通用户两层授权均拒绝，未知结果返回 404。
 网页在保存结果不确定时保留草稿与 request ID；409 保留草稿，要求显式加载最新评分后再次提交。
 
-兼容发布：先执行 `000007_create_eval_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
+模型评审模式的运行请求额外包含 `reviewer_agent_key: "eval_reviewer"`。专用 Agent 必须是管理员可见、
+无工具、无知识库、`deepseek-v4-pro` 且最多一次模型调用；运行快照保存其版本元数据，不公开 Prompt 正文和 Provider 凭据。
+评审结果严格校验 `case_id`、五个 0–4 整数分数、`hard_fail` 与 `pass` 的关系；任何调用/解析失败为 `UNAVAILABLE`，
+不会计为通过。管理员可通过 `review-agent` 重跑单条不可用评审，审计记录按 attempt 保存。
+
+兼容发布：先执行 `000007_create_eval_reviews` 和 `000008_create_eval_model_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
 新 Gateway 采用扩展后的严格结果契约，不能长期与旧 Agent 混用。

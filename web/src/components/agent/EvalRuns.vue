@@ -94,10 +94,14 @@
             <span>程序检查通过 {{ metrics.check_passes }} / {{ metrics.recorded_cases }}</span
             ><span>最终通过 {{ metrics.effective_passes }} / {{ metrics.recorded_cases }}</span
             ><span>已人工评审 {{ metrics.reviewed_cases }}</span
+            ><span
+              >模型已评审 {{ metrics.model_reviewed_cases }} · 模型通过
+              {{ metrics.model_passes }}</span
+            ><span>模型评审不可用 {{ metrics.model_review_unavailable }}</span
             ><span>平均耗时 {{ metrics.average_latency_ms ?? '—' }} ms</span>
           </div>
           <p class="muted">
-            执行完成表示本批次结束；质量结论需结合程序检查和人工评审。最终通过率以已记录结果为分母。
+            执行完成表示本批次结束；质量结论需结合程序检查、模型评分和人工评审。最终通过率以已记录结果为分母。
           </p>
           <p v-if="selectedRun.cancel_requested && active">
             正在停止模型调用并记录剩余样例，请等待终态。
@@ -111,6 +115,10 @@
           >
             {{ cancelling ? '提交取消中…' : '取消运行' }}
           </button>
+          <details v-if="selectedRun.reviewer_snapshot">
+            <summary>固定的评审 Agent 版本</summary>
+            <pre>{{ JSON.stringify(selectedRun.reviewer_snapshot, null, 2) }}</pre>
+          </details>
           <details>
             <summary>本次固定的配置快照</summary>
             <pre>{{ JSON.stringify(selectedRun.config_snapshot, null, 2) }}</pre>
@@ -169,7 +177,8 @@
                         : '人工未通过'
                       : '待评审'
                   }}
-                  / {{ item.effective_pass ? '通过' : '未通过' }}
+                  · 模型：{{ modelReviewStatus[item.model_review_status] }} /
+                  {{ item.effective_pass ? '通过' : '未通过' }}
                 </td>
                 <td>{{ item.latency_ms ?? '—' }} ms</td>
                 <td>
@@ -225,6 +234,14 @@
   import { useAuthStore } from '../../stores/auth'
   import EvalRunForm from './EvalRunForm.vue'
   import EvalResult from './EvalResult.vue'
+  const modelReviewStatus = {
+    NOT_REQUESTED: '未启用',
+    PENDING: '等待中',
+    RUNNING: '评审中',
+    COMPLETED: '已完成',
+    UNAVAILABLE: '不可用',
+    SKIPPED: '已跳过',
+  }
   const props = defineProps<{ datasetId?: string }>()
   const route = useRoute(),
     router = useRouter(),

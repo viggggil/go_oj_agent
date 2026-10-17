@@ -17,6 +17,8 @@ from app.core.resources import get_resources
 from app.evals.models import (
     EvalDatasetInvalid,
     EvalDatasetUpload,
+    EvalModelReviewPage,
+    EvalModelReviewRetry,
     EvalPage,
     EvalResultPage,
     EvalReviewPage,
@@ -51,7 +53,12 @@ async def handle(request: Request) -> JSONResponse:
             if request.method == "GET":
                 if parameters.get("dataset_id"):
                     raise ConfigError("AGENT_INVALID_ARGUMENT")
-                if request.url.path.endswith("/reviews"):
+                if request.url.path.endswith("/model-reviews"):
+                    result = await service.model_reviews_page(
+                        str(request.path_params["result_id"]),
+                        EvalModelReviewPage.model_validate(parameters),
+                    )
+                elif request.url.path.endswith("/reviews"):
                     result = await service.reviews_page(
                         str(request.path_params["result_id"]),
                         EvalReviewPage.model_validate(parameters),
@@ -103,6 +110,20 @@ async def handle(request: Request) -> JSONResponse:
                     )
                     result = await service.save_review(
                         str(request.path_params["result_id"]), review_body, principal
+                    )
+                elif request.url.path.endswith("/review-agent"):
+                    if parameters:
+                        raise ConfigError("AGENT_INVALID_ARGUMENT")
+                    if runner is None:
+                        raise ConfigError("AGENT_EVAL_UNAVAILABLE", 503)
+                    retry_body = cast(
+                        EvalModelReviewRetry,
+                        await read_body(request, EvalModelReviewRetry, 8_000),
+                    )
+                    result = await runner.retry_model_review(
+                        str(request.path_params["result_id"]),
+                        retry_body.expected_attempt,
+                        principal,
                     )
                 elif request.url.path.endswith("/runs"):
                     if parameters:
@@ -174,3 +195,5 @@ router.add_api_route(
 
 router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/review", handle, methods=["POST"])
 router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/reviews", handle, methods=["GET"])
+router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/review-agent", handle, methods=["POST"])
+router.add_api_route(f"{PREFIX}/results/{{result_id:uuid}}/model-reviews", handle, methods=["GET"])

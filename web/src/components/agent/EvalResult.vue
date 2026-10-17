@@ -43,6 +43,64 @@
         <pre>{{ pretty(result.model_summary) }}</pre>
       </details>
       <section class="eval-review">
+        <h3>评审 Agent 评分</h3>
+        <p v-if="result.model_review_status === 'SKIPPED'" class="muted">
+          此结果为执行失败或程序化硬失败，已跳过模型评审。
+        </p>
+        <p
+          v-else-if="
+            result.model_review_status === 'PENDING' || result.model_review_status === 'RUNNING'
+          "
+          class="muted"
+        >
+          评审 Agent 正在处理第 {{ result.model_review_attempt || 1 }} 次尝试…
+        </p>
+        <template v-else-if="result.model_review">
+          <p>
+            第 {{ result.model_review_attempt }} 次 ·
+            {{ result.model_review.pass ? '模型通过' : '模型未通过' }} ·
+            {{ result.model_review.hard_fail ? '硬失败' : '无硬失败' }}
+          </p>
+          <pre>{{ pretty(result.model_review) }}</pre>
+        </template>
+        <template v-else-if="result.model_review_status === 'UNAVAILABLE'">
+          <p class="error">
+            评审 Agent 暂不可用（{{ result.model_review_error_code || '未知错误' }}），可以重跑第
+            {{ result.model_review_attempt }} 次评审。
+          </p>
+          <button type="button" class="secondary" :disabled="reviewing" @click="retryModelReview">
+            {{ reviewing ? '重跑中…' : '重跑评审 Agent' }}
+          </button>
+        </template>
+        <p v-else class="muted">此运行未启用评审 Agent。</p>
+        <details v-if="modelAudits.length">
+          <summary>评审尝试记录</summary>
+          <ul>
+            <li v-for="audit in modelAudits" :key="audit.id">
+              第 {{ audit.attempt }} 次 · {{ audit.status }} · {{ audit.created_at }}
+              <span v-if="audit.error_code"> · {{ audit.error_code }}</span>
+            </li>
+          </ul>
+          <div v-if="modelAuditTotal > 10" class="eval-pagination">
+            <button
+              type="button"
+              :disabled="modelAuditPage <= 1"
+              @click="loadModelAudits(modelAuditPage - 1)"
+            >
+              上一页评审
+            </button>
+            <span>第 {{ modelAuditPage }} 页 / {{ modelAuditTotal }} 条</span>
+            <button
+              type="button"
+              :disabled="modelAuditPage * 10 >= modelAuditTotal"
+              @click="loadModelAudits(modelAuditPage + 1)"
+            >
+              下一页评审
+            </button>
+          </div>
+        </details>
+      </section>
+      <section class="eval-review">
         <h3>人工评审</h3>
         <p class="muted">五个维度各 0–4 分。人工结论可调整语义判断；程序检查与硬失败始终保留。</p>
         <p v-if="result.manual_review">
@@ -149,6 +207,7 @@
     scoreDimensions,
     type EvalResult,
     type EvalReviewAudit,
+    type EvalModelReviewAttempt,
     type EvalScores,
   } from '../../agent/evals'
   import { useAuthStore } from '../../stores/auth'
@@ -158,10 +217,14 @@
     controller = new AbortController()
   const result = ref<EvalResult>(),
     audits = ref<EvalReviewAudit[]>([]),
+    modelAudits = ref<EvalModelReviewAttempt[]>([]),
+    modelAuditPage = ref(1),
+    modelAuditTotal = ref(0),
     auditPage = ref(1),
     auditTotal = ref(0)
   const loading = ref(false),
     saving = ref(false),
+    reviewing = ref(false),
     conflict = ref(false),
     error = ref(''),
     notice = ref('')
@@ -178,6 +241,35 @@
     reason = ref(''),
     baseVersion = ref(0)
   let pending: { fingerprint: string; id: string } | undefined
+  let modelTimer: ReturnType<typeof setTimeout> | undefined
+  let modelPending: { attempt: number; id: string } | undefined
+  function scheduleModelPoll() {
+    clearTimeout(modelTimer)
+    if (controller.signal.aborted) return
+    if (result.value && ['PENDING', 'RUNNING'].includes(result.value.model_review_status)) {
+      modelTimer = setTimeout(() => void refreshModel(), 1500)
+    }
+  }
+  async function refreshModel() {
+    try {
+      result.value = (
+        await evalApi.result(props.runId, props.resultId, controller.signal)
+      ).data.result
+      error.value = ''
+      await loadModelAudits(modelAuditPage.value)
+      if (!['PENDING', 'RUNNING'].includes(result.value.model_review_status)) emit('updated')
+      scheduleModelPoll()
+    } catch (cause) {
+      await failed(cause)
+      if (
+        !controller.signal.aborted &&
+        result.value &&
+        ['PENDING', 'RUNNING'].includes(result.value.model_review_status)
+      ) {
+        modelTimer = setTimeout(() => void refreshModel(), 3000)
+      }
+    }
+  }
   const pretty = (value: unknown) => JSON.stringify(value, null, 2)
   async function failed(cause: unknown) {
     if (controller.signal.aborted) return
@@ -185,6 +277,7 @@
     if (agentStatus(cause) === 403) {
       result.value = undefined
       audits.value = []
+      modelAudits.value = []
       await auth.fetchProfile().catch(() => undefined)
     }
   }
@@ -194,6 +287,16 @@
       audits.value = data.items
       auditPage.value = page
       auditTotal.value = data.page.total
+    } catch (cause) {
+      await failed(cause)
+    }
+  }
+  async function loadModelAudits(page = 1) {
+    try {
+      const { data } = await evalApi.modelReviews(props.resultId, page, controller.signal)
+      modelAudits.value = data.items
+      modelAuditTotal.value = data.page.total
+      modelAuditPage.value = page
     } catch (cause) {
       await failed(cause)
     }
@@ -213,10 +316,35 @@
         reason.value = ''
       }
       await loadAudits()
+      await loadModelAudits()
+      scheduleModelPoll()
     } catch (cause) {
       await failed(cause)
     } finally {
       loading.value = false
+    }
+  }
+  async function retryModelReview() {
+    if (!result.value || reviewing.value || result.value.model_review_status !== 'UNAVAILABLE')
+      return
+    reviewing.value = true
+    error.value = ''
+    const attempt = result.value.model_review_attempt
+    if (modelPending?.attempt !== attempt) modelPending = { attempt, id: crypto.randomUUID() }
+    try {
+      await evalApi.retryModelReview(props.resultId, attempt, modelPending.id, controller.signal)
+      modelPending = undefined
+      notice.value = '已提交重跑请求，等待评审结果。'
+      result.value.model_review_status = 'RUNNING'
+      await refreshModel()
+    } catch (cause) {
+      await failed(cause)
+      if (agentStatus(cause) === 409) {
+        modelPending = undefined
+        await refreshModel()
+      }
+    } finally {
+      reviewing.value = false
     }
   }
   async function reloadLatest() {
@@ -263,5 +391,8 @@
     }
   }
   onMounted(() => load())
-  onBeforeUnmount(() => controller.abort())
+  onBeforeUnmount(() => {
+    controller.abort()
+    clearTimeout(modelTimer)
+  })
 </script>

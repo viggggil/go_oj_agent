@@ -211,7 +211,72 @@ async def bootstrap_su8(
                     ),
                     content,
                 )
-        print("su8 Provider 与三个真实模型已准备，保留所有已有配置。", flush=True)
+        # 专用评审资源固定为只读、无知识库、单次模型调用的管理员 Agent。
+        from app.evals.reviewer import (
+            REVIEWER_AGENT_KEY,
+            REVIEWER_MODEL_KEY,
+            REVIEWER_PROMPT,
+            REVIEWER_PROMPT_KEY,
+            REVIEWER_SKILL,
+            REVIEWER_SKILL_KEY,
+        )
+
+        reviewer_prompt = await ensure(
+            "prompt",
+            REVIEWER_PROMPT_KEY,
+            {"name": "Eval 结构化评审规则", "text": REVIEWER_PROMPT},
+        )
+        reviewer_skill = await ensure(
+            "skill",
+            REVIEWER_SKILL_KEY,
+            {
+                "name": "Eval 评审量表",
+                "description": "离线质量评分维度与安全边界。",
+                "text": REVIEWER_SKILL,
+            },
+        )
+        reviewer_model = await existing("model", REVIEWER_MODEL_KEY)
+        if reviewer_model is None:
+            reviewer_model = await ensure(
+                "model",
+                REVIEWER_MODEL_KEY,
+                {
+                    "provider": "responses",
+                    "provider_id": provider.id,
+                    "model": "deepseek-v4-pro",
+                    "verbosity": "high",
+                    "max_output_tokens": 2000,
+                    "context_window_tokens": 24000,
+                },
+            )
+        reviewer_agent = await existing("agent", REVIEWER_AGENT_KEY)
+        if reviewer_agent is None:
+            await ensure(
+                "agent",
+                REVIEWER_AGENT_KEY,
+                {
+                    "name": "Eval 专用评审员",
+                    "prompt_id": reviewer_prompt.id,
+                    "skill_ids": [reviewer_skill.id],
+                    "default_skill_id": reviewer_skill.id,
+                    "model_profile_id": reviewer_model.id,
+                    "allowed_tools": [],
+                    "budget": {
+                        "max_run_seconds": 60,
+                        "max_output_chars": 8000,
+                        "max_events": 64,
+                        "max_tool_calls": 0,
+                        "max_model_calls": 1,
+                        "max_input_tokens": 16000,
+                        "max_output_tokens": 2000,
+                    },
+                    "visibility": "admin",
+                },
+            )
+        print(
+            "su8 Provider、三个真实模型及 Eval 专用评审 Agent 已准备，保留所有已有配置。",
+            flush=True,
+        )
     finally:
         if clients is not None:
             await clients.close()

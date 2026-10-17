@@ -663,7 +663,7 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 并保存程序化硬门禁检查、回答摘要、延迟和错误码。`agent_conversations.purpose` 默认 chat，
 历史数据保留为 chat；Eval 使用 eval，普通仓储统一在列表、详情、Run 查询和写入锁检查用途，
 避免评测账号通过普通历史 API 读取原始评测内容。索引 `(user_id,purpose,updated_at,id)` 支持
-隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审由 000007 增加；评审 Agent 结果仍由后续迁移增加。单实例重启中断遗留批次并保留已完成结果，尚无跨实例续跑。
+隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审由 000007 增加，评审 Agent 结果由 000008 增加。单实例重启中断遗留批次并保留已完成结果，评审 RUNNING/PENDING 状态收敛为不可用，尚无跨实例续跑。
 
 ### `agent_runs` / `agent_run_events`
 
@@ -902,3 +902,12 @@ Agent 拥有 `agent_eval_results.review_version`（默认 0）和可空 `manual_
 结果详情只联接 Agent 自有运行/样例表读取不可变 Case；结果筛选和聚合以结果 review_version 明确选择人工或程序结论，避免 MySQL JSON 缺失键布尔转换改变默认值。
 聚合按每个 Run 结果计算；现有 `(run_id,case_id,attempt)` 索引限制每批最多 3000 条记录，不为当前规模新增 JSON 索引。
 000007 是 expand：旧应用可忽略新列/表，新应用要求先迁移；down 删除全部人工评分和审计，不删除数据集、运行、回答、程序检查或聊天。
+
+### Eval 模型评审迁移 000008
+
+`000008_create_eval_model_reviews` 为 `agent_eval_runs` 保存评审 Agent key 与脱敏配置快照，
+为 `agent_eval_results` 增加评审状态、attempt、严格 JSON 评分和错误码，并追加
+`agent_eval_model_reviews` 审计表。每个结果的 `(result_id, attempt)` 和请求 UUID 唯一，状态
+按 `PENDING -> RUNNING -> COMPLETED|UNAVAILABLE` 收敛；硬失败结果为 `SKIPPED`。重试只接受
+当前 attempt 和 `UNAVAILABLE`，旧版本配置不会重新读取。down 迁移会先把运行恢复为普通
+`programmatic` 并清空评审字段，再删除审计表及扩展列，评审结果会丢失但运行和回答保留。

@@ -18,6 +18,8 @@ var agentEvalRun = regexp.MustCompile(`^/api/v1/admin/agent/evals/runs(?:/([0-9a
 
 var agentEvalReview = regexp.MustCompile(`^/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(review|reviews)$`)
 
+var agentEvalModelReview = regexp.MustCompile(`^/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(review-agent|model-reviews)$`)
+
 var agentEvalResult = regexp.MustCompile(`^/api/v1/admin/agent/evals/runs/([0-9a-f-]{36})/results/([0-9a-f-]{36})$`)
 
 var agentResource = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)(?:/([a-z][a-z0-9_]{1,63}))?(?:/(versions|archive|restore|disable|enable)(?:/([0-9a-f-]{36}))?)?$`)
@@ -29,6 +31,14 @@ var agentVersion = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skil
 func AgentOperation(method, path string) (string, error) {
 	allowed := false
 	switch {
+	case agentEvalModelReview.MatchString(path):
+		match := agentEvalModelReview.FindStringSubmatch(path)
+		id, err := uuid.Parse(match[1])
+		expected := http.MethodGet
+		if match[2] == "review-agent" {
+			expected = http.MethodPost
+		}
+		allowed = method == expected && err == nil && id.String() == match[1]
 	case agentEvalReview.MatchString(path):
 		match := agentEvalReview.FindStringSubmatch(path)
 		id, err := uuid.Parse(match[1])

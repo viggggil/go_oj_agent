@@ -25,7 +25,9 @@ export type EvalRun = {
   id: string
   dataset_id: string
   agent_key: string
-  mode: 'programmatic'
+  mode: 'programmatic' | 'programmatic_review'
+  reviewer_agent_key: string | null
+  reviewer_snapshot: Record<string, unknown> | null
   repeat_count: number
   concurrency: number
   status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
@@ -45,6 +47,9 @@ export type EvalMetrics = {
   check_passes: number
   effective_passes: number
   reviewed_cases: number
+  model_reviewed_cases: number
+  model_review_unavailable: number
+  model_passes: number
   average_latency_ms: number | null
 }
 export const scoreDimensions = [
@@ -63,6 +68,26 @@ export type EvalReview = {
   reviewed_by: number
   reviewed_at: string
 }
+export type EvalModelReview = {
+  case_id: string
+  pass: boolean
+  scores: EvalScores
+  hard_fail: boolean
+  violations: string[]
+  missing_facts: string[]
+  reason: string
+}
+export type EvalModelReviewAttempt = {
+  id: string
+  result_id: string
+  attempt: number
+  requested_by: number
+  status: 'RUNNING' | 'COMPLETED' | 'UNAVAILABLE'
+  review: EvalModelReview | null
+  error_code: string | null
+  created_at: string
+  finished_at: string | null
+}
 export type EvalResultSummary = {
   id: string
   run_id: string
@@ -76,13 +101,22 @@ export type EvalResultSummary = {
   latency_ms: number | null
   review_version: number
   manual_review: Pick<EvalReview, 'pass'> | null
+  model_review_status:
+    'NOT_REQUESTED' | 'PENDING' | 'RUNNING' | 'COMPLETED' | 'UNAVAILABLE' | 'SKIPPED'
+  model_review_attempt: number
+  model_review: Pick<EvalModelReview, 'pass' | 'hard_fail'> | null
+  model_review_error_code: string | null
   effective_pass: boolean
   answer_preview: string
 }
-export type EvalResult = Omit<EvalResultSummary, 'manual_review' | 'answer_preview'> & {
+export type EvalResult = Omit<
+  EvalResultSummary,
+  'manual_review' | 'answer_preview' | 'model_review'
+> & {
   answer: string | null
   model_summary: Record<string, unknown> | null
   manual_review: EvalReview | null
+  model_review: EvalModelReview | null
   case: EvalCaseData
 }
 export type EvalReviewAudit = {
@@ -106,7 +140,8 @@ export type EvalReviewWrite = {
 export type EvalRunWrite = {
   dataset_id: string
   agent_key: string
-  mode: 'programmatic'
+  mode: 'programmatic' | 'programmatic_review'
+  reviewer_agent_key?: 'eval_reviewer'
   concurrency: number
   repeat_count: number
 }
@@ -193,6 +228,19 @@ export const evalApi = {
   },
   reviews(id: string, page = 1, signal?: AbortSignal) {
     return api.get<PageResult<EvalReviewAudit>>(`${base}/results/${id}/reviews`, {
+      ...options(signal),
+      params: { page, page_size: 10 },
+    })
+  },
+  retryModelReview(id: string, expected_attempt: number, requestId: string, signal?: AbortSignal) {
+    return api.post<{ attempt: EvalModelReviewAttempt; duplicate: boolean }>(
+      `${base}/results/${id}/review-agent`,
+      { expected_attempt },
+      writeOptions(requestId, signal),
+    )
+  },
+  modelReviews(id: string, page = 1, signal?: AbortSignal) {
+    return api.get<PageResult<EvalModelReviewAttempt>>(`${base}/results/${id}/model-reviews`, {
       ...options(signal),
       params: { page, page_size: 10 },
     })
