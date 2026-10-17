@@ -206,6 +206,7 @@ async def test_model_review_strict_json_unavailable_and_retry(http: httpx.AsyncC
                 .limit(1)
             )
         # 验证部署天花板没有把 Reviewer 的独立事件预算再次夹回 1,000。
+        assert reviewer is not None
         assert reviewer["budget"]["max_events"] == 10000
     finally:
         await engine.dispose()
