@@ -83,6 +83,8 @@ apply_migration 000008_create_eval_model_reviews "$((eval_model_review_present +
 
 summary_present="$(table_count "'agent_conversation_summaries'")"
 apply_migration 000009_create_conversation_summaries "$summary_present" 1
+tool_description_present="$(table_count "'agent_tool_descriptions'")"
+apply_migration 000010_create_tool_descriptions "$tool_description_present" 1
 
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
