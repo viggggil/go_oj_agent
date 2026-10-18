@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -89,6 +90,9 @@ class Settings(BaseSettings):
     tool_max_page_size: int = Field(default=50, ge=1, le=100)
     tool_max_result_bytes: int = Field(default=256_000, ge=1024, le=1_048_576)
     business_tools_enabled: bool = False
+    run_code_enabled: bool = False
+    run_code_url: str = "http://judge-worker:8081/internal/run-code"
+    run_code_token: SecretStr = SecretStr("")
     credential_keyring_file: Path | None = None
     provider_allowed_origins: tuple[str, ...] = ()
     provider_allow_private_network: bool = False
@@ -145,6 +149,20 @@ class Settings(BaseSettings):
             raise ValueError("Production cannot allow private model endpoints")
         if self.business_tools_enabled and self.agent_private_key_file is None:
             raise ValueError("Business tools require Agent service identity")
+        if self.run_code_enabled:
+            target = urlsplit(self.run_code_url)
+            if (
+                not self.business_tools_enabled
+                or len(self.run_code_token.get_secret_value()) < 32
+                or target.scheme != "http"
+                or not target.hostname
+                or target.path != "/internal/run-code"
+                or target.username is not None
+                or target.password is not None
+                or target.query
+                or target.fragment
+            ):
+                raise ValueError("Run Code requires business tools and an internal endpoint token")
         if self.chat_enabled and (
             self.database_url is None
             or self.gateway_public_key_file is None

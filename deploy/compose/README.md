@@ -108,6 +108,8 @@ Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，以及单独�
 PR4 的业务 Tool 默认关闭。设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 后，Agent 使用该
 独立私钥调用 Problem/Judge 的只读 gRPC RPC；目标服务通过 `agent-public.pem` 和 RPC
 allowlist 验证调用。Agent 不会直接挂载业务数据库。
+`run_code` 通过 judge-worker 内部接口复用 Go-Judge 沙箱，不会创建正式提交；它默认启用，管理员仍需将工具加入 Agent 和 Skill 的允许列表。
+生产部署应将 `AGENT_RUN_CODE_TOKEN` 设置为至少 32 个字符的随机密钥；Compose 会把同一密钥只注入 Agent 与 judge-worker，接口不映射到宿主机。
 
 `agent-db-init` 在 MySQL 健康后检查 Agent `000001`～`000005` 的表、增量列和约束，
 按顺序应用尚未执行的迁移；完整的已执行迁移会跳过，保留已有会话、配置和凭据。

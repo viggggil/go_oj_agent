@@ -339,6 +339,8 @@ services:
       KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
       KRATOS_WORKER_CONCURRENCY: "2"
       KRATOS_WORKER_TASK_TIMEOUT: "60s"
+      KRATOS_RUN_CODE_ADDRESS: ":8081"
+      KRATOS_RUN_CODE_AUTH_TOKEN: "${AGENT_RUN_CODE_TOKEN:-local-development-run-code-token-change-before-sharing}"
     depends_on:
       minio-init:
         condition: service_completed_successfully
@@ -454,6 +456,9 @@ services:
       AGENT_GATEWAY_PUBLIC_KEY_FILE: /run/agent-auth/gateway-public.pem
       AGENT_GATEWAY_KEY_ID: gateway-internal-2026-09
       AGENT_BUSINESS_TOOLS_ENABLED: "${AGENT_BUSINESS_TOOLS_ENABLED:-true}"
+      AGENT_RUN_CODE_ENABLED: "${AGENT_RUN_CODE_ENABLED:-true}"
+      AGENT_RUN_CODE_URL: "http://judge-worker:8081/internal/run-code"
+      AGENT_RUN_CODE_TOKEN: "${AGENT_RUN_CODE_TOKEN:-local-development-run-code-token-change-before-sharing}"
       AGENT_AGENT_PRIVATE_KEY_FILE: /run/agent-auth-private/agent-private.pem
       AGENT_AGENT_KEY_ID: agent-internal-2026-10
       AGENT_AGENT_ISSUER: go-oj-agent
@@ -482,6 +487,8 @@ services:
         condition: service_completed_successfully
       auth-key-init:
         condition: service_completed_successfully
+      judge-worker:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).close()"]
       interval: 3s

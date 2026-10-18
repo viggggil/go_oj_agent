@@ -12,6 +12,7 @@ type Bootstrap struct {
 	Language  Language  `json:"language" yaml:"language"`
 	Storage   Storage   `json:"storage" yaml:"storage"`
 	Worker    Worker    `json:"worker" yaml:"worker"`
+	RunCode   RunCode   `json:"run_code" yaml:"run_code"`
 	Messaging Messaging `json:"messaging" yaml:"messaging"`
 }
 
@@ -20,6 +21,11 @@ type Worker struct {
 	TaskTimeout     string `json:"task_timeout" yaml:"task_timeout"`
 	ShutdownTimeout string `json:"shutdown_timeout" yaml:"shutdown_timeout"`
 	Retry           Retry  `json:"retry" yaml:"retry"`
+}
+
+type RunCode struct {
+	Address   string `json:"address" yaml:"address"`
+	AuthToken string `json:"auth_token" yaml:"auth_token"`
 }
 type Retry struct {
 	MaxRetries int    `json:"max_retries" yaml:"max_retries"`
@@ -82,6 +88,12 @@ func (c *Bootstrap) Validate() error {
 	}
 	if strings.TrimSpace(c.Sandbox.GoJudge.Endpoint) == "" || strings.TrimSpace(c.Sandbox.GoJudge.Token) == "" {
 		return fmt.Errorf("go-judge endpoint and token are required")
+	}
+	if c.RunCode.Address == "" {
+		c.RunCode.Address = ":8081"
+	}
+	if len(c.RunCode.AuthToken) < 32 {
+		return fmt.Errorf("run-code auth token must contain at least 32 characters")
 	}
 	if _, err := ParseDuration(c.Sandbox.GoJudge.Timeout, 30*time.Second); err != nil {
 		return fmt.Errorf("invalid go-judge timeout: %w", err)

@@ -105,3 +105,8 @@ def test_production_cannot_start_without_database(monkeypatch: pytest.MonkeyPatc
 def test_business_tools_cannot_start_without_agent_identity() -> None:
     with pytest.raises(ValidationError):
         Settings(business_tools_enabled=True)
+
+
+def test_run_code_requires_internal_token_and_business_tools() -> None:
+    with pytest.raises(ValidationError):
+        Settings(run_code_enabled=True, run_code_token=SecretStr("short"))

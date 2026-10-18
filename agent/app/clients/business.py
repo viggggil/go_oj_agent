@@ -5,6 +5,7 @@ from typing import Any
 
 from app.clients.auth import JUDGE_AUDIENCE, PROBLEM_AUDIENCE, AgentTokenSigner
 from app.clients.grpc import AuthenticatedChannel
+from app.clients.run_code import RunCodeClient
 from app.core.settings import Settings
 from app.grpcgen.api.common.v1 import common_pb2 as _common_pb2
 from app.grpcgen.api.contest.v1 import contest_pb2 as _contest_pb2
@@ -23,12 +24,15 @@ class BusinessClients:
     problem: "ProblemClient"
     judge: "JudgeClient"
     contest: "ContestClient | None" = None
+    run_code: RunCodeClient | None = None
 
     async def close(self) -> None:
         await self.problem.close()
         await self.judge.close()
         if self.contest is not None:
             await self.contest.close()
+        if self.run_code is not None:
+            await self.run_code.close()
 
 
 class ProblemClient:
@@ -171,4 +175,5 @@ def build_business_clients(settings: Settings) -> BusinessClients:
         ProblemClient(settings, signer),
         JudgeClient(settings, signer),
         ContestClient(settings, signer),
+        RunCodeClient(settings) if settings.run_code_enabled else None,
     )

@@ -7,6 +7,7 @@
 package main
 
 import (
+	"github.com/go-kratos/kratos/v3"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/comparator"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/conf"
@@ -19,7 +20,7 @@ import (
 
 // Injectors from wire.go:
 
-func initApp(config *conf.Bootstrap) (*App, func(), error) {
+func initApp(config *conf.Bootstrap) (*kratos.App, func(), error) {
 	goJudge, cleanup, err := sandbox.NewGoJudgeFromConfig(config)
 	if err != nil {
 		return nil, nil, err
@@ -51,9 +52,9 @@ func initApp(config *conf.Bootstrap) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	worker := server.NewWorkerWithConsumer(goJudge, engine, consumer)
-	v2 := newApp(config, worker)
-	return v2, func() {
+	worker := server.NewWorkerWithRunCode(goJudge, engine, consumer, config, v)
+	app := newApp(config, worker)
+	return app, func() {
 		cleanup()
 	}, nil
 }
