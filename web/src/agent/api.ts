@@ -89,6 +89,12 @@ export const agentApi = {
       params: { page, page_size: 100 },
       signal,
     }),
+  saveToolDescription: (name: string, description: string, signal?: AbortSignal) =>
+    api.put<{ tool: Tool }>(
+      `${base}/tools/${encodeURIComponent(name)}`,
+      { description },
+      { ...bounded, signal },
+    ),
 }
 export function agentStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined

@@ -95,6 +95,7 @@ class ToolContext(BaseModel):
 class ToolRegistry:
     def __init__(self) -> None:
         self._definitions: dict[str, ToolDefinition] = {}
+        self._descriptions: dict[str, str] = {}
 
     def register(self, definition: ToolDefinition) -> None:
         name = definition.spec.name
@@ -109,7 +110,18 @@ class ToolRegistry:
             raise ToolNotFound(f"Tool is not registered: {name}") from None
 
     def catalog(self) -> list[dict[str, Any]]:
-        return [self._definitions[name].catalog() for name in sorted(self._definitions)]
+        return [
+            {**self._definitions[name].catalog(), "description": self.description(name)}
+            for name in sorted(self._definitions)
+        ]
+
+    def description(self, name: str) -> str:
+        definition = self.get(name)
+        return self._descriptions.get(name, definition.spec.description)
+
+    def set_description(self, name: str, description: str) -> None:
+        self.get(name)
+        self._descriptions[name] = description
 
     def names(self) -> tuple[str, ...]:
         return tuple(sorted(self._definitions))

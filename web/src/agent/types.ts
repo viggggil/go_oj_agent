@@ -88,6 +88,8 @@ export interface Tool {
   allowed_roles: string[]
   input_schema: object
   output_schema: object
+  timeout_seconds: number
+  requires_confirmation: boolean
 }
 export interface Binding {
   id: string

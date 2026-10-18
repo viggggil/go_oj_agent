@@ -1,13 +1,15 @@
 """经 Gateway 委托的管理 HTTP 与公开目录，不透传原始异常。"""
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.auth import InvalidDelegation
@@ -23,9 +25,23 @@ from app.models.admin import (
 )
 from app.models.configuration import ConfigError, ConfigKind, ConfigWrite
 from app.models.runtime import Principal
+from app.storage.schema import agent_tool_descriptions
 
 router = APIRouter()
 KINDS: dict[str, ConfigKind] = {"agents": "agent", "prompts": "prompt", "skills": "skill"}
+
+
+class ToolDescriptionWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    description: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("description cannot be blank")
+        return value
 
 
 async def read_body(request: Request, model: type[BaseModel], maximum: int) -> Any:
@@ -117,12 +133,34 @@ async def dispatch(
     if path.startswith("/api/v1/admin/agent/model-options/"):
         return await service.model_detail(request.path_params["identifier"])
     if path.endswith("/tools"):
+        await service.load_tool_descriptions()
         values = [item for item in service.registry.catalog() if query.search in item["name"]]
         offset = (query.page - 1) * query.page_size
         return {
             "items": values[offset : offset + query.page_size],
             "page": {"page": query.page, "page_size": query.page_size, "total": len(values)},
         }
+    if path.startswith("/api/v1/admin/agent/tools/") and method == "PUT":
+        if request.query_params:
+            raise ConfigError("AGENT_INVALID_ARGUMENT")
+        body = await read_body(request, ToolDescriptionWrite, service.settings.max_request_bytes)
+        name = request.path_params["tool_name"]
+        if name not in service.registry.names():
+            raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
+        async with service.store._engine.begin() as connection:
+            statement = mysql_insert(agent_tool_descriptions).values(
+                tool_name=name,
+                description=body.description,
+                updated_by=principal.user_id,
+                updated_at=datetime.now(UTC),
+            ).on_duplicate_key_update(
+                description=body.description,
+                updated_by=principal.user_id,
+                updated_at=datetime.now(UTC),
+            )
+            await connection.execute(statement)
+        service.registry.set_description(name, body.description)
+        return {"tool": next(item for item in service.registry.catalog() if item["name"] == name)}
     kind = KINDS[request.path_params["resource"]]
     key = request.path_params.get("key")
     action = request.path_params.get("action")
@@ -181,6 +219,7 @@ router.add_api_route("/api/v1/agent/agents/{agent_key}/skills", handle, methods=
 router.add_api_route("/api/v1/admin/agent/model-options", handle, methods=["GET"])
 router.add_api_route("/api/v1/admin/agent/model-options/{identifier}", handle, methods=["GET"])
 router.add_api_route("/api/v1/admin/agent/tools", handle, methods=["GET"])
+router.add_api_route("/api/v1/admin/agent/tools/{tool_name}", handle, methods=["PUT"])
 router.add_api_route(
     "/api/v1/admin/agent/{resource}/versions/{identifier:uuid}", handle, methods=["GET"]
 )

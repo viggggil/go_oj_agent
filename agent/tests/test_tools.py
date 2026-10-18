@@ -70,10 +70,19 @@ async def test_registry_catalog_and_typed_execution() -> None:
         registry.register(definition())
     catalog = registry.catalog()
     assert catalog[0]["name"] == "test_tool"
+    assert catalog[0]["description"] == "测试工具"
     assert catalog[0]["input_schema"]["additionalProperties"] is False
     assert catalog[0]["output_schema"]["properties"]["value"]["type"] == "integer"
     result = await ToolExecutor(registry).execute("test_tool", {"value": 2}, context())
     assert result.ok and result.data == {"value": 3}
+
+
+def test_registry_description_override_is_used_by_runtime_catalog() -> None:
+    registry = ToolRegistry()
+    registry.register(definition())
+    registry.set_description("test_tool", "管理员修订后的工具说明")
+    assert registry.description("test_tool") == "管理员修订后的工具说明"
+    assert registry.catalog()[0]["description"] == "管理员修订后的工具说明"
 
 
 @pytest.mark.parametrize("arguments", [{}, {"value": "2"}, {"value": 2, "user_id": 999}])
