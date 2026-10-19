@@ -29,7 +29,7 @@
   <p v-if="error" class="error">{{ error }}</p>
   <div class="pager">
     <button :disabled="page <= 1 || loading" @click="load(page - 1)">上一页</button
-    ><span>第 {{ page }} 页 · 共 {{ total }} 题</span
+    ><span>第 {{ page }} 页，共 {{ pageCount }} 页</span
     ><button :disabled="page * pageSize >= total || loading" @click="load(page + 1)">下一页</button>
   </div>
 </template>
@@ -47,6 +47,7 @@
     loading = ref(false),
     error = ref('')
   const isAdmin = computed(() => auth.user?.roles.includes('admin'))
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
   const difficulty = (v: number) => ({ 1: '简单', 2: '中等', 3: '困难' })[v] || '未知'
   async function load(next = 1) {
     loading.value = true

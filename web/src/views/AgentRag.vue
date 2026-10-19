@@ -22,20 +22,11 @@
             刷新分组
           </button>
         </div>
-        <form @submit.prevent="saveGroup(false)">
-          <label
-            >新分组名称<input
-              v-model="groupName"
-              required
-              maxlength="128"
-              :disabled="busy" /></label
-          ><button :disabled="busy || !groupName.trim()">创建分组</button>
-        </form>
         <p v-if="groupsLoading" class="muted">加载分组中…</p>
-        <p v-else-if="!groups.length" class="muted">还没有分组，先创建一个，再上传文档。</p>
+        <p v-else-if="!visibleGroups.length" class="muted">没有可显示的知识索引。</p>
         <div class="rag-group-list">
           <button
-            v-for="group in groups"
+            v-for="group in visibleGroups"
             :key="group.id"
             :class="{ secondary: selected?.id !== group.id }"
             :aria-pressed="selected?.id === group.id"
@@ -68,91 +59,225 @@
         <div class="section-head">
           <div>
             <h2>{{ selected.name }}</h2>
-            <p class="muted">Agent 按此分组绑定访问范围。新文档索引就绪后需要启用。</p>
+            <p class="muted">Agent 按分组绑定知识范围。索引就绪后可启用文档。</p>
           </div>
           <button :disabled="busy" @click="newDocument">上传文档</button>
         </div>
-        <details>
-          <summary>修改分组名称</summary>
-          <form class="rag-inline-form" @submit.prevent="saveGroup(true)">
-            <label
-              >分组名称<input v-model="rename" required maxlength="128" :disabled="busy" /></label
-            ><button :disabled="busy || !rename.trim() || rename === selected.name">
-              保存分组名称
-            </button>
-          </form>
-        </details>
-        <div class="section-head">
-          <h3>文档</h3>
-          <button
-            class="secondary"
-            :disabled="busy || documentsLoading"
-            @click="loadDocuments(documentPage.page)"
-          >
-            刷新文档与索引状态
-          </button>
-        </div>
-        <p v-if="documentsLoading" class="muted">加载文档中…</p>
-        <p v-else-if="!documents.length" class="empty-panel compact">此分组还没有文档。</p>
-        <div v-else class="rag-document-list">
-          <article v-for="doc in documents" :key="doc.document_id" class="rag-document">
-            <div>
-              <h3>{{ doc.title }}</h3>
-              <p>
-                {{ kinds[doc.kind]
-                }}<span v-if="doc.problem_id"> · 题号 {{ doc.problem_id }}</span> ·
-                {{ indexState[doc.state] }} · {{ doc.enabled ? '已启用' : '未启用' }}
-              </p>
-              <p class="muted">
-                {{ doc.chunk_count }} 个片段 · {{ doc.size_bytes }} 字节<span
-                  v-if="doc.active_version && doc.active_version !== doc.id"
-                >
-                  · 仍使用上一发布版本</span
-                >
-              </p>
-              <p v-if="doc.error_code" class="error">{{ indexError(doc.error_code) }}</p>
-            </div>
-            <div class="agent-actions">
-              <button class="secondary" :disabled="busy" @click="openDocument(doc.document_id)">
-                查看与编辑</button
-              ><button
-                v-if="doc.state === 'FAILED'"
+        <div class="rag-workarea">
+          <div>
+            <div class="section-head">
+              <h3>文档</h3>
+              <button
                 class="secondary"
-                :disabled="busy"
-                @click="changeState(doc, 'retry')"
+                :disabled="busy || documentsLoading"
+                @click="loadDocuments(documentPage.page)"
               >
-                重试索引</button
-              ><button
-                v-if="!doc.enabled"
-                :disabled="busy || !doc.active_version"
-                @click="changeState(doc, 'enable')"
-              >
-                启用</button
-              ><button v-else class="danger" :disabled="busy" @click="changeState(doc, 'archive')">
-                归档
+                刷新文档与索引状态
               </button>
             </div>
-          </article>
-        </div>
-        <div v-if="documentPage.total" class="pager">
-          <button
-            class="secondary"
-            :disabled="busy || documentsLoading || documentPage.page <= 1"
-            @click="loadDocuments(documentPage.page - 1)"
-          >
-            上一页文档</button
-          ><span>第 {{ documentPage.page }} 页，共 {{ documentPage.total }} 篇</span
-          ><button
-            class="secondary"
-            :disabled="
-              busy ||
-              documentsLoading ||
-              documentPage.page * documentPage.page_size >= documentPage.total
-            "
-            @click="loadDocuments(documentPage.page + 1)"
-          >
-            下一页文档
-          </button>
+            <p v-if="documentsLoading" class="muted">加载文档中…</p>
+            <p v-else-if="!documents.length" class="empty-panel compact">此分组还没有文档。</p>
+            <div v-else class="rag-document-list">
+              <article v-for="doc in documents" :key="doc.document_id" class="rag-document">
+                <div>
+                  <h3>{{ doc.title }}</h3>
+                  <p>
+                    {{ kinds[doc.kind]
+                    }}<span v-if="doc.problem_id"> · 题号 {{ doc.problem_id }}</span> ·
+                    {{ indexState[doc.state] }} · {{ doc.enabled ? '已启用' : '未启用' }}
+                  </p>
+                  <p class="muted">
+                    {{ doc.chunk_count }} 个片段 · {{ doc.size_bytes }} 字节<span
+                      v-if="doc.active_version && doc.active_version !== doc.id"
+                    >
+                      · 仍使用上一发布版本</span
+                    >
+                  </p>
+                  <p v-if="doc.error_code" class="error">{{ indexError(doc.error_code) }}</p>
+                </div>
+                <div class="agent-actions">
+                  <button class="secondary" :disabled="busy" @click="openDocument(doc.document_id)">
+                    查看与编辑</button
+                  ><button
+                    v-if="doc.state === 'FAILED'"
+                    class="secondary"
+                    :disabled="busy"
+                    @click="changeState(doc, 'retry')"
+                  >
+                    重试索引</button
+                  ><button
+                    v-if="!doc.enabled"
+                    :disabled="busy || !doc.active_version"
+                    @click="changeState(doc, 'enable')"
+                  >
+                    启用</button
+                  ><button
+                    v-else
+                    class="danger"
+                    :disabled="busy"
+                    @click="changeState(doc, 'archive')"
+                  >
+                    归档
+                  </button>
+                </div>
+              </article>
+            </div>
+            <div v-if="documentPage.total" class="pager">
+              <button
+                class="secondary"
+                :disabled="busy || documentsLoading || documentPage.page <= 1"
+                @click="loadDocuments(documentPage.page - 1)"
+              >
+                上一页文档</button
+              ><span>第 {{ documentPage.page }} 页，共 {{ documentPage.total }} 篇</span
+              ><button
+                class="secondary"
+                :disabled="
+                  busy ||
+                  documentsLoading ||
+                  documentPage.page * documentPage.page_size >= documentPage.total
+                "
+                @click="loadDocuments(documentPage.page + 1)"
+              >
+                下一页文档
+              </button>
+            </div>
+          </div>
+          <aside v-if="editorVisible" class="rag-editor-card" aria-label="知识库文档编辑">
+            <div class="section-head">
+              <h2>{{ current ? '查看与编辑文档' : '上传文档' }}</h2>
+              <button class="secondary" :disabled="busy" @click="closeEditor">关闭</button>
+            </div>
+            <p v-if="editorError" class="error" role="alert">
+              {{ editorError
+              }}<button
+                v-if="editorStatus === 409 && current"
+                type="button"
+                class="link"
+                :disabled="busy"
+                @click="reloadCurrent"
+              >
+                重新加载当前文档
+              </button>
+            </p>
+            <form @submit.prevent="saveDocument">
+              <fieldset class="agent-form-body" :disabled="busy">
+                <p>
+                  所属分组：<strong>{{ selected?.name }}</strong>
+                </p>
+                <label
+                  >选择文件（UTF-8 Markdown / TXT，最多 120 KB）<input
+                    type="file"
+                    accept=".md,.txt,text/plain,text/markdown"
+                    @change="readFile"
+                /></label>
+                <div class="agent-field-grid">
+                  <label>文档标题<input v-model="form.title" required maxlength="128" /></label
+                  ><label
+                    >文档类型<select v-model="form.kind">
+                      <option value="editorial">题解</option>
+                      <option value="lecture">算法讲义</option>
+                      <option value="platform">平台文档</option>
+                    </select></label
+                  ><label
+                    >关联题号（选填）<input
+                      v-model="problem"
+                      type="number"
+                      min="1"
+                      step="1" /></label
+                  ><label
+                    >来源地址（选填）<input v-model="form.source_url" maxlength="512"
+                  /></label>
+                </div>
+                <label>标签（逗号分隔，最多 20 个）<input v-model="tags" /></label
+                ><label>文件名<input v-model="form.filename" required maxlength="128" /></label
+                ><label
+                  >正文<textarea
+                    v-model="form.content"
+                    class="agent-prompt"
+                    required
+                    spellcheck="false"
+                  ></textarea>
+                </label>
+                <p class="muted">
+                  {{ contentBytes }} / 120000
+                  字节。保存修改会创建新版本，索引完成前保留上次发布版本。
+                </p>
+                <div class="agent-actions">
+                  <button
+                    type="button"
+                    class="secondary"
+                    :disabled="!form.content.trim()"
+                    @click="preview(1)"
+                  >
+                    切分预览</button
+                  ><button :disabled="!form.content.trim()">
+                    {{ busy ? '处理中…' : current ? '保存新版本' : '上传并索引' }}
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+            <section v-if="previewPage.total">
+              <h3>切分预览</h3>
+              <p class="muted">
+                共 {{ previewPage.total }} 个片段，以下是第 {{ previewPage.page }} 页。
+              </p>
+              <article v-for="chunk in chunks" :key="chunk.number" class="rag-match">
+                <strong>{{ chunk.section }} · 片段 {{ chunk.number + 1 }}</strong>
+                <p class="muted">字符 {{ chunk.start }}–{{ chunk.end }}</p>
+                <pre>{{ chunk.text }}</pre>
+              </article>
+              <div class="pager">
+                <button
+                  class="secondary"
+                  :disabled="busy || previewPage.page <= 1"
+                  @click="preview(previewPage.page - 1)"
+                >
+                  上一页片段</button
+                ><button
+                  class="secondary"
+                  :disabled="busy || previewPage.page * previewPage.page_size >= previewPage.total"
+                  @click="preview(previewPage.page + 1)"
+                >
+                  下一页片段
+                </button>
+              </div>
+            </section>
+            <section v-if="current">
+              <div class="section-head">
+                <h3>文档版本</h3>
+                <button class="secondary" :disabled="busy" @click="loadHistory(1)">刷新版本</button>
+              </div>
+              <p v-if="historyError" class="error" role="alert">{{ historyError }}</p>
+              <article v-for="version in history" :key="version.id" class="rag-history">
+                <strong
+                  >{{ version.id === current.id ? '当前编辑版本' : '历史版本'
+                  }}{{ version.id === version.active_version ? ' · 已发布' : '' }}</strong
+                >
+                <p>
+                  {{ version.title }} · {{ indexState[version.state] }} ·
+                  {{ version.chunk_count }} 个片段 ·
+                  {{ new Date(version.created_at).toLocaleString() }}
+                </p>
+                <code>{{ version.id }}</code>
+              </article>
+              <div v-if="historyPage.total > historyPage.page_size" class="pager">
+                <button
+                  class="secondary"
+                  :disabled="busy || historyPage.page <= 1"
+                  @click="loadHistory(historyPage.page - 1)"
+                >
+                  上一页版本</button
+                ><button
+                  class="secondary"
+                  :disabled="busy || historyPage.page * historyPage.page_size >= historyPage.total"
+                  @click="loadHistory(historyPage.page + 1)"
+                >
+                  下一页版本
+                </button>
+              </div>
+            </section>
+          </aside>
         </div>
         <section class="rag-search">
           <h2>检索测试</h2>
@@ -192,135 +317,10 @@
         </section>
       </div>
     </div>
-    <dialog ref="editor" class="agent-dialog rag-editor" @cancel.prevent="closeEditor">
-      <div class="section-head">
-        <h2>{{ current ? '查看与编辑文档' : '上传文档' }}</h2>
-        <button class="secondary" :disabled="busy" @click="closeEditor">关闭文档</button>
-      </div>
-      <p v-if="editorError" class="error" role="alert">
-        {{ editorError
-        }}<button
-          v-if="editorStatus === 409 && current"
-          type="button"
-          class="link"
-          :disabled="busy"
-          @click="reloadCurrent"
-        >
-          重新加载当前文档
-        </button>
-      </p>
-      <form @submit.prevent="saveDocument">
-        <fieldset class="agent-form-body" :disabled="busy">
-          <p>
-            所属分组：<strong>{{ selected?.name }}</strong>
-          </p>
-          <label
-            >选择文件（UTF-8 Markdown / TXT，最多 120 KB）<input
-              type="file"
-              accept=".md,.txt,text/plain,text/markdown"
-              @change="readFile"
-          /></label>
-          <div class="agent-field-grid">
-            <label>文档标题<input v-model="form.title" required maxlength="128" /></label
-            ><label
-              >文档类型<select v-model="form.kind">
-                <option value="editorial">题解</option>
-                <option value="lecture">算法讲义</option>
-                <option value="platform">平台文档</option>
-              </select></label
-            ><label
-              >关联题号（选填）<input v-model="problem" type="number" min="1" step="1" /></label
-            ><label>来源地址（选填）<input v-model="form.source_url" maxlength="512" /></label>
-          </div>
-          <label>标签（逗号分隔，最多 20 个）<input v-model="tags" /></label
-          ><label>文件名<input v-model="form.filename" required maxlength="128" /></label
-          ><label
-            >正文<textarea
-              v-model="form.content"
-              class="agent-prompt"
-              required
-              spellcheck="false"
-            ></textarea>
-          </label>
-          <p class="muted">
-            {{ contentBytes }} / 120000 字节。保存修改会创建新版本，索引完成前保留上次发布版本。
-          </p>
-          <div class="agent-actions">
-            <button
-              type="button"
-              class="secondary"
-              :disabled="!form.content.trim()"
-              @click="preview(1)"
-            >
-              切分预览</button
-            ><button :disabled="!form.content.trim()">
-              {{ busy ? '处理中…' : current ? '保存新版本' : '上传并索引' }}
-            </button>
-          </div>
-        </fieldset>
-      </form>
-      <section v-if="previewPage.total">
-        <h3>切分预览</h3>
-        <p class="muted">共 {{ previewPage.total }} 个片段，以下是第 {{ previewPage.page }} 页。</p>
-        <article v-for="chunk in chunks" :key="chunk.number" class="rag-match">
-          <strong>{{ chunk.section }} · 片段 {{ chunk.number + 1 }}</strong>
-          <p class="muted">字符 {{ chunk.start }}–{{ chunk.end }}</p>
-          <pre>{{ chunk.text }}</pre>
-        </article>
-        <div class="pager">
-          <button
-            class="secondary"
-            :disabled="busy || previewPage.page <= 1"
-            @click="preview(previewPage.page - 1)"
-          >
-            上一页片段</button
-          ><button
-            class="secondary"
-            :disabled="busy || previewPage.page * previewPage.page_size >= previewPage.total"
-            @click="preview(previewPage.page + 1)"
-          >
-            下一页片段
-          </button>
-        </div>
-      </section>
-      <section v-if="current">
-        <div class="section-head">
-          <h3>文档版本</h3>
-          <button class="secondary" :disabled="busy" @click="loadHistory(1)">刷新版本</button>
-        </div>
-        <p v-if="historyError" class="error" role="alert">{{ historyError }}</p>
-        <article v-for="version in history" :key="version.id" class="rag-history">
-          <strong
-            >{{ version.id === current.id ? '当前编辑版本' : '历史版本'
-            }}{{ version.id === version.active_version ? ' · 已发布' : '' }}</strong
-          >
-          <p>
-            {{ version.title }} · {{ indexState[version.state] }} · {{ version.chunk_count }} 个片段
-            · {{ new Date(version.created_at).toLocaleString() }}
-          </p>
-          <code>{{ version.id }}</code>
-        </article>
-        <div v-if="historyPage.total > historyPage.page_size" class="pager">
-          <button
-            class="secondary"
-            :disabled="busy || historyPage.page <= 1"
-            @click="loadHistory(historyPage.page - 1)"
-          >
-            上一页版本</button
-          ><button
-            class="secondary"
-            :disabled="busy || historyPage.page * historyPage.page_size >= historyPage.total"
-            @click="loadHistory(historyPage.page + 1)"
-          >
-            下一页版本
-          </button>
-        </div>
-      </section>
-    </dialog>
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { onBeforeRouteLeave } from 'vue-router'
   import { agentError, agentStatus } from '../agent/api'
   import { operationIds } from '../agent/state'
@@ -344,6 +344,9 @@
     selected = ref<KnowledgeGroup>(),
     documents = ref<KnowledgeDocument[]>([]),
     matches = ref<Match[]>([])
+  const visibleGroups = computed(() =>
+    groups.value.filter((group) => ['算法知识', '题解'].includes(group.name)),
+  )
   const groupPage = ref(page()),
     documentPage = ref(page()),
     historyPage = ref(page()),
@@ -353,12 +356,10 @@
     documentsLoading = ref(false),
     error = ref(''),
     notice = ref(''),
-    groupName = ref(''),
-    rename = ref(''),
     query = ref(''),
     searchProblem = ref(''),
     searched = ref(false)
-  const editor = ref<HTMLDialogElement>(),
+  const editorVisible = ref(false),
     current = ref<KnowledgeDocument>(),
     editorError = ref(''),
     editorStatus = ref<number>(),
@@ -372,7 +373,7 @@
     kinds = { editorial: '题解', lecture: '算法讲义', platform: '平台文档' }
   const contentBytes = computed(() => new TextEncoder().encode(form.value.content).length)
   const serialize = () => JSON.stringify([form.value, problem.value, tags.value])
-  const dirty = () => editor.value?.open && serialize() !== baseline.value
+  const dirty = () => editorVisible.value && serialize() !== baseline.value
   const alive = () =>
     !life.signal.aborted &&
     auth.isAuthenticated &&
@@ -416,11 +417,8 @@
       groups.value = data.items
       groupPage.value = data.page
       const refreshed = data.items.find((item) => item.id === selected.value?.id)
-      if (refreshed && selected.value) {
-        if (rename.value === selected.value.name) rename.value = refreshed.name
-        selected.value = refreshed
-      }
-      if (!selected.value && data.items[0]) await selectGroup(data.items[0])
+      if (refreshed && selected.value) selected.value = refreshed
+      if (!selected.value && visibleGroups.value[0]) await selectGroup(visibleGroups.value[0])
     } catch (cause) {
       await failed(cause)
     } finally {
@@ -431,7 +429,6 @@
     if (busy.value || documentsLoading.value) return
     documents.value = []
     selected.value = group
-    rename.value = group.name
     matches.value = []
     searched.value = false
     error.value = ''
@@ -453,47 +450,6 @@
       if (alive()) documentsLoading.value = false
     }
   }
-  async function saveGroup(isRename: boolean) {
-    if (busy.value || groupsLoading.value || documentsLoading.value || !alive()) return
-    busy.value = true
-    error.value = ''
-    notice.value = ''
-    try {
-      const name = (isRename ? rename.value : groupName.value).trim()
-      const request = {
-        action: isRename ? 'rename' : 'create',
-        id: isRename ? selected.value?.id : null,
-        name,
-        expected: isRename ? selected.value?.name : null,
-      }
-      const { data } =
-        isRename && selected.value
-          ? await ragApi.renameGroup(
-              selected.value.id,
-              name,
-              selected.value.name,
-              ids.for(request),
-              life.signal,
-            )
-          : await ragApi.createGroup(name, ids.for(request), life.signal)
-      if (!alive()) return
-      ids.clear()
-      selected.value = data.knowledge_base
-      rename.value = data.knowledge_base.name
-      groupName.value = ''
-      matches.value = []
-      searched.value = false
-      await loadGroups(1)
-      await loadDocuments(1)
-      notice.value = isRename
-        ? '分组名称已更新，Agent 绑定保持有效。'
-        : '分组已创建，可以上传文档。'
-    } catch (cause) {
-      await failed(cause)
-    } finally {
-      if (alive()) busy.value = false
-    }
-  }
   async function newDocument() {
     current.value = undefined
     form.value = emptyForm()
@@ -507,8 +463,7 @@
     editorStatus.value = undefined
     historyError.value = ''
     baseline.value = serialize()
-    await nextTick()
-    editor.value?.showModal()
+    editorVisible.value = true
   }
   async function openDocument(id: string) {
     if (busy.value) return
@@ -540,11 +495,10 @@
       editorStatus.value = undefined
       historyError.value = ''
       baseline.value = serialize()
-      await nextTick()
-      if (!editor.value?.open) editor.value?.showModal()
+      editorVisible.value = true
       await loadHistory(1)
     } catch (cause) {
-      await failed(cause, Boolean(editor.value?.open))
+      await failed(cause, editorVisible.value)
     } finally {
       if (alive()) busy.value = false
     }
@@ -555,7 +509,7 @@
   }
   function closeEditor() {
     if (busy.value || (dirty() && !window.confirm('文档尚未保存，放弃修改吗？'))) return
-    editor.value?.close()
+    editorVisible.value = false
   }
   function problemId(value: string | number): number | null {
     if (value === '') return null
@@ -617,7 +571,7 @@
       if (!alive()) return
       ids.clear()
       baseline.value = serialize()
-      editor.value?.close()
+      editorVisible.value = false
       notice.value = '文档已保存，正在等待索引。可刷新状态，索引就绪后启用。'
       await loadDocuments(1)
     } catch (cause) {
@@ -742,6 +696,5 @@
   onMounted(() => loadGroups())
   onBeforeUnmount(() => {
     life.abort()
-    editor.value?.close()
   })
 </script>

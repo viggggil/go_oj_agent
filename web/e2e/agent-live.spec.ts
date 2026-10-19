@@ -266,7 +266,8 @@ test('Eval 页面创建运行、保留冲突草稿、重放丢失响应的评分
     expectations: { required_facts: ['字面检查未命中_' + randomUUID()] },
   }
   await page.goto('/agent/eval')
-  await page.getByRole('button', { name: '上传数据集', exact: true }).click()
+  await page.getByRole('link', { name: '上传数据集', exact: true }).click()
+  await expect(page).toHaveURL(/\/agent\/eval\/datasets\/new$/)
   await page.getByLabel('名称', { exact: true }).fill(name)
   await page.getByLabel('JSONL 内容', { exact: true }).fill(JSON.stringify(sample))
   await page.getByRole('button', { name: '上传并校验', exact: true }).click()
