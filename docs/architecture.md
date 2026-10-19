@@ -652,10 +652,16 @@ prepare 先估算安全前缀、解析后的 Agent/Skill 文本及当前问题�
 不因历史过大拒绝本轮，不截断单条消息，也不另调模型摘要。若必需输入本身超限，沿用
 AGENT_MODEL_INPUT_LIMIT。有限重试使用相同 PreparedAnswer，完整输入估算计入每次调用预算。
 
-Responses input 按 user/assistant 角色传递历史，当前问题只追加一次；历史不进入 instructions，
-也不能修改安全规则。每轮请求仍 store=false、不使用 previous_response_id，服务端已存消息
-是上下文来源，不引入供应商托管会话、持久化 checkpointer 或长期记忆。
+Responses input 按 user/assistant 角色传递最近未归档历史，当前问题只追加一次；结构化会话摘要
+作为明确标注的辅助上下文进入 instructions，不被当作系统指令，也不能修改安全规则。摘要
+携带已覆盖的最后一条完整 assistant 消息 ID，装配器只读取该游标之后的最近完整轮次，避免同一
+轮次同时出现在摘要和原始历史中。每轮请求仍 store=false、不使用 previous_response_id，服务端
+已存消息是上下文来源，不引入供应商托管会话、持久化 checkpointer 或跨会话长期记忆。
 配置版本仍由当前 Run 固定，新对话历史为空；同会话 Agent key 归属规则不变。
+
+PR1 的 `agent_conversation_summaries` 只提供结构化摘要、用途隔离和乐观版本写入边界。摘要
+更新仍需在成功 Run 提交后由后续异步 Worker 触发；摘要读取失败会让本轮按既有错误语义失败，
+不会改变已有 Run 的终态事务。
 
 ### 只读工具边界
 

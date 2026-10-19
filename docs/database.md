@@ -531,6 +531,15 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 运行中、失败、取消、中断、tool、run_id=NULL 和缺少 user/assistant 的记录不进入上下文。
 查询复用 conversation 与 run_id 索引，无新 DDL、无回填、不修改历史消息；旧应用可继续读取原表。
 
+### Issue #184 PR1 `agent_conversation_summaries`
+
+会话摘要表以 `conversation_id` 为主键，保存 `user_id`、`purpose`、结构化 `summary_json`、
+`covered_until_message_id`、`schema_version`、`version` 和时间戳。摘要游标只能由应用推进到
+同一会话内 COMPLETED Run 的完整 assistant 消息边界，且所有读写都同时校验 owner 与用途。
+新上下文装配只取游标之后的最近完整轮次，从而避免摘要与原文重复；摘要写入使用会话锁和
+期望版本号，旧摘要和游标在校验或保存失败时保持不变。该表不替换消息，也不保存模型内部
+推理；异步摘要 Worker 和重试任务在后续 PR 实现。
+
 ### PR2 `agent_runs` 实际字段与一致性
 
 | Column | Type | Note |

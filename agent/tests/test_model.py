@@ -17,6 +17,7 @@ from app.core.settings import Settings
 from app.graphs.model_runtime import ModelRuntime
 from app.graphs.service import RunService
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
+from app.models.memory import ConfirmedFact, ConversationSummary
 from app.models.provider import ModelFailure
 from app.models.runtime import AgentState, ChatRequest, HistoryMessage, StreamEvent
 from tests.test_runtime import MemoryStore, Reader, state
@@ -382,6 +383,31 @@ async def test_history_keeps_recent_whole_turns_within_input_and_context_limits(
         _ = [event async for event in ModelRuntime(client, Credentials()).run(value)]
         assert calls[1]["input"] == [{"role": "user", "content": value.user_message}]
         assert value.model_summary.attempts[0].input_tokens == base.input_estimate
+    finally:
+        await client.close()
+
+
+async def test_conversation_summary_is_auxiliary_instruction_without_internal_ids() -> None:
+    from app.graphs.direct_answer import DirectAnswer
+
+    value = configured()
+    value.memory_summary = ConversationSummary(
+        goal="定位边界错误",
+        confirmed_facts=(
+            ConfirmedFact(
+                content="输入使用 C++17",
+                source_message_id=42,
+                source_type="user_statement",
+            ),
+        ),
+    )
+
+    client = client_for(lambda _request: httpx.Response(500))
+    try:
+        prepared = DirectAnswer(client, Credentials()).prepare(value)
+        assert "定位边界错误" in prepared.instructions
+        assert "输入使用 C++17" in prepared.instructions
+        assert "source_message_id" not in prepared.instructions
     finally:
         await client.close()
 

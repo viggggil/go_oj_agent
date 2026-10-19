@@ -73,3 +73,10 @@ Down 首先拒绝仍有 Provider 配置的库，避免孤立 Model 引用。清�
 `agent/000008_create_eval_model_reviews` 为运行保存评审 Agent 快照，为结果保存模型评审状态、
 严格 JSON 评分和错误码，并以追加表记录每次尝试。迁移必须在新版 Agent/Gateway/Web 部署前执行；
 旧应用可以忽略新增列和表。`down` 会清空运行中的评审绑定并删除模型评审结果，保留运行、回答和程序检查。
+
+### Agent 会话持久化摘要
+
+`agent/000009_create_conversation_summaries` 为每个 Agent 会话增加一行结构化摘要，保存摘要
+版本、已覆盖的最后一条完整 assistant 消息和用途隔离字段。摘要游标由应用校验只能指向
+COMPLETED Run 的完整问答边界；乐观版本号用于后续异步摘要 Worker 的并发更新。该迁移不
+删除或改写已有消息，旧应用可以忽略新表；部署应先应用迁移再启用读取摘要的新 Agent。

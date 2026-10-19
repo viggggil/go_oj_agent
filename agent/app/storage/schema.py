@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     Computed,
     ForeignKey,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -71,6 +72,25 @@ agent_messages = Table(
     Column("content", MEDIUMTEXT, nullable=False),
     Column("tool_name", String(128)),
     Column("created_at", DATETIME(fsp=3), nullable=False),
+)
+
+agent_conversation_summaries = Table(
+    "agent_conversation_summaries",
+    metadata,
+    Column(
+        "conversation_id",
+        CHAR(36),
+        ForeignKey("agent_conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("user_id", BigInteger, nullable=False),
+    Column("purpose", String(16), nullable=False, server_default="chat"),
+    Column("summary_json", JSON, nullable=False),
+    Column("covered_until_message_id", BigInteger),
+    Column("schema_version", Integer, nullable=False, server_default="1"),
+    Column("version", Integer, nullable=False, server_default="1"),
+    Column("created_at", DATETIME(fsp=3), nullable=False),
+    Column("updated_at", DATETIME(fsp=3), nullable=False),
 )
 
 agent_config_resources = Table(
