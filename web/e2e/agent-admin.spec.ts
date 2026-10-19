@@ -412,6 +412,19 @@ test('普通用户管理 URL 转到对话，不读取管理正文；失败详情
   expect(requests.some((url) => url.includes('/api/v1/admin/agent/'))).toBe(false)
 })
 
+test('Eval 数据集上传使用独立创建页面', async ({ page }) => {
+  await mockManagement(page, ['agent_admin'])
+  await page.goto('/agent/eval/datasets/new')
+  await expect(page.getByRole('heading', { name: '上传评测数据集' })).toBeVisible()
+  await expect(page.getByLabel('名称', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('JSONL 内容', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: '返回数据集', exact: true })).toHaveAttribute(
+    'href',
+    '/agent/eval',
+  )
+  await expect(page.getByRole('table')).toHaveCount(0)
+})
+
 test('管理员详情 404 可重试，正文作为纯文本显示', async ({ page }) => {
   const state = await mockManagement(page, ['agent_admin'])
   await page.goto('/agent/prompts/missing_prompt')

@@ -124,97 +124,104 @@
             <pre>{{ JSON.stringify(selectedRun.config_snapshot, null, 2) }}</pre>
           </details>
         </section>
-        <form class="eval-filters" @submit.prevent="applyFilters">
-          <label
-            >结果结论<select v-model="filters.verdict">
-              <option value="">全部</option>
-              <option value="pass">最终通过</option>
-              <option value="fail">最终未通过</option>
-              <option value="hard_fail">硬失败</option>
-              <option value="unreviewed">待人工评审</option>
-            </select></label
-          ><label
-            >执行状态<select v-model="filters.status">
-              <option value="">全部</option>
-              <option value="COMPLETED">执行完成</option>
-              <option value="FAILED">执行失败</option>
-              <option value="CANCELLED">已取消</option>
-            </select></label
-          ><label>类别<input v-model="filters.category" maxlength="64" /></label
-          ><label>错误码<input v-model="filters.error_code" maxlength="64" /></label
-          ><label>样例 ID<input v-model="filters.search" maxlength="64" /></label
-          ><button :disabled="loading">筛选结果</button>
-        </form>
-        <div class="agent-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>样例 / 次数</th>
-                <th>执行状态</th>
-                <th>程序检查</th>
-                <th>人工 / 最终</th>
-                <th>耗时</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in results" :key="item.id">
-                <td>
-                  <strong>{{ item.case_id }}</strong> · {{ item.attempt }}<br />{{ item.title
-                  }}<br /><small>{{ item.category }}</small>
-                </td>
-                <td>
-                  {{ item.status }}<br /><small>{{ item.error_code }}</small>
-                </td>
-                <td>
-                  {{ item.checks.hard_fail ? '硬失败' : item.checks.pass ? '通过' : '未通过' }}
-                </td>
-                <td>
-                  {{
-                    item.manual_review
-                      ? item.manual_review.pass
-                        ? '人工通过'
-                        : '人工未通过'
-                      : '待评审'
-                  }}
-                  · 模型：{{ modelReviewStatus[item.model_review_status] }} /
-                  {{ item.effective_pass ? '通过' : '未通过' }}
-                </td>
-                <td>{{ item.latency_ms ?? '—' }} ms</td>
-                <td>
-                  <button class="link" type="button" @click="resultId = item.id">查看与评分</button>
-                </td>
-              </tr>
-              <tr v-if="!loading && !results.length">
-                <td colspan="6" class="muted">没有符合条件的结果；运行中的结果会自动刷新。</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="eval-workarea">
+          <div>
+            <form class="eval-filters" @submit.prevent="applyFilters">
+              <label
+                >结果结论<select v-model="filters.verdict">
+                  <option value="">全部</option>
+                  <option value="pass">最终通过</option>
+                  <option value="fail">最终未通过</option>
+                  <option value="hard_fail">硬失败</option>
+                  <option value="unreviewed">待人工评审</option>
+                </select></label
+              ><label
+                >执行状态<select v-model="filters.status">
+                  <option value="">全部</option>
+                  <option value="COMPLETED">执行完成</option>
+                  <option value="FAILED">执行失败</option>
+                  <option value="CANCELLED">已取消</option>
+                </select></label
+              ><label>类别<input v-model="filters.category" maxlength="64" /></label
+              ><label>错误码<input v-model="filters.error_code" maxlength="64" /></label
+              ><label>样例 ID<input v-model="filters.search" maxlength="64" /></label
+              ><button :disabled="loading">筛选结果</button>
+            </form>
+            <div class="agent-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>样例 / 次数</th>
+                    <th>执行状态</th>
+                    <th>程序检查</th>
+                    <th>人工 / 最终</th>
+                    <th>耗时</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in results" :key="item.id">
+                    <td>
+                      <strong>{{ item.case_id }}</strong> · {{ item.attempt }}<br />{{ item.title
+                      }}<br /><small>{{ item.category }}</small>
+                    </td>
+                    <td>
+                      {{ item.status }}<br /><small>{{ item.error_code }}</small>
+                    </td>
+                    <td>
+                      {{ item.checks.hard_fail ? '硬失败' : item.checks.pass ? '通过' : '未通过' }}
+                    </td>
+                    <td>
+                      {{
+                        item.manual_review
+                          ? item.manual_review.pass
+                            ? '人工通过'
+                            : '人工未通过'
+                          : '待评审'
+                      }}
+                      · 模型：{{ modelReviewStatus[item.model_review_status] }} /
+                      {{ item.effective_pass ? '通过' : '未通过' }}
+                    </td>
+                    <td>{{ item.latency_ms ?? '—' }} ms</td>
+                    <td>
+                      <button class="link" type="button" @click="resultId = item.id">
+                        查看与评分
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!loading && !results.length">
+                    <td colspan="6" class="muted">没有符合条件的结果；运行中的结果会自动刷新。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="eval-pagination">
+              <button
+                type="button"
+                :disabled="resultPage <= 1 || loading"
+                @click="changeResultPage(resultPage - 1)"
+              >
+                上一页结果</button
+              ><span>第 {{ resultPage }} 页 · 共 {{ resultTotal }} 条结果</span
+              ><button
+                type="button"
+                :disabled="resultPage * 20 >= resultTotal || loading"
+                @click="changeResultPage(resultPage + 1)"
+              >
+                下一页结果
+              </button>
+            </div>
+          </div>
+          <aside v-if="resultId" class="eval-side-panel" aria-label="评测结果与评分">
+            <EvalResult
+              :key="runId + resultId"
+              :run-id="runId"
+              :result-id="resultId"
+              @close="resultId = ''"
+              @updated="restartView"
+            />
+          </aside>
         </div>
-        <div class="eval-pagination">
-          <button
-            type="button"
-            :disabled="resultPage <= 1 || loading"
-            @click="changeResultPage(resultPage - 1)"
-          >
-            上一页结果</button
-          ><span>第 {{ resultPage }} 页 · 共 {{ resultTotal }} 条结果</span
-          ><button
-            type="button"
-            :disabled="resultPage * 20 >= resultTotal || loading"
-            @click="changeResultPage(resultPage + 1)"
-          >
-            下一页结果
-          </button>
-        </div>
-        <EvalResult
-          v-if="resultId"
-          :key="runId + resultId"
-          :run-id="runId"
-          :result-id="resultId"
-          @close="resultId = ''"
-          @updated="restartView"
-        />
       </template>
     </template>
   </section>

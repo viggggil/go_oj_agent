@@ -166,7 +166,7 @@ func (s *StoreSet) List(ctx context.Context, page, pageSize int32, includeArchiv
 	args := append(countArgs, pageSize, (page-1)*pageSize)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, title, slug, difficulty, status
-		FROM problems`+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, args...)
+		FROM problems`+where+` ORDER BY id ASC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -14,15 +14,15 @@ body {
   margin: 0;
 }
 .shell {
-  max-width: 1120px;
-  margin: auto;
-  padding: 24px;
+  width: 100%;
+  margin: 0;
+  padding: 18px 28px;
 }
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 72px;
+  margin-bottom: 32px;
 }
 .page-head {
   display: flex;
@@ -835,8 +835,9 @@ dd {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
   gap: 28px;
-  max-width: 1280px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 .agent-sidebar {
   min-width: 0;
@@ -1634,31 +1635,50 @@ dd {
 
 .rag-layout {
   display: grid;
-  grid-template-columns: minmax(200px, 250px) minmax(0, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  gap: 1rem;
   align-items: start;
 }
 .rag-groups {
-  border: 1px solid var(--border, #dfe3e8);
-  border-radius: 12px;
-  padding: 1rem;
+  min-width: 0;
 }
-.rag-groups form,
 .rag-search form {
   display: grid;
   gap: 0.75rem;
 }
 .rag-group-list {
   display: grid;
-  gap: 0.5rem;
-  margin: 1rem 0;
+  gap: 0.35rem;
+  margin: 0.65rem 0;
 }
 .rag-group-list button {
   text-align: left;
   overflow-wrap: anywhere;
+  padding: 8px 10px;
+  font-size: 14px;
 }
 .rag-content {
   min-width: 0;
+}
+.rag-workarea {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(420px, 1.15fr);
+  gap: 1rem;
+  align-items: start;
+}
+.rag-editor-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border, #dfe3e8);
+  border-radius: 8px;
+  background: #fff;
+}
+.rag-editor-card .agent-form-body {
+  display: grid;
+  gap: 12px;
+}
+.rag-editor-card .agent-prompt {
+  min-height: 180px;
 }
 .rag-document-list {
   display: grid;
@@ -1688,12 +1708,6 @@ dd {
   margin-top: 2rem;
   padding-top: 1rem;
 }
-.rag-editor {
-  width: min(960px, calc(100vw - 2rem));
-}
-.rag-editor textarea {
-  min-height: 240px;
-}
 .rag-match pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1708,11 +1722,32 @@ dd {
   .rag-layout {
     grid-template-columns: 1fr;
   }
+  .rag-workarea {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Eval：沿用 Agent 工作区导航，长回答和审计内容在卡片内换行。 */
 .agent-eval {
   min-width: 0;
+}
+.eval-workarea {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+.eval-workarea > * {
+  min-width: 0;
+}
+.eval-side-panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+.eval-dataset-create {
+  max-width: 1100px;
 }
 .agent-eval .agent-table-wrap {
   min-width: 0;
@@ -1844,6 +1879,16 @@ dd {
   height: 14px;
 }
 @media (max-width: 760px) {
+  .eval-workarea {
+    grid-template-columns: 1fr;
+  }
+  .eval-side-panel {
+    position: static;
+    max-height: none;
+  }
+  .shell {
+    padding: 14px 16px;
+  }
   .eval-panel,
   .eval-result {
     padding: 14px;
