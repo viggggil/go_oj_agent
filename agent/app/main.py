@@ -27,6 +27,7 @@ from app.core.settings import ConfigurationError, Settings, load_settings
 from app.evals.api import router as eval_router
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
+from app.memory.worker import ConversationMemoryWorker
 from app.storage.configuration import ConfigurationStore
 from app.storage.credentials import CredentialStore
 from app.storage.repository import AgentStore
@@ -61,6 +62,7 @@ def create_app(
         evals = None
         eval_clients = None
         eval_runner = None
+        memory_worker = None
         management = None
         verifier = None
         store = None
@@ -147,6 +149,7 @@ def create_app(
                     else:
                         runtime = FakeRuntime(tool_executor=tool_executor)
                     store = AgentStore(database.engine)
+                    memory_worker = ConversationMemoryWorker(store)
                     registry = business_tools or ToolRegistry()
                     config_reader: ConfigSnapshotReader = (
                         DatabaseConfigReader(
@@ -158,7 +161,12 @@ def create_app(
                         if config.config_mode == "database"
                         else DemoConfigReader(config)
                     )
-                    service = RunService(store, runtime, config_reader)
+                    service = RunService(
+                        store,
+                        runtime,
+                        config_reader,
+                        memory_trigger=memory_worker,
+                    )
                 try:
                     async with asyncio.timeout(config.preflight_timeout_seconds):
                         await service.initialize()
@@ -172,6 +180,8 @@ def create_app(
                         },
                     )
                     raise ConfigurationError("Agent Chat initialization failed") from None
+                if memory_worker is not None:
+                    await memory_worker.start()
                 controller = ChatController(config, verifier, service)
                 if evals is not None:
                     assert isinstance(database, DatabaseProbe) and database.engine is not None
@@ -198,6 +208,7 @@ def create_app(
                 rag=rag,
                 evals=evals,
                 eval_runner=eval_runner,
+                memory_worker=memory_worker,
             )
             logger.info("Agent service started")
             yield
@@ -205,6 +216,9 @@ def create_app(
             try:
                 try:
                     try:
+                        if memory_worker is not None:
+                            async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
+                                await memory_worker.close()
                         if controller is not None:
                             async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                                 await controller.close()

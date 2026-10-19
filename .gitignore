@@ -30,3 +30,6 @@ tmp/
 
 # Agent 部署主密钥与凭据目录
 deploy/compose/model-keys/
+
+# Local knowledge-base and generated runtime data
+/data/

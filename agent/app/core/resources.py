@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.core.management import ManagementService
     from app.evals.runner import EvalRunner
     from app.evals.store import EvalStore
+    from app.memory.worker import ConversationMemoryWorker
     from app.rag.service import KnowledgeService
     from app.storage.repository import AgentStore
 
@@ -33,6 +34,7 @@ class AppResources:
     rag: "KnowledgeService | None" = None
     evals: "EvalStore | None" = None
     eval_runner: "EvalRunner | None" = None
+    memory_worker: "ConversationMemoryWorker | None" = None
 
 
 def get_resources(request: Request) -> AppResources:

@@ -11,6 +11,7 @@ from uuid import UUID
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader
 from app.graphs.context import ContextAssembler
 from app.graphs.runtime import AgentRuntime
+from app.memory.worker import MemoryTrigger
 from app.models.provider import MODEL_ERROR_CODES, ModelFailure
 from app.models.runtime import (
     AgentState,
@@ -76,7 +77,6 @@ class RuntimeStore(Protocol):
         *,
         after_message_id: int | None = None,
         limit: int = 20,
-        oldest_first: bool = False,
     ) -> list[CompletedTurnRecord]: ...
 
     async def get_conversation_summary(
@@ -124,12 +124,14 @@ class RunService:
         *,
         cleanup_timeout_seconds: float = 5,
         context_assembler: ContextAssembler | None = None,
+        memory_trigger: MemoryTrigger | None = None,
     ) -> None:
         self._store = store
         self._runtime = runtime
         self._reader = config_reader
         self._cleanup_timeout = cleanup_timeout_seconds
         self._context_assembler = context_assembler or ContextAssembler()
+        self._memory_trigger = memory_trigger
 
     def with_store(self, store: RuntimeStore) -> "RunService":
         """共享 Runtime 和配置解析器，使用独立用途的持久化边界。"""
@@ -139,6 +141,9 @@ class RunService:
             self._reader,
             cleanup_timeout_seconds=self._cleanup_timeout,
             context_assembler=self._context_assembler,
+            # Evaluation stores have their own purpose and must not enqueue
+            # ordinary chat memory jobs.
+            memory_trigger=None,
         )
 
     @property
@@ -259,6 +264,19 @@ class RunService:
                         ),
                         timeout=max(0, end - monotonic()),
                     )
+                    if self._memory_trigger is not None:
+                        try:
+                            self._memory_trigger.notify_completed(
+                                user_id=state.user_id,
+                                conversation_id=str(state.conversation_id),
+                            )
+                        except Exception as exc:
+                            # Memory is best-effort and must never turn a
+                            # durably completed chat run into an error.
+                            logger.warning(
+                                "Conversation memory enqueue failed",
+                                extra={"error_type": type(exc).__name__},
+                            )
                     terminal = True
                     state.status = "COMPLETED"
                     logger.info(
