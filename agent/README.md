@@ -14,7 +14,7 @@
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；长期记忆、RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；Issue #184 PR1 增加会话摘要表、带消息游标的完整轮次查询和摘要辅助上下文，异步摘要 Worker 仍在后续 PR。RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
 Issue #180 将真实模型统一为 ReAct Graph：
 `START → prepare → check_budget → reason → validate_action → act → observe → check_budget`，
@@ -36,7 +36,7 @@ prepare 为当前安全前缀、Agent/Skill 提示词、当前问题和输出预
 超过预算从最旧整轮裁剪，不摘要历史、不截断单条消息；单轮本身超限仍报 AGENT_MODEL_INPUT_LIMIT。
 历史分别使用 user/assistant 角色，不拼入 instructions；当前问题只追加一次。
 每次重试固定同一份上下文并计入累计输入预算；store=false，不使用 previous_response_id。
-页面在同一会话续聊即可使用上下文，新对话从空历史开始。历史可能因预算裁剪，不能保证永久记忆。
+页面在同一会话续聊即可使用上下文，新对话从空历史开始。Issue #184 PR1 已增加结构化摘要读取和最近未归档轮次装配；摘要仍需后续 Worker 在成功 Run 之后异步生成，当前不会自动生成摘要。
 
 ## PR7 管理 HTTP 与 test Agent
 

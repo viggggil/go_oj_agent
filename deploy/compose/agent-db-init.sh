@@ -81,6 +81,9 @@ eval_model_run_columns="$(($(column_count agent_eval_runs reviewer_agent_key) + 
 eval_model_result_columns="$(($(column_count agent_eval_results model_review_status) + $(column_count agent_eval_results model_review_attempt) + $(column_count agent_eval_results model_review) + $(column_count agent_eval_results model_review_error_code)))"
 apply_migration 000008_create_eval_model_reviews "$((eval_model_review_present + eval_model_run_columns + eval_model_result_columns))" 7
 
+summary_present="$(table_count "'agent_conversation_summaries'")"
+apply_migration 000009_create_conversation_summaries "$summary_present" 1
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"

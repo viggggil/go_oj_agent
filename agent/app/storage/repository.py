@@ -10,8 +10,14 @@ from sqlalchemy import Select, and_, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from app.models.memory import ConversationSummary
 from app.models.runtime import RunStatus, validate_run_transition
-from app.storage.schema import agent_conversations, agent_messages, agent_runs
+from app.storage.schema import (
+    agent_conversation_summaries,
+    agent_conversations,
+    agent_messages,
+    agent_runs,
+)
 
 
 class StoreError(RuntimeError):
@@ -38,6 +44,10 @@ class RunStateConflict(StoreError):
     """运行已经进入终态，不能重复提交终态。"""
 
 
+class SummaryVersionConflict(StoreError):
+    """会话摘要版本或覆盖游标已经被其他更新推进。"""
+
+
 @dataclass(frozen=True)
 class ConversationRecord:
     id: str
@@ -58,6 +68,28 @@ class MessageRecord:
     content: str
     tool_name: str | None
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class CompletedTurnRecord:
+    run_id: str
+    user_message_id: int
+    assistant_message_id: int
+    user_content: str
+    assistant_content: str
+
+
+@dataclass(frozen=True)
+class ConversationSummaryRecord:
+    conversation_id: str
+    user_id: int
+    purpose: str
+    summary: ConversationSummary
+    covered_until_message_id: int | None
+    schema_version: int
+    version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(frozen=True)
@@ -277,15 +309,27 @@ class AgentStore:
             "next_before": items[0]["id"] if len(rows) > 4 else None,
         }
 
-    async def list_completed_turns(
-        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
-    ) -> list[tuple[str, str]]:
-        """模型上下文只取成功事务中同一 Run 的完整问答；不改变页面消息列表。"""
+    async def list_completed_turn_records(
+        self,
+        user_id: int,
+        conversation_id: str | UUID,
+        *,
+        after_message_id: int | None = None,
+        limit: int = 20,
+        oldest_first: bool = False,
+    ) -> list[CompletedTurnRecord]:
+        """返回成功 Run 的完整轮次，并支持按 assistant 消息游标增量读取。"""
         conversation = await self.get_conversation(user_id, conversation_id)
         users = agent_messages.alias("history_user")
         answers = agent_messages.alias("history_assistant")
         query = (
-            select(users.c.content, answers.c.content)
+            select(
+                agent_runs.c.id.label("run_id"),
+                users.c.id.label("user_message_id"),
+                answers.c.id.label("assistant_message_id"),
+                users.c.content.label("user_content"),
+                answers.c.content.label("assistant_content"),
+            )
             .select_from(
                 agent_runs.join(users, users.c.run_id == agent_runs.c.id).join(
                     answers, answers.c.run_id == agent_runs.c.id
@@ -303,12 +347,167 @@ class AgentStore:
                     users.c.id < answers.c.id,
                 )
             )
-            .order_by(users.c.id.desc())
-            .limit(min(max(limit, 1), 20))
         )
+        if after_message_id is not None:
+            if after_message_id <= 0:
+                raise ValueError("Invalid completed turn cursor")
+            query = query.where(answers.c.id > after_message_id).order_by(
+                users.c.id.asc() if oldest_first else users.c.id.desc()
+            )
+        else:
+            query = query.order_by(users.c.id.desc())
+        query = query.limit(min(max(limit, 1), 200))
         async with self._engine.connect() as connection:
-            rows = (await connection.execute(query)).all()
-        return [(row[0], row[1]) for row in reversed(rows)]
+            rows = (await connection.execute(query)).mappings().all()
+        if after_message_id is None or not oldest_first:
+            rows = list(reversed(rows))
+        return [CompletedTurnRecord(**row) for row in rows]
+
+    async def list_completed_turns(
+        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
+    ) -> list[tuple[str, str]]:
+        """兼容旧调用方的文本投影；模型上下文使用带 ID 的完整记录。"""
+        # 保持 PR2 旧文本投影的最多 20 轮约束；新游标查询单独允许更大的批次。
+        safe_limit = min(max(limit, 1), 20)
+        turns = await self.list_completed_turn_records(user_id, conversation_id, limit=safe_limit)
+        return [(turn.user_content, turn.assistant_content) for turn in turns]
+
+    async def get_conversation_summary(
+        self, user_id: int, conversation_id: str | UUID
+    ) -> ConversationSummaryRecord | None:
+        """按 owner 和用途读取摘要；不存在摘要表示尚未完成归档。"""
+        conversation = await self.get_conversation(user_id, conversation_id)
+        async with self._engine.connect() as connection:
+            row = (
+                (
+                    await connection.execute(
+                        select(agent_conversation_summaries).where(
+                            and_(
+                                agent_conversation_summaries.c.conversation_id == conversation.id,
+                                agent_conversation_summaries.c.user_id == user_id,
+                                agent_conversation_summaries.c.purpose == self._purpose,
+                            )
+                        )
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        return self._summary_record(row) if row is not None else None
+
+    async def save_conversation_summary(
+        self,
+        *,
+        user_id: int,
+        conversation_id: str | UUID,
+        summary: ConversationSummary,
+        covered_until_message_id: int | None,
+        expected_version: int | None,
+    ) -> ConversationSummaryRecord:
+        """在会话锁内以版本号推进摘要；失败不会改变旧摘要和游标。"""
+        if covered_until_message_id is not None and covered_until_message_id <= 0:
+            raise ValueError("Invalid summary cursor")
+        now = self._clock()
+        # DATETIME(3) truncates sub-millisecond precision; return the same value we persist.
+        now = now.replace(microsecond=(now.microsecond // 1_000) * 1_000)
+        async with self._engine.begin() as connection:
+            await self._lock_owned_conversation(connection, user_id, conversation_id)
+            existing = (
+                (
+                    await connection.execute(
+                        select(agent_conversation_summaries)
+                        .where(
+                            and_(
+                                agent_conversation_summaries.c.conversation_id
+                                == str(conversation_id),
+                                agent_conversation_summaries.c.user_id == user_id,
+                                agent_conversation_summaries.c.purpose == self._purpose,
+                            )
+                        )
+                        .with_for_update()
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if existing is None:
+                if expected_version not in (None, 0):
+                    raise SummaryVersionConflict("Summary version does not match")
+                version = 1
+                await self._validate_summary_cursor(
+                    connection,
+                    user_id,
+                    str(conversation_id),
+                    covered_until_message_id,
+                )
+                values = {
+                    "conversation_id": str(conversation_id),
+                    "user_id": user_id,
+                    "purpose": self._purpose,
+                    "summary_json": summary.model_dump(mode="json"),
+                    "covered_until_message_id": covered_until_message_id,
+                    "schema_version": summary.schema_version,
+                    "version": version,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                await connection.execute(insert(agent_conversation_summaries).values(values))
+                return ConversationSummaryRecord(
+                    conversation_id=str(conversation_id),
+                    user_id=user_id,
+                    purpose=self._purpose,
+                    summary=summary,
+                    covered_until_message_id=covered_until_message_id,
+                    schema_version=summary.schema_version,
+                    version=version,
+                    created_at=now,
+                    updated_at=now,
+                )
+
+            current_version = int(existing["version"])
+            if expected_version != current_version:
+                raise SummaryVersionConflict("Summary version does not match")
+            current_cursor = existing["covered_until_message_id"]
+            if (
+                current_cursor is not None
+                and covered_until_message_id is not None
+                and covered_until_message_id < current_cursor
+            ):
+                raise SummaryVersionConflict("Summary cursor cannot move backwards")
+            await self._validate_summary_cursor(
+                connection,
+                user_id,
+                str(conversation_id),
+                covered_until_message_id,
+            )
+            version = current_version + 1
+            await connection.execute(
+                update(agent_conversation_summaries)
+                .where(
+                    and_(
+                        agent_conversation_summaries.c.conversation_id == str(conversation_id),
+                        agent_conversation_summaries.c.version == current_version,
+                    )
+                )
+                .values(
+                    summary_json=summary.model_dump(mode="json"),
+                    covered_until_message_id=covered_until_message_id,
+                    schema_version=summary.schema_version,
+                    version=version,
+                    updated_at=now,
+                )
+            )
+            return ConversationSummaryRecord(
+                conversation_id=str(conversation_id),
+                user_id=user_id,
+                purpose=self._purpose,
+                summary=summary,
+                covered_until_message_id=covered_until_message_id,
+                schema_version=summary.schema_version,
+                version=version,
+                created_at=existing["created_at"],
+                updated_at=now,
+            )
 
     async def create_run_with_user_message(
         self,
@@ -539,6 +738,62 @@ class AgentStore:
                 .values(status="INTERRUPTED", finished_at=now, error_code="AGENT_DEADLINE_EXCEEDED")
             )
         return int(getattr(result, "rowcount", 0) or 0)
+
+    @staticmethod
+    def _summary_record(row: Any) -> ConversationSummaryRecord:
+        try:
+            summary = ConversationSummary.model_validate(row["summary_json"])
+        except Exception:
+            raise StoreError("Invalid conversation summary") from None
+        return ConversationSummaryRecord(
+            conversation_id=row["conversation_id"],
+            user_id=row["user_id"],
+            purpose=row["purpose"],
+            summary=summary,
+            covered_until_message_id=row["covered_until_message_id"],
+            schema_version=row["schema_version"],
+            version=row["version"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    async def _validate_summary_cursor(
+        self,
+        connection: AsyncConnection,
+        user_id: int,
+        conversation_id: str,
+        cursor: int | None,
+    ) -> None:
+        if cursor is None:
+            return
+        users = agent_messages.alias("summary_user")
+        answers = agent_messages.alias("summary_assistant")
+        row = (
+            await connection.execute(
+                select(answers.c.id)
+                .select_from(
+                    agent_runs.join(users, users.c.run_id == agent_runs.c.id).join(
+                        answers, answers.c.run_id == agent_runs.c.id
+                    )
+                )
+                .where(
+                    and_(
+                        agent_runs.c.id == users.c.run_id,
+                        agent_runs.c.user_id == user_id,
+                        agent_runs.c.conversation_id == conversation_id,
+                        agent_runs.c.status == "COMPLETED",
+                        users.c.conversation_id == conversation_id,
+                        answers.c.conversation_id == conversation_id,
+                        users.c.role == "user",
+                        answers.c.role == "assistant",
+                        answers.c.id == cursor,
+                        users.c.id < answers.c.id,
+                    )
+                )
+            )
+        ).first()
+        if row is None:
+            raise ValueError("Summary cursor must reference a completed assistant message")
 
     async def _lock_owned_conversation(
         self, connection: AsyncConnection, user_id: int, conversation_id: str | UUID

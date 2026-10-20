@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.models.memory import ConversationSummary
 from app.models.provider import ModelSummary
 
 RunStatus = Literal["RUNNING", "COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"]
@@ -82,6 +83,7 @@ class AgentState(BaseModel):
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     context: ChatContext = Field(default_factory=ChatContext)
     history: tuple[HistoryMessage, ...] = ()
+    memory_summary: ConversationSummary | None = None
     model_summary: ModelSummary | None = None
     knowledge_queries: int = Field(default=0, ge=0)
     answer_draft: str = ""

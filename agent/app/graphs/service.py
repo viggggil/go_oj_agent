@@ -9,17 +9,22 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader
+from app.graphs.context import ContextAssembler
 from app.graphs.runtime import AgentRuntime
 from app.models.provider import MODEL_ERROR_CODES, ModelFailure
 from app.models.runtime import (
     AgentState,
     ChatRequest,
-    HistoryMessage,
     Principal,
     RunStatus,
     StreamEvent,
 )
-from app.storage.repository import RunRecord, utc_now
+from app.storage.repository import (
+    CompletedTurnRecord,
+    ConversationSummaryRecord,
+    RunRecord,
+    utc_now,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +69,19 @@ class RuntimeStore(Protocol):
 
     async def expire_running_runs(self) -> int: ...
 
-    async def list_completed_turns(
-        self, user_id: int, conversation_id: str | UUID, *, limit: int = 20
-    ) -> list[tuple[str, str]]: ...
+    async def list_completed_turn_records(
+        self,
+        user_id: int,
+        conversation_id: str | UUID,
+        *,
+        after_message_id: int | None = None,
+        limit: int = 20,
+        oldest_first: bool = False,
+    ) -> list[CompletedTurnRecord]: ...
+
+    async def get_conversation_summary(
+        self, user_id: int, conversation_id: str | UUID
+    ) -> ConversationSummaryRecord | None: ...
 
 
 class RuntimeFailure(RuntimeError):
@@ -108,11 +123,13 @@ class RunService:
         config_reader: ConfigSnapshotReader,
         *,
         cleanup_timeout_seconds: float = 5,
+        context_assembler: ContextAssembler | None = None,
     ) -> None:
         self._store = store
         self._runtime = runtime
         self._reader = config_reader
         self._cleanup_timeout = cleanup_timeout_seconds
+        self._context_assembler = context_assembler or ContextAssembler()
 
     def with_store(self, store: RuntimeStore) -> "RunService":
         """共享 Runtime 和配置解析器，使用独立用途的持久化边界。"""
@@ -121,6 +138,7 @@ class RunService:
             self._runtime,
             self._reader,
             cleanup_timeout_seconds=self._cleanup_timeout,
+            context_assembler=self._context_assembler,
         )
 
     @property
@@ -167,23 +185,18 @@ class RunService:
             deadline_at=record.deadline_at,
         )
         try:
-            turns = await self._store.list_completed_turns(
+            summary = await self._store.get_conversation_summary(
                 principal.user_id, record.conversation_id
             )
-            history: list[HistoryMessage] = []
-            chars = 0
-            for user, assistant in reversed(turns):
-                chars += len(user) + len(assistant)
-                if chars > 64_000:
-                    break
-                # 从最新整轮往前取；反转后保留 user → assistant 顺序。
-                history.extend(
-                    [
-                        HistoryMessage(role="assistant", content=assistant),
-                        HistoryMessage(role="user", content=user),
-                    ]
-                )
-            state.history = tuple(reversed(history))
+            turns = await self._store.list_completed_turn_records(
+                principal.user_id,
+                record.conversation_id,
+                after_message_id=summary.covered_until_message_id if summary else None,
+                limit=24,
+            )
+            assembled = self._context_assembler.assemble(summary, turns)
+            state.history = assembled.history
+            state.memory_summary = assembled.summary
         except asyncio.CancelledError:
             await self._terminate(state, "CANCELLED", "AGENT_CANCELLED")
             raise

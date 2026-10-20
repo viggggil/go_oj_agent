@@ -19,6 +19,7 @@ from app.core.runtime_config import DemoConfigReader
 from app.core.settings import Settings
 from app.graphs.runtime import FakeRuntime
 from app.graphs.service import RunService
+from app.models.memory import ConversationSummary
 from app.models.runtime import ChatRequest, Principal
 from app.storage.repository import (
     ActiveRunConflict,
@@ -27,9 +28,15 @@ from app.storage.repository import (
     RunNotFound,
     RunRecord,
     RunStateConflict,
+    SummaryVersionConflict,
     utc_now,
 )
-from app.storage.schema import agent_conversations, agent_messages, agent_runs
+from app.storage.schema import (
+    agent_conversation_summaries,
+    agent_conversations,
+    agent_messages,
+    agent_runs,
+)
 
 pytestmark = pytest.mark.integration
 MIGRATION_ROOT = Path(__file__).resolve().parents[3] / "migrations" / "agent"
@@ -42,7 +49,12 @@ async def engine() -> AsyncIterator[AsyncEngine]:
         pytest.skip("AGENT_TEST_DATABASE_URL is not set")
     db = create_async_engine(url, pool_size=5, max_overflow=0)
     async with db.begin() as connection:
-        for table in (agent_messages, agent_runs, agent_conversations):
+        for table in (
+            agent_conversation_summaries,
+            agent_messages,
+            agent_runs,
+            agent_conversations,
+        ):
             await connection.execute(table.delete())
     try:
         yield db
@@ -156,6 +168,59 @@ async def test_model_history_pairs_only_completed_runs_and_caps_recent_turns(
     assert await store.list_completed_turns(7, conversation.id, limit=1) == turns[-1:]
     other = await store.create_conversation(7)
     assert await store.list_completed_turns(7, other.id) == []
+
+
+async def test_summary_is_owner_scoped_and_advances_only_completed_boundaries(
+    engine: AsyncEngine,
+) -> None:
+    store = AgentStore(engine)
+    conversation = await store.create_conversation(7)
+    run = await new_run(store, conversation.id)
+    await store.finish_run(user_id=7, run_id=run.id, status="COMPLETED", answer="answer")
+    turns = await store.list_completed_turn_records(7, conversation.id)
+    summary = await store.save_conversation_summary(
+        user_id=7,
+        conversation_id=conversation.id,
+        summary=ConversationSummary(goal="定位问题"),
+        covered_until_message_id=turns[0].assistant_message_id,
+        expected_version=None,
+    )
+    assert summary.version == 1
+    loaded = await store.get_conversation_summary(7, conversation.id)
+    assert loaded is not None
+    assert loaded.summary == summary.summary
+    assert loaded.covered_until_message_id == summary.covered_until_message_id
+    assert loaded.version == summary.version
+    for index in range(2, 5):
+        later = await new_run(store, conversation.id)
+        await store.finish_run(
+            user_id=7, run_id=later.id, status="COMPLETED", answer=f"answer {index}"
+        )
+    assert [
+        turn.assistant_content
+        for turn in await store.list_completed_turn_records(
+            7, conversation.id, after_message_id=summary.covered_until_message_id
+        )
+    ] == ["answer 2", "answer 3", "answer 4"]
+    assert [
+        turn.assistant_content
+        for turn in await store.list_completed_turn_records(
+            7,
+            conversation.id,
+            after_message_id=summary.covered_until_message_id,
+            oldest_first=True,
+        )
+    ] == ["answer 2", "answer 3", "answer 4"]
+    with pytest.raises(SummaryVersionConflict):
+        await store.save_conversation_summary(
+            user_id=7,
+            conversation_id=conversation.id,
+            summary=ConversationSummary(goal="回退"),
+            covered_until_message_id=turns[0].user_message_id,
+            expected_version=summary.version,
+        )
+    with pytest.raises(ConversationNotFound):
+        await store.get_conversation_summary(8, conversation.id)
 
 
 async def test_failed_run_restores_only_safe_tool_trace(engine: AsyncEngine) -> None:
@@ -348,6 +413,7 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
     async with engine.begin() as connection:
         # 此测试明确使用空库；先清理所有配置引用后验证 down/up。
         for statement in (
+            "DELETE FROM agent_conversation_summaries",
             "UPDATE agent_config_resources SET current_id=NULL",
             "DELETE FROM agent_provider_credentials",
             "DELETE FROM agent_config_links",
@@ -360,6 +426,7 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000009_create_conversation_summaries", "down"),
             ("000008_create_eval_model_reviews", "down"),
             ("000007_create_eval_reviews", "down"),
             ("000006_create_eval_runs", "down"),
@@ -376,6 +443,7 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
             ("000006_create_eval_runs", "up"),
             ("000007_create_eval_reviews", "up"),
             ("000008_create_eval_model_reviews", "up"),
+            ("000009_create_conversation_summaries", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):
