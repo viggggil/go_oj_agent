@@ -27,6 +27,7 @@ var agentSkills = regexp.MustCompile(`^/api/v1/agent/agents/[a-z][a-z0-9_]{1,63}
 var agentMessages = regexp.MustCompile(`^/api/v1/agent/conversations/([0-9a-f-]{36})/messages$`)
 var agentModel = regexp.MustCompile(`^/api/v1/admin/agent/model-options/([0-9a-f-]{36})$`)
 var agentVersion = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})$`)
+var agentToolDescription = regexp.MustCompile(`^/api/v1/admin/agent/tools/([a-z][a-z0-9_]{1,127})$`)
 
 func AgentOperation(method, path string) (string, error) {
 	allowed := false
@@ -101,6 +102,8 @@ func AgentOperation(method, path string) (string, error) {
 		allowed = method == http.MethodPost
 	case path == "/api/v1/agent/conversations" || path == "/api/v1/agent/agents" || path == "/api/v1/admin/agent/model-options" || path == "/api/v1/admin/agent/tools" || agentSkills.MatchString(path):
 		allowed = method == http.MethodGet
+	case agentToolDescription.MatchString(path):
+		allowed = method == http.MethodPut
 	default:
 		if conversation := agentMessages.FindStringSubmatch(path); conversation != nil {
 			id, err := uuid.Parse(conversation[1])

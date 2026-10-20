@@ -55,6 +55,7 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		{"/api/v1/admin/agent/model-options", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/model-options/{identifier}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/tools", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/tools/{tool_name:[a-z][a-z0-9_]{1,127}}", []string{http.MethodPut}},
 	}
 	for _, resource := range []string{"agents", "prompts", "skills"} {
 		path := "/api/v1/admin/agent/" + resource

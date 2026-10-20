@@ -31,7 +31,7 @@ def tool_catalog(state: AgentState, registry: ToolRegistry | None) -> tuple[dict
             {
                 "type": "function",
                 "name": name,
-                "description": spec.description,
+                "description": registry.description(name),
                 "parameters": definition.input_model.model_json_schema(),
                 "strict": False,
             }

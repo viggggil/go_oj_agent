@@ -92,6 +92,26 @@ func TestAgentManagementContractRejectsUnexpectedData(t *testing.T) {
 	}
 }
 
+func TestToolDescriptionWriteEnvelope(t *testing.T) {
+	path := "/api/v1/admin/agent/tools/get_problem"
+	valid := `{"tool":{"name":"get_problem","description":"Read a problem","read_scope":"public","allowed_roles":[],"side_effect":"read","sensitivity":"public","timeout_seconds":5,"requires_confirmation":false,"enabled":true,"input_schema":{"type":"object"},"output_schema":{"type":"object"}}}`
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(valid), &payload); err != nil || !validAgentJSONEnvelope(http.MethodPut, path, payload) {
+		t.Fatal("valid tool description response rejected")
+	}
+	for _, invalid := range []string{
+		`{"tool":{"name":"get_problem","description":"","read_scope":"public","allowed_roles":[],"side_effect":"read","sensitivity":"public","timeout_seconds":5,"requires_confirmation":false,"enabled":true,"input_schema":{"type":"object"},"output_schema":{"type":"object"}}}`,
+		`{"tool":{"name":"get_problem","description":"Read a problem","read_scope":"public","allowed_roles":[],"side_effect":"read","sensitivity":"public","timeout_seconds":5,"requires_confirmation":false,"enabled":true,"input_schema":{"type":"object"},"output_schema":{"type":"object"},"unexpected":"private"}}`,
+	} {
+		if err := json.Unmarshal([]byte(invalid), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if validAgentJSONEnvelope(http.MethodPut, path, payload) {
+			t.Fatal("invalid tool response accepted")
+		}
+	}
+}
+
 func TestAgentManagementLimitsPermissionsAndTimeout(t *testing.T) {
 	for _, scenario := range []string{"oversized response", "wrong type", "deadline", "user", "missing auth", "missing request ID", "oversized request"} {
 		t.Run(scenario, func(t *testing.T) {

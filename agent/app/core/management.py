@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.operations import ADMIN_ROLES
@@ -30,6 +31,7 @@ from app.storage.configuration_query import (
     json_text,
     model_supported,
 )
+from app.storage.schema import agent_tool_descriptions
 from app.tools.registry import ToolRegistry
 
 
@@ -77,6 +79,18 @@ class ManagementService:
         self.query = ConfigurationQuery(store)
         self.settings = settings
         self.registry = registry
+
+    async def load_tool_descriptions(self) -> None:
+        async with self.store._engine.connect() as connection:
+            values = await connection.execute(
+                select(
+                    agent_tool_descriptions.c.tool_name,
+                    agent_tool_descriptions.c.description,
+                )
+            )
+            for name, description in values:
+                if name in self.registry.names():
+                    self.registry.set_description(name, description)
 
     async def list(
         self, kind: ConfigKind, query: PageQuery, key: str | None = None

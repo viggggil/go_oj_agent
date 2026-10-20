@@ -86,6 +86,8 @@ def create_app(
                     config,
                     registry,
                 )
+                if run_service_factory is None:
+                    await management.load_tool_descriptions()
             if config.rag_enabled:
                 from app.rag.clients import RagClients
                 from app.rag.service import KnowledgeService

@@ -19,6 +19,7 @@ services:
       - ../../migrations/agent/000007_create_eval_reviews.up.sql:/docker-entrypoint-initdb.d/507_create_eval_reviews.sql:ro
       - ../../migrations/agent/000008_create_eval_model_reviews.up.sql:/docker-entrypoint-initdb.d/508_create_eval_model_reviews.sql:ro
       - ../../migrations/agent/000009_create_conversation_summaries.up.sql:/docker-entrypoint-initdb.d/509_create_conversation_summaries.sql:ro
+      - ../../migrations/agent/000010_create_tool_descriptions.up.sql:/docker-entrypoint-initdb.d/510_create_tool_descriptions.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s

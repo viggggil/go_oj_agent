@@ -12,6 +12,7 @@ _RESOURCE = re.compile(
 _SKILLS = re.compile(rf"/api/v1/agent/agents/({KEY_PATTERN})/skills")
 _MESSAGES = re.compile(r"/api/v1/agent/conversations/([0-9a-f-]{36})/messages")
 _MODEL = re.compile(r"/api/v1/admin/agent/model-options/([0-9a-f-]{36})")
+_TOOL = re.compile(r"/api/v1/admin/agent/tools/([a-z][a-z0-9_]{1,127})")
 _VERSION = re.compile(r"/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})")
 _EVAL_DATASET = re.compile(r"/api/v1/admin/agent/evals/datasets(?:/([0-9a-f-]{36})(/cases)?)?")
 _EVAL_RUN = re.compile(r"/api/v1/admin/agent/evals/runs(?:/([0-9a-f-]{36})(/(cancel|results))?)?")
@@ -68,6 +69,8 @@ def operation(method: str, path: str) -> str:
         "/api/v1/admin/agent/tools",
     } or _SKILLS.fullmatch(path):
         allowed = method == "GET"
+    elif _TOOL.fullmatch(path):
+        allowed = method == "PUT"
     elif conversation := _MESSAGES.fullmatch(path):
         try:
             allowed = method == "GET" and str(UUID(conversation[1])) == conversation[1]

@@ -7,6 +7,32 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if method == "PUT" && strings.HasPrefix(path, "/api/v1/admin/agent/tools/") {
+		if len(payload) != 1 {
+			return false
+		}
+		var tool struct {
+			Name                 string          `json:"name"`
+			Description          string          `json:"description"`
+			ReadScope            string          `json:"read_scope"`
+			AllowedRoles         []string        `json:"allowed_roles"`
+			SideEffect           string          `json:"side_effect"`
+			Sensitivity          string          `json:"sensitivity"`
+			TimeoutSeconds       float64         `json:"timeout_seconds"`
+			RequiresConfirmation bool            `json:"requires_confirmation"`
+			Enabled              bool            `json:"enabled"`
+			InputSchema          json.RawMessage `json:"input_schema"`
+			OutputSchema         json.RawMessage `json:"output_schema"`
+		}
+		if _, ok := agentJSONFields(payload["tool"], "name description read_scope allowed_roles side_effect sensitivity timeout_seconds requires_confirmation enabled input_schema output_schema", ""); !ok || json.Unmarshal(payload["tool"], &tool) != nil {
+			return false
+		}
+		return tool.Name != "" && tool.Description != "" && len(tool.Description) <= 1000 &&
+			(tool.ReadScope == "public" || tool.ReadScope == "current_user" || tool.ReadScope == "admin") &&
+			(tool.SideEffect == "read" || tool.SideEffect == "write") &&
+			(tool.Sensitivity == "public" || tool.Sensitivity == "private" || tool.Sensitivity == "source" || tool.Sensitivity == "internal") &&
+			tool.TimeoutSeconds > 0 && tool.TimeoutSeconds <= 60 && agentJSONObject(tool.InputSchema) && agentJSONObject(tool.OutputSchema)
+	}
 	if strings.HasPrefix(path, "/api/v1/admin/agent/evals/") {
 		return validEvalEnvelope(method, path, payload)
 	}

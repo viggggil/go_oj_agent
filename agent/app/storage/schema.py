@@ -188,3 +188,12 @@ agent_provider_credentials = Table(
     Column("version_id", CHAR(36), ForeignKey("agent_config_versions.id"), primary_key=True),
     Column("credential_id", CHAR(36), ForeignKey("agent_credentials.id"), nullable=False),
 )
+
+agent_tool_descriptions = Table(
+    "agent_tool_descriptions",
+    metadata,
+    Column("tool_name", String(128, collation="utf8mb4_bin"), primary_key=True),
+    Column("description", String(1000), nullable=False),
+    Column("updated_by", BigInteger, nullable=False),
+    Column("updated_at", DATETIME(fsp=3), nullable=False),
+)
