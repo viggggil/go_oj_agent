@@ -80,8 +80,12 @@ def test_tool_description_operation_is_admin_write_only() -> None:
     path = "/api/v1/admin/agent/tools/get_problem"
     assert operation("GET", "/api/v1/admin/agent/tools") == "HTTP GET /api/v1/admin/agent/tools"
     assert operation("PUT", path) == "HTTP PUT " + path
-    for method, target in [("POST", path), ("GET", path), ("DELETE", path),
-                           ("PUT", "/api/v1/admin/agent/tools/Bad_Name")]:
+    for method, target in [
+        ("POST", path),
+        ("GET", path),
+        ("DELETE", path),
+        ("PUT", "/api/v1/admin/agent/tools/Bad_Name"),
+    ]:
         with pytest.raises(ValueError):
             operation(method, target)
 

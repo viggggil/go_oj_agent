@@ -148,15 +148,19 @@ async def dispatch(
         if name not in service.registry.names():
             raise ConfigError("AGENT_CONFIGURATION_NOT_FOUND", 404)
         async with service.store._engine.begin() as connection:
-            statement = mysql_insert(agent_tool_descriptions).values(
-                tool_name=name,
-                description=body.description,
-                updated_by=principal.user_id,
-                updated_at=datetime.now(UTC),
-            ).on_duplicate_key_update(
-                description=body.description,
-                updated_by=principal.user_id,
-                updated_at=datetime.now(UTC),
+            statement = (
+                mysql_insert(agent_tool_descriptions)
+                .values(
+                    tool_name=name,
+                    description=body.description,
+                    updated_by=principal.user_id,
+                    updated_at=datetime.now(UTC),
+                )
+                .on_duplicate_key_update(
+                    description=body.description,
+                    updated_by=principal.user_id,
+                    updated_at=datetime.now(UTC),
+                )
             )
             await connection.execute(statement)
         service.registry.set_description(name, body.description)

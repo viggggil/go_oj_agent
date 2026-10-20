@@ -36,9 +36,7 @@
           <RouterLink to="/agent/eval" @click="open = false"
             ><FileCheck :size="17" />Agent Eval</RouterLink
           >
-          <RouterLink to="/agent/tools" @click="open = false"
-            ><Wrench :size="17" />工具</RouterLink
-          >
+          <RouterLink to="/agent/tools" @click="open = false"><Wrench :size="17" />工具</RouterLink>
           <RouterLink to="/agent/agents" @click="open = false"><Bot :size="17" />Agent</RouterLink>
           <RouterLink to="/agent/prompts" @click="open = false"
             ><FileText :size="17" />Prompt</RouterLink
@@ -68,7 +66,17 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-  import { Bot, Database, FileCheck, FileText, Menu, MessageSquare, Puzzle, Wrench, X } from '@lucide/vue'
+  import {
+    Bot,
+    Database,
+    FileCheck,
+    FileText,
+    Menu,
+    MessageSquare,
+    Puzzle,
+    Wrench,
+    X,
+  } from '@lucide/vue'
   import { useAuthStore } from '../stores/auth'
   import { agentAdministrator, clearAgentDrafts } from '../agent/state'
   const auth = useAuthStore(),
