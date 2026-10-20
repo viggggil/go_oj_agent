@@ -51,7 +51,7 @@ SQL
 
 # 空 Agent schema / 旧业务数据卷：补齐表和受限账户。
 bootstrap
-assert_eq 22 "$(sql <<< "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='oj_agent';")" "完整 Agent 表"
+assert_eq 23 "$(sql <<< "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='oj_agent';")" "完整 Agent 表"
 compose exec -T mysql sh -c \
     'MYSQL_PWD=local-agent-password mysql -h127.0.0.1 -uoj_agent -e "SELECT COUNT(*) FROM oj_agent.agent_runs"'
 if compose exec -T mysql sh -c \
