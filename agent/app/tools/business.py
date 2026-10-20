@@ -270,6 +270,45 @@ def build_business_tool_registry(
             "private",
         ),
     ]
+    if clients.run_code is not None:
+
+        class RunCodeInput(BaseModel):
+            model_config = ConfigDict(extra="forbid", strict=True)
+            language: str = Field(pattern=r"^(c|cpp|go|java|python)$")
+            source: str = Field(min_length=1, max_length=65_536)
+            stdin: str = Field(default="", max_length=16_384)
+
+        class RunCodeOutput(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+            status: str
+            verdict: str = ""
+            stdout: str = Field(default="", max_length=32_768)
+            stderr: str = Field(default="", max_length=32_768)
+            time_ms: int = Field(default=0, ge=0)
+            memory_bytes: int = Field(default=0, ge=0)
+
+        async def run_code(arguments: RunCodeInput, principal: Principal) -> RunCodeOutput:
+            del principal
+            assert clients.run_code is not None
+            value = await clients.run_code.run(
+                arguments.language, arguments.source, arguments.stdin
+            )
+            return RunCodeOutput.model_validate(value)
+
+        registry.register(
+            ToolDefinition(
+                spec=ToolSpec(
+                    name="run_code",
+                    description="在无网络、限时限内存的独立沙箱中编译并运行一段代码。输入仅用于验证示例，不会提交到题目。",
+                    read_scope="public",
+                    sensitivity="internal",
+                    timeout_seconds=60,
+                ),
+                input_model=RunCodeInput,
+                output_model=RunCodeOutput,
+                handler=cast(Any, run_code),
+            )
+        )
     for name, description, input_model, handler, scope, sensitivity in definitions:
         registry.register(
             ToolDefinition(

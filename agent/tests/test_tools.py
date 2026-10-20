@@ -219,6 +219,49 @@ def test_registry_contains_only_read_tools() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_code_is_registered_with_bounded_input_and_output() -> None:
+    class RunCode:
+        async def run(self, language: str, source: str, stdin: str) -> dict[str, object]:
+            assert (language, source, stdin) == ("cpp", "int main(){}", "sample")
+            return {
+                "status": "executed",
+                "verdict": "AC",
+                "stdout": "42",
+                "stderr": "",
+                "time_ms": 1,
+                "memory_bytes": 1024,
+            }
+
+    clients = BusinessClients(
+        FakeProblemClient(),  # type: ignore[arg-type]
+        FakeJudgeClient(),  # type: ignore[arg-type]
+        run_code=RunCode(),  # type: ignore[arg-type]
+    )
+    registry = build_business_tool_registry(clients)
+    assert "run_code" in registry.names()
+    result = await ToolExecutor(registry).execute(
+        "run_code",
+        {"language": "cpp", "source": "int main(){}", "stdin": "sample"},
+        ToolContext(
+            principal=Principal(user_id=7, request_id="request-1"),
+            remaining_seconds=60,
+            allowed_tools=frozenset({"run_code"}),
+        ),
+    )
+    assert result.ok and result.data["stdout"] == "42"
+    rejected = await ToolExecutor(registry).execute(
+        "run_code",
+        {"language": "bash", "source": "echo unsafe"},
+        ToolContext(
+            principal=Principal(user_id=7, request_id="request-2"),
+            remaining_seconds=60,
+            allowed_tools=frozenset({"run_code"}),
+        ),
+    )
+    assert rejected.error_code == "TOOL_INVALID_ARGUMENT"
+
+
+@pytest.mark.asyncio
 async def test_non_empty_problem_list_uses_summary_schema() -> None:
     clients = BusinessClients(FakeProblemClient(), FakeJudgeClient())  # type: ignore[arg-type]
     result = await ToolExecutor(build_business_tool_registry(clients)).execute(

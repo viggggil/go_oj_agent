@@ -32,6 +32,10 @@ worker:
     max_retries: 3
     delay: 5s
 
+run_code:
+  address: ":8081"
+  auth_token: local-development-run-code-token-change-before-sharing
+
 messaging:
   rabbitmq:
     url: amqp://judge:judge-password@rabbitmq:5672/
