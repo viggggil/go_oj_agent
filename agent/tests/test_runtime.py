@@ -166,6 +166,7 @@ class MemoryStore:
         *,
         after_message_id: int | None = None,
         limit: int = 20,
+        oldest_first: bool = False,
     ) -> list[CompletedTurnRecord]:
         return []
 
