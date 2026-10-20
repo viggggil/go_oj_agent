@@ -271,6 +271,7 @@ def build_business_tool_registry(
         ),
     ]
     if clients.run_code is not None:
+
         class RunCodeInput(BaseModel):
             model_config = ConfigDict(extra="forbid", strict=True)
             language: str = Field(pattern=r"^(c|cpp|go|java|python)$")

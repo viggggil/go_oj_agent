@@ -233,7 +233,9 @@ async def test_run_code_is_registered_with_bounded_input_and_output() -> None:
             }
 
     clients = BusinessClients(
-        FakeProblemClient(), FakeJudgeClient(), run_code=RunCode()  # type: ignore[arg-type]
+        FakeProblemClient(),  # type: ignore[arg-type]
+        FakeJudgeClient(),  # type: ignore[arg-type]
+        run_code=RunCode(),  # type: ignore[arg-type]
     )
     registry = build_business_tool_registry(clients)
     assert "run_code" in registry.names()
