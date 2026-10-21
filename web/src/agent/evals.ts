@@ -140,8 +140,6 @@ export type EvalReviewWrite = {
 export type EvalRunWrite = {
   dataset_id: string
   agent_key: string
-  mode: 'programmatic' | 'programmatic_review'
-  reviewer_agent_key?: 'eval_reviewer'
   concurrency: number
   repeat_count: number
 }

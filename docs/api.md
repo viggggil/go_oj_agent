@@ -937,9 +937,9 @@ JSON，包含五个 0–4 分维度；调用失败、超时、身份不匹配或
 校验后的 Case 投影。重复内容哈希返回已有数据集，不重复创建。上述接口均要求管理员角色，
 普通用户由 Gateway 和 Agent 双重拒绝。
 
-运行创建请求包含 `dataset_id`（UUID）、`agent_key`、`mode=programmatic`、
-`repeat_count`（默认 1，范围 1–3）和 `concurrency`（默认 1，范围 1–8）。
-支持 `programmatic` 和 `programmatic_review`；后者在创建时固定专用评审 Agent 配置。
+运行创建请求包含 `dataset_id`（UUID）、`agent_key`、`repeat_count`（默认 1，范围 1–3）
+和 `concurrency`（默认 1，范围 1–8）。每次运行都会执行程序化检查，并在创建时固定专用
+`eval_reviewer` Agent 配置，对通过程序门禁的回答进行模型评审。请求不接受评测模式或评审 Agent 选择。
 服务在创建时固定 Agent/Prompt/Skill/Model/Provider/知识版本；每个 Case 的 user turn
 通过普通 Runtime 按真实生成历史执行，assistant turn 仅保留为参考。
 fixture.principal 必须是部署 `AGENT_EVAL_PRINCIPALS` 中配置的专用账号别名，执行角色固定 user，
@@ -1740,7 +1740,7 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 
 管理员 `/agent/eval` 页面保留左侧导航，支持分页数据集与样例、上传 UTF-8 JSONL 文件或文本、选择 Agent/数据集/并发/重复次数、运行进度和取消、结果筛选/详情、人工评分与修改记录。
 `?tab=runs&run={uuid}` 可恢复运行详情；轮询在离开页面时停止，切换批次不复用旧结果。
-支持 `programmatic` 与 `programmatic_review` 两种运行模式；后者使用固定的管理员专用评审 Agent。
+所有新运行均执行程序化检查，并由固定的管理员专用评审 Agent 评审通过程序门禁的回答。
 导出和 CLI 仍在后续阶段。
 
 运行详情增加 `metrics`：`recorded_cases`、`check_passes`、`effective_passes`、`reviewed_cases`、
@@ -1781,7 +1781,7 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 普通用户两层授权均拒绝，未知结果返回 404。
 网页在保存结果不确定时保留草稿与 request ID；409 保留草稿，要求显式加载最新评分后再次提交。
 
-模型评审模式的运行请求额外包含 `reviewer_agent_key: "eval_reviewer"`。专用 Agent 必须是管理员可见、
+每次运行都会自动固定专用 `eval_reviewer` Agent。它必须是管理员可见、
 无工具、无知识库、`deepseek-v4-pro` 且最多一次模型调用；运行快照保存其版本元数据，不公开 Prompt 正文和 Provider 凭据。
 评审结果严格校验 `case_id`、五个 0–4 整数分数、`hard_fail` 与 `pass` 的关系；任何调用/解析失败为 `UNAVAILABLE`，
 不会计为通过。管理员可通过 `review-agent` 重跑单条不可用评审，审计记录按 attempt 保存。

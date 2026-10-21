@@ -50,23 +50,10 @@
         <p v-if="!agents.length && !optionsLoading" class="muted">
           没有普通用户可用的 Agent，请先在 Agent 管理中配置。
         </p>
-        <label
-          >评测模式<select v-model="form.mode" aria-label="评测模式">
-            <option value="programmatic">程序化评测</option>
-            <option value="programmatic_review">程序化评测 + 评审 Agent</option>
-          </select></label
-        >
-        <label v-if="form.mode === 'programmatic_review'"
-          >评审 Agent<select v-model="form.reviewer_agent_key" aria-label="评审 Agent" required>
-            <option v-if="reviewerReady" value="eval_reviewer">
-              Eval 专用评审员（deepseek-v4-pro）
-            </option>
-          </select></label
-        >
         <p v-if="reviewerLoading" class="muted">正在检查评审 Agent 配置…</p>
         <p v-if="reviewerError" class="error" role="alert">{{ reviewerError }}</p>
-        <p v-if="form.mode === 'programmatic_review'" class="muted">
-          评审配置在本批次启动时固定；每个结果只传入有界回答摘要，不含题目参考回答或凭据。
+        <p class="muted">
+          每条通过程序检查的回答都会由专用评审 Agent 评分；评审配置在本批次启动时固定。
         </p>
         <div class="eval-score-grid">
           <label
@@ -101,11 +88,7 @@
           取消创建</button
         ><button
           :disabled="
-            saving ||
-            reviewerLoading ||
-            !form.dataset_id ||
-            !form.agent_key ||
-            (form.mode === 'programmatic_review' && (!form.reviewer_agent_key || !reviewerReady))
+            saving || reviewerLoading || !form.dataset_id || !form.agent_key || !reviewerReady
           "
         >
           {{ saving ? '创建中…' : '启动评测' }}
@@ -115,7 +98,7 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
+  import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
   import { agentApi, agentError, agentStatus } from '../../agent/api'
   import { evalApi, type EvalDataset, type EvalRunWrite } from '../../agent/evals'
   import type { AgentContent, Summary } from '../../agent/types'
@@ -127,8 +110,6 @@
   const form = reactive<EvalRunWrite>({
     dataset_id: props.datasetId || '',
     agent_key: '',
-    mode: 'programmatic',
-    reviewer_agent_key: undefined,
     concurrency: 1,
     repeat_count: 1,
   })
@@ -210,7 +191,6 @@
   }
   async function loadReviewer() {
     reviewerReady.value = false
-    form.reviewer_agent_key = undefined
     reviewerError.value = ''
     reviewerLoading.value = true
     try {
@@ -220,7 +200,7 @@
         undefined,
         controller.signal,
       )
-      if (controller.signal.aborted || form.mode !== 'programmatic_review') return
+      if (controller.signal.aborted) return
       const config = data.configuration.content as AgentContent
       if (
         data.configuration.disabled ||
@@ -233,7 +213,6 @@
         return
       }
       reviewerReady.value = true
-      form.reviewer_agent_key = 'eval_reviewer'
     } catch (cause) {
       if (!controller.signal.aborted) {
         reviewerError.value = agentError(cause)
@@ -259,7 +238,7 @@
     }
   }
   onMounted(async () => {
-    await Promise.all([loadDatasets(), loadAgents()])
+    await Promise.all([loadDatasets(), loadAgents(), loadReviewer()])
     if (props.datasetId && !chosenDataset.value) {
       try {
         datasets.value.push(
@@ -270,16 +249,5 @@
       }
     }
   })
-  watch(
-    () => form.mode,
-    (mode) => {
-      if (mode === 'programmatic_review') void loadReviewer()
-      else {
-        reviewerReady.value = false
-        reviewerError.value = ''
-        form.reviewer_agent_key = undefined
-      }
-    },
-  )
   onBeforeUnmount(() => controller.abort())
 </script>

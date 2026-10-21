@@ -14,7 +14,7 @@
 
 PR6 增加版本化 Provider、独立加密凭据、本机管理命令、Responses 流式适配器和真实 Direct Answer Runtime。Chat 默认关闭；生产可显式启用真实模型，仍禁止 Fake。首个接入目标是 su8 的 `https://www.su8.codes/v1`，模型为 `deepseek-v4-flash`，请求固定 `store=false`。Provider 和模型由管理员手动配置；没有自动切换、调用顺序、自动比价或余额查询。
 
-会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；Issue #184 PR1 增加会话摘要表、带消息游标的完整轮次查询和摘要辅助上下文，异步摘要 Worker 仍在后续 PR。RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
+会话和消息已经持久化，真实模型使用程序安全前缀、解析后的 Agent/Skill Prompt、预算内已完成的会话问答和当前用户消息。PR7 增加经 Gateway 的 Agent/Prompt/Skill 管理 API、模型选项与聊天目录；PR8 接入三类配置管理页面、版本绑定和历史恢复。PR9 接入 Gateway 流式对话前端；Issue #169 保留左侧导航和 Agent 选择，Skill 由模型参考。只读业务工具和完整成功轮次的历史上下文已接入；Issue #184 的摘要表、异步 Worker 与增量摘要已实现。RAG 和完整观测/评估平台仍在后续范围。下面的目标设计不能视为已全部实现。
 
 Issue #180 将真实模型统一为 ReAct Graph：
 `START → prepare → check_budget → reason → validate_action → act → observe → check_budget`，
@@ -33,10 +33,11 @@ Issue #162 的 PR2 自动读取当前用户、同一会话最近最多 20 个 CO
 最多 64,000 历史字符，不使用失败、取消、中断、活动 Run、tool 或无 Run 的消息。
 prepare 为当前安全前缀、Agent/Skill 提示词、当前问题和输出预算预留空间，
 再按 UTF-8 字节上界与逐消息开销估算输入，取预算内最近完整轮次并按时间顺序发送。
-超过预算从最旧整轮裁剪，不摘要历史、不截断单条消息；单轮本身超限仍报 AGENT_MODEL_INPUT_LIMIT。
+每次请求超预算时从最旧整轮裁剪，不在请求期间临时调用摘要模型，也不截断单条消息；
+单轮本身超限仍报 AGENT_MODEL_INPUT_LIMIT。较早轮次由后台 Worker 增量归档摘要。
 历史分别使用 user/assistant 角色，不拼入 instructions；当前问题只追加一次。
 每次重试固定同一份上下文并计入累计输入预算；store=false，不使用 previous_response_id。
-页面在同一会话续聊即可使用上下文，新对话从空历史开始。Issue #184 PR1 已增加结构化摘要读取和最近未归档轮次装配；摘要仍需后续 Worker 在成功 Run 之后异步生成，当前不会自动生成摘要。
+页面在同一会话续聊即可使用上下文，新对话从空历史开始。Issue #184 Worker 在成功 Run 后异步归档较旧完整轮次，以乐观版本写入结构化增量摘要和 assistant 消息游标。摘要会滚动压缩早期上下文、优先保留最近轮次，并将文本总量限制为 6,000 字符；最近 6 轮仍以原文进入模型上下文。摘要失败不会改变聊天结果，后续成功轮次会再次触发处理。
 
 ## PR7 管理 HTTP 与 test Agent
 
@@ -644,7 +645,8 @@ Agent 绑定知识分组后，真实模型自动可用 retrieve_knowledge，无�
 ### Eval 批量程序化运行
 
 启用管理和 Chat 后，管理员通过 `POST /api/v1/admin/agent/evals/runs` 指定数据集 UUID、
-被测 `agent_key`、`mode=programmatic`、`repeat_count`（1–3）和 `concurrency`（1–8）。
+被测 `agent_key`、`repeat_count`（1–3）和 `concurrency`（1–8）。每次运行都会执行程序化检查，
+并由专用 `eval_reviewer` Agent 评审通过程序门禁的回答。
 `X-Request-ID` 为规范 UUID；相同管理员和相同正文重试返回已有运行，不同正文返回 409。
 运行/结果分页接口和取消版本参数见 `docs/api.md`。管理页面已支持数据集、新建运行、进度、取消、结果详情和人工评审。
 
@@ -685,5 +687,5 @@ CANCELLED。正常关闭会取消运行；异常重启时遗留 QUEUED/RUNNING �
 有硬失败或执行不成功时不能改为通过；语义人工结论与程序 checks 分开保留。
 每次修改保留操作者、时间、前后值和原因；并发冲突保留草稿，需显式加载最新评分再提交。
 网络响应丢失时相同内容重试复用 request UUID，避免新增审计版本。
-专用评审 Agent 使用 su8 的 `deepseek-v4-pro`，管理员可在 `programmatic_review` 运行中查看严格 JSON 评分，
+专用评审 Agent 使用 su8 的 `deepseek-v4-pro`，管理员可在运行详情中查看严格 JSON 评分，
 模型调用失败可从结果详情单条重跑；CLI/报告导出仍在 #175 后续阶段。
