@@ -63,21 +63,14 @@ def test_programmatic_checks_use_actual_tools_evidence_and_all_hard_failures() -
     assert EvalRunner._grade(case, "O(n)", "FAILED", "AGENT_MODEL_TIMEOUT", None)["hard_fail"]
 
 
-def test_unimplemented_review_modes_are_rejected() -> None:
-    for mode in ("manual",):
+def test_eval_runs_always_use_the_agent_reviewer() -> None:
+    value = EvalRunCreate.model_validate_json(
+        '{"dataset_id":"00000000-0000-4000-8000-000000000001","agent_key":"learning_assistant"}'
+    )
+    assert value.agent_key == "learning_assistant"
+    for removed_option in ('"mode":"programmatic"', '"reviewer_agent_key":"eval_reviewer"'):
         with pytest.raises(ValidationError):
             EvalRunCreate.model_validate_json(
                 '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
-                '"agent_key":"learning_assistant","mode":"' + mode + '"}'
+                '"agent_key":"learning_assistant",' + removed_option + "}"
             )
-    with pytest.raises(ValidationError):
-        EvalRunCreate.model_validate_json(
-            '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
-            '"agent_key":"learning_assistant","mode":"programmatic_review"}'
-        )
-    value = EvalRunCreate.model_validate_json(
-        '{"dataset_id":"00000000-0000-4000-8000-000000000001",'
-        '"agent_key":"learning_assistant","mode":"programmatic_review",'
-        '"reviewer_agent_key":"eval_reviewer"}'
-    )
-    assert value.reviewer_agent_key == "eval_reviewer"

@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from app.graphs.runtime import FakeRuntime
 from app.graphs.service import RunService
+from app.memory.generator import IncrementalSummaryGenerator
 from app.memory.worker import ConversationMemoryWorker
 from app.models.memory import ConversationSummary
 from app.models.runtime import ChatRequest
@@ -25,6 +26,26 @@ def turn(index: int) -> CompletedTurnRecord:
         user_content=f"问题 {index}",
         assistant_content=f"回答 {index}",
     )
+
+
+async def test_incremental_generator_compacts_old_context_and_keeps_recent_turns() -> None:
+    generator = IncrementalSummaryGenerator()
+    first = await generator.generate(None, [turn(index) for index in range(1, 11)], {})
+    updated = await generator.generate(first, [turn(index) for index in range(11, 21)], {})
+
+    assert updated.goal == "问题 20"
+    assert len(updated.context_notes) <= 9
+    assert sum(map(len, updated.context_notes)) <= 6_000
+    assert updated.context_notes[0].startswith("较早对话摘要：")
+    assert "问题 20" in updated.context_notes[-1]
+    assert updated.attempted_actions == ()
+
+
+async def test_incremental_generator_without_new_turns_returns_previous_summary() -> None:
+    generator = IncrementalSummaryGenerator()
+    previous = await generator.generate(None, [turn(1)], {})
+
+    assert await generator.generate(previous, [], {}) is previous
 
 
 class MemoryWorkerStore:
@@ -149,6 +170,35 @@ async def test_worker_retries_queue_overflow_after_space_is_available() -> None:
     await worker.start()
     await worker.close()
     assert worker.pending_count == 0
+
+
+async def test_worker_rescans_when_completion_arrives_during_final_read() -> None:
+    class LateCompletionStore(MemoryWorkerStore):
+        worker: ConversationMemoryWorker | None = None
+        injected = False
+
+        async def list_completed_turn_records(
+            self, *args: Any, **kwargs: Any
+        ) -> list[CompletedTurnRecord]:
+            rows = await super().list_completed_turn_records(*args, **kwargs)
+            if kwargs.get("after_message_id") == 2 and len(rows) == 1 and not self.injected:
+                self.injected = True
+                self.turns.extend([turn(3), turn(4)])
+                assert self.worker is not None
+                assert self.worker.notify_completed(user_id=7, conversation_id="conversation")
+            return rows
+
+    store = LateCompletionStore([turn(1), turn(2)])
+    worker = ConversationMemoryWorker(store, recent_turns=1, retry_delay_seconds=0)
+    store.worker = worker
+    assert worker.notify_completed(user_id=7, conversation_id="conversation")
+    assert await worker.drain_once()
+    assert worker.pending_count == 1
+    assert await worker.drain_once()
+    assert worker.pending_count == 0
+    assert store.summary is not None
+    assert store.summary.covered_until_message_id == 6
+    assert "问题 3" in "\n".join(store.summary.summary.context_notes)
 
 
 async def test_run_service_notifies_after_completed_persistence() -> None:

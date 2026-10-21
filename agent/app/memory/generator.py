@@ -1,9 +1,4 @@
-"""Summary generators used by the conversation memory worker.
-
-The first implementation is deliberately extractive. It keeps the worker useful in
-fake/test deployments without making an untracked model request. The protocol is
-the extension point for a model-backed summarizer in a later PR.
-"""
+"""Bounded incremental summary generation for the conversation memory worker."""
 
 from collections.abc import Sequence
 from typing import Any, Protocol
@@ -29,13 +24,18 @@ def _clip(value: str, maximum: int = 1_800) -> str:
     return value[: maximum - 1].rstrip() + "…"
 
 
-class ExtractiveSummaryGenerator:
-    """Build a bounded, non-instructional summary from completed turns.
+class IncrementalSummaryGenerator:
+    """Roll completed turns into a bounded, non-instructional conversation summary.
 
     This is intentionally conservative: it never invents facts or claims that a
-    tool was called. The stored text remains auxiliary context and is treated as
-    untrusted by the prompt assembler.
+    tool was called. Older context is compacted as a rolling extractive note while
+    recent turns remain separate. The stored text remains auxiliary context and is
+    treated as untrusted by the prompt assembler.
     """
+
+    _RECENT_NOTES = 8
+    _COMPACT_NOTE_CHARS = 2_400
+    _TOTAL_NOTE_CHARS = 6_000
 
     async def generate(
         self,
@@ -48,15 +48,39 @@ class ExtractiveSummaryGenerator:
             return previous
         base = previous or ConversationSummary()
         notes = list(base.context_notes)
-        actions = list(base.attempted_actions)
         for turn in turns:
             notes.append(_clip(f"用户：{turn.user_content}\n助手：{turn.assistant_content}"))
-            actions.append(_clip(f"已完成对话轮次：{turn.user_content}", 512))
+        notes = list(dict.fromkeys(note for note in notes if note.strip()))
+
+        # Keep a compact rolling record of older context and preserve the latest
+        # turns verbatim enough to remain useful for follow-up questions.
+        recent = notes[-self._RECENT_NOTES :]
+        older = notes[: -self._RECENT_NOTES]
+        compacted: list[str] = []
+        if older:
+            merged = "；".join(older)
+            if len(merged) > self._COMPACT_NOTE_CHARS:
+                merged = "…" + merged[-(self._COMPACT_NOTE_CHARS - 1) :]
+            compacted.append(_clip("较早对话摘要：" + merged, self._COMPACT_NOTE_CHARS))
+        compacted.extend(recent)
+
+        # Keep prompt cost stable as a conversation grows.
+        while compacted and sum(map(len, compacted)) > self._TOTAL_NOTE_CHARS:
+            if len(compacted) > 1:
+                compacted.pop(1)
+            else:
+                compacted[0] = _clip(compacted[0], self._TOTAL_NOTE_CHARS)
+                break
         return ConversationSummary(
             goal=_clip(turns[-1].user_content) if turns else base.goal,
             user_constraints=base.user_constraints,
             confirmed_facts=base.confirmed_facts,
-            attempted_actions=tuple(actions[-32:]),
+            attempted_actions=base.attempted_actions,
             open_questions=base.open_questions,
-            context_notes=tuple(notes[-32:]),
+            context_notes=tuple(compacted),
         )
+
+
+# Keep the original import name for deployments or extensions using the first
+# extractive implementation directly.
+ExtractiveSummaryGenerator = IncrementalSummaryGenerator

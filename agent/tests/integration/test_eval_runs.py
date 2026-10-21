@@ -15,7 +15,13 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.storage.schema import agent_messages, agent_runs
 from tests.integration.test_chat_http import user_token
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.environ.get("AGENT_TEST_MODEL_MODE") != "true",
+        reason="Eval runs require the isolated model-review phase",
+    ),
+]
 BASE = "/api/v1/admin/agent/evals"
 
 
@@ -188,8 +194,6 @@ async def test_model_review_strict_json_unavailable_and_retry(http: httpx.AsyncC
         json={
             "dataset_id": dataset_id,
             "agent_key": "learning_assistant",
-            "mode": "programmatic_review",
-            "reviewer_agent_key": "eval_reviewer",
         },
         headers={"X-Request-ID": str(uuid4())},
     )
@@ -261,8 +265,6 @@ async def test_model_reviews_reject_bad_schema_skip_hard_failure_and_enforce_per
     body = {
         "dataset_id": dataset_id,
         "agent_key": "learning_assistant",
-        "mode": "programmatic_review",
-        "reviewer_agent_key": "eval_reviewer",
         "concurrency": 2,
     }
     response = await http.post(BASE + "/runs", json=body, headers={"X-Request-ID": str(uuid4())})

@@ -82,26 +82,21 @@ class EvalRunner:
                 snapshot = await self.reader.read(request, principal, render_prompts=False)
             else:
                 snapshot = await self.reader.read(request, principal)
-            reviewer_snapshot = None
-            if body.mode == "programmatic_review":
-                if (
-                    not isinstance(self.reader, DatabaseConfigReader)
-                    or body.reviewer_agent_key != REVIEWER_AGENT_KEY
-                ):
-                    raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
-                reviewer_request = ChatRequest(
-                    agent_key=REVIEWER_AGENT_KEY,
-                    message="离线评审配置校验",
-                )
-                reviewer_snapshot = await self.reader.read(reviewer_request, principal)
-                validate_reviewer_snapshot(reviewer_snapshot)
+            if not isinstance(self.reader, DatabaseConfigReader):
+                raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
+            reviewer_request = ChatRequest(
+                agent_key=REVIEWER_AGENT_KEY,
+                message="离线评审配置校验",
+            )
+            reviewer_snapshot = await self.reader.read(reviewer_request, principal)
+            validate_reviewer_snapshot(reviewer_snapshot)
             result = await self.store.create_run(
                 body,
                 principal,
                 snapshot.model_dump(mode="json"),
                 principal.request_id,
                 fingerprint,
-                reviewer_snapshot.model_dump(mode="json") if reviewer_snapshot else None,
+                reviewer_snapshot.model_dump(mode="json"),
             )
             if not result["duplicate"]:
                 run_id = result["run"]["id"]

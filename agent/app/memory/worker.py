@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
-from app.memory.generator import ExtractiveSummaryGenerator, SummaryGenerator
+from app.memory.generator import IncrementalSummaryGenerator, SummaryGenerator
 from app.models.memory import ConversationSummary
 from app.storage.repository import (
     CompletedTurnRecord,
@@ -73,9 +73,10 @@ class ConversationMemoryWorker:
         if retry_delay_seconds < 0 or close_timeout_seconds <= 0:
             raise ValueError("Memory worker delays must be valid")
         self._store = store
-        self._generator = generator or ExtractiveSummaryGenerator()
+        self._generator = generator or IncrementalSummaryGenerator()
         self._queue: asyncio.Queue[MemoryJob] = asyncio.Queue(maxsize=queue_size)
         self._pending: set[tuple[int, str]] = set()
+        self._rerun: set[tuple[int, str]] = set()
         self._overflow: set[tuple[int, str]] = set()
         self._recent_turns = recent_turns
         self._batch_size = batch_size
@@ -101,7 +102,12 @@ class ConversationMemoryWorker:
         if self._stopping or user_id <= 0 or not conversation_id:
             return False
         key = (user_id, conversation_id)
-        if key in self._pending or key in self._overflow:
+        if key in self._pending:
+            # The active/queued job may have observed a stale database snapshot.
+            # Keep one follow-up scan so a completion during processing is not lost.
+            self._rerun.add(key)
+            return True
+        if key in self._overflow:
             return True
         self._pending.add(key)
         try:
@@ -120,7 +126,7 @@ class ConversationMemoryWorker:
         try:
             await self._process_with_retry(job)
         finally:
-            self._pending.discard((job.user_id, job.conversation_id))
+            self._finish_job(job)
             self._queue.task_done()
         return True
 
@@ -152,8 +158,20 @@ class ConversationMemoryWorker:
             try:
                 await self._process_with_retry(job)
             finally:
-                self._pending.discard((job.user_id, job.conversation_id))
+                self._finish_job(job)
                 self._queue.task_done()
+
+    def _finish_job(self, job: MemoryJob) -> None:
+        key = (job.user_id, job.conversation_id)
+        if key not in self._rerun:
+            self._pending.discard(key)
+            return
+
+        self._rerun.discard(key)
+        try:
+            self._queue.put_nowait(job)
+        except asyncio.QueueFull:
+            self._overflow.add(key)
 
     def _promote_overflow(self) -> None:
         while self._overflow and not self._queue.full():

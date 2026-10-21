@@ -80,16 +80,8 @@ class EvalRunCreate(BaseModel):
 
     dataset_id: UUID
     agent_key: str = Field(min_length=2, max_length=64, pattern=r"^[a-z][a-z0-9_]{1,63}$")
-    mode: Literal["programmatic", "programmatic_review"] = "programmatic"
-    reviewer_agent_key: Literal["eval_reviewer"] | None = None
     repeat_count: int = Field(default=1, ge=1, le=3, strict=True)
     concurrency: int = Field(default=1, ge=1, le=8, strict=True)
-
-    @model_validator(mode="after")
-    def reviewer_mode_binding(self) -> "EvalRunCreate":
-        if (self.mode == "programmatic_review") != (self.reviewer_agent_key is not None):
-            raise ValueError("Reviewer Agent is required only for programmatic_review")
-        return self
 
 
 class EvalRunPage(EvalPage):
