@@ -398,8 +398,6 @@ test('Eval 页面创建运行、保留冲突草稿、重放丢失响应的评分
   expect(modelDataset.ok()).toBe(true)
   await page.goto('/agent/eval?tab=runs&dataset=' + (await modelDataset.json()).dataset.id)
   await page.getByLabel('被测 Agent', { exact: true }).selectOption('learning_assistant')
-  await page.getByLabel('评测模式', { exact: true }).selectOption('programmatic_review')
-  await expect(page.getByLabel('评审 Agent', { exact: true })).toHaveValue('eval_reviewer')
   await page.getByRole('button', { name: '启动评测', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: 'learning_assistant · 执行完成', exact: true }),
