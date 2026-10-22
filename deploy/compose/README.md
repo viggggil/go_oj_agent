@@ -250,3 +250,7 @@ make observability-down
 ```
 
 本栈端口仅绑定 loopback。OTLP gRPC/HTTP 与 Collector metrics endpoint 只在 Compose 网络内部开放。
+
+### Agent LangSmith 脱敏导出
+
+Agent → LangSmith Cloud 导出默认关闭。需要启用时，在未提交的本地 `.env` 或部署 Secret 中设置 `AGENT_LANGSMITH_EXPORT_ENABLED=true` 和 `LANGSMITH_API_KEY`，再重建 Agent 容器。适配器只发送 Run UUID、OTel Trace ID、受控模型/工具别名、状态、耗时和 Token 元数据；inputs/outputs 留空。不会开启 LangGraph 自动内容追踪。停用时将开关设为 `false` 并重建 Agent。

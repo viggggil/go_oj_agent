@@ -106,6 +106,7 @@ class RunRecord:
     deadline_at: datetime
     error_code: str | None
     model_summary: dict[str, Any] | None = None
+    trace_id: str | None = None
 
 
 _RUN_COLUMNS = tuple(column for column in agent_runs.c if column.name != "active_conversation_id")
@@ -515,6 +516,7 @@ class AgentStore:
         user_id: int,
         conversation_id: str | UUID | None,
         request_id: str,
+        trace_id: str | None = None,
         content: str,
         agent_key: str | None = "demo",
         config_source: str,
@@ -574,6 +576,7 @@ class AgentStore:
                         conversation_id=str(conversation_id),
                         user_id=user_id,
                         request_id=request_id,
+                        trace_id=trace_id,
                         config_source=config_source,
                         config_snapshot=config_snapshot,
                         status="RUNNING",
@@ -611,6 +614,7 @@ class AgentStore:
                 finished_at=None,
                 deadline_at=deadline_at,
                 error_code=None,
+                trace_id=trace_id,
             )
 
     async def finish_run(

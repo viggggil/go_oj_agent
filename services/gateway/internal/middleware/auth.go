@@ -12,6 +12,7 @@ import (
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	pkgauth "github.com/viggggil/go_oj_agent/pkg/auth"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type AuthMiddleware struct {
@@ -79,11 +80,16 @@ func (m *AuthMiddleware) Middleware() middleware.Middleware {
 			if err != nil {
 				return nil, ErrUnauthenticated("bearer token is invalid")
 			}
+			spanContext := trace.SpanContextFromContext(ctx)
+			traceID := ""
+			if spanContext.IsValid() {
+				traceID = spanContext.TraceID().String()
+			}
 			requestContext := &commonv1.RequestContext{
 				UserId:    claims.Subject,
 				Roles:     append([]string(nil), claims.Roles...),
 				RequestId: RequestIDFromContext(ctx),
-				TraceId:   request.Header.Get("X-Trace-ID"),
+				TraceId:   traceID,
 			}
 			ctx = context.WithValue(ctx, claimsKey, claims)
 			ctx = context.WithValue(ctx, requestContextKey, requestContext)

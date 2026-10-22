@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：待实施。本文基于 2026-10-21 的仓库代码，接口、目录和指标名称如未注明“已有”，均为建议新增项。
+状态：阶段一和 Issue #189 的 Agent 本地追踪已实现。管理员查询 UI、Judge/MQ 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 
@@ -30,7 +30,7 @@
 | `pkg/mq/envelope.go` | `trace_id`、`event_id`、`causation_id` | 缺少完整追踪上下文；Judge Outbox 构建消息时没有填入 TraceID |
 | `services/contest/internal/server/metrics.go` | 独立端口的 Prometheus 文本及 JSON | 目前主要是排行榜缓存与 Outbox 计数，需接入统一采集 |
 | `agent/app/models/provider.py` | ModelAttempt、ToolTraceStep、ModelSummary | 摘要不是时序监控；缺少统一 Trace、导出与管理员 Run 查询 |
-| `agent/app/storage/schema.py` | Run 状态、时间、request_id、配置快照、model_summary | 没有专用 trace_id；跨用户管理员查询需受控接口与索引 |
+| `agent/app/storage/schema.py` | Run 状态、时间、request_id、配置快照、model_summary、可空 trace_id | 管理员 Run 查询仍需受控接口与权限；`trace_id` 可为空以兼容历史 Run |
 | `agent/app/graphs/model_runtime.py` | 使用 LangGraph；显式禁用 LangSmith 自动追踪 | 不能只改环境变量开启，否则可能上传 AgentState 中的内容 |
 | `agent/app/evals/` 与前端 Eval 页面 | 数据集、程序检查、模型评审和人工评分 | 应复用现有质量工程，避免再建一套评测事实库 |
 
@@ -127,7 +127,7 @@ Relay 从持久化上下文创建 publish Span，注入 AMQP Header；Worker、J
 
 ### 5.3 LangSmith 元数据模式
 
-保留现有图自动追踪关闭的保护。首期由专门适配器显式构造安全 Run 树，而不是给持有完整 AgentState 的函数直接加装饰器。根 Run 对应业务 Run，子 Run 对应每个模型 attempt、工具和检索阶段。
+保留现有图自动追踪关闭的保护。由专门适配器显式构造安全 Run 树，而不是给持有完整 AgentState 的函数直接加装饰器。根 Run 对应业务 Run，子 Run 对应每个模型 attempt、工具和检索阶段。实现应使用独立有界队列异步发送，配置 `AGENT_LANGSMITH_EXPORT_ENABLED` 默认关闭；云端请求失败不能改变业务终态。
 
 允许上传的字段：随机 Run 标识、本地 otel_trace_id、环境、部署版本、配置版本 UUID、受控模型/工具名称、起止时间、Token 及 usage_source、枚举状态与稳定错误码。首期不上传用户 ID、会话标题、知识文档标题、完整配置快照和自由文本；确有后续会话分析需求时再设计随机关联标识。
 
@@ -190,7 +190,7 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 | 阶段 | 实施内容 | 验收 |
 | --- | --- | --- |
 | PR1 基础设施与最小追踪 | 可选 Compose overlay：Collector、Prometheus、Tempo、Grafana；共用初始化；Gateway→Agent 的 HTTP/SSE、进程指标、JSON 日志关联 | 一次 fake 聊天在 Grafana 可查完整 HTTP/SSE 生命周期；关闭 Collector 仍能正常聊天 |
-| PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文 |
+| PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文。Issue #188 完成云导出基础；Issue #189 完成本地 Run Trace 与业务 Span |
 | PR3 管理员最小页面 | Gateway 固定指标查询；Agent Run 列表/安全详情与索引；Vue 概览和运行 Tab | 管理员从异常指标进入 Run 详情并跳到排障页；普通用户与仅 Agent 管理员的越界请求被拒绝；失联显示 unknown |
 | PR4 Judge/Contest 异步链路 | Outbox trace context migration；AMQP 传播；队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |
 | PR5 运行保障与扩展 | RAG/Eval/Memory worker 与基础设施指标；阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |

@@ -13,7 +13,7 @@ GO_FILES := $(shell git ls-files '*.go')
 API_PROTO_FILES := $(shell find api -name '*.proto' -type f | sort)
 BUF_GENERATE_PATHS := --path api --path services/user/internal/conf --path services/problem/internal/conf --path services/gateway/internal/conf --path services/judge/internal/conf --path services/contest/internal/conf
 
-.PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-infra test-integration test-e2e agent-init agent-dev agent-proto agent-fmt agent-fmt-check agent-lint agent-type agent-check agent-test-unit agent-test-integration agent-eval infra-up infra-down dev
+.PHONY: init proto generate validate errors fmt fmt-check lint vet build test test-unit test-infra test-integration test-e2e agent-init agent-dev agent-proto agent-fmt agent-fmt-check agent-lint agent-type agent-check agent-test-unit agent-test-integration agent-eval infra-up infra-down observability-up observability-down observability-check dev
 
 init:
 	@$(GO) version
@@ -133,6 +133,21 @@ infra-up:
 
 infra-down:
 	@$(COMPOSE) -f $(COMPOSE_FILE) down
+
+OBSERVABILITY_FILE := deploy/compose/observability.yaml
+observability-up:
+	@$(COMPOSE) -f $(COMPOSE_FILE) -f $(OBSERVABILITY_FILE) up --detach --wait
+
+observability-down:
+	@$(COMPOSE) -f $(COMPOSE_FILE) -f $(OBSERVABILITY_FILE) stop grafana prometheus tempo otel-collector
+	@$(COMPOSE) -f $(COMPOSE_FILE) up --detach gateway-service agent-service
+
+observability-check:
+	@curl --fail --silent http://127.0.0.1:13133/ >/dev/null || (echo "OpenTelemetry Collector 不可用" && exit 1)
+	@curl --fail --silent http://127.0.0.1:9090/-/ready >/dev/null || (echo "Prometheus 不可用" && exit 1)
+	@curl --fail --silent http://127.0.0.1:3200/ready >/dev/null || (echo "Tempo 不可用" && exit 1)
+	@curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null || (echo "Grafana 不可用" && exit 1)
+	@echo "Observability stack is ready"
 
 dev:
 	@echo "dev workflow is not wired yet"

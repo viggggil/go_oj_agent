@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"os"
+	"time"
 
 	kratos "github.com/go-kratos/kratos/v3"
 	"github.com/go-kratos/kratos/v3/config"
@@ -12,6 +14,7 @@ import (
 	"github.com/go-kratos/kratos/v3/registry"
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
 
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 )
 
@@ -44,6 +47,12 @@ func main() {
 		errorLogger.Error("解析 Agent 配置失败", "error", err)
 		os.Exit(1)
 	}
+	shutdownTelemetry, telemetryErr := observability.Init(context.Background(), "gateway-service")
+	if telemetryErr != nil {
+		// Telemetry failure must not prevent the gateway from serving traffic.
+		errorLogger.Error("初始化 OpenTelemetry 失败", "error_type", "exporter_init")
+		shutdownTelemetry = func(context.Context) error { return nil }
+	}
 
 	app, cleanup, err := initApp(&bc)
 	if err != nil {
@@ -51,6 +60,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer cleanup()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = shutdownTelemetry(ctx)
+	}()
 
 	logger.Info("启动 gateway-service")
 	if err := app.Run(); err != nil {

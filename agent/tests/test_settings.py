@@ -14,6 +14,18 @@ def test_standalone_defaults_need_no_model_key() -> None:
     assert settings.port == 8000
     assert settings.database_url is None
     assert settings.environment == "development"
+    assert settings.langsmith_export_enabled is False
+    assert settings.langsmith_api_key is None
+
+
+def test_langsmith_secret_is_masked_and_export_is_explicit() -> None:
+    settings = Settings(
+        langsmith_export_enabled=True,
+        langsmith_api_key=SecretStr("langsmith-private-key"),
+    )
+    assert settings.langsmith_export_enabled is True
+    assert "langsmith-private-key" not in str(settings)
+    assert "langsmith-private-key" not in settings.model_dump_json()
 
 
 def test_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

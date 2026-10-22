@@ -3,9 +3,11 @@
 from typing import Any
 
 import grpc
+from opentelemetry import propagate
 
 from app.clients.auth import AgentTokenSigner
 from app.models.runtime import Principal
+from app.observability import span
 
 
 class GrpcDependencyError(RuntimeError):
@@ -57,10 +59,16 @@ class AuthenticatedChannel:
             response_deserializer=response.FromString,
         )
         try:
-            return await call(
-                request,
-                timeout=min(self._timeout, deadline_seconds or self._timeout),
-                metadata=(("authorization", f"Bearer {token}"),),
-            )
+            async with span("agent.grpc.client", {"rpc.system": "grpc", "rpc.method": method}):
+                trace_metadata: dict[str, str] = {}
+                propagate.inject(trace_metadata)
+                return await call(
+                    request,
+                    timeout=min(self._timeout, deadline_seconds or self._timeout),
+                    metadata=(
+                        ("authorization", f"Bearer {token}"),
+                        *tuple(trace_metadata.items()),
+                    ),
+                )
         except grpc.aio.AioRpcError as error:
             raise map_grpc_error(error) from None

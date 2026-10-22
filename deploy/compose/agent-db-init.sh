@@ -86,6 +86,12 @@ apply_migration 000009_create_conversation_summaries "$summary_present" 1
 tool_description_present="$(table_count "'agent_tool_descriptions'")"
 apply_migration 000010_create_tool_descriptions "$tool_description_present" 1
 
+trace_id_present="$(column_count agent_runs trace_id)"
+trace_index_present="$(query "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA='oj_agent' AND TABLE_NAME='agent_runs'
+    AND INDEX_NAME='idx_agent_runs_trace_started'")"
+apply_migration 000011_add_run_trace_id "$((trace_id_present + trace_index_present))" 2
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"

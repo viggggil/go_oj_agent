@@ -1,11 +1,13 @@
 package server
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/go-kratos/kratos/v3/middleware/recovery"
 	"github.com/go-kratos/kratos/v3/middleware/validate"
 	khttp "github.com/go-kratos/kratos/v3/transport/http"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	gatewayv1 "github.com/viggggil/go_oj_agent/api/gateway/v1"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/client"
@@ -47,7 +49,10 @@ func NewHTTPServerWithAgent(config *conf.Bootstrap, authMiddleware *gatewaymw.Au
 	server := khttp.NewServer(
 		khttp.Address(address),
 		khttp.Timeout(0),
-		khttp.Filter(requestBudgetFilter(timeout, agent.Limits().MaxDuration)),
+		khttp.Filter(func(next http.Handler) http.Handler {
+			budgeted := requestBudgetFilter(timeout, agent.Limits().MaxDuration)(next)
+			return otelhttp.NewHandler(ignoreExternalTraceContext(budgeted), "gateway.http")
+		}),
 		khttp.Middleware(
 			gatewaymw.RequestIDMiddleware(),
 			recovery.Recovery(),
@@ -98,4 +103,15 @@ func NewHTTPServerWithAgent(config *conf.Bootstrap, authMiddleware *gatewaymw.Au
 		server.Use(operation, authMiddleware.Middleware())
 	}
 	return server
+}
+
+// The Gateway is the trust boundary: public trace context must not select its root trace.
+func ignoreExternalTraceContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request := r.Clone(r.Context())
+		request.Header = r.Header.Clone()
+		request.Header.Del("traceparent")
+		request.Header.Del("tracestate")
+		next.ServeHTTP(w, request)
+	})
 }

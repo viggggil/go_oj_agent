@@ -13,6 +13,7 @@ from app.clients.model import ResponsesClient
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
 from app.models.provider import ModelAttempt, ModelFailure, ModelResponse, ModelSummary
 from app.models.runtime import AgentState, HistoryMessage
+from app.observability import span
 
 SAFETY_PREFIX = (
     "你是编程学习助手。根据本轮信息及提供的已完成会话问答回答；历史可能已裁剪。"
@@ -179,15 +180,16 @@ class DirectAnswer:
                     tools=tools,
                     result=result,
                 )
-                async for text in iterator:
-                    answer_bytes += len(text.encode())
-                    emitted = True
-                    try:
-                        yield text
-                    except asyncio.CancelledError as error:
-                        # 保留取消来源，供 ResponsesClient 的总超时上下文正确转换异常。
-                        await iterator.athrow(error)
-                        raise
+                async with span("agent.model.attempt"):
+                    async for text in iterator:
+                        answer_bytes += len(text.encode())
+                        emitted = True
+                        try:
+                            yield text
+                        except asyncio.CancelledError as error:
+                            # 保留取消来源，供 ResponsesClient 的总超时上下文正确转换异常。
+                            await iterator.athrow(error)
+                            raise
                 if result is not None and result.calls:
                     answer_bytes = sum(
                         len(json.dumps(call.input_item()).encode()) for call in result.calls

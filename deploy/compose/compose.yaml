@@ -361,6 +361,8 @@ services:
       context: ../..
       dockerfile: services/gateway/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_DEPLOYMENT_ENVIRONMENT: "development"
       KRATOS_SERVER_HTTP_ADDRESS: ":8080"
       KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
       KRATOS_AUTH_ISSUER: "go-oj-agent"
@@ -434,6 +436,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["exec python /bootstrap/agent-dev-init.py --serve"]
     environment:
+      AGENT_LANGSMITH_EXPORT_ENABLED: "${AGENT_LANGSMITH_EXPORT_ENABLED:-false}"
+      AGENT_LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       AGENT_RAG_ENABLED: "true"
       AGENT_RAG_EMBEDDING_URL: http://embedding:8001
       AGENT_RAG_QDRANT_URL: http://qdrant:6333

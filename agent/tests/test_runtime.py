@@ -104,6 +104,7 @@ class MemoryStore:
         user_id: int,
         conversation_id: str | UUID | None,
         request_id: str,
+        trace_id: str | None = None,
         content: str,
         agent_key: str | None = "demo",
         config_source: str,
@@ -118,6 +119,7 @@ class MemoryStore:
             conversation_id=str(conversation_id or uuid4()),
             user_id=user_id,
             request_id=request_id,
+            trace_id=trace_id,
             config_source=config_source,
             config_snapshot=config_snapshot,
             status="RUNNING",
@@ -196,6 +198,52 @@ async def test_done_follows_persistence_and_config_snapshot_is_fixed() -> None:
                 assert store.record is not None and store.record.status == "COMPLETED"
             events.append(event)
     assert [event.type for event in events] == ["thinking", "token", "done"]
+
+
+async def test_langsmith_export_uses_persisted_chat_terminal_once() -> None:
+    class Exporter:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def submit(self, **kwargs: Any) -> None:
+            self.calls.append(kwargs)
+
+    store = MemoryStore()
+    exporter = Exporter()
+    service = RunService(store, FakeRuntime("safe answer"), Reader(), langsmith_exporter=exporter)
+    accepted = await service.accept(ChatRequest(message="private user message"), state().principal)
+    async with accepted:
+        events = [event async for event in accepted.events]
+    assert events[-1].type == "done"
+    assert store.record is not None and store.record.status == "COMPLETED"
+    assert len(exporter.calls) == 1
+    assert exporter.calls[0]["status"] == "COMPLETED"
+    assert exporter.calls[0]["run_id"] == accepted.state.run_id
+    assert "private user message" not in repr(exporter.calls)
+
+
+async def test_langsmith_export_skips_run_without_persisted_terminal() -> None:
+    class Exporter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def submit(self, **_kwargs: Any) -> None:
+            self.calls += 1
+
+    class BrokenStore(MemoryStore):
+        async def finish_run(self, **kwargs: Any) -> RunRecord:
+            raise RuntimeError("database unavailable")
+
+    exporter = Exporter()
+    store = BrokenStore()
+    accepted = await RunService(
+        store, FakeRuntime("answer"), Reader(), langsmith_exporter=exporter
+    ).accept(ChatRequest(message="hello"), state().principal)
+    async with accepted:
+        events = [event async for event in accepted.events]
+    assert events[-1].type == "error"
+    assert store.record is not None and store.record.status == "RUNNING"
+    assert exporter.calls == 0
 
 
 @pytest.mark.parametrize("failure", ["persist", "output", "incomplete", "exception"])

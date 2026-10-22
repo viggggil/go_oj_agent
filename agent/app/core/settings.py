@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     database_url: SecretStr | None = None
+    langsmith_export_enabled: bool = False
+    langsmith_api_key: SecretStr | None = None
     readiness_timeout_seconds: float = Field(default=2, gt=0, le=30)
     shutdown_timeout_seconds: int = Field(default=10, ge=1, le=60)
     runtime_mode: Literal["disabled", "fake", "langgraph_fake", "model"] = "disabled"

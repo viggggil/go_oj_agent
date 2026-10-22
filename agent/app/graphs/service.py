@@ -3,10 +3,14 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import monotonic
 from typing import Any, Protocol
 from uuid import UUID
+
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader
 from app.graphs.context import ContextAssembler
@@ -20,6 +24,7 @@ from app.models.runtime import (
     RunStatus,
     StreamEvent,
 )
+from app.observability import span
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
@@ -28,6 +33,12 @@ from app.storage.repository import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ExportTracker:
+    submitted: bool = False
+
 
 _PUBLIC_RUNTIME_ERROR_CODES = frozenset(
     {
@@ -48,6 +59,7 @@ class RuntimeStore(Protocol):
         user_id: int,
         conversation_id: str | UUID | None,
         request_id: str,
+        trace_id: str | None = None,
         content: str,
         config_source: str,
         config_snapshot: dict[str, Any],
@@ -94,11 +106,18 @@ class AcceptedRun:
     """调用方必须消费事件到结束或显式 aclose，确保取消写入数据库。"""
 
     def __init__(
-        self, state: AgentState, events: AsyncIterator[StreamEvent], service: "RunService"
+        self,
+        state: AgentState,
+        events: AsyncIterator[StreamEvent],
+        service: "RunService",
+        trace_id: str | None,
+        export_tracker: _ExportTracker,
     ) -> None:
         self.state = state
         self.events = events
         self._service = service
+        self._trace_id = trace_id
+        self._export_tracker = export_tracker
 
     async def __aenter__(self) -> "AcceptedRun":
         return self
@@ -113,6 +132,9 @@ class AcceptedRun:
         # 建流前调用方取消时，未启动的 async generator 也需要释放 Run。
         if self.state.status == "RUNNING":
             await self._service._terminate(self.state, "CANCELLED", "AGENT_CANCELLED")
+            self._service._export_terminal(
+                self.state, self._trace_id, "CANCELLED", "AGENT_CANCELLED", self._export_tracker
+            )
 
 
 class RunService:
@@ -125,6 +147,7 @@ class RunService:
         cleanup_timeout_seconds: float = 5,
         context_assembler: ContextAssembler | None = None,
         memory_trigger: MemoryTrigger | None = None,
+        langsmith_exporter: Any | None = None,
     ) -> None:
         self._store = store
         self._runtime = runtime
@@ -132,6 +155,7 @@ class RunService:
         self._cleanup_timeout = cleanup_timeout_seconds
         self._context_assembler = context_assembler or ContextAssembler()
         self._memory_trigger = memory_trigger
+        self._langsmith_exporter = langsmith_exporter
 
     def with_store(self, store: RuntimeStore) -> "RunService":
         """共享 Runtime 和配置解析器，使用独立用途的持久化边界。"""
@@ -144,6 +168,8 @@ class RunService:
             # Evaluation stores have their own purpose and must not enqueue
             # ordinary chat memory jobs.
             memory_trigger=None,
+            # Eval and review runs never enter the production Chat export.
+            langsmith_exporter=None,
         )
 
     @property
@@ -161,6 +187,10 @@ class RunService:
         *,
         snapshot: ConfigSnapshot | None = None,
     ) -> AcceptedRun:
+        span_context = trace.get_current_span().get_span_context()
+        trace_id = (
+            span_context.trace_id.to_bytes(16, "big").hex() if span_context.is_valid else None
+        )
         snapshot = snapshot or await self._reader.read(request, principal)
         # 上次终态持久化失败的 Run 会在 deadline 之后释放活动关联。
         await self._store.expire_running_runs()
@@ -169,6 +199,7 @@ class RunService:
             user_id=principal.user_id,
             conversation_id=request.conversation_id,
             request_id=principal.request_id,
+            trace_id=trace_id,
             content=request.message,
             config_source=snapshot.source,
             config_snapshot=snapshot.model_dump(mode="json"),
@@ -208,9 +239,41 @@ class RunService:
         except Exception:
             await self._terminate(state, "FAILED", "AGENT_HISTORY_UNAVAILABLE")
             raise
-        return AcceptedRun(state, self._events(state), self)
+        tracker = _ExportTracker()
+        return AcceptedRun(
+            state, self._traced_events(state, trace_id, tracker), self, trace_id, tracker
+        )
 
-    async def _events(self, state: AgentState) -> AsyncIterator[StreamEvent]:
+    async def _traced_events(
+        self, state: AgentState, trace_id: str | None, tracker: _ExportTracker
+    ) -> AsyncIterator[StreamEvent]:
+        attributes: dict[str, str] = {"agent.purpose": "chat", "run.id": str(state.run_id)}
+        async with span("agent.run", attributes) as run_span:
+            iterator = self._events(state, trace_id, tracker)
+            try:
+                async for event in iterator:
+                    if event.type == "done":
+                        run_span.set_attribute("run.status", "completed")
+                    elif event.type == "error":
+                        run_span.set_attribute("run.status", "failed")
+                        code = event.data.get("code")
+                        if isinstance(code, str) and code.isascii() and len(code) <= 64:
+                            run_span.set_attribute("error.code", code)
+                        run_span.set_status(Status(StatusCode.ERROR))
+                    yield event
+            except (asyncio.CancelledError, GeneratorExit):
+                run_span.set_attribute("run.status", "cancelled")
+                close = getattr(iterator, "aclose", None)
+                if close is not None:
+                    await close()
+                raise
+            except Exception:
+                run_span.set_attribute("run.status", "failed")
+                raise
+
+    async def _events(
+        self, state: AgentState, trace_id: str | None, tracker: _ExportTracker
+    ) -> AsyncIterator[StreamEvent]:
         budget = state.config_snapshot["budget"]
         remaining = max(0.0, (state.deadline_at - utc_now()).total_seconds())
         end = monotonic() + remaining
@@ -279,6 +342,7 @@ class RunService:
                             )
                     terminal = True
                     state.status = "COMPLETED"
+                    self._export_terminal(state, trace_id, "COMPLETED", None, tracker)
                     logger.info(
                         "Agent run completed",
                         extra={
@@ -293,13 +357,14 @@ class RunService:
             state.model_summary = runtime_state.model_summary
             await self._terminate(state, "CANCELLED", "AGENT_CANCELLED")
             terminal = True
+            self._export_terminal(state, trace_id, "CANCELLED", "AGENT_CANCELLED", tracker)
             raise
         except Exception as exc:
             state.model_summary = runtime_state.model_summary
             # 注入的 Runtime 即使误用内部异常类，也不能输出任意错误文本。
             logger.warning(
                 "Agent runtime failed",
-                extra={"error_type": type(exc).__name__},
+                extra={"error_type": type(exc).__name__, "error_code": getattr(exc, "code", None)},
             )
             code = (
                 exc.code
@@ -310,6 +375,7 @@ class RunService:
                 code = exc.code
             await self._terminate(state, "FAILED", code)
             terminal = True
+            self._export_terminal(state, trace_id, "FAILED", code, tracker)
             yield StreamEvent.error(state, code, sequence + 1)
         finally:
             if not terminal:
@@ -354,4 +420,35 @@ class RunService:
             await asyncio.gather(task, return_exceptions=True)
             logger.error(
                 "Run finalization failed", extra={"error_code": "AGENT_FINALIZATION_FAILED"}
+            )
+
+    def _export_terminal(
+        self,
+        state: AgentState,
+        trace_id: str | None,
+        status: str,
+        error_code: str | None,
+        tracker: _ExportTracker,
+    ) -> None:
+        if tracker.submitted or self._langsmith_exporter is None or state.status == "RUNNING":
+            return
+        tracker.submitted = True
+        try:
+            self._langsmith_exporter.submit(
+                run_id=state.run_id,
+                started_at=state.started_at,
+                status=status,
+                error_code=error_code,
+                model_summary=state.model_summary,
+                trace_id=trace_id,
+                config_version=state.config_snapshot.get("model_profile_id"),
+            )
+        except Exception as exc:
+            # Export bugs must never change the already committed Run outcome.
+            logger.warning(
+                "LangSmith export enqueue failed",
+                extra={
+                    "error_code": "LANGSMITH_ENQUEUE_FAILED",
+                    "error_type": type(exc).__name__,
+                },
             )

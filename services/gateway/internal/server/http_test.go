@@ -245,8 +245,8 @@ func TestHTTPServerCurrentUserForwardsAuthenticatedContext(t *testing.T) {
 	if got := userClient.currentUserRequest.GetContext().GetRequestId(); got != "req-me" {
 		t.Fatalf("request id = %q, want req-me", got)
 	}
-	if got := userClient.currentUserRequest.GetContext().GetTraceId(); got != "trace-me" {
-		t.Fatalf("trace id = %q, want trace-me", got)
+	if got := userClient.currentUserRequest.GetContext().GetTraceId(); got == "trace-me" {
+		t.Fatalf("client supplied trace id was trusted: %q", got)
 	}
 	if got := userClient.currentUserRequest.GetContext().GetRoles(); len(got) != 2 || got[0] != "user" || got[1] != "admin" {
 		t.Fatalf("roles = %#v, want user/admin", got)

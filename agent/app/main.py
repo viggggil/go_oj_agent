@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel
 
 from app.api.chat import ChatController
@@ -27,7 +28,9 @@ from app.core.settings import ConfigurationError, Settings, load_settings
 from app.evals.api import router as eval_router
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
+from app.langsmith_exporter import new_exporter
 from app.memory.worker import ConversationMemoryWorker
+from app.observability import configure as configure_observability
 from app.storage.configuration import ConfigurationStore
 from app.storage.credentials import CredentialStore
 from app.storage.repository import AgentStore
@@ -49,11 +52,19 @@ def create_app(
     run_service_factory: Callable[[Settings, ReadinessProbe], RunService] | None = None,
 ) -> FastAPI:
     config = settings if settings is not None else load_settings()
+    shutdown_observability = configure_observability("agent-service", config.environment)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         database = probe_factory(config)
         controller: ChatController | None = None
+        langsmith_exporter = new_exporter(
+            config.langsmith_export_enabled,
+            config.langsmith_api_key.get_secret_value() if config.langsmith_api_key else None,
+            config.environment,
+        )
+        if langsmith_exporter is not None:
+            langsmith_exporter.start()
         business_clients = None
         business_tools = None
         model_client = None
@@ -168,6 +179,7 @@ def create_app(
                         runtime,
                         config_reader,
                         memory_trigger=memory_worker,
+                        langsmith_exporter=langsmith_exporter,
                     )
                 try:
                     async with asyncio.timeout(config.preflight_timeout_seconds):
@@ -224,6 +236,8 @@ def create_app(
                         if controller is not None:
                             async with asyncio.timeout(config.shutdown_timeout_seconds / 2):
                                 await controller.close()
+                        if langsmith_exporter is not None:
+                            await langsmith_exporter.close(config.shutdown_timeout_seconds / 2)
                         if eval_runner is not None:
                             await eval_runner.close()
                         if rag_clients is not None:
@@ -254,6 +268,7 @@ def create_app(
                     },
                 )
             finally:
+                shutdown_observability()
                 if hasattr(application.state, "resources"):
                     del application.state.resources
                 logger.info("Agent service stopped")
@@ -265,6 +280,8 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
     )
+    # OTel ASGI instrumentation does not capture request/response bodies.
+    FastAPIInstrumentor.instrument_app(application, excluded_urls="/health,/ready")
 
     @application.exception_handler(Exception)
     async def internal_error(_request: Request, exc: Exception) -> JSONResponse:
