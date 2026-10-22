@@ -8,6 +8,8 @@ from time import monotonic
 from typing import Any
 from uuid import uuid4
 
+from opentelemetry import trace
+
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader, DatabaseConfigReader
 from app.evals.models import EvalCase, EvalRunCreate
 from app.evals.reviewer import (
@@ -21,6 +23,7 @@ from app.graphs.service import RunService
 from app.models.configuration import ConfigError
 from app.models.provider import ModelSummary
 from app.models.runtime import ChatContext, ChatRequest, Principal
+from app.observability import traced_async
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +179,7 @@ class EvalRunner:
             context=ChatContext.model_validate(context),
         )
 
+    @traced_async("agent.eval.run")
     async def _run(
         self,
         run_id: str,
@@ -219,12 +223,16 @@ class EvalRunner:
                             },
                         )
                 await self.store.finish_run(run_id, "FAILED")
+                trace.get_current_span().set_attribute("job.status", "failed")
                 return
-            await self.store.finish_run(
-                run_id, "CANCELLED" if await self.store.cancel_requested(run_id) else "COMPLETED"
+            cancelled = await self.store.cancel_requested(run_id)
+            await self.store.finish_run(run_id, "CANCELLED" if cancelled else "COMPLETED")
+            trace.get_current_span().set_attribute(
+                "job.status", "cancelled" if cancelled else "completed"
             )
         except asyncio.CancelledError:
             await self.store.finish_run(run_id, "CANCELLED")
+            trace.get_current_span().set_attribute("job.status", "cancelled")
             raise
         except Exception as exc:
             logger.error(
@@ -235,10 +243,12 @@ class EvalRunner:
                 },
             )
             await self.store.finish_run(run_id, "FAILED")
+            trace.get_current_span().set_attribute("job.status", "failed")
         finally:
             self._tasks.pop(run_id, None)
             self._cancel_events.pop(run_id, None)
 
+    @traced_async("agent.eval.case.attempt")
     async def _run_case(
         self,
         run_id: str,
@@ -339,6 +349,11 @@ class EvalRunner:
             status = "FAILED"
             error_code = "AGENT_EVAL_CASE_FAILED"
         text = "\n\n".join(answer)
+        current_span = trace.get_current_span()
+        current_span.set_attribute("eval.attempt", attempt)
+        current_span.set_attribute("job.status", status.lower())
+        if error_code and error_code.isascii() and len(error_code) <= 64:
+            current_span.set_attribute("error.code", error_code)
         checks = self._grade(case, text, status, error_code, summary)
         result_id = str(uuid4())
         await self.store.add_result(
@@ -382,6 +397,7 @@ class EvalRunner:
                 cancel_event,
             )
 
+    @traced_async("agent.eval.review")
     async def _execute_model_review(
         self,
         result_id: str,
@@ -404,8 +420,10 @@ class EvalRunner:
                 review = await self._call_reviewer(
                     case, answer, checks, summary, reviewer_snapshot, principal, cancel_event
                 )
+            trace.get_current_span().set_attribute("review.status", "completed")
         except asyncio.CancelledError:
             error_code = "AGENT_EVAL_REVIEW_UNAVAILABLE"
+            trace.get_current_span().set_attribute("review.status", "cancelled")
             raise
         except Exception as exc:
             error_code = (
@@ -422,6 +440,8 @@ class EvalRunner:
                     "error_type": type(exc).__name__,
                 },
             )
+            trace.get_current_span().set_attribute("review.status", "failed")
+            trace.get_current_span().set_attribute("error.code", error_code)
         finally:
             finish = asyncio.create_task(
                 self.store.finish_model_review(result_id, attempt, review, error_code)

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from app.memory.generator import IncrementalSummaryGenerator, SummaryGenerator
 from app.models.memory import ConversationSummary
+from app.observability import span
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
@@ -180,17 +181,30 @@ class ConversationMemoryWorker:
 
     async def _process_with_retry(self, job: MemoryJob) -> None:
         for attempt in range(self._max_retries):
-            try:
-                await self._process(job)
-                return
-            except Exception as exc:
-                if attempt + 1 >= self._max_retries:
-                    logger.warning(
-                        "Conversation memory update failed",
-                        extra={"error_type": type(exc).__name__},
-                    )
+            async with span(
+                "agent.memory.job", {"agent.purpose": "memory", "job.attempt": attempt + 1}
+            ) as item:
+                try:
+                    await self._process(job)
+                    item.set_attribute("job.status", "completed")
                     return
-                await asyncio.sleep(self._retry_delay * (2**attempt))
+                except asyncio.CancelledError:
+                    item.set_attribute("job.status", "cancelled")
+                    raise
+                except Exception as exc:
+                    item.set_attribute(
+                        "job.status", "retrying" if attempt + 1 < self._max_retries else "failed"
+                    )
+                    code = getattr(exc, "code", None)
+                    if isinstance(code, str) and code.isascii() and len(code) <= 64:
+                        item.set_attribute("error.code", code)
+                    if attempt + 1 >= self._max_retries:
+                        logger.warning(
+                            "Conversation memory update failed",
+                            extra={"error_type": type(exc).__name__},
+                        )
+                        return
+                    await asyncio.sleep(self._retry_delay * (2**attempt))
 
     async def _process(self, job: MemoryJob) -> None:
         while True:
