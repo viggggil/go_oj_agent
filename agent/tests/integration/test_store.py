@@ -62,16 +62,30 @@ async def engine() -> AsyncIterator[AsyncEngine]:
         await db.dispose()
 
 
-async def new_run(store: AgentStore, conversation_id: str | None = None) -> RunRecord:
+async def new_run(
+    store: AgentStore, conversation_id: str | None = None, trace_id: str | None = None
+) -> RunRecord:
     return await store.create_run_with_user_message(
         user_id=7,
         conversation_id=conversation_id,
         request_id="request",
+        trace_id=trace_id,
         content="介绍二分查找",
         config_source="demo_environment",
         config_snapshot={"version": "pr2-demo-v1"},
         deadline_at=utc_now() + timedelta(seconds=30),
     )
+
+
+async def test_run_trace_id_is_persisted_and_legacy_null_is_supported(
+    engine: AsyncEngine,
+) -> None:
+    store = AgentStore(engine)
+    linked = await new_run(store, trace_id="a" * 32)
+    legacy = await new_run(store)
+
+    assert (await store.get_run(7, linked.id)).trace_id == "a" * 32
+    assert (await store.get_run(7, legacy.id)).trace_id is None
 
 
 async def test_owner_isolation_and_latest_history_order(engine: AsyncEngine) -> None:
@@ -426,6 +440,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000011_add_run_trace_id", "down"),
+            ("000010_create_tool_descriptions", "down"),
             ("000009_create_conversation_summaries", "down"),
             ("000008_create_eval_model_reviews", "down"),
             ("000007_create_eval_reviews", "down"),
@@ -444,6 +460,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
             ("000007_create_eval_reviews", "up"),
             ("000008_create_eval_model_reviews", "up"),
             ("000009_create_conversation_summaries", "up"),
+            ("000010_create_tool_descriptions", "up"),
+            ("000011_add_run_trace_id", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):

@@ -13,6 +13,7 @@ from app.core.settings import Settings
 from app.models.configuration import AgentConfig, ConfigError
 from app.models.provider import KnowledgeSource
 from app.models.runtime import AgentState, Principal
+from app.observability import traced_async
 from app.rag.clients import RagClients
 from app.rag.store import KnowledgeStore
 from app.storage.configuration import ConfigurationStore
@@ -95,6 +96,7 @@ class KnowledgeRuntime:
             allowed.update(visible & safe)
         return [row for row in rows if row["problem_id"] is None or row["problem_id"] in allowed]
 
+    @traced_async("agent.rag.retrieve")
     async def retrieve(self, raw: BaseModel, context: ToolContext) -> RetrieveOutput:
         state = context.state
         if (

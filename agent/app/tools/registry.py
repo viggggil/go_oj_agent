@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.models.runtime import AgentState, Principal
+from app.observability import traced_async
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,7 @@ class ToolExecutor:
     def __init__(self, registry: ToolRegistry) -> None:
         self._registry = registry
 
+    @traced_async("agent.tool")
     async def execute(
         self, name: str, arguments: Mapping[str, Any], context: ToolContext
     ) -> ToolResult:

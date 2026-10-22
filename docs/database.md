@@ -549,6 +549,7 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 | `conversation_id` | CHAR(36) | FK within `oj_agent`，ON DELETE RESTRICT |
 | `user_id` | BIGINT | 逻辑 owner，无跨服务 FK |
 | `request_id` | VARCHAR(128) | 关联请求，不作为幂等键 |
+| `trace_id` | CHAR(32) ASCII | Nullable OTel Trace ID；历史 Run 或无有效上下文时为 NULL |
 | `config_source` | VARCHAR(64) | 当前 `demo_environment` |
 | `config_snapshot` | JSON | 版本、Runtime、预算、allowlist，不保存凭据 |
 | `status` | VARCHAR(32) | RUNNING / COMPLETED / FAILED / CANCELLED / INTERRUPTED |
@@ -558,6 +559,8 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 | `active_conversation_id` | CHAR(36) | 存储生成列：仅 RUNNING 时为 conversation_id |
 
 索引包含 `(conversation_id,started_at,id)`、`(user_id,started_at,id)` 和 `(status,deadline_at)`。
+`000011_add_run_trace_id` 新增 `(trace_id,started_at,id)`，供运维按 Trace 关联 Run；
+该索引不改变用户侧列表排序与权限边界。
 `UNIQUE(active_conversation_id)` 利用多个 NULL 可共存，强制同会话最多一个 RUNNING。
 MySQL 不允许这里的生成列基础字段外键使用级联删除，所以 Run → Conversation 使用
 RESTRICT；未来物理清理需按 messages、runs、conversations 顺序，不跨 Schema 删除。

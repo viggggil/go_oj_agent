@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from app.core.runtime_config import ConfigSnapshot, ConfigSnapshotReader
 from app.graphs.context import ContextAssembler
@@ -23,6 +24,7 @@ from app.models.runtime import (
     RunStatus,
     StreamEvent,
 )
+from app.observability import span
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
@@ -57,6 +59,7 @@ class RuntimeStore(Protocol):
         user_id: int,
         conversation_id: str | UUID | None,
         request_id: str,
+        trace_id: str | None = None,
         content: str,
         config_source: str,
         config_snapshot: dict[str, Any],
@@ -196,6 +199,7 @@ class RunService:
             user_id=principal.user_id,
             conversation_id=request.conversation_id,
             request_id=principal.request_id,
+            trace_id=trace_id,
             content=request.message,
             config_source=snapshot.source,
             config_snapshot=snapshot.model_dump(mode="json"),
@@ -236,7 +240,36 @@ class RunService:
             await self._terminate(state, "FAILED", "AGENT_HISTORY_UNAVAILABLE")
             raise
         tracker = _ExportTracker()
-        return AcceptedRun(state, self._events(state, trace_id, tracker), self, trace_id, tracker)
+        return AcceptedRun(
+            state, self._traced_events(state, trace_id, tracker), self, trace_id, tracker
+        )
+
+    async def _traced_events(
+        self, state: AgentState, trace_id: str | None, tracker: _ExportTracker
+    ) -> AsyncIterator[StreamEvent]:
+        attributes: dict[str, str] = {"agent.purpose": "chat", "run.id": str(state.run_id)}
+        async with span("agent.run", attributes) as run_span:
+            iterator = self._events(state, trace_id, tracker)
+            try:
+                async for event in iterator:
+                    if event.type == "done":
+                        run_span.set_attribute("run.status", "completed")
+                    elif event.type == "error":
+                        run_span.set_attribute("run.status", "failed")
+                        code = event.data.get("code")
+                        if isinstance(code, str) and code.isascii() and len(code) <= 64:
+                            run_span.set_attribute("error.code", code)
+                        run_span.set_status(Status(StatusCode.ERROR))
+                    yield event
+            except (asyncio.CancelledError, GeneratorExit):
+                run_span.set_attribute("run.status", "cancelled")
+                close = getattr(iterator, "aclose", None)
+                if close is not None:
+                    await close()
+                raise
+            except Exception:
+                run_span.set_attribute("run.status", "failed")
+                raise
 
     async def _events(
         self, state: AgentState, trace_id: str | None, tracker: _ExportTracker
@@ -331,7 +364,7 @@ class RunService:
             # 注入的 Runtime 即使误用内部异常类，也不能输出任意错误文本。
             logger.warning(
                 "Agent runtime failed",
-                extra={"error_type": type(exc).__name__},
+                extra={"error_type": type(exc).__name__, "error_code": getattr(exc, "code", None)},
             )
             code = (
                 exc.code
