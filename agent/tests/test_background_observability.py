@@ -2,6 +2,7 @@
 
 import asyncio
 
+import pytest
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -9,7 +10,9 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from app import observability
 
 
-async def test_background_jobs_are_detached_roots_and_keep_context_isolated(monkeypatch) -> None:
+async def test_background_jobs_are_detached_roots_and_keep_context_isolated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
