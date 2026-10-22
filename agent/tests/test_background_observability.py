@@ -30,6 +30,8 @@ async def test_background_jobs_are_detached_roots_and_keep_context_isolated(
 
     async with observability.span("http.request"):
         await asyncio.gather(job("memory"), job("eval"))
+        async with observability.job_span("agent.eval.case", "eval"):
+            observability.job_status("failed", "AGENT_MODEL_QUOTA")
 
     spans = exporter.get_finished_spans()
     roots = [item for item in spans if item.name == "agent.test.job"]
@@ -47,5 +49,9 @@ async def test_background_jobs_are_detached_roots_and_keep_context_isolated(
         assert item.attributes is not None
         purposes.add(item.attributes["agent.purpose"])
     assert purposes == {"memory", "eval"}
+    failed = next(item for item in spans if item.name == "agent.eval.case")
+    assert failed.attributes is not None
+    assert failed.attributes["error.code"] == "AGENT_MODEL_QUOTA"
+    assert failed.status.status_code.name == "ERROR"
     assert all("secret-marker" not in repr(item.attributes) for item in spans)
     provider.shutdown()
