@@ -127,7 +127,7 @@ Relay 从持久化上下文创建 publish Span，注入 AMQP Header；Worker、J
 
 ### 5.3 LangSmith 元数据模式
 
-保留现有图自动追踪关闭的保护。首期由专门适配器显式构造安全 Run 树，而不是给持有完整 AgentState 的函数直接加装饰器。根 Run 对应业务 Run，子 Run 对应每个模型 attempt、工具和检索阶段。
+保留现有图自动追踪关闭的保护。由专门适配器显式构造安全 Run 树，而不是给持有完整 AgentState 的函数直接加装饰器。根 Run 对应业务 Run，子 Run 对应每个模型 attempt、工具和检索阶段。实现应使用独立有界队列异步发送，配置 `AGENT_LANGSMITH_EXPORT_ENABLED` 默认关闭；云端请求失败不能改变业务终态。
 
 允许上传的字段：随机 Run 标识、本地 otel_trace_id、环境、部署版本、配置版本 UUID、受控模型/工具名称、起止时间、Token 及 usage_source、枚举状态与稳定错误码。首期不上传用户 ID、会话标题、知识文档标题、完整配置快照和自由文本；确有后续会话分析需求时再设计随机关联标识。
 

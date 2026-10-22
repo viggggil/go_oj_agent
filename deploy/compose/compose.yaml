@@ -436,6 +436,8 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["exec python /bootstrap/agent-dev-init.py --serve"]
     environment:
+      AGENT_LANGSMITH_EXPORT_ENABLED: "${AGENT_LANGSMITH_EXPORT_ENABLED:-false}"
+      AGENT_LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       AGENT_RAG_ENABLED: "true"
       AGENT_RAG_EMBEDDING_URL: http://embedding:8001
