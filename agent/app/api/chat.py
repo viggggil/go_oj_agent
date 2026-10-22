@@ -1,6 +1,7 @@
 """可信 Chat 入口与有界 SSE；响应结束时关闭 AcceptedRun。"""
 
 import asyncio
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -15,6 +16,7 @@ from app.core.settings import Settings
 from app.graphs.service import AcceptedRun, RunService
 from app.models.configuration import ConfigError
 from app.models.runtime import ChatRequest, StreamEvent
+from app.observability import run_finished, run_first_event, run_started
 from app.storage.repository import (
     ActiveRunConflict,
     ConversationAgentConflict,
@@ -87,8 +89,13 @@ class ChatStreamResponse(Response):
         self.accepted = accepted
         self.lease = lease
         self.settings = settings
+        self.started_at = time.monotonic()
+        self.terminal_status: str | None = None
+        self.first_event_recorded = False
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        run_started()
+
         async def disconnect() -> None:
             while (await receive())["type"] != "http.disconnect":
                 pass
@@ -123,6 +130,11 @@ class ChatStreamResponse(Response):
             except asyncio.CancelledError:
                 # cleanup 有独立预算，外层再次取消也不能跳过 Run 回收。
                 await asyncio.shield(closing)
+            finally:
+                status = self.terminal_status
+                if status is None:
+                    status = "cancelled" if disconnected.done() else "failed"
+                run_finished(status, time.monotonic() - self.started_at)
 
     async def _stream(self, send: Send) -> None:
         next_event: asyncio.Future[StreamEvent] | None = None
@@ -140,8 +152,12 @@ class ChatStreamResponse(Response):
                     if not completed:
                         await self._send(send, b": heartbeat\n\n")
                 event = await next_event
+                if event.type == "token" and not self.first_event_recorded:
+                    run_first_event(time.monotonic() - self.started_at)
+                    self.first_event_recorded = True
                 await self._send(send, encode_event(event))
                 if event.type in {"done", "error"}:
+                    self.terminal_status = "completed" if event.type == "done" else "failed"
                     await asyncio.wait_for(
                         send({"type": "http.response.body", "body": b"", "more_body": False}),
                         self.settings.sse_write_timeout_seconds,
