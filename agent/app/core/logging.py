@@ -1,6 +1,7 @@
 """基础 JSON 日志；请求内容和驱动异常文本不进入日志。"""
 
 import logging
+import os
 from datetime import UTC, datetime
 from logging.config import dictConfig
 from typing import Any
@@ -15,6 +16,8 @@ class JSONFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
+            "service": "agent-service",
+            "environment": os.getenv("AGENT_ENVIRONMENT", "development"),
         }
         try:
             from opentelemetry import trace

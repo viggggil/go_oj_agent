@@ -28,3 +28,5 @@ def test_formatter_redacts_exception_and_unlisted_extras() -> None:
     assert "private-error-password" not in output
     assert "private-key" not in output
     assert "timestamp" in data
+    assert data["service"] == "agent-service"
+    assert data["environment"]
