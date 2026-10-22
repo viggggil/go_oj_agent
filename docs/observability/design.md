@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：阶段一和 Issue #189 的 Agent 本地追踪已实现。管理员查询 UI、Judge/MQ 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
+状态：阶段一、Issue #189 的 Agent Chat 本地追踪和 Issue #191 的 Agent 后台任务本地追踪已实现。管理员查询 UI、Judge/MQ 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 
@@ -193,9 +193,9 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 | PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文。Issue #188 完成云导出基础；Issue #189 完成本地 Run Trace 与业务 Span |
 | PR3 管理员最小页面 | Gateway 固定指标查询；Agent Run 列表/安全详情与索引；Vue 概览和运行 Tab | 管理员从异常指标进入 Run 详情并跳到排障页；普通用户与仅 Agent 管理员的越界请求被拒绝；失联显示 unknown |
 | PR4 Judge/Contest 异步链路 | Outbox trace context migration；AMQP 传播；队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |
-| PR5 运行保障与扩展 | RAG/Eval/Memory worker 与基础设施指标；阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |
+| PR5 运行保障与扩展 | RAG/Eval/Memory worker 指标；基础设施指标、阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |
 
-首个可交付里程碑为 PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。PR4 后形成完整 OJ 与 Agent 监控。PR5 的主机/容器 exporters 按实际部署条件选择，不一次引入所有 exporter。
+首个可交付里程碑为 PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。PR4 后形成完整 OJ 与 Agent 监控。Agent Chat Span 已在 Issue #189 实现；Memory、Eval/Review、RAG ingestion 的独立本地任务 Span 已在 Issue #191 实现。异步父子因果传播、worker 指标和 PR5 主机/容器 exporters 仍为后续工作。
 
 ## 9. 变更面与文档
 

@@ -24,7 +24,7 @@ from app.models.runtime import (
     RunStatus,
     StreamEvent,
 )
-from app.observability import span
+from app.observability import current_purpose, span
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
@@ -247,7 +247,10 @@ class RunService:
     async def _traced_events(
         self, state: AgentState, trace_id: str | None, tracker: _ExportTracker
     ) -> AsyncIterator[StreamEvent]:
-        attributes: dict[str, str] = {"agent.purpose": "chat", "run.id": str(state.run_id)}
+        attributes: dict[str, str] = {
+            "agent.purpose": current_purpose(),
+            "run.id": str(state.run_id),
+        }
         async with span("agent.run", attributes) as run_span:
             iterator = self._events(state, trace_id, tracker)
             try:

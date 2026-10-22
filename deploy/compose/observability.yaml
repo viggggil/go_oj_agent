@@ -6,6 +6,9 @@ services:
   agent-service:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+  rag-worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.123.0
     command: ["--config=/etc/otelcol/config.yaml"]
