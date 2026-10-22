@@ -232,3 +232,21 @@ PR1 未提供管理页面和聊天检索工具，分别由后续 PR2 / PR3 完�
 先部署新增 Contest CheckKnowledgeAccess RPC 和 Problem/Contest 的 Agent 调用白名单，再部署 Agent。现有容器不会因绑定挂载配置文件内容改变自动重启，更新 configs/problem.yaml、configs/contest.yaml 后执行 `docker compose -f deploy/compose/compose.yaml restart problem-service contest-service` 加载白名单。干净启动由 make infra-up 完成。Agent 地址为 AGENT_CONTEST_SERVICE_ENDPOINT=contest-service:9005；不授予 Agent 其他 Contest RPC，不向公网增加授权入口。旧业务服务未升级时检索失败关闭，不能以普通管理搜索绕过。
 
 管理员启用题解文档并在 Agent 表单绑定“题解”组后，可以正常聊天，由模型按需检索；RAG 页支持按 Run 查询来源版本。未关联题号的资料按分组授权使用，题解应填写真实题号，以便执行比赛与题目检查。现有 Agent/Contest 数据库迁移须按原说明先应用，PR3 没有新表/列。
+# 本地 Observability（阶段一）
+
+可选启动本地 OpenTelemetry Collector、Tempo、Prometheus 与 Grafana：
+
+```bash
+make observability-up
+make observability-check
+```
+
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Gateway 和 Agent 设置 OTLP endpoint；没有 overlay 时应用保持 no-op。
+
+测试 Agent Trace 时，可在 `.env` 设置 `AGENT_RUNTIME_MODE=langgraph_fake`，再调用现有 Gateway Chat API。Trace/Metric 不记录请求响应正文；Agent 的 LangSmith tracing 仍保持关闭。Collector/Tempo/Prometheus/Grafana 本地卷会保留数据，使用 `make observability-down` 停止栈，不会删除业务数据卷。
+
+```bash
+make observability-down
+```
+
+本栈端口仅绑定 loopback。OTLP gRPC/HTTP 与 Collector metrics endpoint 只在 Compose 网络内部开放。
