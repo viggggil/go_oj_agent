@@ -8,11 +8,10 @@ from uuid import UUID
 
 from app.memory.generator import IncrementalSummaryGenerator, SummaryGenerator
 from app.models.memory import ConversationSummary
-from app.observability import span
+from app.observability import job_span, job_status, traced_job
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
-    SummaryVersionConflict,
 )
 
 logger = logging.getLogger(__name__)
@@ -179,32 +178,26 @@ class ConversationMemoryWorker:
             user_id, conversation_id = self._overflow.pop()
             self._queue.put_nowait(MemoryJob(user_id, conversation_id))
 
+    @traced_job("agent.memory.job", "memory", root=True)
     async def _process_with_retry(self, job: MemoryJob) -> None:
         for attempt in range(self._max_retries):
-            async with span(
-                "agent.memory.job", {"agent.purpose": "memory", "job.attempt": attempt + 1}
-            ) as item:
-                try:
+            try:
+                async with job_span(
+                    "agent.memory.attempt", "memory", attributes={"job.attempt": attempt + 1}
+                ):
                     await self._process(job)
-                    item.set_attribute("job.status", "completed")
-                    return
-                except asyncio.CancelledError:
-                    item.set_attribute("job.status", "cancelled")
-                    raise
-                except Exception as exc:
-                    item.set_attribute(
-                        "job.status", "retrying" if attempt + 1 < self._max_retries else "failed"
+                    job_status("completed")
+                job_status("completed")
+                return
+            except Exception as exc:
+                if attempt + 1 >= self._max_retries:
+                    job_status("failed", getattr(exc, "code", None))
+                    logger.warning(
+                        "Conversation memory update failed",
+                        extra={"error_type": type(exc).__name__},
                     )
-                    code = getattr(exc, "code", None)
-                    if isinstance(code, str) and code.isascii() and len(code) <= 64:
-                        item.set_attribute("error.code", code)
-                    if attempt + 1 >= self._max_retries:
-                        logger.warning(
-                            "Conversation memory update failed",
-                            extra={"error_type": type(exc).__name__},
-                        )
-                        return
-                    await asyncio.sleep(self._retry_delay * (2**attempt))
+                    return
+                await asyncio.sleep(self._retry_delay * (2**attempt))
 
     async def _process(self, job: MemoryJob) -> None:
         while True:
@@ -220,12 +213,11 @@ class ConversationMemoryWorker:
             if not archive:
                 return
             batch = archive[: self._batch_size]
-            summary = await self._generator.generate(
-                record.summary if record else None,
-                batch,
-                {},
-            )
-            try:
+            async with job_span("agent.memory.generate", "memory"):
+                summary = await self._generator.generate(
+                    record.summary if record else None, batch, {}
+                )
+            async with job_span("agent.memory.persist", "memory"):
                 await self._store.save_conversation_summary(
                     user_id=job.user_id,
                     conversation_id=job.conversation_id,
@@ -233,5 +225,3 @@ class ConversationMemoryWorker:
                     covered_until_message_id=batch[-1].assistant_message_id,
                     expected_version=record.version if record else None,
                 )
-            except SummaryVersionConflict:
-                raise

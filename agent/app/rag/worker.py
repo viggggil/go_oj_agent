@@ -9,7 +9,7 @@ from typing import Any
 from app.core.database import DatabaseProbe
 from app.core.settings import load_settings
 from app.models.configuration import ConfigError
-from app.observability import span
+from app.observability import configure, job_span, job_status
 from app.rag.clients import RagClients
 from app.rag.models import REVISION, SPLITTER
 from app.rag.store import KnowledgeStore
@@ -22,7 +22,7 @@ async def process_one(store: KnowledgeStore, clients: RagClients) -> bool:
     if value is None:
         return False
 
-    async with span("agent.rag.ingest", {"agent.purpose": "rag_ingestion"}) as ingest_span:
+    async with job_span("agent.rag.ingest", "rag_ingestion", root=True) as ingest_span:
         return await _process_claimed(store, clients, value, ingest_span)
 
 
@@ -43,41 +43,41 @@ async def _process_claimed(
         async with asyncio.timeout(240):
             if value["model_revision"] != REVISION or value["splitter_version"] != SPLITTER:
                 raise ConfigError("AGENT_RAG_INDEX_VERSION_INVALID", 503)
-            async with span("agent.rag.ingest.fetch"):
+            async with job_span("agent.rag.ingest.fetch", "rag_ingestion"):
                 content = await clients.get(value["object_key"])
             if hashlib.sha256(content.encode()).hexdigest() != value["content_hash"]:
                 raise ConfigError("AGENT_RAG_OBJECT_INVALID", 503)
-            async with span("agent.rag.ingest.split"):
+            async with job_span("agent.rag.ingest.split", "rag_ingestion"):
                 chunks = await clients.split(content)
             ingest_span.set_attribute("rag.chunk_count", len(chunks))
             await clients.ensure_collection()
             for offset in range(0, len(chunks), 8):
                 if not await store.heartbeat(value["id"], value["lease_token"]):
-                    ingest_span.set_attribute("job.status", "lease_lost")
+                    job_status("lease_lost")
                     return True
-                async with span("agent.rag.ingest.embed_upsert"):
+                async with job_span("agent.rag.ingest.embed_upsert", "rag_ingestion"):
                     await clients.upsert(value, chunks[offset : offset + 8])
             count = len(chunks)
     except asyncio.CancelledError:
-        ingest_span.set_attribute("job.status", "cancelled")
+        job_status("cancelled")
         raise  # 进程停止保留租约，重启后过期重领。
     except Exception as exc:
         error = exc.code if isinstance(exc, ConfigError) else "AGENT_RAG_INDEX_FAILED"
-        ingest_span.set_attribute("job.status", "failed")
-        ingest_span.set_attribute("error.code", error)
+        job_status("failed", error)
         logger.warning("Knowledge index failed", extra={"error_code": error})
     finally:
         heartbeat_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
-    await store.finish(value, count, error)
-    if error is None:
-        ingest_span.set_attribute("job.status", "completed")
+    async with job_span("agent.rag.ingest.persist", "rag_ingestion"):
+        published = await store.finish(value, count, error)
+    job_status("lease_lost" if not published else ("failed" if error else "completed"), error)
     return True
 
 
 async def main() -> None:
     settings = load_settings()
+    shutdown = configure("agent-rag-worker", settings.environment)
     database = DatabaseProbe(settings)
     assert database.engine is not None
     store, clients = KnowledgeStore(database.engine), RagClients(settings)
@@ -93,8 +93,11 @@ async def main() -> None:
             if not worked:
                 await asyncio.sleep(2)
     finally:
-        await clients.close()
-        await database.close()
+        try:
+            await clients.close()
+            await database.close()
+        finally:
+            shutdown()
 
 
 if __name__ == "__main__":

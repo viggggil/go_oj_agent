@@ -5,10 +5,12 @@ import logging
 import os
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
 from opentelemetry import metrics, propagate, trace
+from opentelemetry.context import Context, attach, detach
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
@@ -24,6 +26,119 @@ logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer("oj.agent")
 P = ParamSpec("P")
 T = TypeVar("T")
+_purpose: ContextVar[str] = ContextVar("agent_trace_purpose", default="chat")
+_JOB_PURPOSES = frozenset({"memory", "eval", "review", "rag_ingestion"})
+_JOB_ATTRIBUTE_KEYS = frozenset({"job.attempt", "eval.attempt", "rag.chunk_count"})
+_JOB_STATUSES = frozenset({"completed", "failed", "retrying", "cancelled", "lease_lost"})
+_JOB_ERRORS = frozenset(
+    {
+        "AGENT_CANCELLED",
+        "AGENT_DEADLINE_EXCEEDED",
+        "AGENT_EVAL_CASE_FAILED",
+        "AGENT_EVAL_CASE_INVALID",
+        "AGENT_EVAL_PRINCIPAL_INVALID",
+        "AGENT_EVAL_REVIEW_INVALID",
+        "AGENT_EVAL_REVIEW_INPUT_INVALID",
+        "AGENT_EVAL_REVIEW_UNAVAILABLE",
+        "AGENT_RAG_INDEX_VERSION_INVALID",
+        "AGENT_RAG_OBJECT_INVALID",
+        "AGENT_RAG_INDEX_FAILED",
+        "AGENT_RAG_DEPENDENCY_UNAVAILABLE",
+        "AGENT_MODEL_TIMEOUT",
+        "AGENT_MODEL_UNAVAILABLE",
+        "AGENT_MODEL_RATE_LIMIT",
+        "AGENT_MODEL_REJECTED",
+        "AGENT_MODEL_AUTH_FAILED",
+        "AGENT_MODEL_INVALID_RESPONSE",
+        "AGENT_MODEL_OUTPUT_LIMIT",
+        "AGENT_MODEL_INPUT_LIMIT",
+        "AGENT_MODEL_CALL_LIMIT",
+        "AGENT_CREDENTIAL_UNAVAILABLE",
+        "AGENT_RUN_FAILED",
+        "AGENT_HISTORY_UNAVAILABLE",
+    }
+)
+
+
+def current_purpose() -> str:
+    return _purpose.get()
+
+
+def job_status(status: str, error_code: object = None) -> None:
+    """后台任务只记录受控状态与错误码，调用方不得传入异常正文。"""
+    safe_status = status if status in _JOB_STATUSES else "failed"
+    current = trace.get_current_span()
+    current.set_attribute("job.status", safe_status)
+    if safe_status in {"failed", "retrying"}:
+        current.set_status(Status(StatusCode.ERROR))
+        current.set_attribute(
+            "error.code",
+            error_code
+            if isinstance(error_code, str) and error_code in _JOB_ERRORS
+            else "AGENT_BACKGROUND_FAILED",
+        )
+
+
+@asynccontextmanager
+async def detached_context() -> AsyncIterator[None]:
+    """手动重评脱离发起请求；内部真实 Review Span 自行成为根节点。"""
+    token = attach(Context())
+    try:
+        yield
+    finally:
+        detach(token)
+
+
+@asynccontextmanager
+async def job_span(
+    name: str,
+    purpose: str,
+    *,
+    root: bool = False,
+    attributes: Mapping[str, str | int | bool] | None = None,
+) -> AsyncIterator[Span]:
+    safe_purpose = purpose if purpose in _JOB_PURPOSES else "other"
+    safe_attributes = {
+        key: value
+        for key, value in (attributes or {}).items()
+        if key in _JOB_ATTRIBUTE_KEYS and isinstance(value, int) and 0 <= value <= 1_000_000
+    }
+    token = _purpose.set(safe_purpose)
+    try:
+        async with span(
+            name,
+            {"agent.purpose": safe_purpose, **safe_attributes},
+            root=root,
+            safe_errors=True,
+        ) as item:
+            try:
+                yield item
+            except asyncio.CancelledError:
+                job_status("cancelled")
+                raise
+            except Exception as exc:
+                job_status("failed", getattr(exc, "code", None))
+                raise
+    finally:
+        _purpose.reset(token)
+
+
+def traced_job(
+    name: str, purpose: str, *, root: bool = False
+) -> Callable[[Callable[P, Coroutine[Any, Any, T]]], Callable[P, Coroutine[Any, Any, T]]]:
+    def decorate(
+        function: Callable[P, Coroutine[Any, Any, T]],
+    ) -> Callable[P, Coroutine[Any, Any, T]]:
+        @wraps(function)
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            async with job_span(name, purpose, root=root):
+                return await function(*args, **kwargs)
+
+        return wrapped
+
+    return decorate
+
+
 _meter = metrics.get_meter("oj.agent")
 _runs_started = _meter.create_counter("agent.run.started", description="Accepted Agent Runs")
 _runs_terminal = _meter.create_counter("agent.run.terminal", description="Terminal Agent Runs")
@@ -36,12 +151,17 @@ _first_event = _meter.create_histogram("agent.run.first_event.duration", unit="s
 
 @asynccontextmanager
 async def span(
-    name: str, attributes: Mapping[str, str | int | bool] | None = None
+    name: str,
+    attributes: Mapping[str, str | int | bool] | None = None,
+    *,
+    root: bool = False,
+    safe_errors: bool = False,
 ) -> AsyncIterator[Span]:
     """Create a low-cardinality business span without recording exception text."""
     with _tracer.start_as_current_span(
         name,
         kind=SpanKind.INTERNAL,
+        context=Context() if root else None,
         attributes=attributes,
         record_exception=False,
         set_status_on_exception=False,
@@ -55,6 +175,12 @@ async def span(
             raise
         except Exception as exc:
             code = getattr(exc, "code", None)
+            if safe_errors or current_purpose() != "chat":
+                code = (
+                    code
+                    if isinstance(code, str) and code in _JOB_ERRORS
+                    else "AGENT_BACKGROUND_FAILED"
+                )
             if isinstance(code, str) and code.isascii() and len(code) <= 64:
                 item.set_attribute("error.code", code)
             item.set_status(Status(StatusCode.ERROR))

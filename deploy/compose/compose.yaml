@@ -529,6 +529,7 @@ services:
       dockerfile: Dockerfile
     entrypoint: ["python", "-m", "app.rag.worker"]
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_RAG_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       AGENT_RAG_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}

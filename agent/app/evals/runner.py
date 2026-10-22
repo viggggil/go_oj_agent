@@ -23,7 +23,7 @@ from app.graphs.service import RunService
 from app.models.configuration import ConfigError
 from app.models.provider import ModelSummary
 from app.models.runtime import ChatContext, ChatRequest, Principal
-from app.observability import traced_async
+from app.observability import detached_context, job_status, traced_job
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ class EvalRunner:
                     raise ConfigError("AGENT_EVAL_REVIEWER_INVALID", 409)
                 reviewer_snapshot = ConfigSnapshot.model_validate(snapshot_data)
                 validate_reviewer_snapshot(reviewer_snapshot)
-                coroutine = self._execute_model_review(
+                coroutine = self._retry_model_review_task(
                     result_id,
                     attempt,
                     EvalCase.model_validate(context["case"]),
@@ -179,7 +179,7 @@ class EvalRunner:
             context=ChatContext.model_validate(context),
         )
 
-    @traced_async("agent.eval.run")
+    @traced_job("agent.eval.run", "eval", root=True)
     async def _run(
         self,
         run_id: str,
@@ -188,6 +188,7 @@ class EvalRunner:
         principal: Principal,
         reviewer_snapshot: ConfigSnapshot | None,
     ) -> None:
+        trace.get_current_span().set_attribute("eval.run_id", run_id)
         try:
             await self.store.mark_running(run_id)
             cases = await self.store.cases_for_run(run_id)
@@ -223,16 +224,14 @@ class EvalRunner:
                             },
                         )
                 await self.store.finish_run(run_id, "FAILED")
-                trace.get_current_span().set_attribute("job.status", "failed")
+                job_status("failed")
                 return
             cancelled = await self.store.cancel_requested(run_id)
             await self.store.finish_run(run_id, "CANCELLED" if cancelled else "COMPLETED")
-            trace.get_current_span().set_attribute(
-                "job.status", "cancelled" if cancelled else "completed"
-            )
+            job_status("cancelled" if cancelled else "completed")
         except asyncio.CancelledError:
             await self.store.finish_run(run_id, "CANCELLED")
-            trace.get_current_span().set_attribute("job.status", "cancelled")
+            job_status("cancelled")
             raise
         except Exception as exc:
             logger.error(
@@ -243,12 +242,12 @@ class EvalRunner:
                 },
             )
             await self.store.finish_run(run_id, "FAILED")
-            trace.get_current_span().set_attribute("job.status", "failed")
+            job_status("failed")
         finally:
             self._tasks.pop(run_id, None)
             self._cancel_events.pop(run_id, None)
 
-    @traced_async("agent.eval.case.attempt")
+    @traced_job("agent.eval.case.attempt", "eval")
     async def _run_case(
         self,
         run_id: str,
@@ -259,6 +258,7 @@ class EvalRunner:
         cancel_event: asyncio.Event,
         reviewer_snapshot: ConfigSnapshot | None,
     ) -> None:
+        trace.get_current_span().set_attribute("eval.attempt", attempt)
         started = monotonic()
         answer: list[str] = []
         status = "COMPLETED"
@@ -349,11 +349,6 @@ class EvalRunner:
             status = "FAILED"
             error_code = "AGENT_EVAL_CASE_FAILED"
         text = "\n\n".join(answer)
-        current_span = trace.get_current_span()
-        current_span.set_attribute("eval.attempt", attempt)
-        current_span.set_attribute("job.status", status.lower())
-        if error_code and error_code.isascii() and len(error_code) <= 64:
-            current_span.set_attribute("error.code", error_code)
         checks = self._grade(case, text, status, error_code, summary)
         result_id = str(uuid4())
         await self.store.add_result(
@@ -378,6 +373,7 @@ class EvalRunner:
                 "finished_at": self.store.clock(),
             },
         )
+        job_status(status.lower(), error_code)
         if reviewer_snapshot is not None:
             if status != "COMPLETED" or checks.get("hard_fail"):
                 return
@@ -397,7 +393,11 @@ class EvalRunner:
                 cancel_event,
             )
 
-    @traced_async("agent.eval.review")
+    async def _retry_model_review_task(self, *args: Any) -> None:
+        async with detached_context():
+            await self._execute_model_review(*args)
+
+    @traced_job("agent.eval.review", "review")
     async def _execute_model_review(
         self,
         result_id: str,
@@ -410,6 +410,7 @@ class EvalRunner:
         principal: Principal,
         cancel_event: asyncio.Event | None = None,
     ) -> None:
+        trace.get_current_span().set_attribute("eval.attempt", attempt)
         review: dict[str, Any] | None = None
         error_code: str | None = None
         try:
@@ -420,10 +421,10 @@ class EvalRunner:
                 review = await self._call_reviewer(
                     case, answer, checks, summary, reviewer_snapshot, principal, cancel_event
                 )
-            trace.get_current_span().set_attribute("review.status", "completed")
+
         except asyncio.CancelledError:
             error_code = "AGENT_EVAL_REVIEW_UNAVAILABLE"
-            trace.get_current_span().set_attribute("review.status", "cancelled")
+            job_status("cancelled")
             raise
         except Exception as exc:
             error_code = (
@@ -440,13 +441,13 @@ class EvalRunner:
                     "error_type": type(exc).__name__,
                 },
             )
-            trace.get_current_span().set_attribute("review.status", "failed")
-            trace.get_current_span().set_attribute("error.code", error_code)
+            job_status("failed", error_code)
         finally:
             finish = asyncio.create_task(
                 self.store.finish_model_review(result_id, attempt, review, error_code)
             )
             await asyncio.shield(finish)
+        job_status("failed" if error_code else "completed", error_code)
 
     async def _call_reviewer(
         self,

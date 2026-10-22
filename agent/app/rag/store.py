@@ -536,7 +536,7 @@ class KnowledgeStore:
             )
             return result.rowcount == 1
 
-    async def finish(self, value: dict[str, Any], count: int, error: str | None) -> None:
+    async def finish(self, value: dict[str, Any], count: int, error: str | None) -> bool:
         # 和上传/启停保持相同锁顺序：document → task，避免死锁。
         async with self.engine.begin() as conn:
             doc = (
@@ -566,7 +566,7 @@ class KnowledgeStore:
                 .one()
             )
             if task["lease_token"] != value["lease_token"] or task["lease_until"] <= now():
-                return  # 失租 worker 不得发布或覆盖新 worker 结果。
+                return False  # 失租 worker 不得发布或覆盖新 worker 结果。
             state = "READY" if error is None else ("FAILED" if task["attempts"] >= 4 else "PENDING")
             await conn.execute(
                 update(tasks)
@@ -587,3 +587,4 @@ class KnowledgeStore:
                     .where(documents.c.id == value["document_id"])
                     .values(active_version=value["id"])
                 )
+        return True
