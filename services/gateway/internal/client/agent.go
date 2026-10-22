@@ -19,6 +19,7 @@ import (
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 	gatewaymw "github.com/viggggil/go_oj_agent/services/gateway/internal/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const AgentChatPath = "/api/v1/agent/chat"
@@ -131,7 +132,7 @@ func NewAgentClient(config *conf.Bootstrap) (*AgentClient, func(), error) {
 	result := &AgentClient{
 		baseURL:  strings.TrimSuffix(endpoint.String(), "/"),
 		endpoint: strings.TrimSuffix(endpoint.String(), "/") + AgentChatPath, signer: signer,
-		http:   &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
+		http:   &http.Client{Transport: otelhttp.NewTransport(transport), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 		limits: limits, slots: make(chan struct{}, limits.MaxConcurrent),
 	}
 	return result, transport.CloseIdleConnections, nil

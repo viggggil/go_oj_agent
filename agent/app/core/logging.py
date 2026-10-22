@@ -16,6 +16,15 @@ class JSONFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        try:
+            from opentelemetry import trace
+
+            span_context = trace.get_current_span().get_span_context()
+            if span_context.is_valid:
+                entry["trace_id"] = f"{span_context.trace_id:032x}"
+                entry["span_id"] = f"{span_context.span_id:016x}"
+        except ImportError:
+            pass
         for key in ("error_code", "error_type", "run_id", "request_id"):
             value = getattr(record, key, None)
             if isinstance(value, str):
