@@ -440,6 +440,7 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000013_add_run_status_started_index", "down"),
             ("000012_add_run_started_index", "down"),
             ("000011_add_run_trace_id", "down"),
             ("000010_create_tool_descriptions", "down"),
@@ -464,6 +465,7 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
             ("000010_create_tool_descriptions", "up"),
             ("000011_add_run_trace_id", "up"),
             ("000012_add_run_started_index", "up"),
+            ("000013_add_run_status_started_index", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):

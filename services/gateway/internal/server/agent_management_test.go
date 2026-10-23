@@ -411,3 +411,16 @@ func TestAgentHistorySanitizedToolTraceContract(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentObservabilityContractAllowsRunningRunAndOverview(t *testing.T) {
+	run := map[string]json.RawMessage{}
+	_ = json.Unmarshal([]byte(`{"run_id":"run","trace_id":null,"status":"RUNNING","purpose":"chat","started_at":"2026-10-23T00:00:00Z","finished_at":null,"duration_ms":null,"error_code":null,"tool_step_count":0,"knowledge_query_count":0,"tempo_url":null,"langsmith_url":null}`), &run)
+	if !validAgentJSONEnvelope("GET", "/api/v1/admin/agent/observability/runs/00000000-0000-0000-0000-000000000001", run) {
+		t.Fatal("running observability run rejected")
+	}
+	overview := map[string]json.RawMessage{}
+	_ = json.Unmarshal([]byte(`{"generated_at":"2026-10-23T00:00:00Z","window_minutes":60,"availability":"available","runs":{"RUNNING":1,"COMPLETED":2,"FAILED":0,"CANCELLED":0,"INTERRUPTED":0},"total":3}`), &overview)
+	if !validAgentJSONEnvelope("GET", "/api/v1/admin/agent/observability/overview", overview) {
+		t.Fatal("observability overview rejected")
+	}
+}

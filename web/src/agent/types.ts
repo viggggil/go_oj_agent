@@ -102,6 +102,15 @@ export interface AgentRun {
   error_code: string | null
   tool_step_count: number
   knowledge_query_count: number
+  tempo_url: string | null
+  langsmith_url: string | null
+}
+export interface AgentOverview {
+  generated_at: string
+  window_minutes: number
+  availability: 'available' | 'stale' | 'unavailable'
+  runs: Record<AgentRun['status'], number>
+  total: number
 }
 export interface Binding {
   id: string

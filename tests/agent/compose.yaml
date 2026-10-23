@@ -22,6 +22,7 @@ services:
       - ../../migrations/agent/000010_create_tool_descriptions.up.sql:/docker-entrypoint-initdb.d/510_create_tool_descriptions.sql:ro
       - ../../migrations/agent/000011_add_run_trace_id.up.sql:/docker-entrypoint-initdb.d/511_add_run_trace_id.sql:ro
       - ../../migrations/agent/000012_add_run_started_index.up.sql:/docker-entrypoint-initdb.d/512_add_run_started_index.sql:ro
+      - ../../migrations/agent/000013_add_run_status_started_index.up.sql:/docker-entrypoint-initdb.d/513_add_run_status_started_index.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -proot-password"]
       interval: 2s

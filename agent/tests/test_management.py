@@ -86,6 +86,14 @@ def test_observability_run_operation_is_read_only_and_uuid_bound() -> None:
             operation(method, target)
 
 
+def test_observability_overview_operation_is_read_only() -> None:
+    path = "/api/v1/admin/agent/observability/overview"
+    assert operation("GET", path) == "HTTP GET " + path
+    for method in ("POST", "PUT", "DELETE"):
+        with pytest.raises(ValueError):
+            operation(method, path)
+
+
 def test_tool_description_operation_is_admin_write_only() -> None:
     path = "/api/v1/admin/agent/tools/get_problem"
     assert operation("GET", "/api/v1/admin/agent/tools") == "HTTP GET /api/v1/admin/agent/tools"

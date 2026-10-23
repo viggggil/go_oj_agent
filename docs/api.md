@@ -594,9 +594,14 @@ GET /api/v1/admin/agent/observability/runs/{run_id}
 Agent 委托。列表按 `started_at DESC, run_id DESC` 稳定排序，`page_size` 最大为 100，
 状态可选 `RUNNING`、`COMPLETED`、`FAILED`、`CANCELLED`、`INTERRUPTED`。
 响应只包含 `run_id`、可空 `trace_id`、状态、时间、耗时、受控 `error_code`、工具步骤数和
-知识检索次数；不包含用户消息、Prompt、配置快照、工具参数/结果、RAG 文本、原始异常或凭据。
+知识检索次数，以及由服务端配置构造的可空 `tempo_url`/`langsmith_url`；不包含用户消息、Prompt、配置快照、工具参数/结果、RAG 文本、原始异常或凭据。
 无本地 Trace 的历史 Run 的 `trace_id` 为 `null`。普通用户、无权限用户和无效 Run ID 分别
 返回 403、403 和 404；服务或数据库不可用返回 503。
+
+### GET `/api/v1/admin/agent/observability/overview`
+
+返回最近 60 分钟 Agent Chat Run 的固定状态计数、生成时间和数据可用性。数据查询失败时
+返回 503；前端将超过 45 秒未更新的数据标为 stale，不把未知状态显示为零。
 
 外部请求先由 Gateway 的现有 Access Token middleware 认证。Gateway 从已认证的请求上下文
 签发短期 RS256 委托 JWT（固定 `iss=go-oj-gateway`、`aud=agent-service`、

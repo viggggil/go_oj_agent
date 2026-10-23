@@ -8,10 +8,21 @@
       <button class="button secondary" type="button" :disabled="loading" @click="load">刷新</button>
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="overviewError" class="error" role="status">运行概览：{{ overviewError }}</p>
+    <p v-if="overview" class="freshness" :class="freshnessState">
+      近 {{ overview.window_minutes }} 分钟 · 共 {{ overview.total }} 次运行 · 数据时间
+      {{ format(overview.generated_at) }} · {{ freshnessLabel }}
+    </p>
+    <div v-if="overview" class="eval-metrics">
+      <span>运行中 {{ overview.runs.RUNNING }}</span
+      ><span>成功 {{ overview.runs.COMPLETED }}</span> <span>失败 {{ overview.runs.FAILED }}</span
+      ><span>取消 {{ overview.runs.CANCELLED }}</span>
+      <span>中断 {{ overview.runs.INTERRUPTED }}</span>
+    </div>
     <div class="toolbar">
       <label
         >状态
-        <select v-model="status" @change="load">
+        <select v-model="status" @change="changeFilter">
           <option value="">全部</option>
           <option v-for="value in statuses" :key="value" :value="value">{{ value }}</option>
         </select></label
@@ -42,7 +53,14 @@
             <td>{{ format(run.started_at) }}</td>
             <td>{{ run.duration_ms == null ? '运行中' : run.duration_ms + ' ms' }}</td>
             <td>
-              <code v-if="run.trace_id">{{ run.trace_id }}</code
+              <a
+                v-if="run.tempo_url"
+                :href="run.tempo_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                >在 Tempo 查看</a
+              >
+              <code v-else-if="run.trace_id">{{ run.trace_id }}</code
               ><span v-else>无本地 Trace</span>
             </td>
             <td><button class="link" type="button" @click="select(run)">详情</button></td>
@@ -70,27 +88,88 @@
         <dt>结束时间</dt>
         <dd>{{ selected.finished_at ? format(selected.finished_at) : '运行中' }}</dd>
       </dl>
+      <p class="observability-links">
+        <a
+          v-if="selected.tempo_url"
+          :href="selected.tempo_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          >在 Tempo 中打开 Trace</a
+        >
+        <span v-else>Trace 不可用或没有本地 Trace</span>
+        <a
+          v-if="selected.langsmith_url"
+          :href="selected.langsmith_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          >在 LangSmith 中打开</a
+        >
+        <span v-else>LangSmith 导出未启用或链接尚未配置</span>
+      </p>
     </aside>
+    <nav v-if="total > pageSize" class="pagination" aria-label="运行记录分页">
+      <button class="button secondary" :disabled="page <= 1 || loading" @click="goPage(page - 1)">
+        上一页
+      </button>
+      <span>第 {{ page }} / {{ pageCount }} 页（{{ total }} 条）</span>
+      <button
+        class="button secondary"
+        :disabled="page >= pageCount || loading"
+        @click="goPage(page + 1)"
+      >
+        下一页
+      </button>
+    </nav>
   </section>
 </template>
 <script setup lang="ts">
-  import { onMounted, onUnmounted, ref } from 'vue'
+  import { computed, onMounted, onUnmounted, ref } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'
   import { agentApi, agentError } from '../agent/api'
-  import type { AgentRun } from '../agent/types'
+  import type { AgentOverview, AgentRun } from '../agent/types'
   const statuses = ['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'] as const
+  const route = useRoute(),
+    router = useRouter()
   const runs = ref<AgentRun[]>([]),
     selected = ref<AgentRun | null>(null),
+    overview = ref<AgentOverview>(),
     loading = ref(false),
     error = ref(''),
+    overviewError = ref(''),
+    page = ref(1),
+    total = ref(0),
+    pageSize = 20,
     status = ref<AgentRun['status'] | ''>('')
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+  const freshnessState = computed(() =>
+    overview.value && Date.now() - Date.parse(overview.value.generated_at) > 45_000
+      ? 'stale'
+      : 'fresh',
+  )
+  const freshnessLabel = computed(() =>
+    freshnessState.value === 'stale' ? '数据可能已过期' : '数据新鲜',
+  )
   async function load() {
+    if (loading.value) return
     loading.value = true
     error.value = ''
+    overviewError.value = ''
     try {
-      const response = await agentApi.runs(1, status.value || undefined)
-      runs.value = response.data.items
-    } catch (err) {
-      error.value = agentError(err)
+      const [runResult, overviewResult] = await Promise.allSettled([
+        agentApi.runs(page.value, status.value || undefined),
+        agentApi.overview(),
+      ])
+      if (runResult.status === 'fulfilled') {
+        runs.value = runResult.value.data.items
+        total.value = runResult.value.data.page.total
+      } else {
+        error.value = agentError(runResult.reason)
+      }
+      if (overviewResult.status === 'fulfilled') {
+        overview.value = overviewResult.value.data
+      } else {
+        overviewError.value = '未知；Agent 概览暂不可用'
+      }
     } finally {
       loading.value = false
     }
@@ -99,9 +178,18 @@
     selected.value = run
     try {
       selected.value = (await agentApi.run(run.run_id)).data
+      await router.replace({ query: { ...route.query, run_id: run.run_id } })
     } catch (err) {
       error.value = agentError(err)
     }
+  }
+  function changeFilter() {
+    page.value = 1
+    void load()
+  }
+  function goPage(value: number) {
+    page.value = value
+    void load()
   }
   function format(value: string) {
     return new Date(value).toLocaleString()
@@ -109,6 +197,16 @@
   let timer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
     void load()
+    const runId = typeof route.query.run_id === 'string' ? route.query.run_id : ''
+    if (runId)
+      void agentApi
+        .run(runId)
+        .then((response) => {
+          selected.value = response.data
+        })
+        .catch((err) => {
+          error.value = agentError(err)
+        })
     timer = setInterval(() => {
       if (document.visibilityState === 'visible') void load()
     }, 15000)

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     langsmith_export_enabled: bool = False
     langsmith_api_key: SecretStr | None = None
+    observability_grafana_url: str = "http://localhost:3000"
+    observability_langsmith_project_url: str | None = None
     readiness_timeout_seconds: float = Field(default=2, gt=0, le=30)
     shutdown_timeout_seconds: int = Field(default=10, ge=1, le=60)
     runtime_mode: Literal["disabled", "fake", "langgraph_fake", "model"] = "disabled"
@@ -134,6 +136,23 @@ class Settings(BaseSettings):
         if url.port is not None and not 1 <= url.port <= 65535:
             raise ValueError("Database port is out of range")
         return value
+
+    @field_validator("observability_grafana_url", "observability_langsmith_project_url")
+    @classmethod
+    def validate_observability_url(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return value
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("Invalid observability destination")
+        return value.rstrip("/")
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":

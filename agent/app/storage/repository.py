@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
@@ -801,6 +801,33 @@ class AgentStore:
         if row is None:
             raise RunNotFound("Run not found")
         return self._safe_run(dict(row))
+
+    async def get_admin_run_overview(self) -> dict[str, Any]:
+        now = self._clock()
+        since = now - timedelta(minutes=60)
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    select(agent_runs.c.status, func.count().label("count"))
+                    .select_from(agent_runs.join(agent_conversations))
+                    .where(
+                        agent_conversations.c.purpose == "chat",
+                        agent_runs.c.started_at >= since,
+                    )
+                    .group_by(agent_runs.c.status)
+                )
+            ).all()
+        counts = {status: int(count) for status, count in rows}
+        return {
+            "generated_at": now,
+            "window_minutes": 60,
+            "availability": "available",
+            "runs": {
+                status: counts.get(status, 0)
+                for status in ("RUNNING", "COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED")
+            },
+            "total": sum(counts.values()),
+        }
 
     @staticmethod
     def _safe_run(row: dict[str, Any]) -> dict[str, Any]:
