@@ -104,6 +104,7 @@ export interface AgentRun {
   knowledge_query_count: number
   tempo_url: string | null
   langsmith_url: string | null
+  langsmith_export_status: 'PENDING' | 'EXPORTED' | 'FAILED' | null
 }
 export interface AgentOverview {
   generated_at: string

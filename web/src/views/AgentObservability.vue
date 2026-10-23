@@ -22,7 +22,7 @@
     <div class="toolbar">
       <label
         >状态
-        <select v-model="status" @change="changeFilter">
+        <select v-model="status" :disabled="loading" @change="changeFilter">
           <option value="">全部</option>
           <option v-for="value in statuses" :key="value" :value="value">{{ value }}</option>
         </select></label
@@ -104,7 +104,7 @@
           rel="noopener noreferrer"
           >在 LangSmith 中打开</a
         >
-        <span v-else>LangSmith 导出未启用或链接尚未配置</span>
+        <span v-else>{{ langsmithStatusLabel(selected.langsmith_export_status) }}</span>
       </p>
     </aside>
     <nav v-if="total > pageSize" class="pagination" aria-label="运行记录分页">
@@ -141,8 +141,9 @@
     pageSize = 20,
     status = ref<AgentRun['status'] | ''>('')
   const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+  const now = ref(Date.now())
   const freshnessState = computed(() =>
-    overview.value && Date.now() - Date.parse(overview.value.generated_at) > 45_000
+    overview.value && now.value - Date.parse(overview.value.generated_at) > 45_000
       ? 'stale'
       : 'fresh',
   )
@@ -155,9 +156,12 @@
     error.value = ''
     overviewError.value = ''
     try {
-      const [runResult, overviewResult] = await Promise.allSettled([
+      const selectedId = selected.value?.run_id
+      const selectedRequest = selectedId ? agentApi.run(selectedId) : Promise.resolve(null)
+      const [runResult, overviewResult, selectedResult] = await Promise.allSettled([
         agentApi.runs(page.value, status.value || undefined),
         agentApi.overview(),
+        selectedRequest,
       ])
       if (runResult.status === 'fulfilled') {
         runs.value = runResult.value.data.items
@@ -169,6 +173,9 @@
         overview.value = overviewResult.value.data
       } else {
         overviewError.value = '未知；Agent 概览暂不可用'
+      }
+      if (selectedId && selectedResult.status === 'fulfilled' && selectedResult.value) {
+        selected.value = selectedResult.value.data
       }
     } finally {
       loading.value = false
@@ -194,6 +201,12 @@
   function format(value: string) {
     return new Date(value).toLocaleString()
   }
+  function langsmithStatusLabel(value: AgentRun['langsmith_export_status']) {
+    if (value === 'PENDING') return 'LangSmith 导出等待确认'
+    if (value === 'EXPORTED') return '已确认导出；链接未配置'
+    if (value === 'FAILED') return 'LangSmith 导出失败'
+    return 'LangSmith 导出未启用或未配置'
+  }
   let timer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
     void load()
@@ -208,6 +221,7 @@
           error.value = agentError(err)
         })
     timer = setInterval(() => {
+      now.value = Date.now()
       if (document.visibilityState === 'visible') void load()
     }, 15000)
   })

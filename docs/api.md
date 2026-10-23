@@ -594,7 +594,7 @@ GET /api/v1/admin/agent/observability/runs/{run_id}
 Agent 委托。列表按 `started_at DESC, run_id DESC` 稳定排序，`page_size` 最大为 100，
 状态可选 `RUNNING`、`COMPLETED`、`FAILED`、`CANCELLED`、`INTERRUPTED`。
 响应只包含 `run_id`、可空 `trace_id`、状态、时间、耗时、受控 `error_code`、工具步骤数和
-知识检索次数，以及由服务端配置构造的可空 `tempo_url`/`langsmith_url`；不包含用户消息、Prompt、配置快照、工具参数/结果、RAG 文本、原始异常或凭据。
+知识检索次数，以及 `langsmith_export_status`（空、`PENDING`、`EXPORTED` 或 `FAILED`）和由服务端配置构造的可空 `tempo_url`/`langsmith_url`；只有确认云端上传成功且当前配置仍指向该 Run 的 LangSmith 项目 UUID 时才返回 LangSmith 链接。不包含用户消息、Prompt、配置快照、工具参数/结果、RAG 文本、原始异常或凭据。
 无本地 Trace 的历史 Run 的 `trace_id` 为 `null`。普通用户、无权限用户和无效 Run ID 分别
 返回 403、403 和 404；服务或数据库不可用返回 503。
 

@@ -63,6 +63,7 @@ def create_app(
             config.langsmith_export_enabled,
             config.langsmith_api_key.get_secret_value() if config.langsmith_api_key else None,
             config.environment,
+            config.langsmith_project_id,
         )
         if langsmith_exporter is not None:
             langsmith_exporter.start()
@@ -181,6 +182,7 @@ def create_app(
                         config_reader,
                         memory_trigger=memory_worker,
                         langsmith_exporter=langsmith_exporter,
+                        langsmith_export_requested=config.langsmith_export_enabled,
                     )
                 try:
                     async with asyncio.timeout(config.preflight_timeout_seconds):

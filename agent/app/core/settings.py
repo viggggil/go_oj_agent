@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -194,7 +195,23 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a database URL")
         if self.environment == "production" and self.runtime_mode in {"fake", "langgraph_fake"}:
             raise ValueError("Production cannot use a demo runtime")
+        if self.observability_langsmith_project_url:
+            parts = urlsplit(self.observability_langsmith_project_url).path.strip("/").split("/")
+            if len(parts) != 5 or parts[0] != "o" or parts[2:4] != ["projects", "p"]:
+                raise ValueError("LangSmith project URL must identify a project")
+            try:
+                UUID(parts[4])
+            except ValueError:
+                raise ValueError("LangSmith project URL must contain a project UUID") from None
         return self
+
+    @property
+    def langsmith_project_id(self) -> UUID | None:
+        if not self.observability_langsmith_project_url:
+            return None
+        return UUID(
+            urlsplit(self.observability_langsmith_project_url).path.rstrip("/").split("/")[-1]
+        )
 
 
 def load_settings() -> Settings:

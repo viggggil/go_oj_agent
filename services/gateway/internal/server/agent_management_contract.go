@@ -122,10 +122,10 @@ func validObservabilityEnvelope(path string, payload map[string]json.RawMessage)
 		return ok && agentJSONTypes(runs, "", "", "RUNNING COMPLETED FAILED CANCELLED INTERRUPTED")
 	}
 	if strings.Count(path, "/") == 7 {
-		if len(payload) != 12 {
+		if len(payload) != 13 {
 			return false
 		}
-		object, ok := agentJSONFieldsFromMap(payload, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count tempo_url langsmith_url", "")
+		object, ok := agentJSONFieldsFromMap(payload, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count tempo_url langsmith_url langsmith_export_status", "")
 		return validObservabilityRun(object, ok)
 	}
 	if len(payload) != 2 {
@@ -140,7 +140,7 @@ func validObservabilityEnvelope(path string, payload map[string]json.RawMessage)
 		return false
 	}
 	for _, item := range items {
-		object, valid := agentJSONFields(item, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count tempo_url langsmith_url", "")
+		object, valid := agentJSONFields(item, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count tempo_url langsmith_url langsmith_export_status", "")
 		if !valid || !validObservabilityRun(object, true) {
 			return false
 		}
@@ -149,7 +149,17 @@ func validObservabilityEnvelope(path string, payload map[string]json.RawMessage)
 }
 
 func validObservabilityRun(object map[string]json.RawMessage, ok bool) bool {
-	return ok && agentJSONTypes(object, "run_id status purpose started_at", "", "tool_step_count knowledge_query_count") && agentJSONNullable(object["trace_id"], new(string)) && agentJSONNullable(object["finished_at"], new(string)) && agentJSONNullable(object["duration_ms"], new(int)) && agentJSONNullable(object["error_code"], new(string)) && agentJSONNullable(object["tempo_url"], new(string)) && agentJSONNullable(object["langsmith_url"], new(string))
+	if !ok || !agentJSONTypes(object, "run_id status purpose started_at", "", "tool_step_count knowledge_query_count") || !agentJSONNullable(object["trace_id"], new(string)) || !agentJSONNullable(object["finished_at"], new(string)) || !agentJSONNullable(object["duration_ms"], new(int)) || !agentJSONNullable(object["error_code"], new(string)) || !agentJSONNullable(object["tempo_url"], new(string)) || !agentJSONNullable(object["langsmith_url"], new(string)) || !agentJSONNullable(object["langsmith_export_status"], new(string)) {
+		return false
+	}
+	if string(object["langsmith_export_status"]) == "null" {
+		return true
+	}
+	var exportStatus string
+	if json.Unmarshal(object["langsmith_export_status"], &exportStatus) != nil {
+		return false
+	}
+	return exportStatus == "PENDING" || exportStatus == "EXPORTED" || exportStatus == "FAILED"
 }
 
 func agentJSONFieldsFromMap(payload map[string]json.RawMessage, required, optional string) (map[string]json.RawMessage, bool) {

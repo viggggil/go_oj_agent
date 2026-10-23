@@ -155,7 +155,7 @@ Agent 指标概览由 Gateway 拥有，避免新增 Agent→Gateway 反向查询
 
 Run 列表使用 `started_at DESC, id DESC` 稳定游标，默认 20 条、最多 100 条，强制时间窗，首期过滤 status / purpose / run_id；精确 model/version/skill 的复杂 JSON 筛选暂不开放。新增索引 `(started_at, id)`、`(status, started_at, id)`，purpose 通过 Agent 自有会话查询约束。监控查询预算和执行计划必须在真实 MySQL 验证。
 
-Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；LangSmith 根 Run 使用同一个随机业务 Run UUID 作为逻辑关联标识。UI 仅在适配器确认导出后或用户主动查询状态时显示可用链接；不存在或尚未导出可明确显示未知，不能承诺链接一定可用。
+Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；LangSmith 根 Run 使用同一个随机业务 Run UUID 作为逻辑关联标识。项目详情 URL 中的项目 UUID 同时作为 LangSmith 上传目标；Run 持久化导出状态和接受时的项目 UUID 快照，只有后台上传成功后 UI 才显示原目标链接。缺少密钥、队列已满或发送失败时不会显示可用链接；服务重启后未完成的内存队列标记为失败。
 
 详情响应不得包含 messages、config_snapshot 原文或任意 model_summary JSON。明确映射模型 attempt、工具安全状态、运行时间和配置版本；链接由服务端基于受控部署地址构造，不能接受用户提供 URL。Grafana/LangSmith 详情使用各自独立认证，链接不是公开分享链接，页面不持有供应商密钥。
 

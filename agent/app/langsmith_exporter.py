@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -78,6 +79,13 @@ class SafeRun:
     error: str | None
     metadata: dict[str, Any]
     children: tuple[SafeChild, ...]
+    project_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class _ExportJob:
+    run: SafeRun
+    on_result: Callable[[bool], Awaitable[None]] | None = None
 
 
 def _safe_error(value: str | None) -> str | None:
@@ -103,6 +111,7 @@ def build_safe_run(
     environment: str,
     deployment_version: str,
     config_version: str | None,
+    project_id: UUID | None = None,
     finished_at: datetime | None = None,
 ) -> SafeRun:
     """仅从脱敏摘要挑选字段；不会保留 AgentState 或任何自由文本。"""
@@ -199,12 +208,17 @@ def build_safe_run(
         error=_safe_error(error_code),
         metadata=metadata,
         children=tuple(children),
+        project_id=project_id,
     )
 
 
 def build_run_batch(run: SafeRun, client: Any) -> list[dict[str, Any]]:
     """Build LangSmith SDK request dictionaries with empty inputs and outputs."""
-    project = f"oj-agent-{run.metadata['environment']}"
+    project = (
+        {"session_id": str(run.project_id)}
+        if run.project_id is not None
+        else {"session_name": f"oj-agent-{run.metadata['environment']}"}
+    )
     root_trace_id = (
         UUID(run.metadata["otel_trace_id"]) if "otel_trace_id" in run.metadata else run.id
     )
@@ -222,7 +236,7 @@ def build_run_batch(run: SafeRun, client: Any) -> list[dict[str, Any]]:
             "error": run.error,
             "tags": ["oj-agent", "chat"],
             "extra": {"metadata": {**run.metadata, "status": run.status}},
-            "session_name": project,
+            **project,
             "trace_id": str(root_trace_id),
             "dotted_order": root_dotted,
         }
@@ -241,7 +255,7 @@ def build_run_batch(run: SafeRun, client: Any) -> list[dict[str, Any]]:
                 "error": child.error,
                 "tags": ["oj-agent"],
                 "extra": {"metadata": child.metadata},
-                "session_name": project,
+                **project,
                 "parent_run_id": str(run.id),
                 "trace_id": str(root_trace_id),
                 "dotted_order": (
@@ -261,6 +275,7 @@ class LangSmithExporter:
         *,
         environment: str,
         deployment_version: str,
+        project_id: UUID | None = None,
         queue_size: int = 32,
         client: Any | None = None,
     ) -> None:
@@ -268,6 +283,7 @@ class LangSmithExporter:
             raise ValueError("LangSmith API key is required")
         self.environment = environment
         self.deployment_version = deployment_version
+        self.project_id = project_id
         self._client = client or Client(
             api_url="https://api.smith.langchain.com",
             api_key=api_key,
@@ -279,7 +295,7 @@ class LangSmithExporter:
             omit_traced_runtime_info=True,
             max_batch_size_bytes=256 * 1024,
         )
-        self._queue: asyncio.Queue[tuple[SafeRun, ...] | None] = asyncio.Queue(queue_size)
+        self._queue: asyncio.Queue[_ExportJob | None] = asyncio.Queue(queue_size)
         self._worker: asyncio.Task[None] | None = None
 
     def start(self) -> None:
@@ -297,7 +313,8 @@ class LangSmithExporter:
         trace_id: str | None,
         config_version: str | None,
         finished_at: datetime | None = None,
-    ) -> None:
+        on_result: Callable[[bool], Awaitable[None]] | None = None,
+    ) -> bool:
         safe = build_safe_run(
             run_id=run_id,
             started_at=started_at,
@@ -308,14 +325,17 @@ class LangSmithExporter:
             environment=self.environment,
             deployment_version=self.deployment_version,
             config_version=config_version,
+            project_id=self.project_id,
             finished_at=finished_at,
         )
         try:
-            self._queue.put_nowait((safe,))
+            self._queue.put_nowait(_ExportJob(safe, on_result))
+            return True
         except asyncio.QueueFull:
             logger.warning(
                 "LangSmith export queue full", extra={"error_code": "LANGSMITH_QUEUE_FULL"}
             )
+            return False
 
     async def _run(self) -> None:
         while True:
@@ -323,12 +343,47 @@ class LangSmithExporter:
             try:
                 if item is None:
                     return
-                await asyncio.to_thread(self._send, item)
+                try:
+                    await asyncio.to_thread(self._send, (item.run,))
+                    exported = True
+                except asyncio.CancelledError:
+                    if item.on_result is not None:
+                        try:
+                            await item.on_result(False)
+                        except Exception as exc:
+                            logger.warning(
+                                "LangSmith export status update failed",
+                                extra={
+                                    "error_code": "LANGSMITH_STATUS_UPDATE_FAILED",
+                                    "error_type": type(exc).__name__,
+                                },
+                            )
+                    raise
+                except Exception as exc:
+                    exported = False
+                    logger.warning(
+                        "LangSmith export failed",
+                        extra={
+                            "error_code": "LANGSMITH_EXPORT_FAILED",
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                if item.on_result is not None:
+                    try:
+                        await item.on_result(exported)
+                    except Exception as exc:
+                        logger.warning(
+                            "LangSmith export status update failed",
+                            extra={
+                                "error_code": "LANGSMITH_STATUS_UPDATE_FAILED",
+                                "error_type": type(exc).__name__,
+                            },
+                        )
             except Exception as exc:
                 logger.warning(
-                    "LangSmith export failed",
+                    "LangSmith exporter worker failed",
                     extra={
-                        "error_code": "LANGSMITH_EXPORT_FAILED",
+                        "error_code": "LANGSMITH_EXPORTER_WORKER_FAILED",
                         "error_type": type(exc).__name__,
                     },
                 )
@@ -358,13 +413,36 @@ class LangSmithExporter:
             )
             worker.cancel()
             await asyncio.gather(worker, return_exceptions=True)
+            while True:
+                try:
+                    item = self._queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                try:
+                    if item is not None and item.on_result is not None:
+                        await item.on_result(False)
+                except Exception as exc:
+                    logger.warning(
+                        "LangSmith export status update failed",
+                        extra={
+                            "error_code": "LANGSMITH_STATUS_UPDATE_FAILED",
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                finally:
+                    self._queue.task_done()
         finally:
             close = getattr(self._client, "close", None)
             if close:
                 await asyncio.to_thread(close)
 
 
-def new_exporter(enabled: bool, api_key: str | None, environment: str) -> LangSmithExporter | None:
+def new_exporter(
+    enabled: bool,
+    api_key: str | None,
+    environment: str,
+    project_id: UUID | None = None,
+) -> LangSmithExporter | None:
     if not enabled:
         return None
     if not api_key:
@@ -378,6 +456,7 @@ def new_exporter(enabled: bool, api_key: str | None, environment: str) -> LangSm
             api_key,
             environment=environment,
             deployment_version=os.getenv("AGENT_VERSION", "dev"),
+            project_id=project_id,
         )
     except Exception as exc:
         logger.warning(

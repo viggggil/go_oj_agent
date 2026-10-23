@@ -32,6 +32,8 @@ def test_admin_run_projection_excludes_private_runtime_payload() -> None:
         "finished_at": started + timedelta(milliseconds=125),
         "duration_ms": 125,
         "error_code": "AGENT_RUN_FAILED",
+        "langsmith_export_status": None,
+        "langsmith_project_id": None,
         "tool_step_count": 1,
         "knowledge_query_count": 2,
     }

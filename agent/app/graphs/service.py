@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import monotonic
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from opentelemetry import trace
@@ -76,7 +76,15 @@ class RuntimeStore(Protocol):
         answer: str | None = None,
         error_code: str | None = None,
         model_summary: dict[str, Any] | None = None,
+        langsmith_export_status: Literal["PENDING", "FAILED"] | None = None,
+        langsmith_project_id: str | None = None,
     ) -> RunRecord: ...
+
+    async def set_langsmith_export_status(
+        self, run_id: str | UUID, status: Literal["EXPORTED", "FAILED"]
+    ) -> None: ...
+
+    async def fail_pending_langsmith_exports(self) -> int: ...
 
     async def interrupt_running_runs(self) -> int: ...
 
@@ -132,7 +140,7 @@ class AcceptedRun:
         # 建流前调用方取消时，未启动的 async generator 也需要释放 Run。
         if self.state.status == "RUNNING":
             await self._service._terminate(self.state, "CANCELLED", "AGENT_CANCELLED")
-            self._service._export_terminal(
+            await self._service._export_terminal(
                 self.state, self._trace_id, "CANCELLED", "AGENT_CANCELLED", self._export_tracker
             )
 
@@ -148,6 +156,7 @@ class RunService:
         context_assembler: ContextAssembler | None = None,
         memory_trigger: MemoryTrigger | None = None,
         langsmith_exporter: Any | None = None,
+        langsmith_export_requested: bool = False,
     ) -> None:
         self._store = store
         self._runtime = runtime
@@ -156,6 +165,7 @@ class RunService:
         self._context_assembler = context_assembler or ContextAssembler()
         self._memory_trigger = memory_trigger
         self._langsmith_exporter = langsmith_exporter
+        self._langsmith_export_requested = langsmith_export_requested
 
     def with_store(self, store: RuntimeStore) -> "RunService":
         """共享 Runtime 和配置解析器，使用独立用途的持久化边界。"""
@@ -178,6 +188,7 @@ class RunService:
 
     async def initialize(self) -> int:
         """仅允许单实例，在开始接受运行前中断旧进程遗留的 RUNNING。"""
+        await self._store.fail_pending_langsmith_exports()
         return await self._store.interrupt_running_runs()
 
     async def accept(
@@ -327,6 +338,8 @@ class RunService:
                                 if runtime_state.model_summary is not None
                                 else None
                             ),
+                            langsmith_export_status=self._pending_langsmith_status(),
+                            langsmith_project_id=self._langsmith_project_id(),
                         ),
                         timeout=max(0, end - monotonic()),
                     )
@@ -345,7 +358,7 @@ class RunService:
                             )
                     terminal = True
                     state.status = "COMPLETED"
-                    self._export_terminal(state, trace_id, "COMPLETED", None, tracker)
+                    await self._export_terminal(state, trace_id, "COMPLETED", None, tracker)
                     logger.info(
                         "Agent run completed",
                         extra={
@@ -360,7 +373,7 @@ class RunService:
             state.model_summary = runtime_state.model_summary
             await self._terminate(state, "CANCELLED", "AGENT_CANCELLED")
             terminal = True
-            self._export_terminal(state, trace_id, "CANCELLED", "AGENT_CANCELLED", tracker)
+            await self._export_terminal(state, trace_id, "CANCELLED", "AGENT_CANCELLED", tracker)
             raise
         except Exception as exc:
             state.model_summary = runtime_state.model_summary
@@ -378,7 +391,7 @@ class RunService:
                 code = exc.code
             await self._terminate(state, "FAILED", code)
             terminal = True
-            self._export_terminal(state, trace_id, "FAILED", code, tracker)
+            await self._export_terminal(state, trace_id, "FAILED", code, tracker)
             yield StreamEvent.error(state, code, sequence + 1)
         finally:
             if not terminal:
@@ -412,6 +425,8 @@ class RunService:
                     if state.model_summary is not None
                     else None
                 ),
+                langsmith_export_status=self._pending_langsmith_status(),
+                langsmith_project_id=self._langsmith_project_id(),
             )
         )
         try:
@@ -425,7 +440,16 @@ class RunService:
                 "Run finalization failed", extra={"error_code": "AGENT_FINALIZATION_FAILED"}
             )
 
-    def _export_terminal(
+    def _pending_langsmith_status(self) -> Literal["PENDING", "FAILED"] | None:
+        if self._langsmith_exporter is not None:
+            return "PENDING"
+        return "FAILED" if self._langsmith_export_requested else None
+
+    def _langsmith_project_id(self) -> str | None:
+        project_id = getattr(self._langsmith_exporter, "project_id", None)
+        return str(project_id) if project_id is not None else None
+
+    async def _export_terminal(
         self,
         state: AgentState,
         trace_id: str | None,
@@ -436,8 +460,14 @@ class RunService:
         if tracker.submitted or self._langsmith_exporter is None or state.status == "RUNNING":
             return
         tracker.submitted = True
+
+        async def report_result(exported: bool) -> None:
+            await self._store.set_langsmith_export_status(
+                state.run_id, "EXPORTED" if exported else "FAILED"
+            )
+
         try:
-            self._langsmith_exporter.submit(
+            queued = self._langsmith_exporter.submit(
                 run_id=state.run_id,
                 started_at=state.started_at,
                 status=status,
@@ -445,9 +475,16 @@ class RunService:
                 model_summary=state.model_summary,
                 trace_id=trace_id,
                 config_version=state.config_snapshot.get("model_profile_id"),
+                on_result=report_result,
             )
+            if not queued:
+                await report_result(False)
         except Exception as exc:
             # Export bugs must never change the already committed Run outcome.
+            try:
+                await report_result(False)
+            except Exception:
+                pass
             logger.warning(
                 "LangSmith export enqueue failed",
                 extra={

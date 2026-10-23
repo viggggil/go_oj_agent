@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.api.observability import with_links
 from app.core.auth import DelegationVerifier, InvalidDelegation
 from app.core.management import ManagementService
 from app.core.operations import operation
@@ -92,6 +93,35 @@ def test_observability_overview_operation_is_read_only() -> None:
     for method in ("POST", "PUT", "DELETE"):
         with pytest.raises(ValueError):
             operation(method, path)
+
+
+def test_langsmith_deep_link_requires_confirmed_export_and_uses_project_id() -> None:
+    project = "00000000-0000-0000-0000-000000000001"
+    settings = Settings(
+        langsmith_export_enabled=True,
+        observability_langsmith_project_url=(
+            f"https://smith.langchain.com/o/example/projects/p/{project}"
+        ),
+    )
+    base = {
+        "run_id": str(uuid4()),
+        "trace_id": None,
+        "langsmith_project_id": project,
+    }
+    for status in (None, "PENDING", "FAILED"):
+        item = with_links({**base, "langsmith_export_status": status}, settings)
+        assert item["langsmith_url"] is None
+    item = with_links({**base, "langsmith_export_status": "EXPORTED"}, settings)
+    assert item["langsmith_url"] == (
+        f"https://smith.langchain.com/o/example/projects/p/{project}/r/{base['run_id']}"
+    )
+    changed_settings = Settings(
+        observability_langsmith_project_url=(
+            "https://smith.langchain.com/o/another/projects/p/00000000-0000-0000-0000-000000000002"
+        )
+    )
+    item = with_links({**base, "langsmith_export_status": "EXPORTED"}, changed_settings)
+    assert item["langsmith_url"] is None
 
 
 def test_tool_description_operation_is_admin_write_only() -> None:

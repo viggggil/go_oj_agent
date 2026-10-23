@@ -110,9 +110,14 @@ def with_links(item: dict[str, object], settings: Settings) -> dict[str, object]
         }
     )
     item["tempo_url"] = f"{grafana}/explore?{query}" if trace_id and grafana else None
+    exported_project_id = item.pop("langsmith_project_id", None)
     project = settings.observability_langsmith_project_url
     item["langsmith_url"] = (
-        f"{project}/r/{item['run_id']}" if settings.langsmith_export_enabled and project else None
+        f"{project}/r/{item['run_id']}"
+        if item.get("langsmith_export_status") == "EXPORTED"
+        and exported_project_id == str(settings.langsmith_project_id)
+        and project
+        else None
     )
     return item
 
