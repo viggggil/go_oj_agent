@@ -123,9 +123,7 @@ async def test_initialize_fails_exports_left_pending_by_previous_process(
         langsmith_export_status="PENDING",
         langsmith_project_id="00000000-0000-0000-0000-000000000001",
     )
-    service = RunService(
-        store, FakeRuntime(), DemoConfigReader(Settings(runtime_mode="fake"))
-    )
+    service = RunService(store, FakeRuntime(), DemoConfigReader(Settings(runtime_mode="fake")))
 
     assert await service.initialize() == 0
     item = await store.get_admin_run(run.id)
