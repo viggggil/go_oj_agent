@@ -91,6 +91,18 @@ export interface Tool {
   timeout_seconds: number
   requires_confirmation: boolean
 }
+export interface AgentRun {
+  run_id: string
+  trace_id: string | null
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'INTERRUPTED'
+  purpose: 'chat'
+  started_at: string
+  finished_at: string | null
+  duration_ms: number | null
+  error_code: string | null
+  tool_step_count: number
+  knowledge_query_count: number
+}
 export interface Binding {
   id: string
   key: string

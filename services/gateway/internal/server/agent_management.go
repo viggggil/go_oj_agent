@@ -26,6 +26,8 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		path    string
 		methods []string
 	}{
+		{"/api/v1/admin/agent/observability/runs", []string{http.MethodGet}},
+		{"/api/v1/admin/agent/observability/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/rag/knowledge-bases", []string{http.MethodGet, http.MethodPost}},
 		{"/api/v1/admin/agent/rag/knowledge-bases/{base_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/rag/knowledge-bases/{base_id:[0-9a-f-]{36}}/rename", []string{http.MethodPost}},
@@ -217,6 +219,7 @@ func agentJSONTimeout(ctx context.Context, err error) bool {
 }
 
 var agentManagementErrors = map[string]bool{
+	"AGENT_RUN_NOT_FOUND": true,
 	"AGENT_RAG_NOT_FOUND": true, "AGENT_RAG_STALE": true, "AGENT_RAG_NOT_READY": true,
 	"AGENT_RAG_REQUEST_CONFLICT": true, "AGENT_RAG_DEPENDENCY_UNAVAILABLE": true,
 	"AGENT_CONVERSATION_NOT_FOUND": true,

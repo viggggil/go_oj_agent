@@ -9,6 +9,7 @@ import type {
   Resource,
   Summary,
   Tool,
+  AgentRun,
 } from './types'
 
 const base = '/api/v1/admin/agent'
@@ -95,6 +96,17 @@ export const agentApi = {
       { description },
       { ...bounded, signal },
     ),
+  runs: (page = 1, status?: AgentRun['status'], signal?: AbortSignal) =>
+    api.get<PageResult<AgentRun>>(`${base}/observability/runs`, {
+      ...bounded,
+      params: { page, page_size: 20, ...(status ? { status } : {}) },
+      signal,
+    }),
+  run: (id: string, signal?: AbortSignal) =>
+    api.get<AgentRun>(`${base}/observability/runs/${encodeURIComponent(id)}`, {
+      ...bounded,
+      signal,
+    }),
 }
 export function agentStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined

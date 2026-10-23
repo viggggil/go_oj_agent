@@ -24,11 +24,20 @@ _EVAL_REVIEW = re.compile(r"/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(r
 _EVAL_MODEL_REVIEW = re.compile(
     r"/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(review-agent|model-reviews)"
 )
+_OBSERVABILITY_RUN = re.compile(r"/api/v1/admin/agent/observability/runs(?:/([0-9a-f-]{36}))?")
 
 
 def operation(method: str, path: str) -> str:
     allowed = False
-    if match := _EVAL_MODEL_REVIEW.fullmatch(path):
+    if match := _OBSERVABILITY_RUN.fullmatch(path):
+        if match[1] is None:
+            allowed = method == "GET"
+        else:
+            try:
+                allowed = method == "GET" and str(UUID(match[1])) == match[1]
+            except ValueError:
+                pass
+    elif match := _EVAL_MODEL_REVIEW.fullmatch(path):
         allowed = (
             method == ("POST" if match[2] == "review-agent" else "GET")
             and str(UUID(match[1])) == match[1]

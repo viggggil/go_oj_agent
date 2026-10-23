@@ -581,6 +581,23 @@ Gateway 始终注册受保护的路由，`clients.agent.enabled=false` 时返回
 在 `AGENT_CHAT_ENABLED=true` 并配置数据库、公钥与运行时后才注册内部 Chat 路由。Agent
 未启用时返回 404，不保留可匿名调用的临时入口。
 
+### Agent Chat 运行诊断
+
+管理员可通过 Gateway 查询安全 Run 投影：
+
+```text
+GET /api/v1/admin/agent/observability/runs?page=1&page_size=20&status=FAILED
+GET /api/v1/admin/agent/observability/runs/{run_id}
+```
+
+两条接口都要求 `admin`、`system_admin` 或 `agent_admin` 角色，并使用 Gateway 的短期
+Agent 委托。列表按 `started_at DESC, run_id DESC` 稳定排序，`page_size` 最大为 100，
+状态可选 `RUNNING`、`COMPLETED`、`FAILED`、`CANCELLED`、`INTERRUPTED`。
+响应只包含 `run_id`、可空 `trace_id`、状态、时间、耗时、受控 `error_code`、工具步骤数和
+知识检索次数；不包含用户消息、Prompt、配置快照、工具参数/结果、RAG 文本、原始异常或凭据。
+无本地 Trace 的历史 Run 的 `trace_id` 为 `null`。普通用户、无权限用户和无效 Run ID 分别
+返回 403、403 和 404；服务或数据库不可用返回 503。
+
 外部请求先由 Gateway 的现有 Access Token middleware 认证。Gateway 从已认证的请求上下文
 签发短期 RS256 委托 JWT（固定 `iss=go-oj-gateway`、`aud=agent-service`、
 `sub=gateway-service`、`rpc=HTTP POST /api/v1/agent/chat`、`kid`），只把用户 ID、角色、

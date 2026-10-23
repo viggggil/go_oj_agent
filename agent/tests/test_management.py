@@ -76,6 +76,16 @@ def test_model_version_operation_whitelist() -> None:
             operation(method, target)
 
 
+def test_observability_run_operation_is_read_only_and_uuid_bound() -> None:
+    base = "/api/v1/admin/agent/observability/runs"
+    assert operation("GET", base) == "HTTP GET " + base
+    run = base + "/" + str(uuid4())
+    assert operation("GET", run) == "HTTP GET " + run
+    for method, target in [("POST", base), ("DELETE", base), ("GET", base + "/not-a-uuid")]:
+        with pytest.raises(ValueError):
+            operation(method, target)
+
+
 def test_tool_description_operation_is_admin_write_only() -> None:
     path = "/api/v1/admin/agent/tools/get_problem"
     assert operation("GET", "/api/v1/admin/agent/tools") == "HTTP GET /api/v1/admin/agent/tools"

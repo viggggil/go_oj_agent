@@ -37,6 +37,9 @@
             ><FileCheck :size="17" />Agent Eval</RouterLink
           >
           <RouterLink to="/agent/tools" @click="open = false"><Wrench :size="17" />工具</RouterLink>
+          <RouterLink to="/agent/observability" @click="open = false"
+            ><Activity :size="17" />运行诊断</RouterLink
+          >
           <RouterLink to="/agent/agents" @click="open = false"><Bot :size="17" />Agent</RouterLink>
           <RouterLink to="/agent/prompts" @click="open = false"
             ><FileText :size="17" />Prompt</RouterLink
@@ -68,6 +71,7 @@
   import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
   import {
     Bot,
+    Activity,
     Database,
     FileCheck,
     FileText,

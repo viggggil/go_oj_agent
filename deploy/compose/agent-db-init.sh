@@ -92,6 +92,11 @@ trace_index_present="$(query "SELECT COUNT(DISTINCT INDEX_NAME) FROM information
     AND INDEX_NAME='idx_agent_runs_trace_started'")"
 apply_migration 000011_add_run_trace_id "$((trace_id_present + trace_index_present))" 2
 
+started_index_present="$(query "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA='oj_agent' AND TABLE_NAME='agent_runs'
+    AND INDEX_NAME='idx_agent_runs_started_id'")"
+apply_migration 000012_add_run_started_index "$started_index_present" 1
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"

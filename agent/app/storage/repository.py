@@ -723,6 +723,113 @@ class AgentStore:
             raise RunNotFound("Run not found")
         return RunRecord(**row)
 
+    async def list_admin_runs(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status: RunStatus | None = None,
+    ) -> dict[str, Any]:
+        """返回仅供管理员使用的 Run 安全投影，不读取消息正文或配置快照。"""
+        page = min(max(page, 1), 10000)
+        page_size = min(max(page_size, 1), 100)
+        predicates = [agent_conversations.c.purpose == self._purpose]
+        if status is not None:
+            predicates.append(agent_runs.c.status == status)
+        async with self._engine.connect() as connection:
+            total = int(
+                await connection.scalar(
+                    select(func.count())
+                    .select_from(agent_runs.join(agent_conversations))
+                    .where(*predicates)
+                )
+                or 0
+            )
+            rows = (
+                (
+                    await connection.execute(
+                        select(
+                            agent_runs.c.id,
+                            agent_runs.c.trace_id,
+                            agent_runs.c.user_id,
+                            agent_runs.c.status,
+                            agent_runs.c.started_at,
+                            agent_runs.c.finished_at,
+                            agent_runs.c.error_code,
+                            agent_runs.c.model_summary,
+                        )
+                        .select_from(agent_runs.join(agent_conversations))
+                        .where(*predicates)
+                        .order_by(agent_runs.c.started_at.desc(), agent_runs.c.id.desc())
+                        .offset((page - 1) * page_size)
+                        .limit(page_size)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "items": [self._safe_run(dict(row)) for row in rows],
+            "page": {"page": page, "page_size": page_size, "total": total},
+        }
+
+    async def get_admin_run(self, run_id: str | UUID) -> dict[str, Any]:
+        async with self._engine.connect() as connection:
+            row = (
+                (
+                    await connection.execute(
+                        select(
+                            agent_runs.c.id,
+                            agent_runs.c.trace_id,
+                            agent_runs.c.user_id,
+                            agent_runs.c.status,
+                            agent_runs.c.started_at,
+                            agent_runs.c.finished_at,
+                            agent_runs.c.error_code,
+                            agent_runs.c.model_summary,
+                        )
+                        .select_from(agent_runs.join(agent_conversations))
+                        .where(
+                            agent_runs.c.id == str(run_id),
+                            agent_conversations.c.purpose == self._purpose,
+                        )
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            raise RunNotFound("Run not found")
+        return self._safe_run(dict(row))
+
+    @staticmethod
+    def _safe_run(row: dict[str, Any]) -> dict[str, Any]:
+        started = row["started_at"]
+        finished = row["finished_at"]
+        duration = None
+        if finished is not None:
+            duration = max(0, int((finished - started).total_seconds() * 1000))
+        raw_summary = row.get("model_summary")
+        summary: dict[str, Any] = (
+            cast(dict[str, Any], raw_summary) if isinstance(raw_summary, dict) else {}
+        )
+        return {
+            "run_id": row["id"],
+            "trace_id": row.get("trace_id"),
+            "status": row["status"],
+            "purpose": "chat",
+            "started_at": started,
+            "finished_at": finished,
+            "duration_ms": duration,
+            "error_code": row.get("error_code"),
+            "tool_step_count": len(summary.get("tool_steps", []))
+            if isinstance(summary.get("tool_steps"), list)
+            else 0,
+            "knowledge_query_count": len(summary.get("knowledge", []))
+            if isinstance(summary.get("knowledge"), list)
+            else 0,
+        }
+
     async def interrupt_running_runs(self) -> int:
         now = self._clock()
         async with self._engine.begin() as connection:

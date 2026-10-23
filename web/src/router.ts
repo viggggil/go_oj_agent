@@ -23,6 +23,7 @@ import AgentRag from './views/AgentRag.vue'
 import AgentEval from './views/AgentEval.vue'
 import AgentEvalDatasetCreate from './views/AgentEvalDatasetCreate.vue'
 import AgentTools from './views/AgentTools.vue'
+import AgentObservability from './views/AgentObservability.vue'
 import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
@@ -53,6 +54,7 @@ const router = createRouter({
         { path: 'rag', component: AgentRag, meta: { agentAdmin: true } },
         { path: 'eval', component: AgentEval, meta: { agentAdmin: true } },
         { path: 'tools', component: AgentTools, meta: { agentAdmin: true } },
+        { path: 'observability', component: AgentObservability, meta: { agentAdmin: true } },
         {
           path: 'eval/datasets/new',
           component: AgentEvalDatasetCreate,

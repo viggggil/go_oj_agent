@@ -64,6 +64,7 @@ Index(
     agent_runs.c.started_at,
     agent_runs.c.id,
 )
+Index("idx_agent_runs_started_id", agent_runs.c.started_at, agent_runs.c.id)
 
 agent_messages = Table(
     "agent_messages",
