@@ -25,11 +25,14 @@ _EVAL_MODEL_REVIEW = re.compile(
     r"/api/v1/admin/agent/evals/results/([0-9a-f-]{36})/(review-agent|model-reviews)"
 )
 _OBSERVABILITY_RUN = re.compile(r"/api/v1/admin/agent/observability/runs(?:/([0-9a-f-]{36}))?")
+_OBSERVABILITY_OVERVIEW = "/api/v1/admin/agent/observability/overview"
 
 
 def operation(method: str, path: str) -> str:
     allowed = False
-    if match := _OBSERVABILITY_RUN.fullmatch(path):
+    if path == _OBSERVABILITY_OVERVIEW:
+        allowed = method == "GET"
+    elif match := _OBSERVABILITY_RUN.fullmatch(path):
         if match[1] is None:
             allowed = method == "GET"
         else:

@@ -26,6 +26,7 @@ func registerAgentManagementRoutes(server *khttp.Server, agent *client.AgentClie
 		path    string
 		methods []string
 	}{
+		{"/api/v1/admin/agent/observability/overview", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/observability/runs", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/observability/runs/{run_id:[0-9a-f-]{36}}", []string{http.MethodGet}},
 		{"/api/v1/admin/agent/rag/knowledge-bases", []string{http.MethodGet, http.MethodPost}},

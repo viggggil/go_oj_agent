@@ -88,6 +88,49 @@ async def test_run_trace_id_is_persisted_and_legacy_null_is_supported(
     assert (await store.get_run(7, legacy.id)).trace_id is None
 
 
+async def test_admin_run_reports_only_confirmed_langsmith_export(engine: AsyncEngine) -> None:
+    store = AgentStore(engine)
+    project_id = "00000000-0000-0000-0000-000000000001"
+    run = await new_run(store)
+    await store.finish_run(
+        user_id=7,
+        run_id=run.id,
+        status="FAILED",
+        error_code="AGENT_RUN_FAILED",
+        langsmith_export_status="PENDING",
+        langsmith_project_id=project_id,
+    )
+    pending = await store.get_admin_run(run.id)
+    assert pending["langsmith_export_status"] == "PENDING"
+    assert pending["langsmith_project_id"] == project_id
+    await store.set_langsmith_export_status(run.id, "EXPORTED")
+    assert (await store.get_admin_run(run.id))["langsmith_export_status"] == "EXPORTED"
+    # 重复或迟到的失败回调不能覆盖已确认成功的状态。
+    await store.set_langsmith_export_status(run.id, "FAILED")
+    assert (await store.get_admin_run(run.id))["langsmith_export_status"] == "EXPORTED"
+
+
+async def test_initialize_fails_exports_left_pending_by_previous_process(
+    engine: AsyncEngine,
+) -> None:
+    store = AgentStore(engine)
+    run = await new_run(store)
+    await store.finish_run(
+        user_id=7,
+        run_id=run.id,
+        status="FAILED",
+        error_code="AGENT_RUN_FAILED",
+        langsmith_export_status="PENDING",
+        langsmith_project_id="00000000-0000-0000-0000-000000000001",
+    )
+    service = RunService(store, FakeRuntime(), DemoConfigReader(Settings(runtime_mode="fake")))
+
+    assert await service.initialize() == 0
+    item = await store.get_admin_run(run.id)
+    assert item["langsmith_export_status"] == "FAILED"
+    assert item["langsmith_project_id"] == "00000000-0000-0000-0000-000000000001"
+
+
 async def test_owner_isolation_and_latest_history_order(engine: AsyncEngine) -> None:
     store = AgentStore(engine)
     conversation = await store.create_conversation(7)
@@ -440,6 +483,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
         ):
             await connection.execute(text(statement))
         for name, direction in (
+            ("000014_add_langsmith_export_status", "down"),
+            ("000013_add_run_status_started_index", "down"),
             ("000012_add_run_started_index", "down"),
             ("000011_add_run_trace_id", "down"),
             ("000010_create_tool_descriptions", "down"),
@@ -464,6 +509,8 @@ async def test_down_and_up_migration_are_reversible_in_empty_test_database(
             ("000010_create_tool_descriptions", "up"),
             ("000011_add_run_trace_id", "up"),
             ("000012_add_run_started_index", "up"),
+            ("000013_add_run_status_started_index", "up"),
+            ("000014_add_langsmith_export_status", "up"),
         ):
             sql = (MIGRATION_ROOT / f"{name}.{direction}.sql").read_text()
             for statement in sql.split(";"):

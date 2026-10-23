@@ -10,6 +10,7 @@ import type {
   Summary,
   Tool,
   AgentRun,
+  AgentOverview,
 } from './types'
 
 const base = '/api/v1/admin/agent'
@@ -96,6 +97,8 @@ export const agentApi = {
       { description },
       { ...bounded, signal },
     ),
+  overview: (signal?: AbortSignal) =>
+    api.get<AgentOverview>(`${base}/observability/overview`, { ...bounded, signal }),
   runs: (page = 1, status?: AgentRun['status'], signal?: AbortSignal) =>
     api.get<PageResult<AgentRun>>(`${base}/observability/runs`, {
       ...bounded,

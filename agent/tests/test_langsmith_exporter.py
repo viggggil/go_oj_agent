@@ -177,17 +177,11 @@ def test_batch_is_accepted_by_locked_langsmith_sdk_and_remains_allowlisted() -> 
         sdk.close()
 
 
-def test_exporter_is_disabled_without_explicit_enablement(monkeypatch: Any) -> None:
-    monkeypatch.setenv("LANGSMITH_API_KEY", "ignored")
-    monkeypatch.setenv("LANGSMITH_TRACING", "true")
-    assert new_exporter(False, "ignored", "development") is None
-
-
-def test_queue_is_bounded() -> None:
+def test_configured_project_id_is_used_for_all_exported_runs() -> None:
+    project_id = UUID("00000000-0000-0000-0000-000000000001")
     safe = build_safe_run(
         run_id=RUN_ID,
         started_at=NOW,
-        finished_at=NOW,
         status="COMPLETED",
         error_code=None,
         model_summary=None,
@@ -195,7 +189,19 @@ def test_queue_is_bounded() -> None:
         environment="test",
         deployment_version="dev",
         config_version=None,
+        project_id=project_id,
     )
+    batch = build_run_batch(safe, CapturingClient())
+    assert all(run["session_id"] == str(project_id) for run in batch)
+
+
+def test_exporter_is_disabled_without_explicit_enablement(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LANGSMITH_API_KEY", "ignored")
+    monkeypatch.setenv("LANGSMITH_TRACING", "true")
+    assert new_exporter(False, "ignored", "development") is None
+
+
+def test_queue_is_bounded() -> None:
     exporter = LangSmithExporter(
         "unit-test-key",
         environment="test",
@@ -203,10 +209,48 @@ def test_queue_is_bounded() -> None:
         queue_size=1,
         client=CapturingClient(),
     )
-    exporter._queue.put_nowait((safe,))
-    try:
-        exporter._queue.put_nowait((safe,))
-    except asyncio.QueueFull:
-        pass
-    else:
-        raise AssertionError("export queue should enforce its configured bound")
+    request: dict[str, Any] = {
+        "run_id": RUN_ID,
+        "started_at": NOW,
+        "status": "COMPLETED",
+        "error_code": None,
+        "model_summary": None,
+        "trace_id": None,
+        "config_version": None,
+    }
+    assert exporter.submit(**request)
+    assert not exporter.submit(**request)
+
+
+async def test_exporter_reports_only_confirmed_send_result() -> None:
+    class FailingClient(CapturingClient):
+        def batch_ingest_runs(self, *, create: list[dict[str, Any]]) -> None:
+            raise RuntimeError(SECRET)
+
+    for client, expected in ((CapturingClient(), True), (FailingClient(), False)):
+        exporter = LangSmithExporter(
+            "unit-test-key", environment="test", deployment_version="dev", client=client
+        )
+        results: list[bool] = []
+        completed = asyncio.Event()
+
+        async def report(
+            value: bool, results: list[bool] = results, completed: Any = completed
+        ) -> None:
+            results.append(value)
+            completed.set()
+
+        exporter.start()
+        assert exporter.submit(
+            run_id=RUN_ID,
+            started_at=NOW,
+            status="COMPLETED",
+            error_code=None,
+            model_summary=None,
+            trace_id=None,
+            config_version=None,
+            on_result=report,
+        )
+        await asyncio.wait_for(completed.wait(), timeout=2)
+        assert results == [expected]
+        await exporter.close()

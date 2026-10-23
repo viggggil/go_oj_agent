@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
@@ -107,6 +107,8 @@ class RunRecord:
     error_code: str | None
     model_summary: dict[str, Any] | None = None
     trace_id: str | None = None
+    langsmith_export_status: Literal["PENDING", "EXPORTED", "FAILED"] | None = None
+    langsmith_project_id: str | None = None
 
 
 _RUN_COLUMNS = tuple(column for column in agent_runs.c if column.name != "active_conversation_id")
@@ -626,6 +628,8 @@ class AgentStore:
         answer: str | None = None,
         error_code: str | None = None,
         model_summary: dict[str, Any] | None = None,
+        langsmith_export_status: Literal["PENDING", "FAILED"] | None = None,
+        langsmith_project_id: str | None = None,
     ) -> RunRecord:
         if status == "RUNNING":
             raise RunStateConflict("RUNNING is not a terminal status")
@@ -676,6 +680,8 @@ class AgentStore:
                     finished_at=now,
                     error_code=error_code,
                     model_summary=model_summary,
+                    langsmith_export_status=langsmith_export_status,
+                    langsmith_project_id=langsmith_project_id,
                 )
             )
             if status == "COMPLETED":
@@ -695,9 +701,38 @@ class AgentStore:
             )
             values = dict(row)
             values.update(
-                status=status, finished_at=now, error_code=error_code, model_summary=model_summary
+                status=status,
+                finished_at=now,
+                error_code=error_code,
+                model_summary=model_summary,
+                langsmith_export_status=langsmith_export_status,
+                langsmith_project_id=langsmith_project_id,
             )
             return RunRecord(**values)
+
+    async def set_langsmith_export_status(
+        self, run_id: str | UUID, status: Literal["EXPORTED", "FAILED"]
+    ) -> None:
+        """只允许将已排队的云导出标记为成功或失败。"""
+        async with self._engine.begin() as connection:
+            await connection.execute(
+                update(agent_runs)
+                .where(
+                    agent_runs.c.id == str(run_id),
+                    agent_runs.c.langsmith_export_status == "PENDING",
+                )
+                .values(langsmith_export_status=status)
+            )
+
+    async def fail_pending_langsmith_exports(self) -> int:
+        """重启后内存队列不能恢复，终结上次进程遗留的待发送状态。"""
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                update(agent_runs)
+                .where(agent_runs.c.langsmith_export_status == "PENDING")
+                .values(langsmith_export_status="FAILED")
+            )
+        return int(result.rowcount or 0)
 
     async def get_run(self, user_id: int, run_id: str | UUID) -> RunRecord:
         async with self._engine.connect() as connection:
@@ -757,6 +792,8 @@ class AgentStore:
                             agent_runs.c.finished_at,
                             agent_runs.c.error_code,
                             agent_runs.c.model_summary,
+                            agent_runs.c.langsmith_export_status,
+                            agent_runs.c.langsmith_project_id,
                         )
                         .select_from(agent_runs.join(agent_conversations))
                         .where(*predicates)
@@ -787,6 +824,8 @@ class AgentStore:
                             agent_runs.c.finished_at,
                             agent_runs.c.error_code,
                             agent_runs.c.model_summary,
+                            agent_runs.c.langsmith_export_status,
+                            agent_runs.c.langsmith_project_id,
                         )
                         .select_from(agent_runs.join(agent_conversations))
                         .where(
@@ -801,6 +840,33 @@ class AgentStore:
         if row is None:
             raise RunNotFound("Run not found")
         return self._safe_run(dict(row))
+
+    async def get_admin_run_overview(self) -> dict[str, Any]:
+        now = self._clock()
+        since = now - timedelta(minutes=60)
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    select(agent_runs.c.status, func.count().label("count"))
+                    .select_from(agent_runs.join(agent_conversations))
+                    .where(
+                        agent_conversations.c.purpose == "chat",
+                        agent_runs.c.started_at >= since,
+                    )
+                    .group_by(agent_runs.c.status)
+                )
+            ).all()
+        counts = {status: int(count) for status, count in rows}
+        return {
+            "generated_at": now,
+            "window_minutes": 60,
+            "availability": "available",
+            "runs": {
+                status: counts.get(status, 0)
+                for status in ("RUNNING", "COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED")
+            },
+            "total": sum(counts.values()),
+        }
 
     @staticmethod
     def _safe_run(row: dict[str, Any]) -> dict[str, Any]:
@@ -822,6 +888,8 @@ class AgentStore:
             "finished_at": finished,
             "duration_ms": duration,
             "error_code": row.get("error_code"),
+            "langsmith_export_status": row.get("langsmith_export_status"),
+            "langsmith_project_id": row.get("langsmith_project_id"),
             "tool_step_count": len(summary.get("tool_steps", []))
             if isinstance(summary.get("tool_steps"), list)
             else 0,

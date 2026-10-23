@@ -21,3 +21,14 @@ func TestAgentToolDescriptionOperationIsRestricted(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentObservabilityOperationsAreReadOnly(t *testing.T) {
+	for _, path := range []string{"/api/v1/admin/agent/observability/overview", "/api/v1/admin/agent/observability/runs"} {
+		if _, err := AgentOperation(http.MethodGet, path); err != nil {
+			t.Fatalf("GET %s rejected: %v", path, err)
+		}
+		if _, err := AgentOperation(http.MethodPost, path); err == nil {
+			t.Fatalf("POST %s accepted", path)
+		}
+	}
+}

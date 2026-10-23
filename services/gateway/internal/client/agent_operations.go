@@ -29,10 +29,13 @@ var agentModel = regexp.MustCompile(`^/api/v1/admin/agent/model-options/([0-9a-f
 var agentVersion = regexp.MustCompile(`^/api/v1/admin/agent/(agents|prompts|skills)/versions/([0-9a-f-]{36})$`)
 var agentToolDescription = regexp.MustCompile(`^/api/v1/admin/agent/tools/([a-z][a-z0-9_]{1,127})$`)
 var agentObservabilityRun = regexp.MustCompile(`^/api/v1/admin/agent/observability/runs(?:/([0-9a-f-]{36}))?$`)
+var agentObservabilityOverview = "/api/v1/admin/agent/observability/overview"
 
 func AgentOperation(method, path string) (string, error) {
 	allowed := false
 	switch {
+	case path == agentObservabilityOverview:
+		allowed = method == http.MethodGet
 	case agentObservabilityRun.MatchString(path):
 		match := agentObservabilityRun.FindStringSubmatch(path)
 		if match[1] == "" {

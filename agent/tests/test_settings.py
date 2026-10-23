@@ -28,6 +28,26 @@ def test_langsmith_secret_is_masked_and_export_is_explicit() -> None:
     assert "langsmith-private-key" not in settings.model_dump_json()
 
 
+def test_observability_destinations_reject_credentials_and_query() -> None:
+    with pytest.raises(ValidationError):
+        Settings(observability_grafana_url="https://user:pass@example.invalid")
+    with pytest.raises(ValidationError):
+        Settings(observability_grafana_url="https://grafana.example.invalid/?token=secret")
+
+
+def test_langsmith_project_url_must_identify_a_project_uuid() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            observability_langsmith_project_url="https://smith.langchain.com/o/org/projects/p/example"
+        )
+    settings = Settings(
+        observability_langsmith_project_url=(
+            "https://smith.langchain.com/o/org/projects/p/00000000-0000-0000-0000-000000000001"
+        )
+    )
+    assert str(settings.langsmith_project_id) == "00000000-0000-0000-0000-000000000001"
+
+
 def test_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     (tmp_path / ".env").write_text(
         "AGENT_PORT=8010\nAGENT_LOG_LEVEL=WARNING\nUNRELATED_SETTING=ignored\n",

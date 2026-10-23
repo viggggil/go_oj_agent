@@ -550,6 +550,8 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 | `user_id` | BIGINT | 逻辑 owner，无跨服务 FK |
 | `request_id` | VARCHAR(128) | 关联请求，不作为幂等键 |
 | `trace_id` | CHAR(32) ASCII | Nullable OTel Trace ID；历史 Run 或无有效上下文时为 NULL |
+| `langsmith_export_status` | VARCHAR(16) | Nullable；PENDING / EXPORTED / FAILED；只在确认上传后标记 EXPORTED |
+| `langsmith_project_id` | CHAR(36) | Nullable；接受 Run 时使用的 LangSmith 项目 UUID，避免配置变更后链接到其他项目 |
 | `config_source` | VARCHAR(64) | 当前 `demo_environment` |
 | `config_snapshot` | JSON | 版本、Runtime、预算、allowlist，不保存凭据 |
 | `status` | VARCHAR(32) | RUNNING / COMPLETED / FAILED / CANCELLED / INTERRUPTED |
@@ -561,6 +563,8 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 索引包含 `(conversation_id,started_at,id)`、`(user_id,started_at,id)` 和 `(status,deadline_at)`。
 `000011_add_run_trace_id` 新增 `(trace_id,started_at,id)`，供运维按 Trace 关联 Run；
 `000012_add_run_started_index` 新增 `(started_at,id)`，支持管理员 Run 诊断列表的稳定倒序分页；
+`000013_add_run_status_started_index` 新增 `(status,started_at,id)`，支持状态筛选下的稳定分页；
+`000014_add_langsmith_export_status` 新增受约束的可空 LangSmith 导出状态和原项目 UUID 快照，支持诊断接口只为已确认导出的 Run 构造准确云端链接；
 这些索引不改变用户侧列表排序与权限边界。
 `UNIQUE(active_conversation_id)` 利用多个 NULL 可共存，强制同会话最多一个 RUNNING。
 MySQL 不允许这里的生成列基础字段外键使用级联删除，所以 Run → Conversation 使用

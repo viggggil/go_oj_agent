@@ -5,6 +5,7 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Computed,
     ForeignKey,
     Index,
@@ -44,6 +45,8 @@ agent_runs = Table(
     Column("user_id", BigInteger, nullable=False),
     Column("request_id", String(128), nullable=False),
     Column("trace_id", CHAR(32, collation="ascii_bin")),
+    Column("langsmith_export_status", String(16)),
+    Column("langsmith_project_id", CHAR(36)),
     Column("config_source", String(64), nullable=False),
     Column("config_snapshot", JSON, nullable=False),
     Column("model_summary", JSON),
@@ -57,6 +60,11 @@ agent_runs = Table(
         CHAR(36),
         Computed("CASE WHEN status = 'RUNNING' THEN conversation_id ELSE NULL END", persisted=True),
     ),
+    CheckConstraint(
+        "langsmith_export_status IS NULL OR langsmith_export_status IN "
+        "('PENDING', 'EXPORTED', 'FAILED')",
+        name="chk_agent_runs_langsmith_export_status",
+    ),
 )
 Index(
     "idx_agent_runs_trace_started",
@@ -65,6 +73,12 @@ Index(
     agent_runs.c.id,
 )
 Index("idx_agent_runs_started_id", agent_runs.c.started_at, agent_runs.c.id)
+Index(
+    "idx_agent_runs_status_started_id",
+    agent_runs.c.status,
+    agent_runs.c.started_at,
+    agent_runs.c.id,
+)
 
 agent_messages = Table(
     "agent_messages",

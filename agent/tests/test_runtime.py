@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import pytest
@@ -97,6 +97,7 @@ class MemoryStore:
         self.record: RunRecord | None = None
         self.answers: list[str] = []
         self.fail_completion = False
+        self.langsmith_status: str | None = None
 
     async def create_run_with_user_message(
         self,
@@ -139,6 +140,8 @@ class MemoryStore:
         answer: str | None = None,
         error_code: str | None = None,
         model_summary: dict[str, Any] | None = None,
+        langsmith_export_status: Literal["PENDING", "FAILED"] | None = None,
+        langsmith_project_id: str | None = None,
     ) -> RunRecord:
         assert self.record is not None
         if status == "COMPLETED" and self.fail_completion:
@@ -150,10 +153,19 @@ class MemoryStore:
             finished_at=utc_now(),
             error_code=error_code,
             model_summary=model_summary,
+            langsmith_export_status=langsmith_export_status,
+            langsmith_project_id=langsmith_project_id,
         )
         if answer:
             self.answers.append(answer)
         return self.record
+
+    async def set_langsmith_export_status(self, run_id: str | UUID, status: str) -> None:
+        assert self.record is not None and self.record.id == str(run_id)
+        self.langsmith_status = status
+
+    async def fail_pending_langsmith_exports(self) -> int:
+        return 0
 
     async def interrupt_running_runs(self) -> int:
         return 0
@@ -205,8 +217,9 @@ async def test_langsmith_export_uses_persisted_chat_terminal_once() -> None:
         def __init__(self) -> None:
             self.calls: list[dict[str, Any]] = []
 
-        def submit(self, **kwargs: Any) -> None:
+        def submit(self, **kwargs: Any) -> bool:
             self.calls.append(kwargs)
+            return True
 
     store = MemoryStore()
     exporter = Exporter()
@@ -219,6 +232,9 @@ async def test_langsmith_export_uses_persisted_chat_terminal_once() -> None:
     assert len(exporter.calls) == 1
     assert exporter.calls[0]["status"] == "COMPLETED"
     assert exporter.calls[0]["run_id"] == accepted.state.run_id
+    assert exporter.calls[0]["on_result"] is not None
+    await exporter.calls[0]["on_result"](True)
+    assert store.langsmith_status == "EXPORTED"
     assert "private user message" not in repr(exporter.calls)
 
 
@@ -227,8 +243,9 @@ async def test_langsmith_export_skips_run_without_persisted_terminal() -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        def submit(self, **_kwargs: Any) -> None:
+        def submit(self, **_kwargs: Any) -> bool:
             self.calls += 1
+            return True
 
     class BrokenStore(MemoryStore):
         async def finish_run(self, **kwargs: Any) -> RunRecord:
@@ -244,6 +261,22 @@ async def test_langsmith_export_skips_run_without_persisted_terminal() -> None:
     assert events[-1].type == "error"
     assert store.record is not None and store.record.status == "RUNNING"
     assert exporter.calls == 0
+
+
+async def test_langsmith_queue_overflow_is_persisted_as_failed() -> None:
+    class FullExporter:
+        def submit(self, **_kwargs: Any) -> bool:
+            return False
+
+    store = MemoryStore()
+    accepted = await RunService(
+        store, FakeRuntime("safe answer"), Reader(), langsmith_exporter=FullExporter()
+    ).accept(ChatRequest(message="hello"), state().principal)
+    async with accepted:
+        events = [event async for event in accepted.events]
+    assert events[-1].type == "done"
+    assert store.record is not None and store.record.status == "COMPLETED"
+    assert store.langsmith_status == "FAILED"
 
 
 @pytest.mark.parametrize("failure", ["persist", "output", "incomplete", "exception"])

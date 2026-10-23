@@ -97,6 +97,18 @@ started_index_present="$(query "SELECT COUNT(DISTINCT INDEX_NAME) FROM informati
     AND INDEX_NAME='idx_agent_runs_started_id'")"
 apply_migration 000012_add_run_started_index "$started_index_present" 1
 
+status_started_index_present="$(query "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA='oj_agent' AND TABLE_NAME='agent_runs'
+    AND INDEX_NAME='idx_agent_runs_status_started_id'")"
+apply_migration 000013_add_run_status_started_index "$status_started_index_present" 1
+
+langsmith_status_present="$(column_count agent_runs langsmith_export_status)"
+langsmith_project_present="$(column_count agent_runs langsmith_project_id)"
+langsmith_status_check_present="$(query "SELECT COUNT(*) FROM information_schema.CHECK_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA='oj_agent' AND CONSTRAINT_NAME='chk_agent_runs_langsmith_export_status'")"
+apply_migration 000014_add_langsmith_export_status \
+    "$((langsmith_status_present + langsmith_project_present + langsmith_status_check_present))" 3
+
 # CREATE USER IF NOT EXISTS 不覆盖已有密码；权限限于 Agent 自有 Schema。
 mysql_root < /bootstrap/agent-user.sql
 echo "Agent 数据库与本地账户准备完成。"
