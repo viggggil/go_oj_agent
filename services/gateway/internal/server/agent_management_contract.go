@@ -7,6 +7,9 @@ import (
 
 // 按具体路由限制返回字段，普通目录不能返回管理正文或 Provider/凭据配置。
 func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMessage) bool {
+	if strings.HasPrefix(path, "/api/v1/admin/agent/observability/runs") {
+		return validObservabilityEnvelope(path, payload)
+	}
 	if method == "PUT" && strings.HasPrefix(path, "/api/v1/admin/agent/tools/") {
 		if len(payload) != 1 {
 			return false
@@ -104,6 +107,53 @@ func validAgentJSONEnvelope(method, path string, payload map[string]json.RawMess
 		}
 	}
 	return true
+}
+
+func validObservabilityEnvelope(path string, payload map[string]json.RawMessage) bool {
+	if strings.Count(path, "/") == 7 {
+		if len(payload) != 10 {
+			return false
+		}
+		object, ok := agentJSONFieldsFromMap(payload, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count", "")
+		return ok && agentJSONTypes(object, "run_id status purpose started_at", "", "duration_ms tool_step_count knowledge_query_count") && agentJSONNullable(object["trace_id"], new(string)) && agentJSONNullable(object["finished_at"], new(string)) && agentJSONNullable(object["error_code"], new(string))
+	}
+	if len(payload) != 2 {
+		return false
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(payload["items"], &items) != nil || items == nil || len(items) > 100 {
+		return false
+	}
+	page, ok := agentJSONFields(payload["page"], "page page_size total", "")
+	if !ok || !agentJSONTypes(page, "", "", "page page_size total") {
+		return false
+	}
+	for _, item := range items {
+		object, valid := agentJSONFields(item, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count", "")
+		if !valid || !agentJSONTypes(object, "run_id status purpose started_at", "", "duration_ms tool_step_count knowledge_query_count") || !agentJSONNullable(object["trace_id"], new(string)) || !agentJSONNullable(object["finished_at"], new(string)) || !agentJSONNullable(object["error_code"], new(string)) {
+			return false
+		}
+	}
+	return true
+}
+
+func agentJSONFieldsFromMap(payload map[string]json.RawMessage, required, optional string) (map[string]json.RawMessage, bool) {
+	allowed := make(map[string]bool)
+	for _, key := range strings.Fields(required) {
+		if _, ok := payload[key]; !ok {
+			return nil, false
+		}
+		allowed[key] = true
+	}
+	for _, key := range strings.Fields(optional) {
+		allowed[key] = true
+	}
+	for key := range payload {
+		if !allowed[key] {
+			return nil, false
+		}
+	}
+	return payload, true
 }
 
 func validEvalEnvelope(method, path string, payload map[string]json.RawMessage) bool {

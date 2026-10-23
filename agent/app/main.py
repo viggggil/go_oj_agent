@@ -15,6 +15,7 @@ from app.api.chat import router as chat_router
 from app.api.health import router
 from app.api.history import router as history_router
 from app.api.management import router as management_router
+from app.api.observability import router as observability_router
 from app.clients.business import build_business_clients
 from app.clients.model import ResponsesClient
 from app.core.auth import DelegationVerifier
@@ -300,6 +301,7 @@ def create_app(
 
     application.include_router(rag_router)
     application.include_router(eval_router)
+    application.include_router(observability_router)
     application.include_router(management_router)
     application.include_router(history_router)
     if config.chat_enabled:
