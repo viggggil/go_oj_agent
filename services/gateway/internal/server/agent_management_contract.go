@@ -115,7 +115,7 @@ func validObservabilityEnvelope(path string, payload map[string]json.RawMessage)
 			return false
 		}
 		object, ok := agentJSONFieldsFromMap(payload, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count", "")
-		return ok && agentJSONTypes(object, "run_id status purpose started_at", "", "duration_ms tool_step_count knowledge_query_count") && agentJSONNullable(object["trace_id"], new(string)) && agentJSONNullable(object["finished_at"], new(string)) && agentJSONNullable(object["error_code"], new(string))
+		return ok && agentJSONTypes(object, "run_id status purpose started_at", "", "tool_step_count knowledge_query_count") && agentJSONNullable(object["trace_id"], new(string)) && agentJSONNullable(object["finished_at"], new(string)) && agentJSONNullable(object["duration_ms"], new(int)) && agentJSONNullable(object["error_code"], new(string))
 	}
 	if len(payload) != 2 {
 		return false
@@ -130,7 +130,7 @@ func validObservabilityEnvelope(path string, payload map[string]json.RawMessage)
 	}
 	for _, item := range items {
 		object, valid := agentJSONFields(item, "run_id trace_id status purpose started_at finished_at duration_ms error_code tool_step_count knowledge_query_count", "")
-		if !valid || !agentJSONTypes(object, "run_id status purpose started_at", "", "duration_ms tool_step_count knowledge_query_count") || !agentJSONNullable(object["trace_id"], new(string)) || !agentJSONNullable(object["finished_at"], new(string)) || !agentJSONNullable(object["error_code"], new(string)) {
+		if !valid || !agentJSONTypes(object, "run_id status purpose started_at", "", "tool_step_count knowledge_query_count") || !agentJSONNullable(object["trace_id"], new(string)) || !agentJSONNullable(object["finished_at"], new(string)) || !agentJSONNullable(object["duration_ms"], new(int)) || !agentJSONNullable(object["error_code"], new(string)) {
 			return false
 		}
 	}
