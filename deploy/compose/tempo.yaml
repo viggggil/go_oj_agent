@@ -15,5 +15,3 @@ storage:
       path: /var/tempo/blocks
     block:
       version: vParquet4
-      index_downsampled: false
-      encoding: zstd
