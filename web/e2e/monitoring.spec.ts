@@ -65,7 +65,7 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
 
   await expect(page.getByRole('link', { name: '监控' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '监控', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Agent 运行诊断' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '判题链路', exact: true }).click()
   await expect(page).toHaveURL(/\/monitoring\/judge$/)
   await expect(page.getByRole('heading', { name: '判题链路' })).toBeVisible()
@@ -81,7 +81,7 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
 test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', async ({ page }) => {
   await loginAs(page, ['agent_admin'])
   await page.goto('/monitoring')
-  await expect(page.getByRole('link', { name: 'Agent 运行诊断' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: '判题链路', exact: true })).toHaveCount(0)
 
   await page.goto('/monitoring/judge')
