@@ -14,6 +14,8 @@ type Envelope struct {
 	EventVersion int32           `json:"event_version"`
 	OccurredAt   time.Time       `json:"occurred_at"`
 	TraceID      string          `json:"trace_id,omitempty"`
+	TraceParent  string          `json:"traceparent,omitempty"`
+	TraceState   string          `json:"tracestate,omitempty"`
 	CausationID  string          `json:"causation_id,omitempty"`
 	Data         json.RawMessage `json:"data"`
 }
@@ -24,6 +26,8 @@ type EnvelopeMetadata struct {
 	EventVersion int32
 	OccurredAt   time.Time
 	TraceID      string
+	TraceParent  string
+	TraceState   string
 	CausationID  string
 }
 
@@ -37,7 +41,7 @@ func MarshalEnvelope(metadata EnvelopeMetadata, data any) ([]byte, error) {
 	}
 	envelope := Envelope{
 		EventID: metadata.EventID, EventType: metadata.EventType, EventVersion: metadata.EventVersion,
-		OccurredAt: metadata.OccurredAt.UTC(), TraceID: metadata.TraceID, CausationID: metadata.CausationID, Data: payload,
+		OccurredAt: metadata.OccurredAt.UTC(), TraceID: metadata.TraceID, TraceParent: metadata.TraceParent, TraceState: metadata.TraceState, CausationID: metadata.CausationID, Data: payload,
 	}
 	return json.Marshal(envelope)
 }
@@ -49,7 +53,7 @@ func UnmarshalEnvelope(body []byte, expectedType string, data any) (Envelope, er
 	}
 	if err := validateMetadata(EnvelopeMetadata{
 		EventID: envelope.EventID, EventType: envelope.EventType, EventVersion: envelope.EventVersion,
-		OccurredAt: envelope.OccurredAt, TraceID: envelope.TraceID, CausationID: envelope.CausationID,
+		OccurredAt: envelope.OccurredAt, TraceID: envelope.TraceID, TraceParent: envelope.TraceParent, TraceState: envelope.TraceState, CausationID: envelope.CausationID,
 	}); err != nil {
 		return Envelope{}, err
 	}
@@ -65,6 +69,18 @@ func UnmarshalEnvelope(body []byte, expectedType string, data any) (Envelope, er
 	return envelope, nil
 }
 
+// WithTraceContext replaces only tracing metadata in an existing envelope.
+// Payload bytes and event identity remain unchanged.
+func WithTraceContext(body []byte, traceparent, tracestate string) ([]byte, error) {
+	var envelope Envelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("unmarshal event envelope: %w", err)
+	}
+	envelope.TraceParent = traceparent
+	envelope.TraceState = tracestate
+	return json.Marshal(envelope)
+}
+
 func validateMetadata(metadata EnvelopeMetadata) error {
 	if _, err := uuid.Parse(metadata.EventID); err != nil {
 		return fmt.Errorf("invalid event id")
@@ -76,6 +92,9 @@ func validateMetadata(metadata EnvelopeMetadata) error {
 		if _, err := uuid.Parse(metadata.CausationID); err != nil {
 			return fmt.Errorf("invalid causation id")
 		}
+	}
+	if len(metadata.TraceParent) > 255 || len(metadata.TraceState) > 512 {
+		return fmt.Errorf("invalid trace context")
 	}
 	return nil
 }

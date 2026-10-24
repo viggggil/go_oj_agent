@@ -61,7 +61,7 @@ func (r *PublisherReporter) report(ctx context.Context, input mq.Envelope, event
 	if r == nil || r.Publisher == nil {
 		return fmt.Errorf("publisher reporter is not configured")
 	}
-	body, err := marshalResult(input, eventType, payload)
+	body, err := marshalResult(ctx, input, eventType, payload)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (r *PublisherReporter) reportTask(ctx context.Context, input mq.Envelope, t
 	if r == nil || r.Publisher == nil {
 		return fmt.Errorf("publisher reporter is not configured")
 	}
-	body, err := marshalTask(input, task)
+	body, err := marshalTask(ctx, input, task)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (r *RabbitReporter) report(ctx context.Context, input mq.Envelope, eventTyp
 	if r == nil || r.url == "" || r.exchange == "" {
 		return fmt.Errorf("rabbit reporter is not configured")
 	}
-	body, err := marshalResult(input, eventType, payload)
+	body, err := marshalResult(ctx, input, eventType, payload)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (r *RabbitReporter) reportTask(ctx context.Context, input mq.Envelope, task
 	if r == nil || r.url == "" || r.exchange == "" {
 		return fmt.Errorf("rabbit reporter is not configured")
 	}
-	body, err := marshalTask(input, task)
+	body, err := marshalTask(ctx, input, task)
 	if err != nil {
 		return err
 	}
@@ -153,14 +153,22 @@ func (r *RabbitReporter) reportTask(ctx context.Context, input mq.Envelope, task
 	return r.publish(ctx, retryRoute(task.Language), envelope.EventID, body)
 }
 
-func marshalResult(input mq.Envelope, eventType string, payload any) ([]byte, error) {
-	return mq.MarshalEnvelope(mq.EnvelopeMetadata{EventID: uuid.NewString(), EventType: eventType, EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(), TraceID: input.TraceID, CausationID: input.EventID}, payload)
+func marshalResult(ctx context.Context, input mq.Envelope, eventType string, payload any) ([]byte, error) {
+	traceparent, tracestate := mq.TraceContextValues(ctx)
+	if traceparent == "" {
+		traceparent, tracestate = input.TraceParent, input.TraceState
+	}
+	return mq.MarshalEnvelope(mq.EnvelopeMetadata{EventID: uuid.NewString(), EventType: eventType, EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(), TraceID: input.TraceID, TraceParent: traceparent, TraceState: tracestate, CausationID: input.EventID}, payload)
 }
 
-func marshalTask(input mq.Envelope, task mq.JudgeTask) ([]byte, error) {
+func marshalTask(ctx context.Context, input mq.Envelope, task mq.JudgeTask) ([]byte, error) {
+	traceparent, tracestate := mq.TraceContextValues(ctx)
+	if traceparent == "" {
+		traceparent, tracestate = input.TraceParent, input.TraceState
+	}
 	return mq.MarshalEnvelope(mq.EnvelopeMetadata{
 		EventID: uuid.NewString(), EventType: mq.EventTypeJudgeTask, EventVersion: mq.EventVersion1,
-		OccurredAt: time.Now().UTC(), TraceID: input.TraceID, CausationID: input.EventID,
+		OccurredAt: time.Now().UTC(), TraceID: input.TraceID, TraceParent: traceparent, TraceState: tracestate, CausationID: input.EventID,
 	}, task)
 }
 
@@ -191,7 +199,7 @@ func (r *RabbitReporter) publish(ctx context.Context, route, messageID string, b
 	if err := r.ensureConnectedLocked(); err != nil {
 		return err
 	}
-	confirm, err := r.channel.PublishWithDeferredConfirmWithContext(pctx, r.exchange, route, false, false, amqp091.Publishing{ContentType: "application/json", DeliveryMode: amqp091.Persistent, MessageId: messageID, Type: route, Body: body, Timestamp: time.Now().UTC()})
+	confirm, err := r.channel.PublishWithDeferredConfirmWithContext(pctx, r.exchange, route, false, false, amqp091.Publishing{ContentType: "application/json", DeliveryMode: amqp091.Persistent, MessageId: messageID, Type: route, Headers: mq.TraceHeadersFromContext(ctx), Body: body, Timestamp: time.Now().UTC()})
 	if err != nil {
 		r.resetLocked()
 		return err

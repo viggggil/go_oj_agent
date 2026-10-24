@@ -12,7 +12,10 @@ import (
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/data"
-	"google.golang.org/grpc/codes"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	otelcodes "go.opentelemetry.io/otel/codes"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -115,13 +118,20 @@ func (s *ResultConsumerServer) Start(ctx context.Context) error {
 				slog.Warn("contest event rejected", "message_id", d.MessageId, "error", parseErr)
 				err = d.Reject(false)
 			} else {
-				handleCtx, cancelHandle := context.WithTimeout(run, 10*time.Second)
+				handleCtx := mq.ContextFromMessage(run, d.Headers, d.Body)
+				handleCtx, span := otel.Tracer("oj.contest.consumer").Start(handleCtx, "contest.result.consume")
+				span.SetAttributes(attribute.String("messaging.event_type", d.Type))
+				handleCtx, cancelHandle := context.WithTimeout(handleCtx, 10*time.Second)
 				err = s.handler.Handle(handleCtx, d.Body)
+				if err != nil {
+					span.SetStatus(otelcodes.Error, "projection handling failed")
+				}
 				cancelHandle()
+				span.End()
 				switch {
 				case err == nil:
 					err = d.Ack(false)
-				case status.Code(err) == codes.InvalidArgument:
+				case status.Code(err) == grpcCodes.InvalidArgument:
 					slog.Warn("contest event rejected", "event_id", envelope.EventID, "error", err)
 					err = d.Reject(false)
 				default:

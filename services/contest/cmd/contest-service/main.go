@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"time"
 
 	kratos "github.com/go-kratos/kratos/v3"
 	"github.com/go-kratos/kratos/v3/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-kratos/kratos/v3/config/file"
 	"github.com/go-kratos/kratos/v3/registry"
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/server"
 )
@@ -37,6 +39,18 @@ func main() {
 		errorLogger.Error("invalid contest service config", "error", err)
 		os.Exit(1)
 	}
+	shutdownTelemetry, telemetryErr := observability.Init(context.Background(), "contest-service")
+	if telemetryErr != nil {
+		errorLogger.Error("failed to initialize OpenTelemetry", "error_type", "exporter_init")
+		shutdownTelemetry = func(context.Context) error { return nil }
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			errorLogger.Error("failed to shut down OpenTelemetry", "error_type", "shutdown")
+		}
+	}()
 	app, cleanup, err := initApp(&bootstrap)
 	if err != nil {
 		errorLogger.Error("failed to initialize contest-service", "error", err)

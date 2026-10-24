@@ -326,6 +326,8 @@ INDEX(submission_id)
 | `aggregate_id` | BIGINT | submission_id |
 | `event_type` | VARCHAR(128) | Internal intent, e.g. judge.requested |
 | `event_version` | INT | NOT NULL |
+| `traceparent` | VARCHAR(255) | Nullable W3C parent context for Relay recovery |
+| `tracestate` | VARCHAR(512) | Nullable W3C vendor state |
 | `payload` | JSON | Event Payload |
 | `status` | VARCHAR(32) | pending / published / dead |
 | `retry_count` | INT | default 0 |
@@ -348,6 +350,10 @@ Relay 使用短事务和 `SELECT ... FOR UPDATE SKIP LOCKED` 领取未发布事�
 lease；发布成功并收到 Publisher Confirm 后标记 `published`。临时失败按退避策略
 回到 `pending`，超过最大次数后进入 `dead` 并保留 `last_error`。lease 只能降低
 并发碰撞，不能替代 Consumer 幂等。
+
+迁移 `000010_add_outbox_trace_context` 为 Outbox 增加可空的 `traceparent` 与
+`tracestate`。它们只保存 W3C 追踪上下文，不参与业务去重、发布确认或重试策略；
+历史行保持 NULL，Relay 对缺失或无效上下文启动新的 Trace，不影响消息发布。
 
 ## 6.4 `processed_events`
 

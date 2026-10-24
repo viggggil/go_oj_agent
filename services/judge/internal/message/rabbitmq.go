@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
@@ -96,7 +99,14 @@ func (c *RabbitResultConsumer) Start(ctx context.Context) error {
 				}
 				return fmt.Errorf("rabbitmq result consumer channel closed")
 			}
-			err := c.handler.Handle(runCtx, delivery.Type, delivery.Body)
+			handleCtx := mq.ContextFromMessage(runCtx, delivery.Headers, delivery.Body)
+			handleCtx, span := otel.Tracer("oj.judge.result").Start(handleCtx, "judge.result.consume")
+			span.SetAttributes(attribute.String("messaging.event_type", delivery.Type))
+			err := c.handler.Handle(handleCtx, delivery.Type, delivery.Body)
+			if err != nil {
+				span.SetStatus(codes.Error, "result handling failed")
+			}
+			span.End()
 			if err == nil {
 				_ = delivery.Ack(false)
 			} else if biz.HasReason(err, biz.ReasonInvalidArgument) {
@@ -210,6 +220,7 @@ func (p *RabbitPublisher) Publish(ctx context.Context, message biz.PublishedMess
 		DeliveryMode: amqp091.Persistent,
 		MessageId:    message.EventID,
 		Type:         message.EventType,
+		Headers:      mq.TraceHeadersFromValues(message.TraceParent, message.TraceState),
 		Timestamp:    time.Now().UTC(),
 		Body:         append([]byte(nil), message.Body...),
 	})

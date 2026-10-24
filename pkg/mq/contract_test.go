@@ -5,6 +5,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"context"
+	"github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestJudgeTaskEnvelopeRoundTrip(t *testing.T) {
@@ -31,6 +38,32 @@ func TestJudgeTaskEnvelopeRoundTrip(t *testing.T) {
 	}
 	if envelope.EventID == "" || decoded != task {
 		t.Fatalf("envelope=%+v task=%+v", envelope, decoded)
+	}
+}
+
+func TestAMQPTraceHeadersRoundTripAndIgnoreMalformedValues(t *testing.T) {
+	previousProvider, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
+	provider := sdktrace.NewTracerProvider()
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	defer func() {
+		_ = provider.Shutdown(context.Background())
+		otel.SetTracerProvider(previousProvider)
+		otel.SetTextMapPropagator(previousPropagator)
+	}()
+
+	ctx, parent := otel.Tracer("test").Start(context.Background(), "parent")
+	headers := TraceHeadersFromContext(ctx)
+	parentContext := trace.SpanContextFromContext(ctx)
+	extracted := ContextFromTraceHeaders(context.Background(), headers)
+	if got := trace.SpanContextFromContext(extracted); !got.IsValid() || got.TraceID() != parentContext.TraceID() || !got.IsRemote() {
+		t.Fatalf("extracted context = %+v, parent = %+v", got, parentContext)
+	}
+	parent.End()
+
+	malformed := ContextFromTraceHeaders(context.Background(), amqp091.Table{TraceParentHeader: "bad"})
+	if trace.SpanContextFromContext(malformed).IsValid() {
+		t.Fatal("malformed traceparent unexpectedly produced a valid parent")
 	}
 }
 

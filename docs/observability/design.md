@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪和 Issue #200 PR1 的同步 Judge Trace 已实现。Judge Outbox/MQ/Worker 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
+状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪、Issue #200 PR1 同步 Judge Trace 与 PR2 异步 Judge Trace 已实现。判题运行指标和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 
@@ -119,9 +119,9 @@ flowchart LR
 
 ### 5.2 Outbox 与 MQ
 
-建议在 Judge 的 outbox_events 增加可空 `traceparent` / `tracestate` 字段，将允许的追踪上下文与业务事件在同一事务保存。没有追踪上下文的历史行仍可发布。
+PR2 已在 Judge 的 outbox_events 增加可空 `traceparent` / `tracestate` 字段，将允许的追踪上下文与业务事件在同一事务保存。没有追踪上下文的历史行仍可发布。
 
-Relay 从持久化上下文创建 publish Span，注入 AMQP Header；Worker、Judge 结果消费者、Contest 消费者提取并创建消费 Span，结果及后续 Outbox 继续保存因果上下文。单消息短任务采用父子关系；批处理、长延迟后台工作采用 Span Links，不伪造一直运行的 HTTP Span。
+Relay 从持久化上下文创建 publish Span，注入 AMQP Header 和 Envelope 字段；Worker、Judge 结果消费者、Contest 消费者提取并创建消费 Span，结果及后续 Outbox 继续保存因果上下文。单消息短任务采用父子关系；批处理、长延迟后台工作采用 Span Links，不伪造一直运行的 HTTP Span。
 
 业务 `event_id`、`causation_id`、重试 attempt、ACK 和 publisher confirm 语义保持不变；每次投递/重投有独立 Span，不为了监控去重业务投递计数。缺少/畸形 Header 只会创建新 Trace，不能阻断或丢弃消息。新的可选字段与 Header 允许新旧消费者共存，先迁移、再生产者、再消费者，旧数据不回填虚构的父 Span。
 
@@ -189,13 +189,14 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 
 | 阶段 | 实施内容 | 验收 |
 | --- | --- | --- |
-| PR1 同步 Judge Trace | Gateway→Judge→Problem gRPC Trace 传播；Judge/Problem provider 与 Server instrumentation；Judge 提交、重判 Span；可选 Compose OTLP 配置 | 同一 Trace 可跨 Gateway、Judge、Problem；未配置 Collector 使用 no-op；观测导出故障不改变业务语义 |
+| Issue #200 PR1 同步 Judge Trace | Gateway→Judge→Problem gRPC Trace 传播；Judge/Problem provider 与 Server instrumentation；Judge 提交、重判 Span；可选 Compose OTLP 配置 | 同一 Trace 可跨 Gateway、Judge、Problem；未配置 Collector 使用 no-op；观测导出故障不改变业务语义 |
+| Issue #200 PR2 异步 Judge Trace | Outbox trace context migration；AMQP Header/Envelope 传播；Relay、Worker、Judge Result、Contest Projection spans | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |
 | PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文。Issue #188 完成云导出基础；Issue #189 完成本地 Run Trace 与业务 Span |
 | PR3 管理员最小页面 | Gateway 固定指标查询；Agent Run 列表/安全详情与索引；Vue 概览和运行 Tab | 管理员从异常指标进入 Run 详情并跳到排障页；普通用户与仅 Agent 管理员的越界请求被拒绝；失联显示 unknown |
-| PR4 Judge/Contest 异步链路 | Outbox trace context migration；AMQP 传播；队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |
-| PR5 运行保障与扩展 | RAG/Eval/Memory worker 指标；基础设施指标、阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |
+| 后续 Judge/Contest 运行指标 | 队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 判题排队、执行、失败和投影积压有稳定统计口径 |
+| PR4 运行保障与扩展 | RAG/Eval/Memory worker 指标；基础设施指标、阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |
 
-首个可交付里程碑为 PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。PR4 后形成完整 OJ 与 Agent 监控。Agent Chat Span 已在 Issue #189 实现；Memory、Eval/Review、RAG ingestion 的独立本地任务 Span 已在 Issue #191 实现；Issue #193 已补齐 Agent Run 安全查询、Gateway 契约、运行概览、受控 Trace 链接、分页和 Vue 运行诊断页。异步父子因果传播、worker 指标和 PR5 主机/容器 exporters 仍为后续工作。
+首个可交付里程碑为 Agent PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。Agent Chat Span 已在 Issue #189 实现；Memory、Eval/Review、RAG ingestion 的独立本地任务 Span 已在 Issue #191 实现；Issue #193 已补齐 Agent Run 安全查询、Gateway 契约、运行概览、受控 Trace 链接、分页和 Vue 运行诊断页。Issue #200 的同步与异步 Judge Trace 已分别在 PR1、PR2 接入；判题运行指标和基础设施 exporters 仍为后续工作。
 
 ## 9. 变更面与文档
 

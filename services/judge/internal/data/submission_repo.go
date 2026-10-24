@@ -10,6 +10,7 @@ import (
 
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
@@ -103,13 +104,8 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 		verdict = "SYSTEM_ERROR"
 	}
 	payload := biz.SubmissionJudgedPayload{SubmissionID: event.SubmissionID, ContestID: contestID.Int64, UserID: userID, ProblemID: problemID, Verdict: verdict, SubmittedAt: submittedAt, JudgedAt: event.OccurredAt}
-	encoded, err := json.Marshal(payload)
-	if err != nil {
-		return biz.ErrorInternal("judge result event cannot be encoded")
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO outbox_events (event_id, aggregate_type, aggregate_id, event_type, event_version, payload, status, retry_count, created_at) VALUES (?, 'submission', ?, ?, 1, ?, 'pending', 0, ?)`, uuid.NewString(), event.SubmissionID, biz.EventTypeSubmissionJudged, encoded, now)
-	if err != nil {
-		return storageError(err)
+	if err = insertOutbox(ctx, tx, uuid.NewString(), event.SubmissionID, biz.EventTypeSubmissionJudged, payload, now); err != nil {
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		return storageError(err)
@@ -448,7 +444,7 @@ func (s *StoreSet) ClaimOutbox(ctx context.Context, owner string, now, leaseUnti
 	defer rollbackOnError(tx, &err)
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, event_id, aggregate_type, aggregate_id, event_type, event_version,
-		       payload, status, retry_count, next_retry_at, lease_owner, lease_until,
+		       traceparent, tracestate, payload, status, retry_count, next_retry_at, lease_owner, lease_until,
 		       created_at, published_at
 		FROM outbox_events
 		WHERE status = ?
@@ -624,12 +620,25 @@ func insertOutbox(ctx context.Context, tx *sql.Tx, eventID string, aggregateID i
 	if err != nil {
 		return biz.ErrorInternal("outbox payload cannot be encoded")
 	}
+	traceparent, tracestate := mq.TraceContextValues(ctx)
+	if traceparent == "" && tracestate == "" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO outbox_events (
+				event_id, aggregate_type, aggregate_id, event_type, event_version,
+				payload, status, retry_count, created_at
+			) VALUES (?, 'submission', ?, ?, 1, ?, 'pending', 0, ?)
+		`, eventID, aggregateID, eventType, encoded, now)
+		if err != nil {
+			return storageError(err)
+		}
+		return nil
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO outbox_events (
 			event_id, aggregate_type, aggregate_id, event_type, event_version,
-			payload, status, retry_count, created_at
-		) VALUES (?, 'submission', ?, ?, 1, ?, 'pending', 0, ?)
-	`, eventID, aggregateID, eventType, encoded, now)
+			traceparent, tracestate, payload, status, retry_count, created_at
+		) VALUES (?, 'submission', ?, ?, 1, ?, ?, ?, 'pending', 0, ?)
+	`, eventID, aggregateID, eventType, traceparent, tracestate, encoded, now)
 	if err != nil {
 		return storageError(err)
 	}
@@ -704,16 +713,18 @@ func scanOutbox(row rowScanner) (biz.OutboxEvent, error) {
 	var event biz.OutboxEvent
 	var payload []byte
 	var nextRetryAt, leaseUntil, publishedAt sql.NullTime
-	var leaseOwner sql.NullString
+	var leaseOwner, traceparent, tracestate sql.NullString
 	if err := row.Scan(
 		&event.ID, &event.EventID, &event.AggregateType, &event.AggregateID,
-		&event.EventType, &event.EventVersion, &payload, &event.Status,
+		&event.EventType, &event.EventVersion, &traceparent, &tracestate, &payload, &event.Status,
 		&event.RetryCount, &nextRetryAt, &leaseOwner, &leaseUntil,
 		&event.CreatedAt, &publishedAt,
 	); err != nil {
 		return biz.OutboxEvent{}, storageError(err)
 	}
 	event.Payload = append(json.RawMessage(nil), payload...)
+	event.TraceParent = traceparent.String
+	event.TraceState = tracestate.String
 	event.NextRetryAt = nullableTime(nextRetryAt)
 	event.LeaseOwner = leaseOwner.String
 	event.LeaseUntil = nullableTime(leaseUntil)

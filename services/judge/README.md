@@ -47,3 +47,10 @@ judged_at。普通提交不产生此事件；最终基础设施失败写入 DONE
 Outbox Relay 继续在 Publisher Confirm 后标记 published。比赛重判仍作废旧 ID、创建新 ID，
 新 ID 保留原 `created_at` 用于比赛计分，deadline 和 updated_at 使用重判时刻。
 `submission.invalidated` 包含比赛 ID 和原提交时间，支持 Contest 在 judged 到达前建立作废记录。
+
+Judge Trace 的 Outbox 上下文由 `migrations/submission/000010_add_outbox_trace_context`
+扩展为可空 `traceparent` / `tracestate`。Relay 从持久化上下文建立 publish Span，并在
+AMQP Header 和 Envelope 字段中传播新父上下文；Judge Worker 的 retry/result 消息继续
+同一 W3C Trace。Judge 结果消费者和 Contest 投影消费者创建各自的消费 Span。历史
+Outbox 和无 Trace 的旧消息仍可处理；上下文无效时只会开启新 Trace。Publisher Confirm、
+手动 ACK/NACK、事件 ID 和幂等事务语义不变。

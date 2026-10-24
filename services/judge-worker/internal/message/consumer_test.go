@@ -10,16 +10,23 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type fakeDelivery struct {
 	body              []byte
+	headers           amqp091.Table
 	ack, nack, reject bool
 	requeue           bool
 }
 
-func (d *fakeDelivery) GetBody() []byte { return d.body }
-func (d *fakeDelivery) Ack(bool) error  { d.ack = true; return nil }
+func (d *fakeDelivery) GetBody() []byte           { return d.body }
+func (d *fakeDelivery) GetHeaders() amqp091.Table { return d.headers }
+func (d *fakeDelivery) Ack(bool) error            { d.ack = true; return nil }
 func (d *fakeDelivery) Nack(_ bool, requeue bool) error {
 	d.nack = true
 	d.requeue = requeue
@@ -30,23 +37,59 @@ func (d *fakeDelivery) Reject(_ bool) error { d.reject = true; return nil }
 type fakeEngine struct {
 	outcome biz.Outcome
 	calls   int
+	trace   trace.SpanContext
 }
 
-func (e *fakeEngine) Execute(context.Context, mq.JudgeTask) biz.Outcome { e.calls++; return e.outcome }
+func (e *fakeEngine) Execute(ctx context.Context, _ mq.JudgeTask) biz.Outcome {
+	e.calls++
+	e.trace = trace.SpanContextFromContext(ctx)
+	return e.outcome
+}
 
 type fakeReporter struct {
 	err               error
 	completed, failed int
 	retries           []mq.JudgeTask
+	trace             trace.SpanContext
 }
 
-func (r *fakeReporter) ReportCompleted(context.Context, mq.Envelope, mq.JudgeCompleted) error {
+func (r *fakeReporter) ReportCompleted(ctx context.Context, _ mq.Envelope, _ mq.JudgeCompleted) error {
 	r.completed++
+	r.trace = trace.SpanContextFromContext(ctx)
 	return r.err
 }
-func (r *fakeReporter) ReportFailed(context.Context, mq.Envelope, mq.JudgeFailed) error {
+func (r *fakeReporter) ReportFailed(ctx context.Context, _ mq.Envelope, _ mq.JudgeFailed) error {
 	r.failed++
+	r.trace = trace.SpanContextFromContext(ctx)
 	return r.err
+}
+
+func TestHandleContinuesRemoteTraceThroughExecutionAndReport(t *testing.T) {
+	previousProvider, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(exporter)))
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	defer func() {
+		_ = provider.Shutdown(context.Background())
+		otel.SetTracerProvider(previousProvider)
+		otel.SetTextMapPropagator(previousPropagator)
+	}()
+
+	rootCtx, root := otel.Tracer("test").Start(context.Background(), "gateway.request")
+	rootSC := root.SpanContext()
+	headers := mq.TraceHeadersFromContext(rootCtx)
+	root.End()
+	engine := &fakeEngine{outcome: biz.Outcome{Completed: &mq.JudgeCompleted{SubmissionID: 1, JudgeRevision: "12345678901234567890123456", Verdict: "AC"}}}
+	reporter := &fakeReporter{}
+	d := &fakeDelivery{body: validBody(t), headers: headers}
+	(&Consumer{Engine: engine, Reporter: reporter, TaskTimeout: time.Second}).Handle(context.Background(), d)
+	if !d.ack || !engine.trace.IsValid() || !reporter.trace.IsValid() || engine.trace.TraceID() != rootSC.TraceID() || reporter.trace.TraceID() != rootSC.TraceID() {
+		t.Fatalf("trace not continued: delivery=%+v engine=%+v reporter=%+v root=%+v", d, engine.trace, reporter.trace, rootSC)
+	}
+	if engine.trace.SpanID() == rootSC.SpanID() || reporter.trace.SpanID() == rootSC.SpanID() {
+		t.Fatalf("worker/report reused parent span instead of creating child: engine=%+v reporter=%+v root=%+v", engine.trace, reporter.trace, rootSC)
+	}
 }
 func (r *fakeReporter) ReportRetry(_ context.Context, _ mq.Envelope, task mq.JudgeTask) error {
 	r.retries = append(r.retries, task)

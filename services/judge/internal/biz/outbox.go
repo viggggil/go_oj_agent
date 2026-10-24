@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -29,6 +32,8 @@ type OutboxEvent struct {
 	AggregateID   int64
 	EventType     string
 	EventVersion  int32
+	TraceParent   string
+	TraceState    string
 	Payload       json.RawMessage
 	Status        string
 	RetryCount    int
@@ -44,6 +49,8 @@ type PublishedMessage struct {
 	EventType    string
 	EventVersion int32
 	RoutingKey   string
+	TraceParent  string
+	TraceState   string
 	Body         []byte
 }
 
@@ -143,11 +150,32 @@ func (r *OutboxRelay) RunOnce(ctx context.Context) (int, error) {
 			processed++
 			continue
 		}
-		if err := r.publisher.Publish(ctx, message); err != nil {
+		publishCtx := mq.ContextFromTraceValues(ctx, event.TraceParent, event.TraceState)
+		publishCtx, span := otel.Tracer("oj.judge.relay").Start(publishCtx, "judge.outbox.publish")
+		span.SetAttributes(attribute.String("messaging.event_type", message.EventType), attribute.String("messaging.routing_key", message.RoutingKey), attribute.String("outbox.event_id", event.EventID))
+		traceparent, tracestate := mq.TraceContextValues(publishCtx)
+		if traceparent != "" {
+			message.TraceParent, message.TraceState = traceparent, tracestate
+			var traceErr error
+			if message.Body, traceErr = mq.WithTraceContext(message.Body, traceparent, tracestate); traceErr != nil {
+				span.End()
+				if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, now, true, stableFailure(traceErr)); err != nil {
+					return processed, err
+				}
+				processed++
+				continue
+			}
+		}
+		publishErr := r.publisher.Publish(publishCtx, message)
+		if publishErr != nil {
+			span.SetStatus(codes.Error, "publish failed")
+		}
+		span.End()
+		if publishErr != nil {
 			attempt := event.RetryCount + 1
 			dead := attempt >= config.MaxRetries
 			next := now.Add(backoff(config.RetryDelay, event.RetryCount))
-			if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, next, dead, stableFailure(err)); err != nil {
+			if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, next, dead, stableFailure(publishErr)); err != nil {
 				return processed, err
 			}
 			processed++
@@ -228,12 +256,12 @@ func buildPublishedMessage(event OutboxEvent) (PublishedMessage, error) {
 		return PublishedMessage{}, fmt.Errorf("unsupported outbox event type %q", event.EventType)
 	}
 	body, err := mq.MarshalEnvelope(mq.EnvelopeMetadata{
-		EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, OccurredAt: event.CreatedAt,
+		EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, OccurredAt: event.CreatedAt, TraceParent: event.TraceParent, TraceState: event.TraceState,
 	}, payload)
 	if err != nil {
 		return PublishedMessage{}, fmt.Errorf("encode outbox message: %w", err)
 	}
-	return PublishedMessage{EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, RoutingKey: routingKey, Body: body}, nil
+	return PublishedMessage{EventID: event.EventID, EventType: publishedType, EventVersion: event.EventVersion, RoutingKey: routingKey, TraceParent: event.TraceParent, TraceState: event.TraceState, Body: body}, nil
 }
 
 func stableFailure(err error) string {

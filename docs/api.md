@@ -1364,6 +1364,8 @@ Judge Worker
   "event_version": 1,
   "occurred_at": "2026-08-27T00:00:00Z",
   "trace_id": "...",
+  "traceparent": "00-...-...-01",
+  "tracestate": "...",
   "data": {}
 }
 ```
@@ -1372,6 +1374,7 @@ Judge Worker
 
 - `event_id` 全局唯一。
 - `event_version` 显式版本化。
+- `traceparent` / `tracestate` 是可选 W3C 追踪元数据；缺失或无效时 Consumer 创建新 Trace，不拒绝业务事件。RabbitMQ Header 同时携带相同传播格式。
 - Event Schema 不直接复用 ORM Entity。
 - Consumer 必须支持重复投递。
 - Breaking Change 需要升级版本或兼容迁移。
