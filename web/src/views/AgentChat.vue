@@ -86,7 +86,7 @@
     </p>
     <RouterLink
       v-if="lastRunId && !streaming && agentAdministrator(auth.user?.roles || [])"
-      :to="{ path: '/agent/observability', query: { run_id: lastRunId } }"
+      :to="{ path: '/monitoring/agent', query: { run_id: lastRunId } }"
       class="link"
       >诊断本轮运行</RouterLink
     >

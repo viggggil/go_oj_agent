@@ -159,10 +159,10 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 
 详情响应不得包含 messages、config_snapshot 原文或任意 model_summary JSON。明确映射模型 attempt、工具安全状态、运行时间和配置版本；链接由服务端基于受控部署地址构造，不能接受用户提供 URL。Grafana/LangSmith 详情使用各自独立认证，链接不是公开分享链接，页面不持有供应商密钥。
 
-前端先实现两个 Tab：
+前端使用顶层“监控”工作区，与题库、提交、比赛、Agent 在顶栏并列。当前工作区包含 Agent 运行诊断和判题链路拓扑两个视图；系统指标总览与判题实时指标在后续接入后扩展。
 
-- 系统概览：已接入服务的可用性、QPS、错误率、P95、数据新鲜度；未接入服务明确标注，后续增加判题积压、Outbox 与依赖资源。
-- Agent 运行：在途/成功/失败/取消、运行耗时、模型 attempt 与首段正文延迟、Token 来源、工具错误；下方 Run 列表与详情抽屉。
+- Agent 运行诊断：在途/成功/失败/取消、运行耗时、模型 attempt 与首段正文延迟、Token 来源、工具错误；下方 Run 列表与详情抽屉。该视图属于监控工作区，不属于 Agent 管理工作区。
+- 判题链路：展示 Gateway、Judge Service、RabbitMQ、Judge Worker、Sandbox 和 Contest 结果回写的因果拓扑；队列积压、Worker 和 Sandbox 的实时指标在后续接入后显示。
 
 图表允许区分没有流量、没有启用采集、采集故障；路由守卫只是用户体验，后端执行真实授权。轮询在页面不可见时暂停，旧查询取消，不重叠堆积；首期无需为监控新增 SSE。
 
