@@ -23,7 +23,10 @@ import AgentRag from './views/AgentRag.vue'
 import AgentEval from './views/AgentEval.vue'
 import AgentEvalDatasetCreate from './views/AgentEvalDatasetCreate.vue'
 import AgentTools from './views/AgentTools.vue'
-import AgentObservability from './views/AgentObservability.vue'
+import MonitoringAgent from './views/MonitoringAgent.vue'
+import MonitoringWorkspace from './views/MonitoringWorkspace.vue'
+import MonitoringHome from './views/MonitoringHome.vue'
+import JudgePipeline from './views/JudgePipeline.vue'
 import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
@@ -33,6 +36,16 @@ const router = createRouter({
     { path: '/login', component: Login },
     { path: '/register', component: Register },
     { path: '/profile', component: Profile, meta: { auth: true } },
+    {
+      path: '/monitoring',
+      component: MonitoringWorkspace,
+      meta: { auth: true },
+      children: [
+        { path: '', component: MonitoringHome },
+        { path: 'agent', component: MonitoringAgent, meta: { monitorAgent: true } },
+        { path: 'judge', component: JudgePipeline, meta: { monitorSystem: true } },
+      ],
+    },
     { path: '/problems', component: Problems, meta: { auth: true } },
     { path: '/problems/new', component: ProblemEditor, meta: { auth: true, admin: true } },
     { path: '/problems/:id', component: ProblemDetail, meta: { auth: true } },
@@ -54,7 +67,10 @@ const router = createRouter({
         { path: 'rag', component: AgentRag, meta: { agentAdmin: true } },
         { path: 'eval', component: AgentEval, meta: { agentAdmin: true } },
         { path: 'tools', component: AgentTools, meta: { agentAdmin: true } },
-        { path: 'observability', component: AgentObservability, meta: { agentAdmin: true } },
+        {
+          path: 'observability',
+          redirect: (to) => ({ path: '/monitoring/agent', query: to.query, hash: to.hash }),
+        },
         {
           path: 'eval/datasets/new',
           component: AgentEvalDatasetCreate,
@@ -91,11 +107,24 @@ router.beforeEach(async (to, from) => {
     return '/login'
   }
 
-  if (to.meta.admin) {
+  if (to.meta.admin || to.meta.monitorSystem) {
     const { useAuthStore } = await import('./stores/auth')
     const auth = useAuthStore()
     if (!auth.user) await auth.fetchProfile().catch(() => undefined)
-    if (!auth.user?.roles.includes('admin')) return '/problems'
+    const allowed = to.meta.monitorSystem
+      ? auth.user?.roles.some((role) => ['admin', 'system_admin'].includes(role))
+      : auth.user?.roles.includes('admin')
+    if (!allowed) return '/problems'
+  }
+
+  if (to.meta.monitorAgent || to.path.startsWith('/monitoring')) {
+    const { useAuthStore } = await import('./stores/auth')
+    const auth = useAuthStore()
+    if (!auth.user || auth.profileError) await auth.fetchProfile().catch(() => undefined)
+    if (!tokens.access) return '/login'
+    if (auth.profileError) return false
+    if (to.meta.monitorAgent && !agentAdministrator(auth.user?.roles || [])) return '/problems'
+    if (to.path === '/monitoring' && !agentAdministrator(auth.user?.roles || [])) return '/problems'
   }
 
   if (to.path.startsWith('/agent')) {
