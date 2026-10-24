@@ -6,7 +6,12 @@ import (
 	"encoding/hex"
 	"strings"
 
+	kerrors "github.com/go-kratos/kratos/v3/errors"
 	"github.com/google/wire"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
@@ -31,18 +36,22 @@ func NewSubmissionService(uc *biz.SubmissionUsecase) *SubmissionService {
 }
 
 func (s *SubmissionService) CreateSubmission(ctx context.Context, req *submissionv1.CreateSubmissionRequest) (*submissionv1.CreateSubmissionResponse, error) {
+	ctx, span := otel.Tracer("oj.judge").Start(ctx, "judge.submission.create")
+	defer span.End()
+	span.SetAttributes(attribute.String("judge.operation", "submission.create"))
 	if req == nil || s == nil || s.uc == nil {
-		return nil, biz.ErrorInvalidArgument("invalid create submission request")
+		return nil, traceError(span, biz.ErrorInvalidArgument("invalid create submission request"))
 	}
 	if err := req.Validate(); err != nil {
-		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+		return nil, traceError(span, biz.ErrorInvalidArgument("%s", err.Error()))
 	}
+	span.SetAttributes(attribute.Int64("problem.id", req.GetProblemId()), attribute.String("submission.language", req.GetLanguage()), attribute.Bool("submission.contest", req.GetContestId() > 0))
 	actor, err := actorFromPrincipal(ctx)
 	if err != nil {
-		return nil, err
+		return nil, traceError(span, err)
 	}
 	if req.GetContestId() > 0 && (req.GetContestStartAt() == nil || req.GetContestEndAt() == nil || req.GetContestStartAt().CheckValid() != nil || req.GetContestEndAt().CheckValid() != nil) {
-		return nil, biz.ErrorInvalidArgument("valid contest interval is required")
+		return nil, traceError(span, biz.ErrorInvalidArgument("valid contest interval is required"))
 	}
 	result, err := s.uc.Create(ctx, biz.CreateSubmissionInput{
 		Actor: actor, ProblemID: req.GetProblemId(), ContestID: req.GetContestId(), Language: req.GetLanguage(),
@@ -50,8 +59,9 @@ func (s *SubmissionService) CreateSubmission(ctx context.Context, req *submissio
 		ContestStartAt: req.GetContestStartAt().AsTime(), ContestEndAt: req.GetContestEndAt().AsTime(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, traceError(span, err)
 	}
+	span.SetAttributes(attribute.Int64("submission.id", result.SubmissionID), attribute.Int64("submission.status", int64(result.Status)))
 	return &submissionv1.CreateSubmissionResponse{SubmissionId: result.SubmissionID, Status: result.Status}, nil
 }
 
@@ -142,21 +152,36 @@ func (s *SubmissionService) GetJudgeResult(ctx context.Context, req *submissionv
 }
 
 func (s *SubmissionService) RejudgeSubmission(ctx context.Context, req *submissionv1.RejudgeSubmissionRequest) (*submissionv1.RejudgeSubmissionResponse, error) {
+	ctx, span := otel.Tracer("oj.judge").Start(ctx, "judge.submission.rejudge")
+	defer span.End()
+	span.SetAttributes(attribute.String("judge.operation", "submission.rejudge"))
 	if req == nil || s == nil || s.uc == nil {
-		return nil, biz.ErrorInvalidArgument("invalid rejudge submission request")
+		return nil, traceError(span, biz.ErrorInvalidArgument("invalid rejudge submission request"))
 	}
 	if err := req.Validate(); err != nil {
-		return nil, biz.ErrorInvalidArgument("%s", err.Error())
+		return nil, traceError(span, biz.ErrorInvalidArgument("%s", err.Error()))
 	}
+	span.SetAttributes(attribute.Int64("submission.id", req.GetSubmissionId()))
 	actor, err := actorFromPrincipal(ctx)
 	if err != nil {
-		return nil, err
+		return nil, traceError(span, err)
 	}
 	result, err := s.uc.Rejudge(ctx, biz.RejudgeSubmissionInput{Actor: actor, SubmissionID: req.GetSubmissionId(), IdempotencyKey: strings.ToLower(req.GetIdempotencyKey())})
 	if err != nil {
-		return nil, err
+		return nil, traceError(span, err)
 	}
+	span.SetAttributes(attribute.Int64("submission.invalidated_id", result.InvalidatedSubmissionID), attribute.Int64("submission.id", result.Submission.ID), attribute.Int64("submission.status", int64(result.Submission.Status)))
 	return &submissionv1.RejudgeSubmissionResponse{InvalidatedSubmissionId: result.InvalidatedSubmissionID, Submission: toProtoSubmission(result.Submission)}, nil
+}
+
+func traceError(span trace.Span, err error) error {
+	if err != nil {
+		span.SetStatus(codes.Error, "")
+		if reason := kerrors.Reason(err); reason != "" {
+			span.SetAttributes(attribute.String("error.code", reason))
+		}
+	}
+	return err
 }
 
 func actorFromPrincipal(ctx context.Context) (biz.Actor, error) {

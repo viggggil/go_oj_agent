@@ -871,9 +871,10 @@ flowchart LR
     Judge --> MQ["RabbitMQ"]
     MQ --> Worker["Worker"]
 
-    Gateway -. "阶段一已接入" .-> OTel["OpenTelemetry"]
+    Gateway -. "同步 gRPC 已接入" .-> OTel["OpenTelemetry"]
     Agent -. "阶段一已接入" .-> OTel
-    Judge -. "后续阶段" .-> OTel
+    Judge -. "同步调用已接入" .-> OTel
+    Problem -. "同步调用已接入" .-> OTel
     Worker -. "后续阶段" .-> OTel
 
     OTel --> Metrics["Prometheus"]
@@ -883,7 +884,7 @@ flowchart LR
 
 RabbitMQ Header 中传播 Trace Context。
 
-阶段一提供可选本地栈：Gateway 与 Agent 通过 OTLP 将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标供 Prometheus 抓取，Grafana 预置 Prometheus 与 Tempo 数据源。使用 `make observability-up` 启动，默认 `make infra-up` 不会启动观测组件；关闭后 Gateway/Agent 恢复无导出配置。当前仅接通 Gateway HTTP/Agent Chat 边界和 Agent FastAPI HTTP 指标，判题、RabbitMQ、Worker 与管理端页面尚未接入。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。阶段一不启用 LangSmith 上传。
+可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span；未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖。RabbitMQ、Outbox、Worker 和结果消费的异步父子传播仍待后续阶段接入；此阶段不启用 LangSmith 上传。
 
 关键 Metrics：
 

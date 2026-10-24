@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-kratos/kratos/v3/middleware"
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
@@ -23,7 +24,10 @@ func NewGRPCServer(
 	if config != nil && config.GetServer() != nil && config.GetServer().GetGrpc() != nil && config.GetServer().GetGrpc().GetAddress() != "" {
 		address = config.GetServer().GetGrpc().GetAddress()
 	}
-	options := []kgrpc.ServerOption{kgrpc.Address(address)}
+	options := []kgrpc.ServerOption{
+		kgrpc.Address(address),
+		kgrpc.Options(grpc.StatsHandler(otelgrpc.NewServerHandler())),
+	}
 	if config != nil {
 		if auth := config.GetInternalAuth(); auth != nil && auth.GetPublicKeyFile() != "" {
 			maxTTL, err := time.ParseDuration(auth.GetMaxTokenTtl())

@@ -1,11 +1,13 @@
 package server
 
 import (
-	"github.com/go-kratos/kratos/v3/middleware"
-	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
-	"google.golang.org/grpc"
 	"os"
 	"time"
+
+	"github.com/go-kratos/kratos/v3/middleware"
+	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
 
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
@@ -22,7 +24,10 @@ func NewGRPCServer(
 	if config != nil && config.GetServer() != nil && config.GetServer().GetGrpc() != nil && config.GetServer().GetGrpc().GetAddress() != "" {
 		address = config.GetServer().GetGrpc().GetAddress()
 	}
-	options := []kgrpc.ServerOption{kgrpc.Address(address)}
+	options := []kgrpc.ServerOption{
+		kgrpc.Address(address),
+		kgrpc.Options(grpc.StatsHandler(otelgrpc.NewServerHandler())),
+	}
 	maxReceiveMessageBytes := 34 * 1024 * 1024
 	if config != nil && config.GetServer() != nil && config.GetServer().GetGrpc() != nil && config.GetServer().GetGrpc().GetMaxReceiveMessageBytes() > 0 {
 		maxReceiveMessageBytes = int(config.GetServer().GetGrpc().GetMaxReceiveMessageBytes())
