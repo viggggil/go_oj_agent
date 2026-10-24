@@ -8,6 +8,8 @@ import (
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -22,6 +24,9 @@ type JudgeResultEvent struct {
 	EventID       string
 	EventType     string
 	EventVersion  int32
+	TraceID       string
+	TraceParent   string
+	TraceState    string
 	SubmissionID  int64
 	JudgeRevision string
 	Verdict       submissionv1.JudgeVerdict
@@ -49,6 +54,11 @@ func (c *ResultConsumer) Handle(ctx context.Context, eventType string, body []by
 	if err != nil {
 		return err
 	}
+	if !trace.SpanContextFromContext(ctx).IsValid() {
+		ctx = mq.ContextFromTraceValues(ctx, event.TraceParent, event.TraceState)
+	}
+	ctx, span := otel.Tracer("oj.judge.result").Start(ctx, "judge.result.apply")
+	defer span.End()
 	return c.repository.ApplyJudgeResult(ctx, event)
 }
 
@@ -60,7 +70,8 @@ func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, err
 		if err != nil || value.Validate() != nil {
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge completed payload")
 		}
-		result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion}
+		result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, TraceID: envelope.TraceID}
+		result.TraceParent, result.TraceState = envelope.TraceParent, envelope.TraceState
 		result.SubmissionID, result.JudgeRevision, result.OccurredAt = value.SubmissionID, value.JudgeRevision, envelope.OccurredAt
 		result.Verdict, _ = verdictFromWire(value.Verdict)
 		result.TimeMS, result.MemoryKB = &value.TimeMS, &value.MemoryKB
@@ -80,7 +91,7 @@ func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, err
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge failed payload")
 		}
 		return JudgeResultEvent{
-			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion,
+			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, TraceID: envelope.TraceID, TraceParent: envelope.TraceParent, TraceState: envelope.TraceState,
 			SubmissionID: value.SubmissionID, JudgeRevision: value.JudgeRevision,
 			Reason: value.Reason, Code: value.Code, Message: value.Message, Retryable: value.Retryable, OccurredAt: envelope.OccurredAt,
 		}, nil

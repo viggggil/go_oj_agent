@@ -30,6 +30,10 @@ retry task 会递增 `attempt`，生成新的 `event_id`，保留 `trace_id`，�
 作为 `causation_id`。达到 `worker.retry.max_retries`，或 retry delay 会超过
 `judge_deadline_at` 时，Worker 发布不可重试的 `judge.failed`。
 
+Worker 从 RabbitMQ 的 W3C `traceparent` / `tracestate` Header 恢复任务上下文，为判题
+执行创建 `judge.worker.task` Span；retry 和结果发布都以该 Span 为父上下文。旧消息没有
+Trace Header 时正常处理并创建新的本地 Trace；追踪字段不参与重试、ACK 或判题状态。
+
 收到 SIGTERM 后先取消 RabbitMQ consumer，停止 intake，等待已接收 delivery；在
 `worker.shutdown_timeout` 内完成必要的判题和已确认结果发布后再关闭 channel/connection。
 超时未完成的 delivery 不会被提前 ACK，连接关闭后由 RabbitMQ 重投。go-judge 编译

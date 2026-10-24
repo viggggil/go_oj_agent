@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"os"
+	"time"
 
 	kratos "github.com/go-kratos/kratos/v3"
 	"github.com/go-kratos/kratos/v3/config"
 	"github.com/go-kratos/kratos/v3/config/env"
 	"github.com/go-kratos/kratos/v3/config/file"
 
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/conf"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/server"
 )
@@ -34,6 +37,18 @@ func main() {
 		logger.Error("invalid judge-worker config", "error", err)
 		os.Exit(1)
 	}
+	shutdownTelemetry, telemetryErr := observability.Init(context.Background(), "judge-worker")
+	if telemetryErr != nil {
+		logger.Error("failed to initialize OpenTelemetry", "error_type", "exporter_init")
+		shutdownTelemetry = func(context.Context) error { return nil }
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			logger.Error("failed to shut down OpenTelemetry", "error_type", "shutdown")
+		}
+	}()
 	app, cleanup, err := initApp(&bootstrap)
 	if err != nil {
 		logger.Error("failed to initialize judge-worker", "error", err)

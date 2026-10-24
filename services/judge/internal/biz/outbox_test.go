@@ -43,6 +43,29 @@ func TestOutboxRelayPublishesAndMarksEvent(t *testing.T) {
 	}
 }
 
+func TestOutboxRelayRestoresPersistedTraceContextBeforePublish(t *testing.T) {
+	now := time.Date(2026, 9, 21, 3, 0, 0, 0, time.UTC)
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	repository := &outboxRepositoryFake{events: []OutboxEvent{{
+		ID: 3, EventID: "123e4567-e89b-12d3-a456-426614174002", AggregateID: 9,
+		EventType: EventTypeJudgeRequested, EventVersion: 1, TraceParent: traceparent,
+		Payload: mustJSON(t, JudgeRequestedPayload{SubmissionID: 9, ProblemID: 7, Language: "go", JudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6", SourceObjectKey: "sources/a/source.go", SourceSHA256: strings.Repeat("a", 64), SourceSizeBytes: 10, JudgeDeadlineAt: now.Add(time.Minute)}), CreatedAt: now,
+	}}}
+	publisher := &publisherFake{}
+	relay := NewOutboxRelay(repository, publisher)
+	relay.clock = func() time.Time { return now }
+	if _, err := relay.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var envelope mq.Envelope
+	if err := json.Unmarshal(publisher.messages[0].Body, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.TraceParent != traceparent || publisher.messages[0].TraceParent != traceparent {
+		t.Fatalf("trace context not persisted to publish: envelope=%+v message=%+v", envelope, publisher.messages[0])
+	}
+}
+
 func TestOutboxRelayBacksOffAndDeadLettersAfterMaxRetries(t *testing.T) {
 	now := time.Date(2026, 9, 21, 3, 0, 0, 0, time.UTC)
 	repository := &outboxRepositoryFake{events: []OutboxEvent{{

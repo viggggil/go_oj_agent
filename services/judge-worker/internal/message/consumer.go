@@ -11,6 +11,10 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Delivery interface {
@@ -22,9 +26,10 @@ type Delivery interface {
 
 type delivery struct{ amqp091.Delivery }
 
-func (d delivery) GetBody() []byte      { return d.Body }
-func (d delivery) GetMessageID() string { return d.MessageId }
-func (d delivery) IsRedelivered() bool  { return d.Redelivered }
+func (d delivery) GetBody() []byte           { return d.Body }
+func (d delivery) GetMessageID() string      { return d.MessageId }
+func (d delivery) IsRedelivered() bool       { return d.Redelivered }
+func (d delivery) GetHeaders() amqp091.Table { return d.Headers }
 
 type Engine interface {
 	Execute(context.Context, mq.JudgeTask) biz.Outcome
@@ -56,7 +61,17 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		return
 	}
 	envelope, task, err := decodeTask(d.GetBody())
+	traceCtx := ctx
+	if carrier, ok := d.(interface{ GetHeaders() amqp091.Table }); ok {
+		traceCtx = mq.ContextFromTraceHeaders(traceCtx, carrier.GetHeaders())
+	}
+	if err == nil && !trace.SpanContextFromContext(traceCtx).IsValid() {
+		traceCtx = mq.ContextFromTraceValues(ctx, envelope.TraceParent, envelope.TraceState)
+	}
+	traceCtx, span := otel.Tracer("oj.judge.worker").Start(traceCtx, "judge.worker.task")
+	defer span.End()
 	if err != nil {
+		span.SetStatus(codes.Error, "task rejected")
 		if c.Logger != nil {
 			attrs := []any{"reason", err.Error()}
 			if metadata, ok := d.(interface{ GetMessageID() string }); ok {
@@ -74,6 +89,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		}
 		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
 	}
+	span.SetAttributes(attribute.Int64("submission.id", task.SubmissionID), attribute.Int64("problem.id", task.ProblemID), attribute.Int64("judge.attempt", int64(task.Attempt)))
 	deadline := time.Now().Add(c.TaskTimeout)
 	if c.TaskTimeout <= 0 {
 		deadline = time.Now().Add(60 * time.Second)
@@ -81,12 +97,13 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	if task.JudgeDeadlineAt.Before(deadline) {
 		deadline = task.JudgeDeadlineAt
 	}
-	taskCtx, cancel := context.WithDeadline(ctx, deadline)
+	taskCtx, cancel := context.WithDeadline(traceCtx, deadline)
 	defer cancel()
 	if c.Logger != nil {
 		c.Logger.Info("judge started", "event_id", envelope.EventID, "submission_id", task.SubmissionID)
 	}
 	if c.Engine == nil || c.Reporter == nil {
+		span.SetStatus(codes.Error, "worker dependency unavailable")
 		_ = d.Nack(false, true)
 		return
 	}
@@ -94,7 +111,8 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	// remains here in addition to Engine's guard for protocol-only engines.
 	if !time.Now().Before(task.JudgeDeadlineAt) {
 		failed := mq.JudgeFailed{SubmissionID: task.SubmissionID, JudgeRevision: task.JudgeRevision, Code: mq.FailureTaskExpired, Message: "judge deadline exceeded", Reason: "JUDGE_DEADLINE_EXCEEDED", Retryable: false}
-		if err := c.Reporter.ReportFailed(ctx, envelope, failed); err != nil {
+		if err := c.Reporter.ReportFailed(traceCtx, envelope, failed); err != nil {
+			span.SetStatus(codes.Error, "result publish failed")
 			_ = d.Nack(false, true)
 			return
 		}
@@ -108,7 +126,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		}
 		// The execution deadline must not cancel publication of the resulting
 		// verdict; otherwise an expired task could be requeued forever.
-		err = c.Reporter.ReportCompleted(ctx, envelope, *outcome.Completed)
+		err = c.Reporter.ReportCompleted(traceCtx, envelope, *outcome.Completed)
 	} else if outcome.Failed != nil {
 		// Retry is an explicit publish to a delayed queue. Never NACK/requeue a
 		// retryable engine result directly, otherwise a busy loop can starve the
@@ -117,7 +135,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 			retryTask := task
 			retryTask.Attempt++
 			if retryReporter, ok := c.Reporter.(RetryReporter); ok {
-				err = retryReporter.ReportRetry(ctx, envelope, retryTask)
+				err = retryReporter.ReportRetry(traceCtx, envelope, retryTask)
 				if err == nil {
 					err = d.Ack(false)
 				}
@@ -135,11 +153,12 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		if c.Logger != nil {
 			c.Logger.Warn("judge failed", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "reason", outcome.Failed.Reason)
 		}
-		err = c.Reporter.ReportFailed(ctx, envelope, *outcome.Failed)
+		err = c.Reporter.ReportFailed(traceCtx, envelope, *outcome.Failed)
 	} else {
 		err = fmt.Errorf("engine returned empty outcome")
 	}
 	if err != nil {
+		span.SetStatus(codes.Error, "result publish failed")
 		if c.Logger != nil {
 			c.Logger.Error("result publish failed", "event_id", envelope.EventID, "error", err)
 		}

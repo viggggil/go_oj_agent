@@ -8,7 +8,11 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 )
 
@@ -19,8 +23,8 @@ func TestStoreClaimOutboxLeasesRows(t *testing.T) {
 	mock.ExpectQuery("SELECT id, event_id, aggregate_type, aggregate_id, event_type").
 		WithArgs(biz.OutboxStatusPending, now, now, 2).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "event_id", "aggregate_type", "aggregate_id", "event_type", "event_version", "payload", "status", "retry_count", "next_retry_at", "lease_owner", "lease_until", "created_at", "published_at",
-		}).AddRow(1, "123e4567-e89b-12d3-a456-426614174000", "submission", 9, biz.EventTypeJudgeRequested, 1, []byte(`{"submission_id":9}`), biz.OutboxStatusPending, 0, nil, nil, nil, now, nil)).
+			"id", "event_id", "aggregate_type", "aggregate_id", "event_type", "event_version", "traceparent", "tracestate", "payload", "status", "retry_count", "next_retry_at", "lease_owner", "lease_until", "created_at", "published_at",
+		}).AddRow(1, "123e4567-e89b-12d3-a456-426614174000", "submission", 9, biz.EventTypeJudgeRequested, 1, nil, nil, []byte(`{"submission_id":9}`), biz.OutboxStatusPending, 0, nil, nil, nil, now, nil)).
 		RowsWillBeClosed()
 	mock.ExpectExec("UPDATE outbox_events").
 		WithArgs("relay-1", leaseUntil, int64(1), biz.OutboxStatusPending).
@@ -33,6 +37,42 @@ func TestStoreClaimOutboxLeasesRows(t *testing.T) {
 	}
 	if string(events[0].Payload) != `{"submission_id":9}` {
 		t.Fatalf("payload = %s", events[0].Payload)
+	}
+	assertExpectations(t, mock)
+}
+
+func TestInsertOutboxPersistsTraceContextInsideBusinessTransaction(t *testing.T) {
+	store, mock, now := newMockStore(t)
+	previousProvider, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
+	provider := sdktrace.NewTracerProvider()
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	defer func() {
+		_ = provider.Shutdown(context.Background())
+		otel.SetTracerProvider(previousProvider)
+		otel.SetTextMapPropagator(previousPropagator)
+	}()
+	ctx, span := otel.Tracer("test").Start(context.Background(), "judge.create")
+	defer span.End()
+	traceparent, tracestate := mq.TraceContextValues(ctx)
+	if traceparent == "" {
+		t.Fatal("expected active traceparent")
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO outbox_events").
+		WithArgs("123e4567-e89b-12d3-a456-426614174010", int64(42), biz.EventTypeJudgeRequested, traceparent, tracestate, sqlmock.AnyArg(), now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = insertOutbox(ctx, tx, "123e4567-e89b-12d3-a456-426614174010", 42, biz.EventTypeJudgeRequested, map[string]int{"submission_id": 42}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 	assertExpectations(t, mock)
 }

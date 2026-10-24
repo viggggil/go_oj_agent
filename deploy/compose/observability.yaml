@@ -11,6 +11,14 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
+  judge-worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_DEPLOYMENT_ENVIRONMENT: development
+  contest-service:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_DEPLOYMENT_ENVIRONMENT: development
   agent-service:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
