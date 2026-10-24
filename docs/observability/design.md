@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：阶段一、Issue #189 的 Agent Chat 本地追踪和 Issue #191 的 Agent 后台任务本地追踪已实现。管理员查询 UI、Judge/MQ 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
+状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪和 Issue #200 PR1 的同步 Judge Trace 已实现。Judge Outbox/MQ/Worker 异步传播和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 
@@ -112,7 +112,7 @@ flowchart LR
 
 1. Go 新增 `pkg/observability/`，Python 新增 `agent/app/observability/`，统一生命周期、资源字段、采样、脱敏和导出；锁定 SDK、Collector 与语义约定版本。
 2. 使用 W3C `traceparent` / `tracestate`。公网入口默认创建自己的 Trace；只有明确配置的可信上游才承接父上下文。无效上下文忽略，不影响业务；首期不传播任意 baggage。
-3. HTTP、gRPC 客户端与服务端注入/提取上下文。Gateway 当前自定义 SSE、上传和 JSON 路由必须显式覆盖，验证 filter/interceptor 不会重复生成 Span。
+3. 已接通 Gateway→Judge、Judge→Problem 的同步 gRPC 上下文注入/提取；Gateway HTTP 已使用 `otelhttp`。Judge 与 Problem gRPC Server 使用 `otelgrpc`，Judge 提交和重判入口创建业务 Span。RabbitMQ 与 Worker 的异步上下文仍由后续 PR 负责。
 4. `RequestContext.trace_id` 改为当前 Span 的 trace_id 派生值；`X-Trace-ID` 兼容响应也由服务端生成。旧客户端传任意字符串不再决定 Trace 身份，需要同步更新现有 Gateway 契约测试。
 5. 流式 Span 覆盖响应体消费与清理，而非只到响应头；记录业务终态，客户端取消及时关闭；HTTP 200 后的 SSE error 仍计入 Run 错误。
 6. Tool→gRPC、内部 run_code、RAG、Eval、Memory 子任务分别关联执行上下文。不要把用户对话或凭据附到自动 HTTP、SQL、异常事件或 Span 名称中；默认关闭 SQL 语句与请求/响应正文采集。
@@ -189,7 +189,7 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 
 | 阶段 | 实施内容 | 验收 |
 | --- | --- | --- |
-| PR1 基础设施与最小追踪 | 可选 Compose overlay：Collector、Prometheus、Tempo、Grafana；共用初始化；Gateway→Agent 的 HTTP/SSE、进程指标、JSON 日志关联 | 一次 fake 聊天在 Grafana 可查完整 HTTP/SSE 生命周期；关闭 Collector 仍能正常聊天 |
+| PR1 同步 Judge Trace | Gateway→Judge→Problem gRPC Trace 传播；Judge/Problem provider 与 Server instrumentation；Judge 提交、重判 Span；可选 Compose OTLP 配置 | 同一 Trace 可跨 Gateway、Judge、Problem；未配置 Collector 使用 no-op；观测导出故障不改变业务语义 |
 | PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文。Issue #188 完成云导出基础；Issue #189 完成本地 Run Trace 与业务 Span |
 | PR3 管理员最小页面 | Gateway 固定指标查询；Agent Run 列表/安全详情与索引；Vue 概览和运行 Tab | 管理员从异常指标进入 Run 详情并跳到排障页；普通用户与仅 Agent 管理员的越界请求被拒绝；失联显示 unknown |
 | PR4 Judge/Contest 异步链路 | Outbox trace context migration；AMQP 传播；队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |

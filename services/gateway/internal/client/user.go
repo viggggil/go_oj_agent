@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/wire"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
@@ -50,7 +51,11 @@ func newGRPCConn(ctx context.Context, config *conf.ClientProto, interceptors ...
 	if parsed, err := time.ParseDuration(config.GetTimeout()); err == nil && parsed > 0 {
 		timeout = parsed
 	}
-	options := []kgrpc.ClientOption{kgrpc.WithEndpoint(config.GetEndpoint()), kgrpc.WithTimeout(timeout)}
+	options := []kgrpc.ClientOption{
+		kgrpc.WithEndpoint(config.GetEndpoint()),
+		kgrpc.WithTimeout(timeout),
+		kgrpc.WithOptions(grpc.WithStatsHandler(otelgrpc.NewClientHandler())),
+	}
 	if len(interceptors) > 0 {
 		options = append(options, kgrpc.WithUnaryInterceptor(interceptors...))
 	}

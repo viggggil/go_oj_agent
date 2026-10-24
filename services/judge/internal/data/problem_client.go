@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -49,6 +50,7 @@ func NewProblemClient(config *conf.Bootstrap) (*ProblemClient, func(), error) {
 	conn, err := grpc.NewClient(
 		cfg.GetEndpoint(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithChainUnaryInterceptor(newTimeoutInterceptor(timeout), interceptor),
 	)
 	if err != nil {
