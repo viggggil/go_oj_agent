@@ -14,6 +14,15 @@
       <span>先从提交详情查看业务状态，再沿 Trace 链接进入 Tempo 检查跨服务 Span。</span>
     </div>
 
+    <form class="pipeline-note trace-search" @submit.prevent="searchTrace">
+      <label for="submission-trace-id">管理员按提交编号排查</label>
+      <input id="submission-trace-id" v-model="submissionId" inputmode="numeric" min="1" type="number" required />
+      <button class="button secondary" :disabled="searching">{{ searching ? '查询中…' : '查找 Trace' }}</button>
+      <a v-if="trace?.link_available" class="button" :href="trace.tempo_url" target="_blank" rel="noopener noreferrer">在 Grafana 中打开</a>
+      <span v-if="trace && !trace.link_available" class="muted">Grafana 未配置，或 Trace 尚不可用 / 未采样。</span>
+      <span v-if="searchError" class="error">{{ searchError }}</span>
+    </form>
+
     <section class="pipeline" aria-label="判题服务链路">
       <article v-for="(node, index) in nodes" :key="node.title" class="pipeline-node">
         <div class="pipeline-node-icon" aria-hidden="true">{{ index + 1 }}</div>
@@ -52,7 +61,30 @@
 </template>
 
 <script setup lang="ts">
+  import { ref } from 'vue'
+  import { api, apiErrorMessage } from '../api'
   import { RouterLink } from 'vue-router'
+
+  const submissionId = ref('')
+  const searching = ref(false)
+  const searchError = ref('')
+  const trace = ref<{ tempo_url: string; link_available: boolean } | null>(null)
+
+  async function searchTrace() {
+    searchError.value = ''
+    trace.value = null
+    searching.value = true
+    try {
+      const { data } = await api.get<{ tempo_url: string; link_available: boolean }>(
+        `/api/v1/admin/observability/judge/submissions/${encodeURIComponent(submissionId.value)}`,
+      )
+      trace.value = data
+    } catch (error) {
+      searchError.value = apiErrorMessage(error, '查询判题 Trace')
+    } finally {
+      searching.value = false
+    }
+  }
 
   const nodes = [
     {

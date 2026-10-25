@@ -12,11 +12,23 @@
         <button v-if="isAdmin" class="danger" :disabled="rejudging" @click="rejudge">
           {{ rejudging ? '重判中…' : '管理员重判' }}
         </button>
+        <a
+          v-if="isAdmin && trace?.link_available"
+          class="button secondary"
+          :href="trace.tempo_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          查看判题 Trace
+        </a>
         <RouterLink class="button secondary" to="/submissions">返回提交记录</RouterLink>
       </div>
     </div>
 
     <p v-if="message" :class="messageIsError ? 'error' : 'notice'">{{ message }}</p>
+    <p v-if="isAdmin && trace && !trace.link_available" class="muted trace-note">
+      判题 Trace 尚未配置或可能未采样，当前没有可用排障链接。
+    </p>
     <div class="submission-summary">
       <div>
         <span>状态</span
@@ -148,10 +160,11 @@
   const sourceCode = ref('')
   const sourceLoading = ref(true)
   const sourceError = ref('')
+  const trace = ref<Awaited<ReturnType<typeof submissionApi.judgeTrace>>['data'] | null>(null)
   const problem = ref<Problem | null>(null)
   const controller = new AbortController()
   let pollTimer: number | undefined
-  const isAdmin = computed(() => auth.user?.roles.includes('admin'))
+  const isAdmin = computed(() => auth.user?.roles.some((role) => ['admin', 'system_admin'].includes(role)))
   const problemTitle = computed(
     () => problem.value?.title || `题目 ${submission.value?.problem_id || ''}`,
   )
@@ -163,6 +176,12 @@
       await Promise.all([
         loadResult(),
         loadSource(),
+        isAdmin.value
+          ? submissionApi
+              .judgeTrace(id)
+              .then(({ data }) => (trace.value = data))
+              .catch(() => (trace.value = { submission_id: id, tempo_url: '', link_available: false, trace_available: false, status: 'NOT_CONFIGURED' }))
+          : Promise.resolve(),
         problemApi
           .get(submission.value.problem_id)
           .then(({ data }) => (problem.value = data.problem))

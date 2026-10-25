@@ -9,6 +9,7 @@ import (
 )
 
 const AgentJSONOperation = "HTTP Agent JSON"
+const JudgeObservabilityOperation = "HTTP Judge Observability"
 
 var agentRAG = regexp.MustCompile(`^/api/v1/admin/agent/rag/documents/([0-9a-f-]{36})(?:/(enable|archive|retry|versions))?$`)
 var agentRAGGroup = regexp.MustCompile(`^/api/v1/admin/agent/rag/knowledge-bases/([0-9a-f-]{36})(/rename)?$`)

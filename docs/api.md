@@ -22,6 +22,10 @@ Go Services / Agent Tools
 
 Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。Gateway 当前已接入认证、用户、Problem、Submission/Judge 和 Contest API。
 
+### Judge Trace 管理员排障接口（Issue #200 PR4）
+
+`GET /api/v1/admin/observability/judge/submissions/{submission_id}` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `JUDGE_OBSERVABILITY_GRAFANA_URL` 返回 Tempo Explore 检索链接。请求不得提供 Grafana/Tempo URL 或任意 TraceQL；`agent_admin` 不具备该权限。响应中的 `SEARCHABLE` 表示检索链接可用，不代表 Trace 一定被采样或保留，`trace_available` 为 `false`。
+
 ---
 
 ## 2. 通用规范

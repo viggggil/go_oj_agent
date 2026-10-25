@@ -243,6 +243,8 @@ make observability-check
 
 Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Gateway 和 Agent 设置 OTLP endpoint；没有 overlay 时应用保持 no-op。
 
+平台管理员的 Judge Trace 入口使用 Gateway 环境变量 `JUDGE_OBSERVABILITY_GRAFANA_URL` 生成固定 Explore 链接，不接受请求中的 URL。链接只表示可执行受控搜索，Tempo 未采样、Collector 故障或数据过期时页面会显示 Trace 不可用。
+
 测试 Agent Trace 时，可在 `.env` 设置 `AGENT_RUNTIME_MODE=langgraph_fake`，再调用现有 Gateway Chat API。Trace/Metric 不记录请求响应正文；Agent 的 LangSmith tracing 仍保持关闭。Collector/Tempo/Prometheus/Grafana 本地卷会保留数据，使用 `make observability-down` 停止栈，不会删除业务数据卷。
 
 ```bash

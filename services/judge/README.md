@@ -54,3 +54,6 @@ AMQP Header 和 Envelope 字段中传播新父上下文；Judge Worker 的 retry
 同一 W3C Trace。Judge 结果消费者和 Contest 投影消费者创建各自的消费 Span。历史
 Outbox 和无 Trace 的旧消息仍可处理；上下文无效时只会开启新 Trace。Publisher Confirm、
 手动 ACK/NACK、事件 ID 和幂等事务语义不变。
+# Trace 排障
+
+管理员排查某次提交时，从 Gateway 的 Judge Trace 入口按 `submission.id` 打开 Tempo。Judge Service 不读取 Gateway 或 Contest 数据库，也不把 Trace 缺失当作判题失败；Publisher Confirm、ACK/NACK、事件 ID 和幂等事务语义保持不变。

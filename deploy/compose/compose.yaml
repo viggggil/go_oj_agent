@@ -365,6 +365,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_DEPLOYMENT_ENVIRONMENT: "development"
+      JUDGE_OBSERVABILITY_GRAFANA_URL: "${JUDGE_OBSERVABILITY_GRAFANA_URL:-http://localhost:3000}"
       KRATOS_SERVER_HTTP_ADDRESS: ":8080"
       KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
       KRATOS_AUTH_ISSUER: "go-oj-agent"

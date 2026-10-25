@@ -14,16 +14,18 @@ import (
 )
 
 type httpSubmissionClient struct {
-	create *submissionv1.CreateSubmissionRequest
-	result *submissionv1.GetJudgeResultResponse
+	create        *submissionv1.CreateSubmissionRequest
+	getSubmission *submissionv1.GetSubmissionRequest
+	result        *submissionv1.GetJudgeResultResponse
 }
 
 func (f *httpSubmissionClient) CreateSubmission(_ context.Context, req *submissionv1.CreateSubmissionRequest, _ ...grpc.CallOption) (*submissionv1.CreateSubmissionResponse, error) {
 	f.create = req
 	return &submissionv1.CreateSubmissionResponse{SubmissionId: 9, Status: submissionv1.SubmissionStatus_SUBMISSION_STATUS_QUEUED}, nil
 }
-func (f *httpSubmissionClient) GetSubmission(context.Context, *submissionv1.GetSubmissionRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionResponse, error) {
-	return &submissionv1.GetSubmissionResponse{}, nil
+func (f *httpSubmissionClient) GetSubmission(_ context.Context, req *submissionv1.GetSubmissionRequest, _ ...grpc.CallOption) (*submissionv1.GetSubmissionResponse, error) {
+	f.getSubmission = req
+	return &submissionv1.GetSubmissionResponse{Submission: &submissionv1.Submission{Id: req.GetSubmissionId()}}, nil
 }
 func (f *httpSubmissionClient) GetSubmissionSource(context.Context, *submissionv1.GetSubmissionSourceRequest, ...grpc.CallOption) (*submissionv1.GetSubmissionSourceResponse, error) {
 	return &submissionv1.GetSubmissionSourceResponse{}, nil

@@ -407,9 +407,17 @@ func (c *fakeUserClient) GetUser(_ context.Context, req *userv1.GetUserRequest, 
 }
 
 func testAccessToken(t *testing.T) string {
+	return testAccessTokenRoles(t, []string{"user", "admin"})
+}
+
+func testAccessTokenRoles(t *testing.T, roles []string) string {
 	t.Helper()
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
-	claims := `{"sub":1001,"username":"alice","roles":["user","admin"],"iss":"go-oj-agent","aud":"go-oj-gateway","iat":4102444800,"exp":4102448400,"jti":"test-token"}`
+	encodedRoles, err := json.Marshal(roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := `{"sub":1001,"username":"alice","roles":` + string(encodedRoles) + `,"iss":"go-oj-agent","aud":"go-oj-gateway","iat":4102444800,"exp":4102448400,"jti":"test-token"}`
 	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
 	signed := header + "." + payload
 	mac := hmac.New(sha256.New, []byte("test-secret"))

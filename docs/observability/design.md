@@ -197,7 +197,7 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 | 后续 Judge/Contest 运行指标 | 队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 判题排队、执行、失败和投影积压有稳定统计口径 |
 | PR4 运行保障与扩展 | RAG/Eval/Memory worker 指标；基础设施指标、阈值告警、runbook、容量基线 | worker 堵塞、MQ 积压、Provider 限流和 exporter 丢弃能被发现并定位；告警可恢复 |
 
-首个可交付里程碑为 Agent PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。Agent Chat Span 已在 Issue #189 实现；Memory、Eval/Review、RAG ingestion 的独立本地任务 Span 已在 Issue #191 实现；Issue #193 已补齐 Agent Run 安全查询、Gateway 契约、运行概览、受控 Trace 链接、分页和 Vue 运行诊断页。Issue #200 的同步与异步 Judge Trace 已分别在 PR1、PR2 接入；判题运行指标和基础设施 exporters 仍为后续工作。
+首个可交付里程碑为 Agent PR1–PR3，先打通“聊天→指标→管理员页面→运行详情→Trace/LangSmith”。Agent Chat Span 已在 Issue #189 实现；Memory、Eval/Review、RAG ingestion 的独立本地任务 Span 已在 Issue #191 实现；Issue #193 已补齐 Agent Run 安全查询、Gateway 契约、运行概览、受控 Trace 链接、分页和 Vue 运行诊断页。Issue #200 的同步与异步 Judge Trace 已分别在 PR1、PR2 接入；PR3 补齐结果与 Contest 投影 Trace，PR4 提供仅平台管理员可用的 Judge Trace 检索链接。判题运行指标和基础设施 exporters 仍为后续工作。
 
 ## 9. 变更面与文档
 

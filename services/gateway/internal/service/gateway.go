@@ -50,6 +50,16 @@ func NewGatewayServiceWithAllClients(auth *AuthService, user *UserService, probl
 	return service
 }
 
+// SubmissionClient exposes the owning Judge client to Gateway-owned, read-only
+// administrative routes. The route still performs authorization before calling
+// Judge; it never reads the Submission database directly.
+func (s *GatewayService) SubmissionClient() submissionv1.SubmissionServiceClient {
+	if s == nil {
+		return nil
+	}
+	return s.submission
+}
+
 func (s *GatewayService) Health(context.Context, *gatewayv1.HealthRequest) (*gatewayv1.HealthResponse, error) {
 	return &gatewayv1.HealthResponse{Status: "ok"}, nil
 }
