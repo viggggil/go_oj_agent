@@ -85,3 +85,6 @@ go test ./services/judge-worker/integration -v
 
 需要 RabbitMQ、MinIO 和 go-judge 的真实环境时，使用 `services/judge-worker/integration`
 和 `tests/e2e` 中的测试；未配置依赖时测试会自动跳过。
+# Trace 排障
+
+Worker 的结果发布 Span 通过事件上下文与 Judge Result、Contest Projection 关联。Trace 只用于诊断；Publisher Confirm、原任务 ACK/NACK、重试和 DLQ 语义保持不变。管理员从提交详情的受控 Grafana 链接查看该链路。

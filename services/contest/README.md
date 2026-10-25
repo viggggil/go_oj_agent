@@ -255,3 +255,6 @@ honor request cancellation.
 
 迁移、回填、部署顺序、功能开关、故障处理、测试矩阵和负载记录见
 [排行榜缓存运维文档](../../docs/contest-cache-operations.md)。
+# Trace 排障
+
+Contest Projection 和 Cache Outbox 会恢复结果事件中的 W3C Trace 上下文，并记录投影事务与 Redis 写入 Span。Trace 缺失不影响 processed event 去重、版本保护、租约 fencing 或缓存重试；管理员从提交编号入口检查链路。

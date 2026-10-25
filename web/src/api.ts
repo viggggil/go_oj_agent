@@ -184,6 +184,14 @@ export const submissionApi = {
   get: (id: number) => api.get<{ submission: Submission }>(`/api/v1/submissions/${id}`),
   result: (id: number) => api.get<{ result: JudgeResult }>(`/api/v1/submissions/${id}/result`),
   source: (id: number) => api.get<SubmissionSource>(`/api/v1/submissions/${id}/source`),
+  judgeTrace: (id: number) =>
+    api.get<{
+      submission_id: number
+      tempo_url: string
+      link_available: boolean
+      trace_available: boolean
+      status: 'NOT_CONFIGURED' | 'SEARCHABLE'
+    }>(`/api/v1/admin/observability/judge/submissions/${id}`),
   rejudge: (id: number, idempotencyKey: string) =>
     api.post<{ invalidated_submission_id: number; submission: Submission }>(
       `/api/v1/submissions/${id}/rejudge`,

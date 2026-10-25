@@ -1359,6 +1359,20 @@ dd {
   color: #172033;
   white-space: nowrap;
 }
+.trace-search {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.trace-search label {
+  color: #172033;
+  font-weight: 600;
+}
+.trace-search input {
+  width: 180px;
+  padding: 9px 10px;
+  border: 1px solid #cbd2df;
+  border-radius: 6px;
+}
 .pipeline {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

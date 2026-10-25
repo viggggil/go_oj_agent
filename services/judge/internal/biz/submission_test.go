@@ -175,6 +175,9 @@ func TestSubmissionUsecaseGetAuthorization(t *testing.T) {
 	if _, err := uc.Get(context.Background(), Actor{ID: 6, Roles: []string{"ADMIN"}}, 11); err != nil {
 		t.Fatalf("admin Get() error = %v", err)
 	}
+	if _, err := uc.Get(context.Background(), Actor{ID: 6, Roles: []string{"system_admin"}}, 11); err != nil {
+		t.Fatalf("system_admin Get() error = %v", err)
+	}
 }
 
 func TestSubmissionUsecaseListAuthorizationAndNormalization(t *testing.T) {

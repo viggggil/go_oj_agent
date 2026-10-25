@@ -22,6 +22,10 @@ Go Services / Agent Tools
 
 Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。Gateway 当前已接入认证、用户、Problem、Submission/Judge 和 Contest API。
 
+### Judge Trace 管理员排障接口（Issue #200 PR4）
+
+`GET /api/v1/admin/observability/judge/submissions/{submission_id}` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `JUDGE_OBSERVABILITY_GRAFANA_URL` 返回 Tempo Explore 检索链接。请求不得提供 Grafana/Tempo URL 或任意 TraceQL；`agent_admin` 不具备该权限。响应中的 `SEARCHABLE` 表示检索链接可用，不代表 Trace 一定被采样或保留，`trace_available` 为 `false`。
+
 ---
 
 ## 2. 通用规范
@@ -1224,7 +1228,7 @@ service SubmissionService {
 校验的内部 Principal；请求体不携带也不能覆盖用户身份。Create 会在上传 MinIO
 源码前检查已完成的幂等记录，并在一个 MySQL 事务内提交 Submission、
 `judge.requested` Outbox 和幂等响应。Get 和 GetJudgeResult 对非 owner 返回与不存在
-资源相同的 NotFound；List 对普通用户强制使用当前 `actor_id`，管理员才可指定其他
+资源相同的 NotFound；`admin` 与 `system_admin` 均视为管理员；List 对普通用户强制使用当前 `actor_id`，管理员才可指定其他
 `user_id`。列表按 `created_at DESC, id DESC` 排序，`page_size` 上限为 100。
 GetJudgeResult 在判题尚未完成时返回当前状态和空的 Case Results。Rejudge 仅允许
 管理员调用，在一个事务内作废旧 Submission、写入 `submission.invalidated`，创建
