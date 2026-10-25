@@ -167,7 +167,9 @@
   const problem = ref<Problem | null>(null)
   const controller = new AbortController()
   let pollTimer: number | undefined
-  const isAdmin = computed(() => auth.user?.roles.some((role) => ['admin', 'system_admin'].includes(role)))
+  const isAdmin = computed(() =>
+    auth.user?.roles.some((role) => ['admin', 'system_admin'].includes(role)),
+  )
   const problemTitle = computed(
     () => problem.value?.title || `题目 ${submission.value?.problem_id || ''}`,
   )
@@ -183,7 +185,16 @@
           ? submissionApi
               .judgeTrace(id)
               .then(({ data }) => (trace.value = data))
-              .catch(() => (trace.value = { submission_id: id, tempo_url: '', link_available: false, trace_available: false, status: 'NOT_CONFIGURED' }))
+              .catch(
+                () =>
+                  (trace.value = {
+                    submission_id: id,
+                    tempo_url: '',
+                    link_available: false,
+                    trace_available: false,
+                    status: 'NOT_CONFIGURED',
+                  }),
+              )
           : Promise.resolve(),
         problemApi
           .get(submission.value.problem_id)
