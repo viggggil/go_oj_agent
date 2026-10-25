@@ -11,6 +11,9 @@ import (
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
@@ -25,6 +28,14 @@ func (s *StoreSet) ApplyJudgeResult(ctx context.Context, event biz.JudgeResultEv
 	if err = event.Validate(); err != nil {
 		return biz.ErrorInvalidArgument("invalid judge result: %s", err.Error())
 	}
+	ctx, span := otel.Tracer("oj.judge.result").Start(ctx, "judge.result.transaction")
+	span.SetAttributes(attribute.String("messaging.event_id", event.EventID), attribute.String("messaging.causation_id", event.CausationID), attribute.Int64("submission.id", event.SubmissionID), attribute.String("judge.revision", event.JudgeRevision))
+	defer func() {
+		if err != nil {
+			span.SetStatus(codes.Error, "result transaction failed")
+		}
+		span.End()
+	}()
 	now := s.now()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

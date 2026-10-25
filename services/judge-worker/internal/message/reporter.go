@@ -10,6 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // Reporter publishes result events and only returns after the broker confirms them.
@@ -61,30 +64,46 @@ func (r *PublisherReporter) report(ctx context.Context, input mq.Envelope, event
 	if r == nil || r.Publisher == nil {
 		return fmt.Errorf("publisher reporter is not configured")
 	}
-	body, err := marshalResult(ctx, input, eventType, payload)
+	publishCtx, span := otel.Tracer("oj.judge.worker").Start(ctx, "judge.worker.result.publish")
+	span.SetAttributes(attribute.String("messaging.event_type", eventType), attribute.String("messaging.routing_key", route), attribute.String("messaging.causation_id", input.EventID))
+	defer span.End()
+	body, err := marshalResult(publishCtx, input, eventType, payload)
 	if err != nil {
+		span.SetStatus(codes.Error, "result envelope failed")
 		return err
 	}
 	var envelope mq.Envelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return err
 	}
-	return r.Publisher.Publish(ctx, route, envelope.EventID, body)
+	err = r.Publisher.Publish(publishCtx, route, envelope.EventID, body)
+	if err != nil {
+		span.SetStatus(codes.Error, "result publish failed")
+	}
+	return err
 }
 
 func (r *PublisherReporter) reportTask(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
 	if r == nil || r.Publisher == nil {
 		return fmt.Errorf("publisher reporter is not configured")
 	}
-	body, err := marshalTask(ctx, input, task)
+	publishCtx, span := otel.Tracer("oj.judge.worker").Start(ctx, "judge.worker.retry.publish")
+	span.SetAttributes(attribute.String("messaging.event_type", mq.EventTypeJudgeTask), attribute.String("messaging.routing_key", retryRoute(task.Language)), attribute.String("messaging.causation_id", input.EventID), attribute.Int("judge.attempt", int(task.Attempt)))
+	defer span.End()
+	body, err := marshalTask(publishCtx, input, task)
 	if err != nil {
+		span.SetStatus(codes.Error, "retry envelope failed")
 		return err
 	}
 	var envelope mq.Envelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return err
 	}
-	return r.Publisher.Publish(ctx, retryRoute(task.Language), envelope.EventID, body)
+	err = r.Publisher.Publish(publishCtx, retryRoute(task.Language), envelope.EventID, body)
+	if err != nil {
+		span.SetStatus(codes.Error, "retry publish failed")
+	}
+	return err
 }
 
 type RabbitReporter struct {
@@ -127,30 +146,46 @@ func (r *RabbitReporter) report(ctx context.Context, input mq.Envelope, eventTyp
 	if r == nil || r.url == "" || r.exchange == "" {
 		return fmt.Errorf("rabbit reporter is not configured")
 	}
-	body, err := marshalResult(ctx, input, eventType, payload)
+	publishCtx, span := otel.Tracer("oj.judge.worker").Start(ctx, "judge.worker.result.publish")
+	span.SetAttributes(attribute.String("messaging.event_type", eventType), attribute.String("messaging.routing_key", route), attribute.String("messaging.causation_id", input.EventID))
+	defer span.End()
+	body, err := marshalResult(publishCtx, input, eventType, payload)
 	if err != nil {
+		span.SetStatus(codes.Error, "result envelope failed")
 		return err
 	}
 	var envelope mq.Envelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return err
 	}
-	return r.publish(ctx, route, envelope.EventID, body)
+	err = r.publish(publishCtx, route, envelope.EventID, body)
+	if err != nil {
+		span.SetStatus(codes.Error, "result publish failed")
+	}
+	return err
 }
 
 func (r *RabbitReporter) reportTask(ctx context.Context, input mq.Envelope, task mq.JudgeTask) error {
 	if r == nil || r.url == "" || r.exchange == "" {
 		return fmt.Errorf("rabbit reporter is not configured")
 	}
-	body, err := marshalTask(ctx, input, task)
+	publishCtx, span := otel.Tracer("oj.judge.worker").Start(ctx, "judge.worker.retry.publish")
+	span.SetAttributes(attribute.String("messaging.event_type", mq.EventTypeJudgeTask), attribute.String("messaging.routing_key", retryRoute(task.Language)), attribute.String("messaging.causation_id", input.EventID), attribute.Int("judge.attempt", int(task.Attempt)))
+	defer span.End()
+	body, err := marshalTask(publishCtx, input, task)
 	if err != nil {
+		span.SetStatus(codes.Error, "retry envelope failed")
 		return err
 	}
 	var envelope mq.Envelope
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return err
 	}
-	return r.publish(ctx, retryRoute(task.Language), envelope.EventID, body)
+	err = r.publish(publishCtx, retryRoute(task.Language), envelope.EventID, body)
+	if err != nil {
+		span.SetStatus(codes.Error, "retry publish failed")
+	}
+	return err
 }
 
 func marshalResult(ctx context.Context, input mq.Envelope, eventType string, payload any) ([]byte, error) {
