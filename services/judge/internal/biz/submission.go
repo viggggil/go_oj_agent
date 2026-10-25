@@ -437,7 +437,7 @@ func requireActor(actor Actor) error {
 
 func actorIsAdmin(actor Actor) bool {
 	for _, role := range actor.Roles {
-		if strings.EqualFold(strings.TrimSpace(role), "admin") {
+		if role = strings.ToLower(strings.TrimSpace(role)); role == "admin" || role == "system_admin" {
 			return true
 		}
 	}

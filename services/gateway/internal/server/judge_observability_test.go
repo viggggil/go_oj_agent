@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -18,8 +20,26 @@ func TestJudgeTraceResponseUsesOnlyConfiguredGrafana(t *testing.T) {
 	if !strings.Contains(response.TempoURL, "grafana.example/ops/explore") || !strings.Contains(response.TempoURL, "submission.id+%3D+42") {
 		t.Fatalf("tempo URL = %q, missing fixed Explore query", response.TempoURL)
 	}
-	if got := buildJudgeTraceResponse(42, "javascript:alert(1)"); got.LinkAvailable || got.TempoURL != "" || got.Status != "NOT_CONFIGURED" {
-		t.Fatalf("unsafe URL accepted: %+v", got)
+	parsed, err := url.Parse(response.TempoURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var left struct {
+		Queries []struct {
+			QueryType string `json:"queryType"`
+			Query     string `json:"query"`
+		} `json:"queries"`
+	}
+	if err := json.Unmarshal([]byte(parsed.Query().Get("left")), &left); err != nil || len(left.Queries) != 1 || left.Queries[0].QueryType != "traceql" || !strings.Contains(left.Queries[0].Query, "span.submission.id = 42") {
+		t.Fatalf("left query = %+v, err=%v", left, err)
+	}
+	if got := buildJudgeTraceResponse(42, "https://grafana.example/#fragment"); !got.LinkAvailable || strings.Contains(got.TempoURL, "#fragment") {
+		t.Fatalf("fragment was not removed: %+v", got)
+	}
+	for _, configured := range []string{"javascript:alert(1)", "https://user:pass@grafana.example", "not a URL"} {
+		if got := buildJudgeTraceResponse(42, configured); got.LinkAvailable || got.TempoURL != "" || got.Status != "NOT_CONFIGURED" {
+			t.Fatalf("unsafe URL %q accepted: %+v", configured, got)
+		}
 	}
 }
 
@@ -51,11 +71,19 @@ func TestJudgeTraceHTTPRoute(t *testing.T) {
 		t.Fatalf("Judge authorization lookup = %+v", client.getSubmission)
 	}
 
+	for _, roles := range [][]string{{"agent_admin"}, {"user"}} {
+		request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/observability/judge/submissions/9", nil)
+		request.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, roles))
+		response = httptest.NewRecorder()
+		h.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("roles=%v status=%d body=%s, want forbidden", roles, response.Code, response.Body.String())
+		}
+	}
 	request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/observability/judge/submissions/9", nil)
-	request.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, []string{"agent_admin"}))
 	response = httptest.NewRecorder()
 	h.ServeHTTP(response, request)
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("agent_admin status=%d body=%s, want forbidden", response.Code, response.Body.String())
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status=%d body=%s, want unauthorized", response.Code, response.Body.String())
 	}
 }

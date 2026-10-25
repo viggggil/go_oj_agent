@@ -26,7 +26,8 @@ created. Rejudge reuses the source object and atomically invalidates the old
 submission before creating the replacement.
 
 Submission RPCs accept identity only from the verified internal RS256
-principal. Owners can read and list their own submissions; administrators can
+principal. Owners can read and list their own submissions; `admin` and
+`system_admin` administrators can
 read other submissions and select a `user_id` filter. Lists use stable
 `created_at DESC, id DESC` ordering and cap `page_size` at 100.
 
