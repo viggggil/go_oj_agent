@@ -885,7 +885,6 @@ flowchart LR
 RabbitMQ Header 中传播 Trace Context。
 
 可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。PR2 已将 Judge Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result 的异步父子 Trace；PR3 继续接通 Judge Result 事务 → `submission.judged` → Contest Projection → Contest Cache Outbox/Relay。旧消息、无 Header 消息和历史 NULL 上下文仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
-
 PR4 为平台管理员提供 Gateway 受控 Judge Trace 检索入口。Gateway 不访问 Judge 数据库，先调用 Judge `GetSubmission` 做授权，再使用固定 `JUDGE_OBSERVABILITY_GRAFANA_URL` 构造按 `submission.id` 检索的 Tempo Explore 链接。普通用户和 `agent_admin` 不可见；Trace 缺失、未采样或保留期结束时显示不可用，不改变判题业务状态。
 
 关键 Metrics：
