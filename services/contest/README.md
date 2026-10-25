@@ -78,6 +78,11 @@ and failure updates require an unexpired matching token. Transient failures
 retry indefinitely with capped exponential backoff (1–60 seconds); malformed
 snapshots enter `dead` with `last_error` for investigation. A cancelled process
 leaves its lease to expire. Confirmation failures safely replay the snapshot.
+The projection transaction persists optional W3C `traceparent` / `tracestate`
+metadata in `contest_cache_outbox` (migration `000005_add_cache_outbox_trace_context`).
+The cache relay restores that context for Redis application and lease completion
+spans. Missing or invalid metadata is compatible with historical rows and does
+not change cache retry, fencing, or authoritative MySQL projection semantics.
 PR1 provides the relay contract. With PR2-PR5 enabled, cache writes and reads
 are active by default, while MySQL remains the source of truth.
 
@@ -85,8 +90,9 @@ are active by default, while MySQL remains the source of truth.
 
 1. Stop all Contest Service result consumers/instances. Leave RabbitMQ running;
    durable result messages will queue while the consumers are stopped.
-2. Back up the database and apply the new migration. MySQL initialization mounts
-   only run for a new volume; explicitly apply migration 000003 for existing data.
+2. Back up the database and apply the new migrations. MySQL initialization mounts
+   only run for a new volume; explicitly apply migrations 000003 and 000005 for
+   existing data (000005 only adds nullable Trace metadata).
 3. Run the backfill from the repository root, supplying a DSN via the environment:
 
 ```bash

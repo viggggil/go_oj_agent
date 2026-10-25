@@ -1,10 +1,29 @@
 package biz
 
 import (
-	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"testing"
 	"time"
+
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 )
+
+func TestParseProjectionEventCarriesTraceContext(t *testing.T) {
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	body, err := mq.MarshalEnvelope(mq.EnvelopeMetadata{
+		EventID: "123e4567-e89b-12d3-a456-426614174099", EventType: mq.EventSubmissionJudged,
+		EventVersion: mq.EventVersion1, OccurredAt: time.Now().UTC(), TraceParent: traceparent, CausationID: "123e4567-e89b-12d3-a456-426614174098",
+	}, mq.SubmissionJudged{SubmissionID: 9, ContestID: 7, UserID: 42, ProblemID: 3, Verdict: "AC", SubmittedAt: time.Now().UTC(), JudgedAt: time.Now().UTC()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := ParseProjectionEvent(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.TraceParent != traceparent || event.TraceState != "" || event.CausationID == "" || event.Fact.SubmissionID != 9 {
+		t.Fatalf("projection event=%+v", event)
+	}
+}
 
 func TestACMScoring(t *testing.T) {
 	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)

@@ -36,6 +36,7 @@ services:
       - ../../migrations/contest/000002_create_result_projection.up.sql:/docker-entrypoint-initdb.d/402_create_result_projection.sql:ro
       - ../../migrations/contest/000003_create_leaderboard_outbox.up.sql:/docker-entrypoint-initdb.d/403_create_leaderboard_outbox.sql:ro
       - ../../migrations/contest/000004_index_cache_lag.up.sql:/docker-entrypoint-initdb.d/404_index_cache_lag.sql:ro
+      - ../../migrations/contest/000005_add_cache_outbox_trace_context.up.sql:/docker-entrypoint-initdb.d/405_add_cache_outbox_trace_context.sql:ro
       - ../../migrations/agent/000001_create_agent_runtime.up.sql:/docker-entrypoint-initdb.d/501_create_agent_runtime.sql:ro
       - ../../migrations/agent/000002_create_agent_configuration.up.sql:/docker-entrypoint-initdb.d/503_create_agent_configuration.sql:ro
       - ../../migrations/agent/000003_create_model_provider.up.sql:/docker-entrypoint-initdb.d/504_create_model_provider.sql:ro

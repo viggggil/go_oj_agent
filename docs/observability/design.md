@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪、Issue #200 PR1 同步 Judge Trace 与 PR2 异步 Judge Trace 已实现。判题运行指标和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
+状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪、Issue #200 PR1 同步 Judge Trace、PR2 异步 Judge Trace 与 PR3 结果回写 Trace 已实现。判题运行指标、受控 Trace 检索和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 
@@ -121,7 +121,7 @@ flowchart LR
 
 PR2 已在 Judge 的 outbox_events 增加可空 `traceparent` / `tracestate` 字段，将允许的追踪上下文与业务事件在同一事务保存。没有追踪上下文的历史行仍可发布。
 
-Relay 从持久化上下文创建 publish Span，注入 AMQP Header 和 Envelope 字段；Worker、Judge 结果消费者、Contest 消费者提取并创建消费 Span，结果及后续 Outbox 继续保存因果上下文。单消息短任务采用父子关系；批处理、长延迟后台工作采用 Span Links，不伪造一直运行的 HTTP Span。
+Relay 从持久化上下文创建 publish Span，注入 AMQP Header 和 Envelope 字段；Worker、Judge 结果消费者、Contest 消费者提取并创建消费 Span，结果及后续 Judge/Contest Outbox 继续保存因果上下文。Contest Cache Relay 领取快照后恢复上下文并创建独立 Span。单消息短任务采用父子关系；批处理、长延迟后台工作采用 Span Links，不伪造一直运行的 HTTP Span。
 
 业务 `event_id`、`causation_id`、重试 attempt、ACK 和 publisher confirm 语义保持不变；每次投递/重投有独立 Span，不为了监控去重业务投递计数。缺少/畸形 Header 只会创建新 Trace，不能阻断或丢弃消息。新的可选字段与 Header 允许新旧消费者共存，先迁移、再生产者、再消费者，旧数据不回填虚构的父 Span。
 
@@ -191,6 +191,7 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 | --- | --- | --- |
 | Issue #200 PR1 同步 Judge Trace | Gateway→Judge→Problem gRPC Trace 传播；Judge/Problem provider 与 Server instrumentation；Judge 提交、重判 Span；可选 Compose OTLP 配置 | 同一 Trace 可跨 Gateway、Judge、Problem；未配置 Collector 使用 no-op；观测导出故障不改变业务语义 |
 | Issue #200 PR2 异步 Judge Trace | Outbox trace context migration；AMQP Header/Envelope 传播；Relay、Worker、Judge Result、Contest Projection spans | 提交、重试、重判、重复事件、Relay 重启仍能关联因果路径，业务结果与 ACK/confirm 行为不变 |
+| Issue #200 PR3 结果回写 Trace | Worker 结果发布 Span；Judge Result 事务与 `submission.judged` Outbox 上下文；Contest Projection/Cache Outbox 上下文与 Span | Worker 结果可继续关联到 Judge 事务、Contest 投影和榜单缓存；重复、乱序、作废和缓存重试保持原有收敛 |
 | PR2 Agent 与 LangSmith | Run/模型 attempt/Tool、业务 gRPC 传播；trace_id migration；手动脱敏 LangSmith 适配器与显式开关 | 一次有工具的聊天可关联本地 Trace 与云 Run；Mock 上传载荷没有秘密标记；并发、取消、重试不串上下文。Issue #188 完成云导出基础；Issue #189 完成本地 Run Trace 与业务 Span |
 | PR3 管理员最小页面 | Gateway 固定指标查询；Agent Run 列表/安全详情与索引；Vue 概览和运行 Tab | 管理员从异常指标进入 Run 详情并跳到排障页；普通用户与仅 Agent 管理员的越界请求被拒绝；失联显示 unknown |
 | 后续 Judge/Contest 运行指标 | 队列、Worker/Sandbox、结果及排行榜投影指标；复用 Contest metrics | 判题排队、执行、失败和投影积压有稳定统计口径 |
@@ -204,7 +205,7 @@ Agent migration 新增可空 `agent_runs.trace_id`，在创建 Run 时固定；L
 - `agent/app/observability/`、main/settings、RunService、模型/工具调用与后台任务：统一上下文、业务埋点和安全云导出。
 - `deploy/compose/`：新增监控 overlay、固定版本配置、Grafana provisioning；更新 Makefile 和 `.env.example` 的非秘密配置说明。
 - `services/gateway/`、必要的 `api/gateway/v1/`、Agent operations、管理 API 和 Gateway 响应校验白名单：新增受控查询契约。生成文件由工具生成。
-- `migrations/agent/`：Run trace_id 与查询索引；`migrations/submission/`：Outbox 上下文字段。迁移编号以实施时的最新仓库为准，先加可空字段兼容旧服务；不得清空已有数据。
+- `migrations/agent/`：Run trace_id 与查询索引；`migrations/submission/`：Judge Outbox 上下文字段；`migrations/contest/`：Contest Cache Outbox 上下文字段。迁移编号以实施时的最新仓库为准，先加可空字段兼容旧服务；不得清空已有数据。
 - `web/src/observability/`、views、router 和导航：监控 DTO、查询、可视化、权限和异常显示；只读查询使用现有认证客户端。
 - 不新增业务 Redis key 或 MinIO 对象；观测历史归 Prometheus/Tempo/LangSmith，业务 Run 和事件仍归原服务。
 - 更新 `docs/architecture.md`、`docs/requirements.md`、`docs/api.md`、`docs/database.md`、部署说明与 Agent README；根 README 同步实际 Agent 能力与观测进度。新增运行手册说明留存、采样、云导出内容、故障排查与停用方式。

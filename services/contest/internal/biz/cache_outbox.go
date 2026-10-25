@@ -6,6 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"time"
 )
 
@@ -13,13 +17,15 @@ var ErrLeaseLost = errors.New("contest cache outbox lease lost")
 var ErrInvalidSnapshot = errors.New("invalid cache outbox snapshot")
 
 type CacheOutboxEvent struct {
-	ID        int64
-	ContestID int64
-	UserID    int64
-	Version   string
-	Payload   []byte
-	Retries   int
-	Age       time.Duration
+	ID          int64
+	ContestID   int64
+	UserID      int64
+	Version     string
+	TraceParent string
+	TraceState  string
+	Payload     []byte
+	Retries     int
+	Age         time.Duration
 }
 type CacheOutboxRepository interface {
 	ClaimCacheEvent(context.Context, string, time.Duration) (*CacheOutboxEvent, error)
@@ -58,12 +64,17 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	age = event.Age
+	traceCtx := mq.ContextFromTraceValues(ctx, event.TraceParent, event.TraceState)
+	traceCtx, span := otel.Tracer("oj.contest.cache").Start(traceCtx, "contest.cache_outbox.apply")
+	span.SetAttributes(attribute.Int64("contest.id", event.ContestID), attribute.Int64("user.id", event.UserID), attribute.String("leaderboard.version", event.Version), attribute.Int("outbox.retry_count", event.Retries))
+	defer span.End()
 	var snapshot LeaderboardSnapshot
 	if err := json.Unmarshal(event.Payload, &snapshot); err != nil || snapshot.Validate() != nil || snapshot.ContestID != event.ContestID || snapshot.UserID != event.UserID || snapshot.Version != event.Version {
 		outcome = "dead"
-		return true, r.Repository.FailCacheEvent(ctx, event.ID, token, 0, true, "invalid leaderboard snapshot")
+		span.SetStatus(codes.Error, "invalid leaderboard snapshot")
+		return true, r.Repository.FailCacheEvent(traceCtx, event.ID, token, 0, true, "invalid leaderboard snapshot")
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	callCtx, cancel := context.WithTimeout(traceCtx, 3*time.Second)
 	err = r.Sink.Apply(callCtx, snapshot)
 	cancel()
 	if err != nil {
@@ -86,12 +97,14 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 		if dead {
 			outcome = "dead"
 		}
-		return true, r.Repository.FailCacheEvent(ctx, event.ID, token, delay, dead, reason)
+		span.SetStatus(codes.Error, "cache apply failed")
+		return true, r.Repository.FailCacheEvent(traceCtx, event.ID, token, delay, dead, reason)
 	}
-	err = r.Repository.CompleteCacheEvent(ctx, event.ID, token)
+	err = r.Repository.CompleteCacheEvent(traceCtx, event.ID, token)
 	outcome = "applied"
 	if err != nil {
 		outcome = "confirm_error"
+		span.SetStatus(codes.Error, "cache outbox completion failed")
 	}
 	return true, err
 }

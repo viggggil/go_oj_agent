@@ -9,13 +9,23 @@ import (
 
 	contestv1 "github.com/viggggil/go_oj_agent/api/contest/v1"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEvent) error {
-	return withContestTx(ctx, r.db, func(tx *sql.Tx) error {
+	ctx, span := otel.Tracer("oj.contest.projection").Start(ctx, "contest.projection.transaction")
+	span.SetAttributes(attribute.Int64("contest.id", event.Fact.ContestID), attribute.Int64("submission.id", event.Fact.SubmissionID), attribute.Int64("user.id", event.Fact.UserID), attribute.Int64("problem.id", event.Fact.ProblemID))
+	defer span.End()
+	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
 		return r.applyProjectionTx(ctx, tx, event)
 	})
+	if err != nil {
+		span.SetStatus(codes.Error, "projection transaction failed")
+	}
+	return err
 }
 
 func (r *Repository) applyProjectionTx(ctx context.Context, tx *sql.Tx, event biz.ProjectionEvent) error {

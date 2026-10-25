@@ -24,6 +24,7 @@ type JudgeResultEvent struct {
 	EventID       string
 	EventType     string
 	EventVersion  int32
+	CausationID   string
 	TraceID       string
 	TraceParent   string
 	TraceState    string
@@ -70,7 +71,7 @@ func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, err
 		if err != nil || value.Validate() != nil {
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge completed payload")
 		}
-		result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, TraceID: envelope.TraceID}
+		result := JudgeResultEvent{EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, CausationID: envelope.CausationID, TraceID: envelope.TraceID}
 		result.TraceParent, result.TraceState = envelope.TraceParent, envelope.TraceState
 		result.SubmissionID, result.JudgeRevision, result.OccurredAt = value.SubmissionID, value.JudgeRevision, envelope.OccurredAt
 		result.Verdict, _ = verdictFromWire(value.Verdict)
@@ -91,7 +92,7 @@ func ParseJudgeResultEvent(eventType string, body []byte) (JudgeResultEvent, err
 			return JudgeResultEvent{}, ErrorInvalidArgument("invalid judge failed payload")
 		}
 		return JudgeResultEvent{
-			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, TraceID: envelope.TraceID, TraceParent: envelope.TraceParent, TraceState: envelope.TraceState,
+			EventID: envelope.EventID, EventType: eventType, EventVersion: envelope.EventVersion, CausationID: envelope.CausationID, TraceID: envelope.TraceID, TraceParent: envelope.TraceParent, TraceState: envelope.TraceState,
 			SubmissionID: value.SubmissionID, JudgeRevision: value.JudgeRevision,
 			Reason: value.Reason, Code: value.Code, Message: value.Message, Retryable: value.Retryable, OccurredAt: envelope.OccurredAt,
 		}, nil

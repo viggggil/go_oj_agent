@@ -41,8 +41,14 @@ func TestMySQLLeaderboardOutbox(t *testing.T) {
 	base := time.Now().UnixNano()
 	fact := mq.SubmissionJudged{SubmissionID: base, ContestID: id, UserID: 42, ProblemID: 7, Verdict: "AC", SubmittedAt: start.Add(10 * time.Minute), JudgedAt: start.Add(20 * time.Minute)}
 	event := biz.ProjectionEvent{EventID: uuid.NewString(), Fact: biz.SubmissionFact{SubmissionJudged: fact}}
-	if err := repo.ApplyProjection(t.Context(), event); err != nil {
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	traceCtx := mq.ContextFromTraceValues(t.Context(), traceparent, "vendor=test")
+	if err := repo.ApplyProjection(traceCtx, event); err != nil {
 		t.Fatal(err)
+	}
+	var storedTrace string
+	if err := db.QueryRow(`SELECT traceparent FROM contest_cache_outbox WHERE contest_id=? AND result_version=1`, id).Scan(&storedTrace); err != nil || storedTrace != traceparent {
+		t.Fatalf("stored traceparent=%q err=%v", storedTrace, err)
 	}
 	// Same event and a stale new event do not advance the result version.
 	if err := repo.ApplyProjection(t.Context(), event); err != nil {

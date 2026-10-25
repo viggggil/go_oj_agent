@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/google/uuid"
+	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
 	"strconv"
 )
@@ -59,8 +60,16 @@ func enqueueCurrentSummary(ctx context.Context, tx *sql.Tx, contestID, userID in
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO contest_cache_outbox (event_id,contest_id,user_id,result_version,payload,next_retry_at,created_at) VALUES (?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`, uuid.NewString(), contestID, userID, version, payload)
+	traceparent, tracestate := mq.TraceContextValues(ctx)
+	_, err = tx.ExecContext(ctx, `INSERT INTO contest_cache_outbox (event_id,contest_id,user_id,result_version,traceparent,tracestate,payload,next_retry_at,created_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))`, uuid.NewString(), contestID, userID, version, nullableTraceValue(traceparent), nullableTraceValue(tracestate), payload)
 	return err
+}
+
+func nullableTraceValue(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
 
 // BackfillLeaderboard requires result consumers to be paused for the migration.

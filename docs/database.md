@@ -484,6 +484,21 @@ INDEX(contest_id, score, penalty)
 SUM(solved) DESC、SUM(penalty_seconds) ASC、user_id ASC。只统计有本地结果的用户。
 罚时用首次 AC submitted_at 减去比赛 start_at，再加 AC 前有效错误次数乘以 1200 秒。
 
+### 7.5.1 `contest_cache_outbox` Trace Context
+
+排行榜快照 Outbox 由投影事务创建，属于 Contest Service 自有的异步缓存交付状态。
+`000005_add_cache_outbox_trace_context` 增加两个可空字段：
+
+| Column | Type | Note |
+| --- | --- | --- |
+| `traceparent` | VARCHAR(255) | Nullable W3C parent context for Cache Relay recovery |
+| `tracestate` | VARCHAR(512) | Nullable W3C vendor state |
+
+字段与 `contest_problem_results`、`contest_user_results` 和快照 Outbox 写入在同一个
+投影事务内提交。Cache Relay Claim 时恢复上下文，Redis 写入、租约完成和失败重试只在
+该上下文下创建观测 Span；Trace 缺失或无效不会阻止缓存处理。历史行保持 NULL，down
+迁移只删除这两个观测字段，不改变排行榜事实或版本数据。
+
 ---
 
 # 8. `oj_agent`

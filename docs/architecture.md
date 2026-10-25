@@ -884,7 +884,7 @@ flowchart LR
 
 RabbitMQ Header 中传播 Trace Context。
 
-可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。PR2 已将 Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result/Contest Projection 的异步父子 Trace；旧消息和无 Header 消息仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
+可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。PR2 已将 Judge Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result 的异步父子 Trace；PR3 继续接通 Judge Result 事务 → `submission.judged` → Contest Projection → Contest Cache Outbox/Relay。旧消息、无 Header 消息和历史 NULL 上下文仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
 
 关键 Metrics：
 
