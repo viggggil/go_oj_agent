@@ -15,7 +15,7 @@ func TestJudgeTraceResponseUsesOnlyConfiguredGrafana(t *testing.T) {
 	if !response.LinkAvailable || response.TraceAvailable || response.Status != "SEARCHABLE" {
 		t.Fatalf("response = %+v, want searchable link without trace existence claim", response)
 	}
-	if !strings.Contains(response.TempoURL, "grafana.example/ops/explore") || !strings.Contains(response.TempoURL, "submission.id") {
+	if !strings.Contains(response.TempoURL, "grafana.example/ops/explore") || !strings.Contains(response.TempoURL, "submission.id+%3D+42") {
 		t.Fatalf("tempo URL = %q, missing fixed Explore query", response.TempoURL)
 	}
 	if got := buildJudgeTraceResponse(42, "javascript:alert(1)"); got.LinkAvailable || got.TempoURL != "" || got.Status != "NOT_CONFIGURED" {

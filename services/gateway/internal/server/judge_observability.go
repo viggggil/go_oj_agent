@@ -54,9 +54,13 @@ func serveJudgeTrace(requestCtx context.Context, httpCtx khttp.Context, gateway 
 	if owner == nil {
 		return kerrors.New(http.StatusServiceUnavailable, "GATEWAY_OBSERVABILITY_UNAVAILABLE", "Judge service is not configured")
 	}
-	if _, err := owner.GetSubmission(requestCtx, &submissionv1.GetSubmissionRequest{SubmissionId: id}); err != nil {
+	lookup, err := owner.GetSubmission(requestCtx, &submissionv1.GetSubmissionRequest{SubmissionId: id})
+	if err != nil {
 		// Preserve the owning service's authorization and not-found boundary.
 		return err
+	}
+	if lookup == nil || lookup.GetSubmission() == nil || lookup.GetSubmission().GetId() != id {
+		return kerrors.New(http.StatusBadGateway, "GATEWAY_OBSERVABILITY_INVALID_JUDGE_RESPONSE", "Judge service returned an invalid submission")
 	}
 	response := buildJudgeTraceResponse(id, os.Getenv("JUDGE_OBSERVABILITY_GRAFANA_URL"))
 	httpCtx.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -79,7 +83,7 @@ func buildJudgeTraceResponse(submissionID int64, configured string) judgeTraceRe
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || base.User != nil {
 		return response
 	}
-	query := `{ resource.service.name =~ "gateway-service|judge-service|judge-worker|contest-service" && span.submission.id = "` + strconv.FormatInt(submissionID, 10) + `" }`
+	query := `{ resource.service.name =~ "gateway-service|judge-service|judge-worker|contest-service" && span.submission.id = ` + strconv.FormatInt(submissionID, 10) + ` }`
 	left, _ := json.Marshal(map[string]any{
 		"datasource": "tempo",
 		"queries":    []map[string]string{{"queryType": "traceql", "query": query, "refId": "A"}},
