@@ -29,6 +29,9 @@
     <p v-if="isAdmin && trace && !trace.link_available" class="muted trace-note">
       判题 Trace 尚未配置或可能未采样，当前没有可用排障链接。
     </p>
+    <p v-else-if="isAdmin && trace?.link_available" class="muted trace-note">
+      已生成 Trace 检索链接；Trace 仍可能因未采样或超过留存时间而查不到。
+    </p>
     <div class="submission-summary">
       <div>
         <span>状态</span

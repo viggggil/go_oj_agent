@@ -20,6 +20,7 @@
       <button class="button secondary" :disabled="searching">{{ searching ? '查询中…' : '查找 Trace' }}</button>
       <a v-if="trace?.link_available" class="button" :href="trace.tempo_url" target="_blank" rel="noopener noreferrer">在 Grafana 中打开</a>
       <span v-if="trace && !trace.link_available" class="muted">Grafana 未配置，或 Trace 尚不可用 / 未采样。</span>
+      <span v-else-if="trace?.link_available" class="muted">搜索无结果可能表示未采样或已超过留存时间。</span>
       <span v-if="searchError" class="error">{{ searchError }}</span>
     </form>
 
