@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
 	"github.com/viggggil/go_oj_agent/services/contest/internal/biz"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"os"
 	"sync"
 	"testing"
@@ -13,6 +15,9 @@ import (
 )
 
 func TestMySQLLeaderboardOutbox(t *testing.T) {
+	previousPropagator := otel.GetTextMapPropagator()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() { otel.SetTextMapPropagator(previousPropagator) })
 	db := testContestDatabase(t)
 	repo := NewRepository(db)
 	start := time.Now().UTC().Truncate(time.Millisecond).Add(-time.Hour)
@@ -40,8 +45,8 @@ func TestMySQLLeaderboardOutbox(t *testing.T) {
 	}
 	base := time.Now().UnixNano()
 	fact := mq.SubmissionJudged{SubmissionID: base, ContestID: id, UserID: 42, ProblemID: 7, Verdict: "AC", SubmittedAt: start.Add(10 * time.Minute), JudgedAt: start.Add(20 * time.Minute)}
-	event := biz.ProjectionEvent{EventID: uuid.NewString(), Fact: biz.SubmissionFact{SubmissionJudged: fact}}
 	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	event := biz.ProjectionEvent{EventID: uuid.NewString(), TraceParent: traceparent, TraceState: "vendor=test", Fact: biz.SubmissionFact{SubmissionJudged: fact}}
 	traceCtx := mq.ContextFromTraceValues(t.Context(), traceparent, "vendor=test")
 	if err := repo.ApplyProjection(traceCtx, event); err != nil {
 		t.Fatal(err)
