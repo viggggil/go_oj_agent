@@ -8,7 +8,7 @@ from uuid import UUID
 
 from app.memory.generator import IncrementalSummaryGenerator, SummaryGenerator
 from app.models.memory import ConversationSummary
-from app.observability import job_span, job_status, traced_job
+from app.observability import job_span, job_status, record_job_retry, traced_job
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
@@ -197,6 +197,7 @@ class ConversationMemoryWorker:
                         extra={"error_type": type(exc).__name__},
                     )
                     return
+                record_job_retry("memory")
                 await asyncio.sleep(self._retry_delay * (2**attempt))
 
     async def _process(self, job: MemoryJob) -> None:

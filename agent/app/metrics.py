@@ -85,6 +85,7 @@ _CONTROLLED_VALUES: dict[str, frozenset[str]] = {
             "timeout",
             "retrying",
             "running",
+            "lease_lost",
             "success",
             "error",
             "other",
@@ -108,6 +109,7 @@ _CONTROLLED_VALUES: dict[str, frozenset[str]] = {
             "get_judge_result",
             "list_submissions",
             "run_code",
+            "retrieve_knowledge",
             "other",
         }
     ),

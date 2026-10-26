@@ -1,10 +1,10 @@
 # Metrics 契约（Issue #205）
 
-本文是业务 Metrics 的命名、单位和标签字典。PR1 落地共享 Meter、属性 allowlist 和遥测自身的健康计数；PR2 接入 Judge 和异步判题链路指标；其他业务领域指标按 Issue #205 后续 PR 分阶段接入。未在本文登记的指标和标签不得直接加入生产代码。
+本文是业务 Metrics 的命名、单位和标签字典。PR1 落地共享 Meter、属性 allowlist 和遥测自身的健康计数；PR2 接入 Judge 和异步判题链路指标；PR3 接入 Contest 投影与缓存指标；PR4 对齐 Agent Chat、模型、Tool/RAG 和后台任务指标。未在本文登记的指标和标签不得直接加入生产代码。
 
 ## 采集路径
 
-Go 服务和 Worker 使用 `pkg/observability` 的 OTel MeterProvider，Agent 使用 `agent/app/metrics.py` 的属性策略。配置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时，OTLP Metrics 发往 Collector；未配置时使用 SDK no-op/无 reader 行为。Collector 通过 Prometheus exporter 暴露指标，Prometheus 负责抓取和保存历史序列。Contest 现有独立 `/metrics` 端口继续保留，统一抓取将在后续 PR 接入。
+Go 服务和 Worker 使用 `pkg/observability` 的 OTel MeterProvider，Agent 使用 `agent/app/metrics.py` 的属性策略。配置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时，OTLP Metrics 发往 Collector；未配置时使用 SDK no-op/无 reader 行为。Collector 通过 Prometheus exporter 暴露指标，Prometheus 负责抓取和保存历史序列。Contest 另保留独立 `/metrics` 端口，由 Prometheus 直接抓取。
 
 Metrics 是旁路数据：Meter 创建、属性规范化、导出失败和 Collector/Prometheus 不可用都不能改变业务请求、事务、Outbox、ACK/NACK、重试、租约或 Agent Run 终态。
 
@@ -30,9 +30,21 @@ OTel instrument name 使用小写点分隔，不在代码中手写 Prometheus `_
 | Contest | `oj.contest.cache.outbox.pending`、`oj.contest.cache.outbox.backlog`、`oj.contest.cache.outbox.oldest_age`、`oj.contest.cache.outbox.dead` | Gauge | `1` / `s` | PR3 |
 | Contest | `oj.contest.cache.outbox.apply.total`、`oj.contest.cache.outbox.retry.total`、`oj.contest.cache.outbox.lease_failure.total` | Counter | `1` | PR3 |
 | Contest | `oj.contest.cache.outbox.delivery_age`、`oj.contest.cache.rebuild.duration` | Counter (duration sum) | `s` | PR3 |
-| Agent | `agent.run.started`、`agent.run.terminal`、`agent.run.in_flight` | Counter / UpDownCounter | `1` | 已有，PR4 对齐 |
-| Agent | `agent.run.duration`、`agent.model.duration`、`agent.rag.duration` | Histogram | `s` | 已有部分，PR4 对齐 |
-| 后台任务 | `agent.job.total`、`agent.job.duration`、`agent.job.in_flight` | Counter / Histogram / UpDownCounter | `1` / `s` | PR4 |
+| Agent Run | `agent.run.started`、`agent.run.in_flight` | Counter / UpDownCounter（无业务 label） | `1` | PR4（Run 既有指标） |
+| Agent Run | `agent.run.terminal`、`agent.run.duration` | Counter / Histogram (`status`) | `1` / `s` | PR4（Run 既有指标） |
+| Agent Run | `agent.run.first_event.duration` | Histogram（无业务 label） | `s` | PR4（Run 既有指标） |
+| Agent 模型 | `agent.model.attempt`、`agent.model.retry` | Counter (`purpose`, `model`, `outcome`) | `1` | PR4 |
+| Agent 模型 | `agent.model.in_flight` | UpDownCounter (`purpose`, `model`) | `1` | PR4 |
+| Agent 模型 | `agent.model.duration` | Histogram (`purpose`, `model`, `outcome`) | `s` | PR4 |
+| Agent Tool | `agent.tool.total` | Counter (`purpose`, `tool`, `outcome`) | `1` | PR4 |
+| Agent Tool | `agent.tool.in_flight` | UpDownCounter (`purpose`, `tool`) | `1` | PR4 |
+| Agent Tool | `agent.tool.duration` | Histogram (`purpose`, `tool`, `outcome`) | `s` | PR4 |
+| Agent RAG | `agent.rag.total` | Counter (`purpose`, `outcome`) | `1` | PR4 |
+| Agent RAG | `agent.rag.in_flight` | UpDownCounter (`purpose`) | `1` | PR4 |
+| Agent RAG | `agent.rag.duration` | Histogram (`purpose`, `outcome`) | `s` | PR4 |
+| 后台任务 | `agent.job.total` | Counter (`purpose`, `status`) | `1` | PR4 |
+| 后台任务 | `agent.job.in_flight` | UpDownCounter (`purpose`) | `1` | PR4 |
+| 后台任务 | `agent.job.duration` | Histogram (`purpose`, `status`) | `s` | PR4 |
 | 遥测自身 | `oj.telemetry.export.failure`、`oj.telemetry.dropped` | Counter | `1` | PR1 基础设施 |
 
 延迟统一使用秒。需要毫秒展示时由 Grafana/PromQL 换算，不能在不同服务中混用单位。跨实例 P95/P99 必须从合并后的 Histogram 计算，不能平均各实例的分位数。
@@ -53,7 +65,7 @@ service environment route rpc status outcome verdict language purpose
 model tool error_code usage_source phase
 ```
 
-`service` 和 `environment` 优先使用 Resource 属性，业务指标不应重复添加为 label。`route` 只接受已登记的规范化路由模板，`rpc` 只接受已登记的稳定方法名。`status`、`outcome`、`verdict`、`purpose`、`language`、`usage_source`、`phase` 使用固定枚举；`model`、`tool`、`error_code` 只能使用已登记的受控值，未知值为 `other`。
+`service` 和 `environment` 优先使用 Resource 属性，业务指标不应重复添加为 label。`route` 只接受已登记的规范化路由模板，`rpc` 只接受已登记的稳定方法名。`status`、`outcome`、`verdict`、`purpose`、`language`、`usage_source`、`phase` 使用固定枚举；`model`、`tool`、`error_code` 只能使用已登记的受控值，未知值为 `other`。Agent Tool 的允许值包括 `retrieve_knowledge`；后台 `status` 额外允许 `lease_lost`。
 
 禁止将以下字段放入 Metrics label：
 
@@ -75,6 +87,7 @@ query payload input output URL token credential exception_message
 - `completed`、`failed`、`cancelled`、`timeout`、`retrying` 等状态必须使用固定枚举。正常判题 verdict（AC/WA/CE/TLE 等）与基础设施失败分开统计。
 - UpDownCounter 表示当前实例观察到的在途数量；进程重启归零，不代表历史总量。
 - Contest 独立 `/metrics` 中的进程级 Counter 在进程重启时归零；短暂停机可能使最后一次事务之后、进程退出之前的业务计数未被 scrape 到。它们用于运行诊断，不是账务或审计事实。
+- Agent Model/Tool/RAG Counter 在每次操作退出后记录；成功、错误、超时和取消分别使用固定 `outcome`。模型重试计数只在下一次 Provider attempt 确实开始时增加。Memory 按逻辑任务终态计数；其内部重试在确定安排下一次处理后单独记录一次 `status=retrying`。RAG ingestion 则每次领取的 attempt 只计一个终态；仅在 lease-fenced finish 已将失败任务持久化为 PENDING 后，以 `status=retrying` 记录，不再额外重复增加。`lease_lost` 表示失租 Worker 未能持久化任务完成状态；重领和退避仍由原存储逻辑控制。Agent 在途数只描述当前进程观察到的操作，进程重启后归零。
 - Gauge/ObservableGauge 必须带 `observed_at` 或等价新鲜度语义；查询失败保留 unknown/stale，不写入 0。
 - 指标采样不依赖 Trace 是否采样；Trace 缺失不能造成 Metrics 缺失。
 

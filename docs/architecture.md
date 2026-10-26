@@ -884,7 +884,7 @@ flowchart LR
 
 RabbitMQ Header 中传播 Trace Context。
 
-可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。Issue #200 PR2 已将 Judge Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result 的异步父子 Trace；Issue #200 PR3 接通 Judge Result 事务 → `submission.judged` → Contest Projection → Contest Cache Outbox/Relay。Issue #200 PR4 提供固定 Grafana 地址的管理员排障入口。Issue #205 PR1 已统一 Go/Agent Metrics 的低基数属性策略和遥测健康计数；PR2 接入 HTTP/gRPC 自动请求指标及 Judge/Outbox/Worker/Result 指标；PR3 对齐 Contest 投影、排行榜缓存与 Outbox Metrics，并将 Contest 独立端口纳入 Prometheus 抓取。Agent 领域指标、看板告警按后续 PR 接入。旧消息、无 Header 消息和历史 NULL 上下文仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
+可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。Issue #200 PR2 已将 Judge Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result 的异步父子 Trace；Issue #200 PR3 接通 Judge Result 事务 → `submission.judged` → Contest Projection → Contest Cache Outbox/Relay。Issue #200 PR4 提供固定 Grafana 地址的管理员排障入口。Issue #205 PR1 已统一 Go/Agent Metrics 的低基数属性策略和遥测健康计数；PR2 接入 HTTP/gRPC 自动请求指标及 Judge/Outbox/Worker/Result 指标；PR3 对齐 Contest 投影、排行榜缓存与 Outbox Metrics，并将 Contest 独立端口纳入 Prometheus 抓取；PR4 补齐 Agent Run、模型 attempt/retry、Tool/RAG 操作及 Memory/Eval/Review/RAG ingestion 后台任务指标。旧消息、无 Header 消息和历史 NULL 上下文仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
 PR4 为平台管理员提供 Gateway 受控 Judge Trace 检索入口。Gateway 不访问 Judge 数据库，先调用 Judge `GetSubmission` 做授权，再使用固定 `JUDGE_OBSERVABILITY_GRAFANA_URL` 构造按 `submission.id` 检索的 Tempo Explore 链接。普通用户和 `agent_admin` 不可见；Trace 缺失、未采样或保留期结束时显示不可用，不改变判题业务状态。
 
 关键 Metrics：
@@ -892,7 +892,7 @@ PR4 为平台管理员提供 Gateway 受控 Judge Trace 检索入口。Gateway �
 - HTTP/gRPC latency / error rate。
 - MQ publish failure / retry / DLQ size。
 - Judge queue time / compile time / execute time / verdict count。
-- Agent latency / tool failure / retrieval latency / eval pass rate。
+- Agent Run 与模型 latency / tool failure / retrieval latency / 后台任务重试及在途数量；Eval 质量分数仍从 Eval 业务数据读取。
 
 ---
 
