@@ -248,10 +248,11 @@ retrying. Contest row locks are acquired before participant, problem or result
 rows. Deadlocks and lock wait timeouts retry at most three times and always
 honor request cancellation.
 
-运行观测使用独立 `server.metrics_address` 端口，提供 Prometheus 文本 `/metrics`
-和 JSON `/debug/vars`。默认本地地址为 `127.0.0.1:9105`，Compose 仅在内部监听。
-指标覆盖命中/未命中/错误、实际 SQL 回源、Outbox backlog/最老年龄/投递延迟、
-重建次数/耗时/失败、完整事务重试。Redis 继续作为可重建投影。
+运行观测使用独立 `server.metrics_address` 端口，提供标准 Prometheus 文本 `/metrics`
+和兼容 JSON `/debug/vars`。Compose 内部监听 `:9105`；开启观测 overlay 后 Prometheus
+通过 `contest-service:9105` 抓取。指标覆盖投影事务/耗时、缓存命中/未命中/错误、SQL 回源、
+缓存重建、Outbox pending/backlog/oldest-age/dead/retry/lease failure 与累计投递年龄。Outbox Gauge 每 15 秒
+刷新并带 `observed_at_seconds`；查询失败保留上次值并增加 observation failure。Redis 继续作为可重建投影。
 
 迁移、回填、部署顺序、功能开关、故障处理、测试矩阵和负载记录见
 [排行榜缓存运维文档](../../docs/contest-cache-operations.md)。

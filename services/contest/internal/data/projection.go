@@ -16,19 +16,30 @@ import (
 )
 
 func (r *Repository) ApplyProjection(ctx context.Context, event biz.ProjectionEvent) error {
+	started := time.Now()
 	ctx, span := otel.Tracer("oj.contest.projection").Start(ctx, "contest.projection.transaction")
 	span.SetAttributes(attribute.Int64("contest.id", event.Fact.ContestID), attribute.Int64("submission.id", event.Fact.SubmissionID), attribute.Int64("user.id", event.Fact.UserID), attribute.Int64("problem.id", event.Fact.ProblemID))
 	defer span.End()
+	processed := false
 	err := withContestTx(ctx, r.db, func(tx *sql.Tx) error {
-		return r.applyProjectionTx(ctx, tx, event)
+		processed = false
+		if err := r.applyProjectionTx(ctx, tx, event, &processed); err != nil {
+			processed = false
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		span.SetStatus(codes.Error, "projection transaction failed")
 	}
+	RecordProjectionResult(err, time.Since(started))
+	if err == nil && processed {
+		RecordProjectionEventProcessed()
+	}
 	return err
 }
 
-func (r *Repository) applyProjectionTx(ctx context.Context, tx *sql.Tx, event biz.ProjectionEvent) error {
+func (r *Repository) applyProjectionTx(ctx context.Context, tx *sql.Tx, event biz.ProjectionEvent, processed *bool) error {
 	// 共享比赛锁保护配置；不同用户之间共享锁兼容，不串行化整场结果。
 	f := event.Fact
 	var start, end time.Time
@@ -46,6 +57,7 @@ func (r *Repository) applyProjectionTx(ctx context.Context, tx *sql.Tx, event bi
 	if n == 0 {
 		return nil
 	}
+	*processed = true
 	// 与 DATETIME(6) 的版本精度一致，避免纳秒重放误判为新版本。
 	f.SubmittedAt = f.SubmittedAt.UTC().Truncate(time.Microsecond)
 	f.JudgedAt = f.JudgedAt.UTC().Truncate(time.Microsecond)

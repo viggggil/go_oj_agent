@@ -241,7 +241,7 @@ make observability-up
 make observability-check
 ```
 
-Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Gateway 和 Agent 设置 OTLP endpoint；没有 overlay 时应用保持 no-op。
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 在 Compose 网络内直接抓取 Contest `contest-service:9105/metrics`；没有 overlay 时 Prometheus 不运行，Contest `/metrics` 仍可供内部运维直接抓取。
 
 平台管理员的 Judge Trace 入口使用 Gateway 环境变量 `JUDGE_OBSERVABILITY_GRAFANA_URL` 生成固定 Explore 链接，不接受请求中的 URL。链接只表示可执行受控搜索，Tempo 未采样、Collector 故障或数据过期时页面会显示 Trace 不可用。
 

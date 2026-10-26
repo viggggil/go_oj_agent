@@ -26,9 +26,6 @@ func NewCacheRelayServer(repo *data.Repository, cache *data.LeaderboardRedis) *C
 	return &CacheRelayServer{enabled: cache.Enabled(), repo: repo, relay: &biz.CacheRelay{Repository: repo, Sink: cache, Observe: data.RecordCacheRelayOutcome}}
 }
 func (s *CacheRelayServer) Start(ctx context.Context) error {
-	if !s.enabled {
-		return nil
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	s.mu.Lock()
 	if s.done != nil {
@@ -46,20 +43,22 @@ func (s *CacheRelayServer) Start(ctx context.Context) error {
 	for {
 		// Limit outage/cold-cache work per polling round. Claim only one event at a
 		// time, so leases cannot expire while queued behind slow Redis requests.
-		for range 32 {
-			if ctx.Err() != nil {
-				return nil
-			}
-			claimed, err := s.relay.RunOnce(ctx)
-			if err != nil {
+		if s.enabled {
+			for range 32 {
 				if ctx.Err() != nil {
 					return nil
 				}
-				slog.Warn("leaderboard cache relay retry", "error", err)
-				break
-			}
-			if !claimed {
-				break
+				claimed, err := s.relay.RunOnce(ctx)
+				if err != nil {
+					if ctx.Err() != nil {
+						return nil
+					}
+					slog.Warn("leaderboard cache relay retry", "error", err)
+					break
+				}
+				if !claimed {
+					break
+				}
 			}
 		}
 		if s.repo != nil && !time.Now().Before(nextObserve) {
