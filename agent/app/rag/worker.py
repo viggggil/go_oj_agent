@@ -9,7 +9,7 @@ from typing import Any
 from app.core.database import DatabaseProbe
 from app.core.settings import load_settings
 from app.models.configuration import ConfigError
-from app.observability import configure, job_span, job_status
+from app.observability import configure, job_metrics, job_span, job_status
 from app.rag.clients import RagClients
 from app.rag.models import REVISION, SPLITTER
 from app.rag.store import KnowledgeStore
@@ -22,8 +22,9 @@ async def process_one(store: KnowledgeStore, clients: RagClients) -> bool:
     if value is None:
         return False
 
-    async with job_span("agent.rag.ingest", "rag_ingestion", root=True) as ingest_span:
-        return await _process_claimed(store, clients, value, ingest_span)
+    async with job_metrics("rag_ingestion"):
+        async with job_span("agent.rag.ingest", "rag_ingestion", root=True) as ingest_span:
+            return await _process_claimed(store, clients, value, ingest_span)
 
 
 async def _process_claimed(
@@ -71,7 +72,12 @@ async def _process_claimed(
             await heartbeat_task
     async with job_span("agent.rag.ingest.persist", "rag_ingestion"):
         published = await store.finish(value, count, error)
-    job_status("lease_lost" if not published else ("failed" if error else "completed"), error)
+    if not published:
+        job_status("lease_lost")
+    elif error:
+        job_status("failed" if value["attempts"] >= 4 else "retrying", error)
+    else:
+        job_status("completed")
     return True
 
 

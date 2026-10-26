@@ -13,7 +13,12 @@ from app.clients.model import ResponsesClient
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
 from app.models.provider import ModelAttempt, ModelFailure, ModelResponse, ModelSummary
 from app.models.runtime import AgentState, HistoryMessage
-from app.observability import span
+from app.observability import (
+    model_attempt_finished,
+    model_attempt_started,
+    record_model_retry,
+    span,
+)
 
 SAFETY_PREFIX = (
     "你是编程学习助手。根据本轮信息及提供的已完成会话问答回答；历史可能已裁剪。"
@@ -149,6 +154,8 @@ class DirectAnswer:
                 raise ModelFailure("AGENT_MODEL_CALL_LIMIT")
             if accumulated_input + input_estimate > budget.max_input_tokens:
                 raise ModelFailure("AGENT_MODEL_INPUT_LIMIT")
+            if index > 0:
+                record_model_retry(profile.model)
             attempt = ModelAttempt(
                 provider_id=snapshot["provider_id"],
                 model_profile_id=snapshot["model_profile_id"],
@@ -156,9 +163,11 @@ class DirectAnswer:
                 input_tokens=input_estimate,
             )
             state.model_summary.attempts.append(attempt)
+            metric_attempt = model_attempt_started(profile.model)
             started = monotonic()
             emitted = False
             answer_bytes = 0
+            metric_outcome = "error"
             iterator: AsyncGenerator[str, None] | None = None
             try:
                 try:
@@ -214,35 +223,45 @@ class DirectAnswer:
                 attempt.duration_ms = int((monotonic() - started) * 1000)
                 if result is not None and result.reasoning_summary and on_reasoning_summary:
                     await on_reasoning_summary(result.reasoning_summary)
+                metric_outcome = "success"
                 return
             except ModelFailure as error:
                 attempt.error_code = error.code
                 attempt.finish_reason = "failed"
+                if error.code.endswith("_TIMEOUT"):
+                    metric_outcome = "timeout"
                 if emitted or not error.retryable or index == provider.max_retries:
                     raise
             except (asyncio.CancelledError, GeneratorExit):
                 attempt.finish_reason = "cancelled"
+                metric_outcome = "cancelled"
                 raise
             finally:
-                input_cost = (
-                    attempt.input_tokens
-                    if attempt.usage_source == "provider"
-                    else max(attempt.input_tokens, input_estimate)
-                )
-                output_cost = (
-                    attempt.output_tokens
-                    if attempt.usage_source == "provider"
-                    else max(attempt.output_tokens, answer_bytes)
-                )
-                if result is not None:
-                    result.spent_input += input_cost
-                    result.spent_output += output_cost
-                accumulated_input += input_cost
-                accumulated_output += output_cost
-                attempt.duration_ms = int((monotonic() - started) * 1000)
-                close = getattr(iterator, "aclose", None)
-                if close is not None:
-                    await close()
+                try:
+                    input_cost = (
+                        attempt.input_tokens
+                        if attempt.usage_source == "provider"
+                        else max(attempt.input_tokens, input_estimate)
+                    )
+                    output_cost = (
+                        attempt.output_tokens
+                        if attempt.usage_source == "provider"
+                        else max(attempt.output_tokens, answer_bytes)
+                    )
+                    if result is not None:
+                        result.spent_input += input_cost
+                        result.spent_output += output_cost
+                    accumulated_input += input_cost
+                    accumulated_output += output_cost
+                    attempt.duration_ms = int((monotonic() - started) * 1000)
+                    close = getattr(iterator, "aclose", None)
+                    if close is not None:
+                        await close()
+                except BaseException:
+                    metric_outcome = "error"
+                    raise
+                finally:
+                    model_attempt_finished(metric_attempt, metric_outcome)
             await asyncio.sleep(min(0.25 * 2**index, 1))
 
     def validate_answer(self, state: AgentState, answer: str) -> None:
