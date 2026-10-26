@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -147,6 +148,7 @@ func (r *OutboxRelay) RunOnce(ctx context.Context) (int, error) {
 			if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, now, true, stableFailure(buildErr)); err != nil {
 				return processed, err
 			}
+			observability.Judge().OutboxDead(ctx, "invalid_message")
 			processed++
 			continue
 		}
@@ -162,6 +164,7 @@ func (r *OutboxRelay) RunOnce(ctx context.Context) (int, error) {
 				if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, now, true, stableFailure(traceErr)); err != nil {
 					return processed, err
 				}
+				observability.Judge().OutboxDead(ctx, "invalid_message")
 				processed++
 				continue
 			}
@@ -178,12 +181,20 @@ func (r *OutboxRelay) RunOnce(ctx context.Context) (int, error) {
 			if err := r.repository.MarkOutboxFailure(ctx, event.ID, config.Owner, next, dead, stableFailure(publishErr)); err != nil {
 				return processed, err
 			}
+			observability.Judge().OutboxPublished(ctx, "error")
+			if !dead {
+				observability.Judge().OutboxRetried(ctx, "scheduled")
+			}
+			if dead {
+				observability.Judge().OutboxDead(ctx, "publish_failed")
+			}
 			processed++
 			continue
 		}
 		if err := r.repository.MarkOutboxPublished(ctx, event.ID, config.Owner, now); err != nil {
 			return processed, err
 		}
+		observability.Judge().OutboxPublished(ctx, "success")
 		processed++
 	}
 	return processed, nil

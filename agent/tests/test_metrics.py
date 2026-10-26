@@ -47,3 +47,14 @@ def test_safe_metric_attributes_collapses_dynamic_values() -> None:
         "route": "other",
         "tool": "other",
     }
+
+
+def test_safe_metric_attributes_accepts_controlled_judge_dimensions() -> None:
+    assert safe_metric_attributes(
+        language="Go", outcome="scheduled", phase="compile", verdict="WA"
+    ) == {
+        "language": "go",
+        "outcome": "scheduled",
+        "phase": "compile",
+        "verdict": "wa",
+    }

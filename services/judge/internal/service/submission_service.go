@@ -17,6 +17,7 @@ import (
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	submissionv1 "github.com/viggggil/go_oj_agent/api/submission/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 )
 
@@ -59,7 +60,11 @@ func (s *SubmissionService) CreateSubmission(ctx context.Context, req *submissio
 		ContestStartAt: req.GetContestStartAt().AsTime(), ContestEndAt: req.GetContestEndAt().AsTime(),
 	})
 	if err != nil {
+		observability.Judge().Submission(ctx, req.GetLanguage(), "error")
 		return nil, traceError(span, err)
+	}
+	if !result.Replayed {
+		observability.Judge().Submission(ctx, req.GetLanguage(), "success")
 	}
 	span.SetAttributes(attribute.Int64("submission.id", result.SubmissionID), attribute.Int64("submission.status", int64(result.Status)))
 	return &submissionv1.CreateSubmissionResponse{SubmissionId: result.SubmissionID, Status: result.Status}, nil
@@ -168,7 +173,11 @@ func (s *SubmissionService) RejudgeSubmission(ctx context.Context, req *submissi
 	}
 	result, err := s.uc.Rejudge(ctx, biz.RejudgeSubmissionInput{Actor: actor, SubmissionID: req.GetSubmissionId(), IdempotencyKey: strings.ToLower(req.GetIdempotencyKey())})
 	if err != nil {
+		observability.Judge().Submission(ctx, "other", "error")
 		return nil, traceError(span, err)
+	}
+	if !result.Replayed {
+		observability.Judge().Submission(ctx, result.Submission.Language, "success")
 	}
 	span.SetAttributes(attribute.Int64("submission.invalidated_id", result.InvalidatedSubmissionID), attribute.Int64("submission.id", result.Submission.ID), attribute.Int64("submission.status", int64(result.Submission.Status)))
 	return &submissionv1.RejudgeSubmissionResponse{InvalidatedSubmissionId: result.InvalidatedSubmissionID, Submission: toProtoSubmission(result.Submission)}, nil

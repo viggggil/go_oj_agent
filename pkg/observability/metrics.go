@@ -31,6 +31,7 @@ const (
 	LabelTool        = "tool"
 	LabelErrorCode   = "error_code"
 	LabelUsageSource = "usage_source"
+	LabelPhase       = "phase"
 )
 
 const maxMetricLabelValueLength = 64
@@ -45,6 +46,7 @@ var (
 		LabelStatus: {}, LabelOutcome: {}, LabelVerdict: {}, LabelLanguage: {},
 		LabelPurpose: {}, LabelModel: {}, LabelTool: {}, LabelErrorCode: {},
 		LabelUsageSource: {},
+		LabelPhase:       {},
 	}
 	controlledMetricValues = map[string]map[string]struct{}{
 		LabelService: {
@@ -80,7 +82,7 @@ var (
 			"completed": {}, "failed": {}, "cancelled": {}, "timeout": {},
 			"retrying": {}, "running": {}, "success": {}, "error": {}, "other": {},
 		},
-		LabelOutcome:  {"success": {}, "error": {}, "timeout": {}, "cancelled": {}, "retrying": {}, "dropped": {}, "other": {}},
+		LabelOutcome:  {"success": {}, "error": {}, "timeout": {}, "cancelled": {}, "retrying": {}, "scheduled": {}, "dropped": {}, "other": {}},
 		LabelVerdict:  {"ac": {}, "wa": {}, "ce": {}, "tle": {}, "mle": {}, "re": {}, "system_error": {}, "unspecified": {}, "other": {}},
 		LabelLanguage: {"c": {}, "cpp": {}, "go": {}, "java": {}, "python": {}, "rust": {}, "other": {}},
 		LabelPurpose:  {"chat": {}, "memory": {}, "eval": {}, "review": {}, "rag_ingestion": {}, "other": {}},
@@ -98,11 +100,12 @@ var (
 			"agent_model_output_limit": {}, "agent_model_input_limit": {},
 			"agent_model_call_limit": {}, "agent_model_unsupported_output": {},
 			"agent_credential_unavailable": {}, "agent_run_failed": {},
-			"agent_background_failed": {}, "otel_export_failed": {},
+			"agent_background_failed": {}, "invalid_message": {}, "publish_failed": {}, "otel_export_failed": {},
 			"otel_init_failed": {}, "otel_shutdown_failed": {},
 			"collector_unavailable": {}, "queue_full": {}, "other": {},
 		},
 		LabelUsageSource: {"provider": {}, "estimated": {}, "other": {}},
+		LabelPhase:       {"compile": {}, "execute": {}, "result": {}, "outbox": {}, "other": {}},
 	}
 )
 
