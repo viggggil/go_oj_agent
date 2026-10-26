@@ -10,6 +10,7 @@ import (
 
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/judge-worker/internal/biz"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -79,7 +80,9 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 			}
 			c.Logger.Warn("task rejected", attrs...)
 		}
-		_ = d.Reject(false)
+		if rejectErr := d.Reject(false); rejectErr == nil {
+			observability.Judge().OutboxDead(traceCtx, "invalid_message")
+		}
 		return
 	}
 	if c.Logger != nil {
@@ -88,6 +91,18 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 			redelivered = metadata.IsRedelivered()
 		}
 		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
+	}
+	startedAt := time.Now()
+	metrics := observability.Judge()
+	metrics.WorkerStart(traceCtx)
+	workerOutcome := "error"
+	defer func() {
+		metrics.WorkerStop(traceCtx)
+		metrics.WorkerTask(traceCtx, task.Language, workerOutcome)
+		metrics.WorkerDuration(traceCtx, time.Since(startedAt), task.Language, workerOutcome)
+	}()
+	if !envelope.OccurredAt.IsZero() && time.Since(envelope.OccurredAt) >= 0 {
+		metrics.Queue(traceCtx, time.Since(envelope.OccurredAt))
 	}
 	span.SetAttributes(attribute.Int64("submission.id", task.SubmissionID), attribute.Int64("problem.id", task.ProblemID), attribute.Int64("judge.attempt", int64(task.Attempt)))
 	deadline := time.Now().Add(c.TaskTimeout)
@@ -116,7 +131,14 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 			_ = d.Nack(false, true)
 			return
 		}
-		_ = d.Ack(false)
+		if err := d.Ack(false); err != nil {
+			span.SetStatus(codes.Error, "task ack failed")
+			if c.Logger != nil {
+				c.Logger.Error("task ack failed", "event_id", envelope.EventID, "error", err)
+			}
+			return
+		}
+		workerOutcome = "success"
 		return
 	}
 	outcome := c.Engine.Execute(taskCtx, task)
@@ -138,6 +160,9 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 				err = retryReporter.ReportRetry(traceCtx, envelope, retryTask)
 				if err == nil {
 					err = d.Ack(false)
+				}
+				if err == nil {
+					workerOutcome = "retrying"
 				}
 				if err != nil {
 					_ = d.Nack(false, true)
@@ -170,6 +195,9 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	}
 	if err = d.Ack(false); err != nil && c.Logger != nil {
 		c.Logger.Error("task ack failed", "event_id", envelope.EventID, "error", err)
+	}
+	if err == nil {
+		workerOutcome = "success"
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -79,6 +80,11 @@ func (r *PublisherReporter) report(ctx context.Context, input mq.Envelope, event
 	err = r.Publisher.Publish(publishCtx, route, envelope.EventID, body)
 	if err != nil {
 		span.SetStatus(codes.Error, "result publish failed")
+		observability.Judge().ResultPublishFailed(ctx)
+	} else if result, ok := payload.(mq.JudgeCompleted); ok {
+		observability.Judge().Result(ctx, result.Verdict, "success")
+	} else {
+		observability.Judge().Result(ctx, "system_error", "success")
 	}
 	return err
 }
@@ -102,6 +108,8 @@ func (r *PublisherReporter) reportTask(ctx context.Context, input mq.Envelope, t
 	err = r.Publisher.Publish(publishCtx, retryRoute(task.Language), envelope.EventID, body)
 	if err != nil {
 		span.SetStatus(codes.Error, "retry publish failed")
+	} else {
+		observability.Judge().WorkerRetry(ctx, task.Language)
 	}
 	return err
 }
@@ -161,6 +169,11 @@ func (r *RabbitReporter) report(ctx context.Context, input mq.Envelope, eventTyp
 	err = r.publish(publishCtx, route, envelope.EventID, body)
 	if err != nil {
 		span.SetStatus(codes.Error, "result publish failed")
+		observability.Judge().ResultPublishFailed(ctx)
+	} else if result, ok := payload.(mq.JudgeCompleted); ok {
+		observability.Judge().Result(ctx, result.Verdict, "success")
+	} else {
+		observability.Judge().Result(ctx, "system_error", "success")
 	}
 	return err
 }
@@ -184,6 +197,8 @@ func (r *RabbitReporter) reportTask(ctx context.Context, input mq.Envelope, task
 	err = r.publish(publishCtx, retryRoute(task.Language), envelope.EventID, body)
 	if err != nil {
 		span.SetStatus(codes.Error, "retry publish failed")
+	} else {
+		observability.Judge().WorkerRetry(ctx, task.Language)
 	}
 	return err
 }

@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
 )
@@ -103,6 +104,11 @@ func (c *RabbitResultConsumer) Start(ctx context.Context) error {
 			handleCtx, span := otel.Tracer("oj.judge.result").Start(handleCtx, "judge.result.consume")
 			span.SetAttributes(attribute.String("messaging.event_type", delivery.Type))
 			err := c.handler.Handle(handleCtx, delivery.Type, delivery.Body)
+			if err == nil {
+				observability.Judge().ResultConsumed(handleCtx, "success")
+			} else {
+				observability.Judge().ResultConsumed(handleCtx, "error")
+			}
 			if err != nil {
 				span.SetStatus(codes.Error, "result handling failed")
 			}

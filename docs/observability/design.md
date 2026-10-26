@@ -1,6 +1,6 @@
 # Observability 模块设计草案
 
-状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪、Issue #200 PR1 同步 Judge Trace、PR2 异步 Judge Trace、PR3 结果回写 Trace 与 PR4 受控 Trace 检索已实现。Issue #205 PR1 已落地 Metrics 契约与共享低基数属性策略；Judge/Contest/Agent 领域指标、Prometheus 看板告警和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
+状态：基础本地观测栈、Issue #189 的 Agent Chat 本地追踪、Issue #191 的 Agent 后台任务本地追踪、Issue #200 PR1 同步 Judge Trace、PR2 异步 Judge Trace、PR3 结果回写 Trace 与 PR4 受控 Trace 检索已实现。Issue #205 PR1 已落地 Metrics 契约与共享低基数属性策略；PR2 接入 Gateway/Judge/Problem HTTP/gRPC instrumentation 与 Judge Outbox/Worker/Result 链路基础指标；Contest、Agent 领域指标、Prometheus 看板告警和运行保障仍为后续阶段；本文中的设计项如未注明“已有”或“已实现”，均为规划。
 
 已确认：使用 LangSmith 云服务；首期只上传脱敏元数据，不上传原始对话、源码或工具结果。
 

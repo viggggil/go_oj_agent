@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/viggggil/go_oj_agent/pkg/mq"
+	"github.com/viggggil/go_oj_agent/pkg/observability"
 )
 
 type Engine struct {
@@ -56,10 +57,16 @@ func (e *Engine) Execute(ctx context.Context, task mq.JudgeTask) (outcome Outcom
 		return outcomeFromError(task, err)
 	}
 
+	compileStarted := time.Now()
 	compile, err := runner.Compile(ctx, loaded.Source)
+	compileDuration := time.Since(compileStarted)
 	if err != nil {
+		observability.Judge().Compile(ctx, compileDuration, "error")
+		observability.Judge().Sandbox(ctx, compileDuration, task.Language, "compile")
 		return outcomeFromError(task, err)
 	}
+	observability.Judge().Compile(ctx, compileDuration, "success")
+	observability.Judge().Sandbox(ctx, compileDuration, task.Language, "compile")
 	if compile.Artifact.ID != "" {
 		// Register cleanup before interpreting the compiler verdict so malformed
 		// runner responses cannot leak a cached executable.
@@ -91,14 +98,20 @@ func (e *Engine) executeCases(ctx context.Context, task mq.JudgeTask, artifact A
 		if !e.now().Before(task.JudgeDeadlineAt) {
 			return failed(task, "JUDGE_DEADLINE_EXCEEDED", false)
 		}
+		runStarted := time.Now()
 		run, err := runner.Run(ctx, artifact, testcase.Input, limits)
+		runDuration := time.Since(runStarted)
 		if err != nil {
+			observability.Judge().Execute(ctx, runDuration, task.Language, "system_error")
+			observability.Judge().Sandbox(ctx, runDuration, task.Language, "execute")
 			return outcomeFromError(task, err)
 		}
 		verdict := run.Verdict
 		if verdict == VerdictAC && !e.comparator.Equal(testcase.Expected, run.Output) {
 			verdict = VerdictWA
 		}
+		observability.Judge().Execute(ctx, runDuration, task.Language, verdict)
+		observability.Judge().Sandbox(ctx, runDuration, task.Language, "execute")
 		if !validExecutionVerdict(verdict) {
 			return failed(task, "INVALID_RUN_RESULT", true)
 		}

@@ -1,6 +1,6 @@
-# Metrics 契约（Issue #205 PR1）
+# Metrics 契约（Issue #205）
 
-本文是业务 Metrics 的命名、单位和标签字典。PR1 先落地共享 Meter、属性 allowlist 和遥测自身的健康计数；业务领域指标按 Issue #205 后续 PR 分阶段接入。未在本文登记的指标和标签不得直接加入生产代码。
+本文是业务 Metrics 的命名、单位和标签字典。PR1 落地共享 Meter、属性 allowlist 和遥测自身的健康计数；PR2 接入 Judge 和异步判题链路指标；其他业务领域指标按 Issue #205 后续 PR 分阶段接入。未在本文登记的指标和标签不得直接加入生产代码。
 
 ## 采集路径
 
@@ -14,13 +14,14 @@ OTel instrument name 使用小写点分隔，不在代码中手写 Prometheus `_
 
 | 领域 | OTel 名称 | 类型 | 单位 | 计划接入 |
 | --- | --- | --- | --- | --- |
-| HTTP/gRPC | `oj.http.server.request.duration` | Histogram | `s` | PR2 |
-| HTTP/gRPC | `oj.request.total`、`oj.rpc.server.duration` | Counter / Histogram | `1` / `s` | PR2 |
+| HTTP/gRPC | `http.server.request.duration` | Histogram | `s` | 已有 OTel HTTP instrumentation |
+| HTTP/gRPC | `rpc.server.duration`、`rpc.client.duration` | Histogram | `s` | 已有 OTel gRPC instrumentation |
 | Judge | `oj.judge.submission.total`、`oj.judge.result.total` | Counter | `1` | PR2 |
+| Judge | `oj.judge.result.publish.failure.total` | Counter | `1` | PR2 |
+| Judge | `oj.judge.result.consume.total` | Counter | `1` | PR2 |
 | Judge | `oj.judge.queue.duration`、`oj.judge.compile.duration`、`oj.judge.execute.duration` | Histogram | `s` | PR2 |
-| Outbox/MQ | `oj.judge.outbox.pending`、`oj.judge.outbox.oldest_age` | ObservableGauge | `1` / `s` | PR2 |
 | Outbox/MQ | `oj.judge.outbox.publish.total`、`oj.judge.outbox.retry.total`、`oj.judge.dlq.total` | Counter | `1` | PR2 |
-| Worker | `oj.judge.worker.task.total`、`oj.judge.worker.in_flight` | Counter / UpDownCounter | `1` | PR2 |
+| Worker | `oj.judge.worker.task.total`、`oj.judge.worker.in_flight`、`oj.judge.worker.retry.total` | Counter / UpDownCounter | `1` | PR2 |
 | Worker | `oj.judge.worker.task.duration`、`oj.judge.worker.sandbox.duration` | Histogram | `s` | PR2 |
 | Contest | `oj.contest.projection.total`、`oj.contest.cache.hit.total`、`oj.contest.cache.miss.total` | Counter | `1` | PR3 |
 | Contest | `oj.contest.projection.duration` | Histogram | `s` | PR3 |
@@ -44,10 +45,10 @@ Metrics 属性使用显式 allowlist。Go 的 `observability.Attributes` 和 Age
 
 ```text
 service environment route rpc status outcome verdict language purpose
-model tool error_code usage_source
+model tool error_code usage_source phase
 ```
 
-`service` 和 `environment` 优先使用 Resource 属性，业务指标不应重复添加为 label。`route` 只接受已登记的规范化路由模板，`rpc` 只接受已登记的稳定方法名。`status`、`outcome`、`verdict`、`purpose`、`language`、`usage_source` 使用固定枚举；`model`、`tool`、`error_code` 只能使用已登记的受控值，未知值为 `other`。
+`service` 和 `environment` 优先使用 Resource 属性，业务指标不应重复添加为 label。`route` 只接受已登记的规范化路由模板，`rpc` 只接受已登记的稳定方法名。`status`、`outcome`、`verdict`、`purpose`、`language`、`usage_source`、`phase` 使用固定枚举；`model`、`tool`、`error_code` 只能使用已登记的受控值，未知值为 `other`。
 
 禁止将以下字段放入 Metrics label：
 
@@ -62,6 +63,9 @@ query payload input output URL token credential exception_message
 ## 状态与计数口径
 
 - Counter 只在业务事实已经发生后增加；事务回滚、消息未收到 Publisher Confirm、任务未 ACK 或 Run 终态未提交不得记录成功。
+- `oj.judge.submission.total` 只计算新创建/重判操作，不重复统计幂等重放；`oj.judge.result.total` 只在 Worker 收到结果事件的 Publisher Confirm 后增加；未确认的结果发布尝试记入 `oj.judge.result.publish.failure.total`，不代表 Broker 未接受（Confirm 可能丢失）；Judge Result consumer 只在处理事务成功后记为消费成功，重复事件仍按成功处理次数统计。
+- `oj.judge.outbox.publish.total` 在 Outbox 状态持久化为 published 或失败/重试状态后计数；Outbox Dead 只在 dead 状态持久化成功后计数。Worker 对不可解析任务执行 `Reject(false)` 后的 DLQ 计数表示客户端成功提交 reject 操作；RabbitMQ consumer reject 没有 Publisher Confirm，因此不等同于 DLQ 队列持久化确认。RabbitMQ confirm、ACK/NACK 的业务顺序不受 Metrics 影响。
+- Worker `in_flight` 覆盖任务开始处理到处理/发布/ACK 路径退出；进程重启后归零。Queue duration 使用当前任务 Envelope 的 `occurred_at` 到 Worker 开始处理的时间；重试消息使用重试消息自身入队时间。
 - `completed`、`failed`、`cancelled`、`timeout`、`retrying` 等状态必须使用固定枚举。正常判题 verdict（AC/WA/CE/TLE 等）与基础设施失败分开统计。
 - UpDownCounter 表示当前实例观察到的在途数量；进程重启归零，不代表历史总量。
 - Gauge/ObservableGauge 必须带 `observed_at` 或等价新鲜度语义；查询失败保留 unknown/stale，不写入 0。

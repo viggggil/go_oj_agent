@@ -20,6 +20,7 @@ _ALLOWED_LABELS = frozenset(
         "tool",
         "error_code",
         "usage_source",
+        "phase",
     }
 )
 _VALUE_PATTERN = re.compile(r"^[a-z0-9/_:.+{}-][a-z0-9._:/+{}-]{0,63}$")
@@ -90,7 +91,7 @@ _CONTROLLED_VALUES: dict[str, frozenset[str]] = {
         }
     ),
     "outcome": frozenset(
-        {"success", "error", "timeout", "cancelled", "retrying", "dropped", "other"}
+        {"success", "error", "timeout", "cancelled", "retrying", "scheduled", "dropped", "other"}
     ),
     "verdict": frozenset(
         {"ac", "wa", "ce", "tle", "mle", "re", "system_error", "unspecified", "other"}
@@ -127,6 +128,8 @@ _CONTROLLED_VALUES: dict[str, frozenset[str]] = {
             "agent_credential_unavailable",
             "agent_run_failed",
             "agent_background_failed",
+            "invalid_message",
+            "publish_failed",
             "otel_export_failed",
             "otel_init_failed",
             "otel_shutdown_failed",
@@ -136,6 +139,7 @@ _CONTROLLED_VALUES: dict[str, frozenset[str]] = {
         }
     ),
     "usage_source": frozenset({"provider", "estimated", "other"}),
+    "phase": frozenset({"compile", "execute", "result", "outbox", "other"}),
 }
 
 
