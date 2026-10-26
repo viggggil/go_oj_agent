@@ -22,6 +22,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, set_tracer_provider
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
+from app.metrics import safe_metric_attributes
+
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer("oj.agent")
 P = ParamSpec("P")
@@ -227,7 +229,7 @@ def run_first_event(seconds: float) -> None:
 
 def run_finished(status: str, seconds: float) -> None:
     safe_status = status if status in {"completed", "failed", "cancelled"} else "failed"
-    attributes = {"status": safe_status}
+    attributes = safe_metric_attributes(status=safe_status)
     _runs_terminal.add(1, attributes)
     _runs_in_flight.add(-1)
     _run_duration.record(seconds, attributes)
