@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"sort"
 	"sync"
 	"time"
 
@@ -27,16 +26,8 @@ func NewMetricsServer(c *conf.Bootstrap) *MetricsServer {
 func metricsHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		metrics := data.CacheMetricsSnapshot()
-		keys := make([]string, 0, len(metrics))
-		for key := range metrics {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			fmt.Fprintf(w, "contest_leaderboard_%s %d\n", key, metrics[key])
-		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		_, _ = w.Write([]byte(data.PrometheusMetrics()))
 	})
 	mux.HandleFunc("/debug/vars", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -75,10 +75,27 @@ func TestCacheRelayServerLifecycle(t *testing.T) {
 }
 func TestCacheRelayServerDisabled(t *testing.T) {
 	s := NewCacheRelayServer(nil, &data.LeaderboardRedis{})
-	if err := s.Start(t.Context()); err != nil {
+	done := make(chan error, 1)
+	go func() { done <- s.Start(t.Context()) }()
+	deadline := time.Now().Add(time.Second)
+	for {
+		s.mu.Lock()
+		ready := s.done != nil
+		s.mu.Unlock()
+		if ready {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("disabled relay metrics worker did not start")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	if err := s.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Stop(t.Context()); err != nil {
+	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
 }

@@ -23,8 +23,13 @@ OTel instrument name 使用小写点分隔，不在代码中手写 Prometheus `_
 | Outbox/MQ | `oj.judge.outbox.publish.total`、`oj.judge.outbox.retry.total`、`oj.judge.dlq.total` | Counter | `1` | PR2 |
 | Worker | `oj.judge.worker.task.total`、`oj.judge.worker.in_flight`、`oj.judge.worker.retry.total` | Counter / UpDownCounter | `1` | PR2 |
 | Worker | `oj.judge.worker.task.duration`、`oj.judge.worker.sandbox.duration` | Histogram | `s` | PR2 |
-| Contest | `oj.contest.projection.total`、`oj.contest.cache.hit.total`、`oj.contest.cache.miss.total` | Counter | `1` | PR3 |
-| Contest | `oj.contest.projection.duration` | Histogram | `s` | PR3 |
+| Contest | `oj.contest.projection.total` | Counter (`outcome=success/error`) | `1` | PR3 |
+| Contest | `oj.contest.projection.processed_event.total` | Counter | `1` | PR3 |
+| Contest | `oj.contest.projection.duration` | Histogram (`outcome=success/error`) | `s` | PR3 |
+| Contest | `oj.contest.cache.hit.total`、`oj.contest.cache.miss.total`、`oj.contest.cache.sql_fallback.total` | Counter | `1` | PR3 |
+| Contest | `oj.contest.cache.outbox.pending`、`oj.contest.cache.outbox.backlog`、`oj.contest.cache.outbox.oldest_age`、`oj.contest.cache.outbox.dead` | Gauge | `1` / `s` | PR3 |
+| Contest | `oj.contest.cache.outbox.apply.total`、`oj.contest.cache.outbox.retry.total`、`oj.contest.cache.outbox.lease_failure.total` | Counter | `1` | PR3 |
+| Contest | `oj.contest.cache.outbox.delivery_age`、`oj.contest.cache.rebuild.duration` | Counter (duration sum) | `s` | PR3 |
 | Agent | `agent.run.started`、`agent.run.terminal`、`agent.run.in_flight` | Counter / UpDownCounter | `1` | 已有，PR4 对齐 |
 | Agent | `agent.run.duration`、`agent.model.duration`、`agent.rag.duration` | Histogram | `s` | 已有部分，PR4 对齐 |
 | 后台任务 | `agent.job.total`、`agent.job.duration`、`agent.job.in_flight` | Counter / Histogram / UpDownCounter | `1` / `s` | PR4 |
@@ -66,8 +71,10 @@ query payload input output URL token credential exception_message
 - `oj.judge.submission.total` 只计算新创建/重判操作，不重复统计幂等重放；`oj.judge.result.total` 只在 Worker 收到结果事件的 Publisher Confirm 后增加；未确认的结果发布尝试记入 `oj.judge.result.publish.failure.total`，不代表 Broker 未接受（Confirm 可能丢失）；Judge Result consumer 只在处理事务成功后记为消费成功，重复事件仍按成功处理次数统计。
 - `oj.judge.outbox.publish.total` 在 Outbox 状态持久化为 published 或失败/重试状态后计数；Outbox Dead 只在 dead 状态持久化成功后计数。Worker 对不可解析任务执行 `Reject(false)` 后的 DLQ 计数表示客户端成功提交 reject 操作；RabbitMQ consumer reject 没有 Publisher Confirm，因此不等同于 DLQ 队列持久化确认。RabbitMQ confirm、ACK/NACK 的业务顺序不受 Metrics 影响。
 - Worker `in_flight` 覆盖任务开始处理到处理/发布/ACK 路径退出；进程重启后归零。Queue duration 使用当前任务 Envelope 的 `occurred_at` 到 Worker 开始处理的时间；重试消息使用重试消息自身入队时间。
+- Contest projection 只在本地投影事务返回后记录；成功包括已处理事件、幂等重复和被旧版本保护逻辑忽略的事件。缓存 Outbox pending/oldest/dead 是每 15 秒独立查询快照，携带 `observed_at_seconds`；查询失败保留上次值并增加 observation failure，不能当成新鲜的 0。`backlog` 为 pending + dead，`pending` 与 `oldest_age_seconds` 只计算 pending；dead 是当前 dead 行数，retry 与 lease failure 是进程累计计数器。
 - `completed`、`failed`、`cancelled`、`timeout`、`retrying` 等状态必须使用固定枚举。正常判题 verdict（AC/WA/CE/TLE 等）与基础设施失败分开统计。
 - UpDownCounter 表示当前实例观察到的在途数量；进程重启归零，不代表历史总量。
+- Contest 独立 `/metrics` 中的进程级 Counter 在进程重启时归零；短暂停机可能使最后一次事务之后、进程退出之前的业务计数未被 scrape 到。它们用于运行诊断，不是账务或审计事实。
 - Gauge/ObservableGauge 必须带 `observed_at` 或等价新鲜度语义；查询失败保留 unknown/stale，不写入 0。
 - 指标采样不依赖 Trace 是否采样；Trace 缺失不能造成 Metrics 缺失。
 

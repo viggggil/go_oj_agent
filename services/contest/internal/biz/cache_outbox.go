@@ -70,9 +70,17 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 	defer span.End()
 	var snapshot LeaderboardSnapshot
 	if err := json.Unmarshal(event.Payload, &snapshot); err != nil || snapshot.Validate() != nil || snapshot.ContestID != event.ContestID || snapshot.UserID != event.UserID || snapshot.Version != event.Version {
-		outcome = "dead"
 		span.SetStatus(codes.Error, "invalid leaderboard snapshot")
-		return true, r.Repository.FailCacheEvent(traceCtx, event.ID, token, 0, true, "invalid leaderboard snapshot")
+		err := r.Repository.FailCacheEvent(traceCtx, event.ID, token, 0, true, "invalid leaderboard snapshot")
+		if err != nil {
+			outcome = "error"
+			if errors.Is(err, ErrLeaseLost) {
+				outcome = "lease_lost"
+			}
+		} else {
+			outcome = "dead"
+		}
+		return true, err
 	}
 	callCtx, cancel := context.WithTimeout(traceCtx, 3*time.Second)
 	err = r.Sink.Apply(callCtx, snapshot)
@@ -93,18 +101,29 @@ func (r *CacheRelay) RunOnce(ctx context.Context) (bool, error) {
 		if len(reason) > 255 {
 			reason = reason[:255]
 		}
-		outcome = "retry"
-		if dead {
-			outcome = "dead"
-		}
 		span.SetStatus(codes.Error, "cache apply failed")
-		return true, r.Repository.FailCacheEvent(traceCtx, event.ID, token, delay, dead, reason)
+		failErr := r.Repository.FailCacheEvent(traceCtx, event.ID, token, delay, dead, reason)
+		if failErr != nil {
+			outcome = "error"
+			if errors.Is(failErr, ErrLeaseLost) {
+				outcome = "lease_lost"
+			}
+		} else if dead {
+			outcome = "dead"
+		} else {
+			outcome = "retry"
+		}
+		return true, failErr
 	}
 	err = r.Repository.CompleteCacheEvent(traceCtx, event.ID, token)
-	outcome = "applied"
 	if err != nil {
 		outcome = "confirm_error"
+		if errors.Is(err, ErrLeaseLost) {
+			outcome = "lease_lost"
+		}
 		span.SetStatus(codes.Error, "cache outbox completion failed")
+	} else {
+		outcome = "applied"
 	}
 	return true, err
 }
