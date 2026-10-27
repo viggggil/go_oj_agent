@@ -143,16 +143,15 @@ observability-down:
 	@$(COMPOSE) -f $(COMPOSE_FILE) up --detach gateway-service agent-service
 
 observability-check:
-	@curl --fail --silent http://127.0.0.1:13133/ >/dev/null || (echo "OpenTelemetry Collector 不可用" && exit 1)
-	@curl --fail --silent http://127.0.0.1:9090/-/ready >/dev/null || (echo "Prometheus 不可用" && exit 1)
-	@curl --fail --silent http://127.0.0.1:3200/ready >/dev/null || (echo "Tempo 不可用" && exit 1)
-	@curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null || (echo "Grafana 不可用" && exit 1)
-	@echo "Observability stack is ready"
+	@./scripts/observability_check.sh
+
+observability-smoke:
+	@./scripts/observability_smoke.sh
 
 dev:
 	@echo "dev workflow is not wired yet"
 
-.PHONY: rag-test-integration rag-corpus-check
+.PHONY: rag-test-integration rag-corpus-check observability-smoke
 rag-test-integration:
 	@UV="$(UV)" ./tests/rag/run.sh
 
