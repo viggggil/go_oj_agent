@@ -1,0 +1,18 @@
+{
+  "title": "OJ Contest 投影与缓存",
+  "uid": "oj-contest-projection",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "annotations": {"list": []},
+  "templating": {"list": []},
+  "panels": [
+    {"id": 1, "title": "投影事务结果", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (outcome) (rate(oj_contest_projection_total[5m]))", "legendFormat": "{{outcome}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}},
+    {"id": 2, "title": "投影耗时 P95", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(oj_contest_projection_duration_seconds_bucket[5m])))", "legendFormat": "{{outcome}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "s", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}},
+    {"id": 3, "title": "排行榜缓存命中率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum(rate(oj_contest_cache_hit_total[5m])) / (sum(rate(oj_contest_cache_hit_total[5m])) + sum(rate(oj_contest_cache_miss_total[5m])))", "legendFormat": "命中率", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "无请求样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}},
+    {"id": 4, "title": "SQL 回源速率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum(rate(oj_contest_cache_sql_fallback_total[5m]))", "legendFormat": "fallback/sec", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}},
+    {"id": 5, "title": "Cache Outbox backlog 与最老年龄", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "oj_contest_cache_outbox_backlog", "legendFormat": "pending + dead", "refId": "A"}, {"expr": "oj_contest_cache_outbox_oldest_age_seconds", "legendFormat": "最老 pending 秒", "refId": "B"}, {"expr": "oj_contest_cache_outbox_dead", "legendFormat": "dead", "refId": "C"}], "fieldConfig": {"defaults": {"noValue": "无观测样本"}, "overrides": [{"matcher": {"id": "byName", "options": "最老 pending 秒"}, "properties": [{"id": "unit", "value": "s"}]}]}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}},
+    {"id": 6, "title": "Outbox 重试与租约失败", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum(rate(oj_contest_cache_outbox_retry_total[5m]))", "legendFormat": "retry/sec", "refId": "A"}, {"expr": "sum(rate(oj_contest_cache_outbox_lease_failure_total[5m]))", "legendFormat": "lease failure/sec", "refId": "B"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}}
+  ]
+}

@@ -3,6 +3,8 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
+      OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
+      OBSERVABILITY_GRAFANA_URL: ${OBSERVABILITY_GRAFANA_URL:-http://127.0.0.1:3000}
   judge-service:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -48,6 +50,7 @@ services:
     command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=7d"]
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
@@ -61,7 +64,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-local-grafana-password}"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/provisioning/dashboards/overview.json:/var/lib/grafana/dashboards/overview.json:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"

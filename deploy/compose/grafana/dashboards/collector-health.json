@@ -1,0 +1,17 @@
+{
+  "title": "OJ Metrics Collector 健康",
+  "uid": "oj-collector-health",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "annotations": {"list": []},
+  "templating": {"list": []},
+  "panels": [
+    {"id": 1, "title": "Prometheus scrape targets", "type": "table", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "up{job=~\"otel-collector|otel-collector-self|contest-service\"}", "format": "table", "instant": true, "refId": "A"}], "fieldConfig": {"defaults": {"noValue": "未知"}, "overrides": []}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}},
+    {"id": 2, "title": "Collector 接收点数", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (receiver) (rate(otelcol_receiver_accepted_metric_points[5m]))", "legendFormat": "{{receiver}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无 Collector 样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}},
+    {"id": 3, "title": "Collector 接收拒绝速率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (receiver) (rate(otelcol_receiver_refused_metric_points[5m]))", "legendFormat": "{{receiver}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无 Collector 样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}},
+    {"id": 4, "title": "Collector 导出点数", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (exporter) (rate(otelcol_exporter_sent_metric_points[5m]))", "legendFormat": "{{exporter}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无 Collector 样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}},
+    {"id": 5, "title": "Collector 导出失败速率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points[5m]))", "legendFormat": "{{exporter}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无 Collector 样本", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 0.01}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}}
+  ]
+}

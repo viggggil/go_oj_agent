@@ -1,0 +1,48 @@
+groups:
+  - name: oj-recording
+    interval: 15s
+    rules:
+      - record: oj:request_rate:sum5m
+        expr: sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+      - record: oj:request_error_rate:sum5m
+        expr: sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+      - record: oj:judge_submission_rate:sum5m
+        expr: sum(rate(oj_judge_submission_total[5m]))
+      - record: oj:judge_queue_p95_seconds:5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(oj_judge_queue_duration_seconds_bucket[5m])))
+      - record: oj:agent_model_error_ratio:5m
+        expr: sum(rate(agent_model_attempt_total{outcome=~"error|timeout"}[5m])) / clamp_min(sum(rate(agent_model_attempt_total[5m])), 1e-9)
+  - name: oj-alerts
+    rules:
+      - alert: OJScrapeTargetDown
+        expr: up{job=~"otel-collector|otel-collector-self|contest-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OJ metrics scrape target is down"
+          description: "Prometheus cannot scrape target {{ $labels.job }} at {{ $labels.instance }}."
+      - alert: OJJudgeQueueLatencyHigh
+        expr: oj:judge_queue_p95_seconds:5m > 5 and sum(increase(oj_judge_submission_total[5m])) >= 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Judge queue P95 exceeds five seconds"
+          description: "Judge queue latency is high while submissions are arriving."
+      - alert: OJContestCacheOutboxOldestPending
+        expr: oj_contest_cache_outbox_oldest_age_seconds > 60 and time() - oj_contest_cache_outbox_observed_at_seconds < 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Contest cache Outbox has an old pending item"
+          description: "The last successful Outbox observation is fresh and its oldest pending item is over one minute old."
+      - alert: OJAgentModelErrorRateHigh
+        expr: oj:agent_model_error_ratio:5m > 0.1 and sum(increase(agent_model_attempt_total[5m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent model error rate is elevated"
+          description: "At least five model attempts were observed and more than ten percent failed or timed out."

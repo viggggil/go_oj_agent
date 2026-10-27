@@ -1,0 +1,18 @@
+{
+  "title": "OJ 判题链路",
+  "uid": "oj-judge-pipeline",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "annotations": {"list": []},
+  "templating": {"list": []},
+  "panels": [
+    {"id": 1, "title": "提交速率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (outcome) (rate(oj_judge_submission_total[5m]))", "legendFormat": "{{outcome}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}},
+    {"id": 2, "title": "判题结果分布", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (verdict, outcome) (rate(oj_judge_result_total[5m]))", "legendFormat": "{{verdict}} / {{outcome}}", "refId": "A"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}},
+    {"id": 3, "title": "排队耗时 P50 / P95", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "histogram_quantile(0.50, sum by (le) (rate(oj_judge_queue_duration_seconds_bucket[5m])))", "legendFormat": "P50", "refId": "A"}, {"expr": "histogram_quantile(0.95, sum by (le) (rate(oj_judge_queue_duration_seconds_bucket[5m])))", "legendFormat": "P95", "refId": "B"}], "fieldConfig": {"defaults": {"unit": "s", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}},
+    {"id": 4, "title": "编译与执行耗时 P95", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(oj_judge_compile_duration_seconds_bucket[5m])))", "legendFormat": "编译", "refId": "A"}, {"expr": "histogram_quantile(0.95, sum by (le) (rate(oj_judge_execute_duration_seconds_bucket[5m])))", "legendFormat": "执行", "refId": "B"}], "fieldConfig": {"defaults": {"unit": "s", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}},
+    {"id": 5, "title": "Worker 任务结果与重试", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (outcome) (rate(oj_judge_worker_task_total[5m]))", "legendFormat": "{{outcome}}", "refId": "A"}, {"expr": "sum(rate(oj_judge_worker_retry_total[5m]))", "legendFormat": "retry", "refId": "B"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}},
+    {"id": 6, "title": "Outbox 发布失败、重试与 DLQ", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum by (outcome) (rate(oj_judge_outbox_publish_total[5m]))", "legendFormat": "publish {{outcome}}", "refId": "A"}, {"expr": "sum(rate(oj_judge_outbox_retry_total[5m]))", "legendFormat": "retry", "refId": "B"}, {"expr": "sum(rate(oj_judge_dlq_total[5m]))", "legendFormat": "DLQ", "refId": "C"}], "fieldConfig": {"defaults": {"unit": "cps", "noValue": "无样本"}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}}
+  ]
+}

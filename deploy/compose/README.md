@@ -241,7 +241,7 @@ make observability-up
 make observability-check
 ```
 
-Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 在 Compose 网络内直接抓取 Contest `contest-service:9105/metrics`；没有 overlay 时 Prometheus 不运行，Contest `/metrics` 仍可供内部运维直接抓取。
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入外发通知。平台管理员可在 Gateway “监控 → 指标总览”查看服务端固定查询；`agent_admin` 只能获取 Agent 固定序列，不接收系统指标或 Grafana 链接。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
 
 平台管理员的 Judge Trace 入口使用 Gateway 环境变量 `JUDGE_OBSERVABILITY_GRAFANA_URL` 生成固定 Explore 链接，不接受请求中的 URL。链接只表示可执行受控搜索，Tempo 未采样、Collector 故障或数据过期时页面会显示 Trace 不可用。
 
@@ -252,6 +252,8 @@ make observability-down
 ```
 
 本栈端口仅绑定 loopback。OTLP gRPC/HTTP 与 Collector metrics endpoint 只在 Compose 网络内部开放。
+
+本地 Grafana 使用 loopback 和匿名 Viewer，不能直接复制到共享或生产环境。部署时应通过现有反向代理/SSO 与内部网络边界保护 Prometheus、Grafana、Collector、各业务 metrics 端口，并仅允许平台管理员使用系统看板；`OBSERVABILITY_GRAFANA_URL` 只用于 Gateway 生成固定系统看板链接。管理 API 通过 `OBSERVABILITY_PROMETHEUS_URL` 查询 Prometheus；该地址仅由服务端环境配置，浏览器不能覆盖查询语句或上游 URL。
 
 ### Agent LangSmith 脱敏导出
 

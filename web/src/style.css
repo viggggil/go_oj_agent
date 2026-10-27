@@ -2116,6 +2116,158 @@ dd {
   background: #f2f5fc;
   border-radius: 6px;
 }
+
+.metrics-actions {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.metrics-actions label {
+  display: grid;
+  gap: 0.25rem;
+  color: #687188;
+  font-size: 0.82rem;
+}
+
+.metrics-actions select {
+  min-height: 2.55rem;
+  border: 1px solid #cbd2df;
+  border-radius: 0.55rem;
+  padding: 0.35rem 0.55rem;
+  background: #fff;
+  color: #172033;
+}
+
+.metrics-state {
+  display: grid;
+  gap: 0.28rem;
+  margin: 1rem 0;
+  border: 1px solid #dfe4ed;
+  border-radius: 0.7rem;
+  padding: 0.8rem 1rem;
+  background: #fff;
+}
+
+.metrics-state small,
+.metrics-targets small,
+.metrics-card small {
+  color: #687188;
+}
+
+.metrics-state.state-available {
+  border-color: #64a87e;
+}
+
+.metrics-state.state-no_data {
+  border-color: #c39b43;
+}
+
+.metrics-state.state-stale,
+.metrics-state.state-unavailable {
+  border-color: #cc715f;
+}
+
+.metrics-targets {
+  margin: 1rem 0;
+}
+
+.metrics-targets h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+}
+
+.metrics-targets ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metrics-targets li,
+.metrics-card {
+  min-width: 0;
+  border: 1px solid #dfe4ed;
+  border-radius: 0.7rem;
+  padding: 0.8rem;
+  background: #fff;
+}
+
+.metrics-targets li {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.target-down strong,
+.target-stale strong {
+  color: #b84735;
+}
+
+.target-up strong {
+  color: #28804c;
+}
+
+.metrics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.metrics-card {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+}
+
+.metrics-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.metrics-card-heading h2 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.metrics-unit {
+  flex: 0 0 auto;
+  color: #687188;
+  font-size: 0.78rem;
+}
+
+.metrics-value {
+  font-size: 1.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.metrics-sparkline {
+  width: 100%;
+  height: 4.5rem;
+  overflow: visible;
+}
+
+.metrics-sparkline polyline {
+  fill: none;
+  stroke: #4c88c7;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.metrics-no-data {
+  min-height: 4.5rem;
+  margin: 0;
+  color: #687188;
+}
+
+.metrics-observed {
+  font-size: 0.76rem;
+}
 .eval-review {
   border-top: 1px solid #dfe4ed;
   padding-top: 16px;
