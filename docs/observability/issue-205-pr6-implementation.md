@@ -17,6 +17,14 @@ make observability-smoke
 
 `observability-up` 启动的是可选 overlay，业务服务不依赖其健康状态。smoke 只证明端点和查询接口可达，不代表已经完成真实提交、判题或 Agent 聊天；要验证业务流量，应在测试环境执行一次受控流程后再采集样本。
 
+完成受控提交、判题、Contest 投影和 Agent 聊天流程后，可要求固定查询必须有样本：
+
+```bash
+OBSERVABILITY_SMOKE_REQUIRE_SAMPLES=true make observability-smoke
+```
+
+该模式会拒绝 Prometheus 空结果，适合在集成环境运行；它仍不替代业务流程本身的成功、失败、重试、取消和 Collector 停机恢复断言，这些流程应由现有集成测试或值班演练记录请求 ID、终态和对应时间窗。
+
 ## 容量基线模板
 
 在固定机器规格、服务副本数、抓取周期和测试流量下记录：

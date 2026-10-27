@@ -14,11 +14,23 @@ case "${gateway_status}" in
   *) echo "Gateway observability endpoint returned unexpected HTTP ${gateway_status}" >&2; exit 1 ;;
 esac
 query() { curl --fail --silent --get "${prometheus_url}/api/v1/query" --data-urlencode "query=$1"; }
+assert_query() {
+  local expression="$1"
+  local response
+  response="$(query "${expression}")"
+  grep -Eq '"status":"success"' <<<"${response}"
+  if [[ "${OBSERVABILITY_SMOKE_REQUIRE_SAMPLES:-false}" == true ]]; then
+    grep -Eq '"result"\s*:\s*\[[[:space:]]*\{' <<<"${response}" || {
+      echo "Prometheus query returned no samples: ${expression}" >&2
+      exit 1
+    }
+  fi
+}
 curl --fail --silent "${prometheus_url}/api/v1/rules" | grep -Fq 'oj:judge_queue_p95_seconds:5m'
 curl --fail --silent "${prometheus_url}/api/v1/rules" | grep -Fq 'oj:request_rate:sum5m'
-query 'up{job="otel-collector"}' | grep -Eq '"status":"success"'
-query 'up{job="otel-collector-self"}' | grep -Eq '"status":"success"'
-query 'up{job="contest-service"}' | grep -Eq '"status":"success"'
-query 'oj:judge_queue_p95_seconds:5m' | grep -Eq '"status":"success"'
-query 'oj:request_rate:sum5m' | grep -Eq '"status":"success"'
+assert_query 'up{job="otel-collector"}'
+assert_query 'up{job="otel-collector-self"}'
+assert_query 'up{job="contest-service"}'
+assert_query 'oj:judge_queue_p95_seconds:5m'
+assert_query 'oj:request_rate:sum5m'
 echo "Observability smoke checks passed"
