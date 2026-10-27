@@ -20,6 +20,79 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
         },
       })
     }
+    if (path === '/api/v1/admin/observability/metrics') {
+      const platformAdmin = roles.some((role) => ['admin', 'system_admin'].includes(role))
+      return route.fulfill({
+        json: {
+          generated_at: new Date().toISOString(),
+          window: new URL(route.request().url()).searchParams.get('window') || '1h',
+          scope: platformAdmin ? 'system' : 'agent',
+          state: 'available',
+          ...(platformAdmin
+            ? { grafana_url: 'http://127.0.0.1:3000/d/oj-system-overview/oj-system-overview' }
+            : {}),
+          targets: platformAdmin
+            ? [
+                {
+                  name: 'collector_exporter',
+                  state: 'up',
+                  last_scrape_at: new Date().toISOString(),
+                },
+                {
+                  name: 'collector_self_metrics',
+                  state: 'up',
+                  last_scrape_at: new Date().toISOString(),
+                },
+                { name: 'contest_metrics', state: 'up', last_scrape_at: new Date().toISOString() },
+              ]
+            : [
+                {
+                  name: 'collector_exporter',
+                  state: 'up',
+                  last_scrape_at: new Date().toISOString(),
+                },
+                {
+                  name: 'collector_self_metrics',
+                  state: 'up',
+                  last_scrape_at: new Date().toISOString(),
+                },
+              ],
+          series: platformAdmin
+            ? [
+                {
+                  key: 'request_rate',
+                  label: 'HTTP 请求速率',
+                  unit: '请求/秒',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 1.2 }],
+                },
+                {
+                  key: 'judge_submission_rate',
+                  label: '判题提交速率',
+                  unit: '次/秒',
+                  state: 'no_data',
+                  points: [],
+                },
+              ]
+            : [
+                {
+                  key: 'agent_run_in_flight',
+                  label: 'Agent 在途 Run',
+                  unit: '个',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 1 }],
+                },
+                {
+                  key: 'agent_model_failure_rate',
+                  label: 'Agent 模型失败速率',
+                  unit: '次/秒',
+                  state: 'no_data',
+                  points: [],
+                },
+              ],
+        },
+      })
+    }
     if (path.endsWith('/observability/overview')) {
       return route.fulfill({
         json: {
@@ -92,4 +165,32 @@ test('system_admin 可进入判题链路监控', async ({ page }) => {
   await loginAs(page, ['system_admin'])
   await page.goto('/monitoring/judge')
   await expect(page.getByRole('heading', { name: '判题链路' })).toBeVisible()
+})
+
+test('指标页区分无样本与零值，并按 Agent 管理员范围显示指标', async ({ page }) => {
+  await loginAs(page, ['system_admin'])
+  await page.goto('/monitoring/metrics')
+  await expect(page.getByRole('heading', { name: '指标总览' })).toBeVisible()
+  await expect(page.getByText('指标源可用')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toBeVisible()
+  await expect(page.getByText('暂无样本；可能没有流量或该指标暂未导出。')).toBeVisible()
+  await expect(page.getByRole('link', { name: '打开 Grafana' })).toHaveAttribute(
+    'href',
+    /oj-system-overview/,
+  )
+  await expect(page.getByText('Contest 独立指标端点')).toBeVisible()
+
+  await loginAs(page, ['agent_admin'])
+  await page.goto('/monitoring/metrics')
+  await expect(page.getByText('仅展示 Agent Run、模型和后台任务的固定摘要')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agent 在途 Run' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toHaveCount(0)
+  await expect(page.getByText('Contest 独立指标端点')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '打开 Grafana' })).toHaveCount(0)
+})
+
+test('普通用户不能打开监控指标页', async ({ page }) => {
+  await loginAs(page, ['user'])
+  await page.goto('/monitoring/metrics')
+  await expect(page).toHaveURL(/\/problems$/)
 })

@@ -8,6 +8,8 @@ Go 服务和 Worker 使用 `pkg/observability` 的 OTel MeterProvider，Agent �
 
 Metrics 是旁路数据：Meter 创建、属性规范化、导出失败和 Collector/Prometheus 不可用都不能改变业务请求、事务、Outbox、ACK/NACK、重试、租约或 Agent Run 终态。
 
+Compose Prometheus exporter 不添加额外 namespace 前缀，避免把已登记的 `oj.*` 命名重复导出为 `oj_oj_*`；资源属性转换为 `service_name` 与 `deployment_environment` 标签。Contest 的手写 exposition 保持 `oj_contest_*` 命名。最终名称示例：`oj.judge.submission.total` → `oj_judge_submission_total`、`agent.run.started` → `agent_run_started_total`、`http.server.request.duration` → `http_server_request_duration_seconds_bucket`。
+
 ## 命名、类型和单位
 
 OTel instrument name 使用小写点分隔，不在代码中手写 Prometheus `_total` 后缀。Prometheus exporter 会按 Counter、Histogram 和 UpDownCounter 规则生成最终 exposition 名称。
@@ -94,6 +96,14 @@ query payload input output URL token credential exception_message
 ## 遥测自身健康
 
 `oj.telemetry.export.failure` 和 `oj.telemetry.dropped` 使用 `error_code` 标签记录受控原因，例如 `otel_export_failed`、`queue_full`、`collector_unavailable`。这些计数器也属于旁路指标，不得在记录失败时触发业务重试或阻塞请求。业务服务未配置 Collector 时，不应把 no-op provider 误报为业务故障；看板需要结合 Collector/Prometheus target 状态区分“未启用采集”和“采集异常”。
+
+## Prometheus 查询与 Grafana 看板（PR5）
+
+Prometheus 每 15 秒抓取 Collector 的 Prometheus exporter（`otel-collector:9464`）、Collector 自身遥测端点（`otel-collector:8888`）和 Contest（`contest-service:9105/metrics`）。Collector 8888 端口只在 Compose 网络内部可见。Gateway 只有在 observability overlay 中配置 `OBSERVABILITY_PROMETHEUS_URL` 才执行固定查询；overlay 关闭或 Prometheus 不可用时业务启动不受影响。
+
+Gateway 指标 API 固定查询请求速率、HTTP 5xx、判题提交/排队、Worker 在途、Contest Cache Outbox、Agent Run/模型/Tool/RAG/后台任务失败速率和遥测导出失败。时间窗只允许 15 分钟、1 小时和 24 小时；各窗步长分别为 15 秒、60 秒和 5 分钟。任意 PromQL、Grafana/Prometheus URL、业务 ID 和未知 label 都不会向客户端透传。平台管理员视图另返回 `up` 抓取目标；Agent 管理员视图只包含 Agent 序列与 Collector 状态，不含 Contest 抓取状态，也不返回 Grafana 链接。
+
+Dashboard provisioning 提供系统/判题、Contest 投影/缓存、Agent 运行和 Collector 健康视图。图表以空序列/无值展示“无样本”，不会以零或绿色代表健康。Prometheus recording rules 计算请求速率、判题提交速率、判题排队 P95 和 Agent 模型错误比例；告警覆盖 scrape target 失败、持续判题排队、Contest Outbox 陈旧积压和 Agent 模型错误比例。当前没有 Alertmanager 或通知渠道配置，告警在 Prometheus/Grafana 侧可检查，不会外发通知。Overlay 将 Prometheus/Grafana 绑定到本机回环地址并开放匿名 Viewer，仅用于本地开发；共享/生产环境必须使用网络与认证边界，并限制 Prometheus 原生查询入口。
 
 ## 验证要求
 

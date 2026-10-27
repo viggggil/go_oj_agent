@@ -19,9 +19,10 @@ exporters:
       insecure: true
   prometheus:
     endpoint: 0.0.0.0:9464
-    namespace: oj
     const_labels:
       environment: development
+    resource_to_telemetry_conversion:
+      enabled: true
   debug:
     verbosity: basic
 extensions:
@@ -29,6 +30,9 @@ extensions:
     endpoint: 0.0.0.0:13133
 service:
   extensions: [health_check]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
   pipelines:
     traces:
       receivers: [otlp]

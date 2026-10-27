@@ -199,6 +199,34 @@ export const submissionApi = {
     ),
 }
 
+export type MetricsWindow = '15m' | '1h' | '24h'
+export type MetricsOverview = {
+  generated_at: string
+  window: MetricsWindow
+  scope: 'system' | 'agent'
+  state: 'available' | 'no_data' | 'stale' | 'unavailable' | 'not_configured'
+  error_code?: string
+  grafana_url?: string
+  targets: {
+    name: string
+    state: 'up' | 'down' | 'stale' | 'unknown'
+    last_scrape_at: string | null
+  }[]
+  series: {
+    key: string
+    service?: string
+    label: string
+    unit: string
+    state: 'available' | 'no_data'
+    points: { timestamp: string; value: number }[]
+  }[]
+}
+
+export const observabilityApi = {
+  metrics: (window: MetricsWindow, signal?: AbortSignal) =>
+    api.get<MetricsOverview>('/api/v1/admin/observability/metrics', { params: { window }, signal }),
+}
+
 export const contestApi = {
   list: (page = 1, pageSize = 20, status?: string) =>
     api.get<{ items: ContestSummary[]; page: { page: number; page_size: number; total: number } }>(

@@ -26,6 +26,7 @@ import AgentTools from './views/AgentTools.vue'
 import MonitoringAgent from './views/MonitoringAgent.vue'
 import MonitoringWorkspace from './views/MonitoringWorkspace.vue'
 import MonitoringHome from './views/MonitoringHome.vue'
+import MonitoringMetrics from './views/MonitoringMetrics.vue'
 import JudgePipeline from './views/JudgePipeline.vue'
 import { agentAdministrator } from './agent/state'
 
@@ -42,6 +43,7 @@ const router = createRouter({
       meta: { auth: true },
       children: [
         { path: '', component: MonitoringHome },
+        { path: 'metrics', component: MonitoringMetrics, meta: { monitorMetrics: true } },
         { path: 'agent', component: MonitoringAgent, meta: { monitorAgent: true } },
         { path: 'judge', component: JudgePipeline, meta: { monitorSystem: true } },
       ],
@@ -123,7 +125,11 @@ router.beforeEach(async (to, from) => {
     if (!auth.user || auth.profileError) await auth.fetchProfile().catch(() => undefined)
     if (!tokens.access) return '/login'
     if (auth.profileError) return false
-    if (to.meta.monitorAgent && !agentAdministrator(auth.user?.roles || [])) return '/problems'
+    if (
+      (to.meta.monitorAgent || to.meta.monitorMetrics) &&
+      !agentAdministrator(auth.user?.roles || [])
+    )
+      return '/problems'
     if (to.path === '/monitoring' && !agentAdministrator(auth.user?.roles || [])) return '/problems'
   }
 

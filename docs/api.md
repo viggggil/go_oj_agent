@@ -26,6 +26,28 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/judge/submissions/{submission_id}` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `JUDGE_OBSERVABILITY_GRAFANA_URL` 返回 Tempo Explore 检索链接。请求不得提供 Grafana/Tempo URL 或任意 TraceQL；`agent_admin` 不具备该权限。响应中的 `SEARCHABLE` 表示检索链接可用，不代表 Trace 一定被采样或保留，`trace_available` 为 `false`。
 
+### 固定 Metrics 概览（Issue #205 PR5）
+
+`GET /api/v1/admin/observability/metrics?window=15m|1h|24h` 只接受固定时间窗，不接受 PromQL、Prometheus URL 或任意 Grafana URL。Gateway 查询服务端登记的 PromQL 模板，限制每序列最多 300 个点和每次响应 1 MiB，并只返回受控序列、单位、时间戳与采集目标状态。
+
+- `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及服务端固定 Grafana 看板链接。
+- `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列和 Collector 抓取状态；响应不含系统指标或 Grafana 链接。
+- 普通用户、无效 token 和缺少角色分别由 Gateway 认证与授权拒绝。
+- `state` 为 `available`、`no_data`、`stale`、`unavailable` 或 `not_configured`。`no_data` 表示采集目标可访问但所选时间窗内没有指标样本；单条 `series.state=no_data` 保持空点数组，不合成为零。
+- Prometheus 未配置或暂不可用时返回受控状态与可选稳定 `error_code`，不转发上游错误正文。查询字段 `generated_at`、`targets[].last_scrape_at` 与 `series[].points[].timestamp` 使用 UTC。
+
+```json
+{
+  "generated_at": "2026-10-27T00:00:00Z",
+  "window": "1h",
+  "scope": "system",
+  "state": "available",
+  "grafana_url": "http://127.0.0.1:3000/d/oj-system-overview/oj-system-overview",
+  "targets": [{"name": "collector_exporter", "state": "up", "last_scrape_at": "2026-10-27T00:00:00Z"}],
+  "series": [{"key": "request_rate", "label": "HTTP 请求速率", "unit": "请求/秒", "state": "available", "points": [{"timestamp": "2026-10-27T00:00:00Z", "value": 1.2}]}]
+}
+```
+
 ---
 
 ## 2. 通用规范

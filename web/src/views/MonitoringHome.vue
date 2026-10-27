@@ -8,6 +8,12 @@
       </div>
     </header>
     <div class="monitoring-grid monitoring-entry-grid">
+      <RouterLink class="monitoring-card monitoring-card-link" to="/monitoring/metrics">
+        <p class="eyebrow">Metrics</p>
+        <h2>指标总览</h2>
+        <p>查看当前角色可访问的固定指标摘要与采集状态。</p>
+        <span>查看指标 →</span>
+      </RouterLink>
       <RouterLink class="monitoring-card monitoring-card-link" to="/monitoring/agent">
         <p class="eyebrow">Agent</p>
         <h2>Agent 运行诊断</h2>
