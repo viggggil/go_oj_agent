@@ -45,6 +45,9 @@ jobs:
       - name: Go build
         run: make build
 
+      - name: Validate observability configuration
+        run: python3 -m pip install --disable-pip-version-check PyYAML && make observability-check
+
   web:
     runs-on: ubuntu-latest
     steps:
