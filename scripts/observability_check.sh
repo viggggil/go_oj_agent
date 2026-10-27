@@ -48,8 +48,13 @@ if command -v promtool >/dev/null 2>&1; then
   promtool check config "${prometheus_config}"
   promtool check rules "${rules_file}"
 elif [[ "${docker_available}" == true ]]; then
-  docker run --rm --entrypoint promtool -v "${repo_root}/deploy/compose:/etc/oj:ro" prom/prometheus:v3.8.0 check config /etc/oj/prometheus.yaml
-  docker run --rm --entrypoint promtool -v "${repo_root}/deploy/compose:/etc/oj:ro" prom/prometheus:v3.8.0 check rules /etc/oj/prometheus-rules/observability.yaml
+  docker run --rm --entrypoint promtool \
+    -v "${prometheus_config}:/etc/prometheus/prometheus.yml:ro" \
+    -v "${repo_root}/deploy/compose/prometheus-rules:/etc/prometheus/rules:ro" \
+    prom/prometheus:v3.8.0 check config /etc/prometheus/prometheus.yml
+  docker run --rm --entrypoint promtool \
+    -v "${rules_file}:/etc/prometheus/rules/observability.yaml:ro" \
+    prom/prometheus:v3.8.0 check rules /etc/prometheus/rules/observability.yaml
 else
   echo "promtool and docker are unavailable; Prometheus syntax check skipped" >&2
 fi
