@@ -234,10 +234,10 @@
         <div>
           <p class="eyebrow">RECENT EVENTS</p>
           <h2>Prometheus 活跃告警</h2>
-          <p v-if="alerts?.state === 'not_configured'">此环境没有配置 Prometheus 告警查询。</p>
-          <p v-else-if="alerts?.state === 'unavailable'">
+          <p v-if="alertsLoadFailed || alerts?.state === 'unavailable'">
             告警查询暂不可用；监控指标和业务服务不受影响。
           </p>
+          <p v-else-if="alerts?.state === 'not_configured'">此环境没有配置 Prometheus 告警查询。</p>
           <p v-else-if="!alerts?.alerts.length">
             当前没有活跃告警。此处展示 Prometheus 规则告警，不代表外发通知状态。
           </p>
@@ -349,6 +349,7 @@
   const overview = ref<MetricsOverview>()
   const serviceHealth = ref<ObservabilityServices>()
   const alerts = ref<ObservabilityAlerts>()
+  const alertsLoadFailed = ref(false)
   const loading = ref(false)
   const requestError = ref('')
   const selectedTrend = ref('request_rate')
@@ -360,8 +361,8 @@
     () => ({ '15m': '15 分钟', '1h': '1 小时', '24h': '24 小时' })[window.value],
   )
   const alertStateLabel = computed(() => {
+    if (alertsLoadFailed.value || alerts.value?.state === 'unavailable') return '告警查询不可用'
     if (!alerts.value || alerts.value.state === 'not_configured') return '未配置'
-    if (alerts.value.state === 'unavailable') return '告警查询不可用'
     return `${alerts.value.alerts.length} 条活跃告警`
   })
   const trendOptions = computed(() =>
@@ -638,6 +639,7 @@
       serviceHealth.value =
         servicesResult.status === 'fulfilled' ? servicesResult.value.data : undefined
       alerts.value = alertsResult.status === 'fulfilled' ? alertsResult.value.data : undefined
+      alertsLoadFailed.value = alertsResult.status === 'rejected' && !controller.signal.aborted
       if (!trendOptions.value.some((item) => item.key === selectedTrend.value))
         selectedTrend.value = trendOptions.value[0].key
       if (

@@ -267,6 +267,16 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page.getByText('abc', { exact: false }).first()).toBeVisible()
 })
 
+test('告警接口失败时展示查询不可用而不是未配置', async ({ page }) => {
+  await loginAs(page, ['admin'])
+  await page.route('**/api/v1/admin/observability/alerts', (route) => route.abort())
+  await page.goto('/monitoring')
+
+  await expect(page.getByText('告警查询暂不可用；监控指标和业务服务不受影响。')).toBeVisible()
+  await expect(page.getByText('告警查询不可用')).toBeVisible()
+  await expect(page.getByText('此环境没有配置 Prometheus 告警查询。')).toHaveCount(0)
+})
+
 test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', async ({ page }) => {
   await loginAs(page, ['agent_admin'])
   await page.goto('/monitoring')

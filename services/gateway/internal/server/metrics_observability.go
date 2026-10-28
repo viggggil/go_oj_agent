@@ -235,6 +235,7 @@ func serveObservabilityAlerts(requestCtx context.Context, httpCtx khttp.Context)
 	base, err := parsePrometheusURL(configured)
 	if err != nil {
 		httpCtx.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+		httpCtx.Response().Header().Set("Cache-Control", "no-store")
 		return json.NewEncoder(httpCtx.Response()).Encode(response)
 	}
 	response.State = "unavailable"
@@ -267,7 +268,17 @@ func requestPrometheusAlerts(ctx context.Context, base *url.URL) (prometheusAler
 	}
 	defer upstream.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(upstream.Body, maxPrometheusResponseBytes+1))
-	if upstream.StatusCode != http.StatusOK || err != nil || len(data) > maxPrometheusResponseBytes || json.Unmarshal(data, &result) != nil || result.Status != "success" {
+	if upstream.StatusCode != http.StatusOK || err != nil || len(data) > maxPrometheusResponseBytes {
+		return result, errors.New("prometheus_invalid_response")
+	}
+	var envelope struct {
+		Status string           `json:"status"`
+		Data   *json.RawMessage `json:"data"`
+	}
+	if json.Unmarshal(data, &envelope) != nil || envelope.Status != "success" || envelope.Data == nil || string(*envelope.Data) == "null" {
+		return result, errors.New("prometheus_invalid_response")
+	}
+	if json.Unmarshal(data, &result) != nil || result.Data.Alerts == nil {
 		return result, errors.New("prometheus_invalid_response")
 	}
 	return result, nil

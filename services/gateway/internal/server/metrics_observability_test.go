@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -269,6 +270,18 @@ func TestDecodeObservabilityAlertsAllowlistAndRedaction(t *testing.T) {
 	system := decodeObservabilityAlerts(response, true)
 	if len(system) != 2 || system[1].Service != "judge-service" || system[1].Severity != "critical" {
 		t.Fatalf("system alerts = %+v", system)
+	}
+}
+
+func TestRequestPrometheusAlertsRejectsMissingAndNullAlerts(t *testing.T) {
+	for _, body := range []string{`{"status":"success"}`, `{"status":"success","data":{}}`, `{"status":"success","data":{"alerts":null}}`} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
+		base, _ := url.Parse(server.URL)
+		_, err := requestPrometheusAlerts(context.Background(), base)
+		server.Close()
+		if err == nil || err.Error() != "prometheus_invalid_response" {
+			t.Errorf("body %s error = %v", body, err)
+		}
 	}
 }
 
