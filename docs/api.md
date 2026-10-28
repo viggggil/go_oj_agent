@@ -34,6 +34,8 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/services` 返回固定服务清单的受控接入状态。Gateway 请求本身标记为 `up`；User、Problem、Judge、Contest 和 Judge Worker 使用服务端配置的固定 TCP 探测，Agent 使用固定 `/readyz` 探测，RAG Worker 当前没有独立探针并返回 `not_configured`。TCP 可达只表示端口可连接，不代表依赖已就绪。该接口不会根据指标样本推断业务健康，也不接受服务 URL。平台管理员可查看系统清单，`agent_admin` 只能查看 Agent 与 RAG Worker 条目。
 
+`GET /api/v1/admin/observability/alerts` 查询 Prometheus 当前活动规则告警，只允许平台管理员查看系统告警，`agent_admin` 只能看到 `OJAgentModelErrorRateHigh`。Gateway 仅返回固定告警名、级别、状态、开始时间、受控服务名、稳定错误码和 `trace_available`；不返回 annotation、原始错误、PromQL、Prometheus 地址或任意 TraceQL。Prometheus 未配置、查询失败和无告警分别由 `not_configured`、`unavailable` 和 `available` 加空数组表示。当前告警没有直接 Trace 链接，详情通过 Agent 诊断或 Judge 受控 Trace 接口进入。
+
 - `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及服务端固定 Grafana 看板链接。
 - `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列和 Collector 抓取状态；响应不含系统指标或 Grafana 链接。
 - 普通用户、无效 token 和缺少角色分别由 Gateway 认证与授权拒绝。

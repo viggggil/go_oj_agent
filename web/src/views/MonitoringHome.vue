@@ -233,13 +233,47 @@
       <section class="monitoring-section monitoring-panel monitoring-alert-preview">
         <div>
           <p class="eyebrow">RECENT EVENTS</p>
-          <h2>告警与异常</h2>
-          <p>
-            当前版本没有活跃告警与日志事件查询接口。Prometheus
-            告警规则在采集端评估，告警摘要将在后续接入。
+          <h2>Prometheus 活跃告警</h2>
+          <p v-if="alerts?.state === 'not_configured'">此环境没有配置 Prometheus 告警查询。</p>
+          <p v-else-if="alerts?.state === 'unavailable'">
+            告警查询暂不可用；监控指标和业务服务不受影响。
           </p>
+          <p v-else-if="!alerts?.alerts.length">
+            当前没有活跃告警。此处展示 Prometheus 规则告警，不代表外发通知状态。
+          </p>
+          <p v-else>显示固定规则告警摘要。详细 Trace 请进入关联的 Agent 或判题诊断页面查询。</p>
         </div>
-        <span class="monitoring-status neutral">告警接口待接入</span>
+        <span class="monitoring-status neutral">{{ alertStateLabel }}</span>
+        <div v-if="alerts?.alerts.length" class="monitoring-alert-list">
+          <article
+            v-for="alert in alerts.alerts"
+            :key="`${alert.name}:${alert.started_at}`"
+            class="monitoring-alert-row"
+          >
+            <span class="monitoring-alert-severity" :class="'severity-' + alert.severity">{{
+              severityLabel(alert.severity)
+            }}</span>
+            <div>
+              <strong>{{ alertName(alert.name) }}</strong>
+              <small
+                >{{ alert.service ? serviceLabel(alert.service) : '服务未标记' }} ·
+                {{ alert.error_code }} · {{ formatTime(alert.started_at) }}</small
+              >
+            </div>
+            <RouterLink
+              v-if="alert.name === 'OJAgentModelErrorRateHigh'"
+              to="/monitoring/agent"
+              class="monitoring-inline-link"
+              >Agent 诊断 →</RouterLink
+            >
+            <RouterLink
+              v-else-if="isPlatformAdmin"
+              to="/monitoring/judge"
+              class="monitoring-inline-link"
+              >判题链路 →</RouterLink
+            >
+          </article>
+        </div>
       </section>
 
       <section
@@ -294,7 +328,12 @@
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { RouterLink } from 'vue-router'
   import { observabilityApi } from '../api'
-  import type { MetricsOverview, MetricsWindow, ObservabilityServices } from '../api'
+  import type {
+    MetricsOverview,
+    MetricsWindow,
+    ObservabilityAlerts,
+    ObservabilityServices,
+  } from '../api'
   import { useAuthStore } from '../stores/auth'
 
   const auth = useAuthStore()
@@ -309,6 +348,7 @@
   const window = ref<MetricsWindow>('1h')
   const overview = ref<MetricsOverview>()
   const serviceHealth = ref<ObservabilityServices>()
+  const alerts = ref<ObservabilityAlerts>()
   const loading = ref(false)
   const requestError = ref('')
   const selectedTrend = ref('request_rate')
@@ -319,6 +359,11 @@
   const windowLabel = computed(
     () => ({ '15m': '15 分钟', '1h': '1 小时', '24h': '24 小时' })[window.value],
   )
+  const alertStateLabel = computed(() => {
+    if (!alerts.value || alerts.value.state === 'not_configured') return '未配置'
+    if (alerts.value.state === 'unavailable') return '告警查询不可用'
+    return `${alerts.value.alerts.length} 条活跃告警`
+  })
   const trendOptions = computed(() =>
     isPlatformAdmin.value
       ? [
@@ -403,6 +448,21 @@
   function ratioValue(key: string) {
     const value = sumLatest(key)
     return value === undefined ? '暂无数据' : `${(value * 100).toFixed(1)}%`
+  }
+  function severityLabel(value: string) {
+    return (
+      { critical: '严重', warning: '警告', info: '提示', unknown: '未知级别' }[value] || '未知级别'
+    )
+  }
+  function alertName(value: string) {
+    return (
+      {
+        OJScrapeTargetDown: 'Prometheus 抓取目标不可用',
+        OJJudgeQueueLatencyHigh: 'Judge 队列延迟偏高',
+        OJContestCacheOutboxOldestPending: 'Contest 缓存 Outbox 积压',
+        OJAgentModelErrorRateHigh: 'Agent 模型错误率偏高',
+      }[value] || '系统告警'
+    )
   }
   const chartStart = computed(() => {
     const first = trendSeries.value[0]?.points[0]?.timestamp
@@ -568,14 +628,16 @@
     loading.value = true
     requestError.value = ''
     try {
-      const [metricsResult, servicesResult] = await Promise.allSettled([
+      const [metricsResult, servicesResult, alertsResult] = await Promise.allSettled([
         observabilityApi.metrics(window.value, controller.signal),
         observabilityApi.services(controller.signal),
+        observabilityApi.alerts(controller.signal),
       ])
       if (metricsResult.status === 'rejected') throw metricsResult.reason
       overview.value = metricsResult.value.data
       serviceHealth.value =
         servicesResult.status === 'fulfilled' ? servicesResult.value.data : undefined
+      alerts.value = alertsResult.status === 'fulfilled' ? alertsResult.value.data : undefined
       if (!trendOptions.value.some((item) => item.key === selectedTrend.value))
         selectedTrend.value = trendOptions.value[0].key
       if (

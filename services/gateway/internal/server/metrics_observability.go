@@ -23,6 +23,7 @@ import (
 
 const metricsOverviewPath = "/api/v1/admin/observability/metrics"
 const observabilityServicesPath = "/api/v1/admin/observability/services"
+const observabilityAlertsPath = "/api/v1/admin/observability/alerts"
 
 const systemMetricsRangeQuery = `label_replace(sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])), "series", "request_rate", "", "")
 or label_replace(sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])), "series", "request_error_rate", "", "")
@@ -168,6 +169,147 @@ func registerMetricsObservabilityRoute(server *khttp.Server) {
 		_, err := handler(ctx, nil)
 		return err
 	})
+	server.Route("").GET(observabilityAlertsPath, func(ctx khttp.Context) error {
+		khttp.SetOperation(ctx, client.MetricsObservabilityOperation)
+		handler := ctx.Middleware(func(requestCtx context.Context, _ interface{}) (interface{}, error) {
+			return nil, serveObservabilityAlerts(requestCtx, ctx)
+		})
+		_, err := handler(ctx, nil)
+		return err
+	})
+}
+
+type observabilityAlert struct {
+	Name           string    `json:"name"`
+	Severity       string    `json:"severity"`
+	State          string    `json:"state"`
+	StartedAt      time.Time `json:"started_at"`
+	Service        string    `json:"service,omitempty"`
+	ErrorCode      string    `json:"error_code"`
+	TraceAvailable bool      `json:"trace_available"`
+}
+
+type observabilityAlertsResponse struct {
+	GeneratedAt time.Time            `json:"generated_at"`
+	Scope       string               `json:"scope"`
+	State       string               `json:"state"`
+	ErrorCode   string               `json:"error_code,omitempty"`
+	Alerts      []observabilityAlert `json:"alerts"`
+}
+
+type prometheusAlertsResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Alerts []struct {
+			Labels   map[string]string `json:"labels"`
+			State    string            `json:"state"`
+			ActiveAt string            `json:"activeAt"`
+		} `json:"alerts"`
+	} `json:"data"`
+}
+
+var observabilityAlertCatalog = map[string]struct {
+	errorCode string
+	agentOnly bool
+}{
+	"OJScrapeTargetDown":                {"OBSERVABILITY_SCRAPE_TARGET_DOWN", false},
+	"OJJudgeQueueLatencyHigh":           {"JUDGE_QUEUE_LATENCY_HIGH", false},
+	"OJContestCacheOutboxOldestPending": {"CONTEST_OUTBOX_PENDING_OLD", false},
+	"OJAgentModelErrorRateHigh":         {"AGENT_MODEL_ERROR_RATE_HIGH", true},
+}
+
+func serveObservabilityAlerts(requestCtx context.Context, httpCtx khttp.Context) error {
+	if httpCtx.Request().URL.RawPath != "" || httpCtx.Request().URL.RawQuery != "" {
+		return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "Alert query does not accept parameters")
+	}
+	rc, ok := gatewaymw.RequestContextFromContext(requestCtx)
+	if !ok || (!platformAdministrator(rc.GetRoles()) && !client.AgentAdministrator(rc.GetRoles())) {
+		return kerrors.New(http.StatusForbidden, "GATEWAY_OBSERVABILITY_FORBIDDEN", "Alerts require an observability administrator")
+	}
+	systemScope := platformAdministrator(rc.GetRoles())
+	response := observabilityAlertsResponse{GeneratedAt: time.Now().UTC(), Scope: "agent", State: "not_configured", Alerts: []observabilityAlert{}}
+	if systemScope {
+		response.Scope = "system"
+	}
+	configured := os.Getenv("OBSERVABILITY_PROMETHEUS_URL")
+	base, err := parsePrometheusURL(configured)
+	if err != nil {
+		httpCtx.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+		return json.NewEncoder(httpCtx.Response()).Encode(response)
+	}
+	response.State = "unavailable"
+	queryCtx, cancel := context.WithTimeout(requestCtx, prometheusTimeout)
+	defer cancel()
+	result, err := requestPrometheusAlerts(queryCtx, base)
+	if err != nil {
+		response.ErrorCode = prometheusErrorCode(err)
+	} else {
+		response.State = "available"
+		response.Alerts = decodeObservabilityAlerts(result, systemScope)
+	}
+	httpCtx.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+	httpCtx.Response().Header().Set("Cache-Control", "no-store")
+	return json.NewEncoder(httpCtx.Response()).Encode(response)
+}
+
+func requestPrometheusAlerts(ctx context.Context, base *url.URL) (prometheusAlertsResponse, error) {
+	var result prometheusAlertsResponse
+	pathURL := *base
+	pathURL.Path = base.Path + "/api/v1/alerts"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pathURL.String(), nil)
+	if err != nil {
+		return result, errors.New("prometheus_unavailable")
+	}
+	client := &http.Client{Timeout: prometheusTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	upstream, err := client.Do(req)
+	if err != nil {
+		return result, errors.New("prometheus_unavailable")
+	}
+	defer upstream.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(upstream.Body, maxPrometheusResponseBytes+1))
+	if upstream.StatusCode != http.StatusOK || err != nil || len(data) > maxPrometheusResponseBytes || json.Unmarshal(data, &result) != nil || result.Status != "success" {
+		return result, errors.New("prometheus_invalid_response")
+	}
+	return result, nil
+}
+
+func decodeObservabilityAlerts(response prometheusAlertsResponse, systemScope bool) []observabilityAlert {
+	alerts := make([]observabilityAlert, 0, len(response.Data.Alerts))
+	for _, item := range response.Data.Alerts {
+		name := item.Labels["alertname"]
+		definition, ok := observabilityAlertCatalog[name]
+		if !ok || (!systemScope && !definition.agentOnly) || (item.State != "firing" && item.State != "pending") {
+			continue
+		}
+		activeAt, err := time.Parse(time.RFC3339Nano, item.ActiveAt)
+		if err != nil {
+			continue
+		}
+		service := sanitizeAlertService(item.Labels["service_name"])
+		if service == "" {
+			service = sanitizeAlertService(item.Labels["job"])
+		}
+		alerts = append(alerts, observabilityAlert{Name: name, Severity: sanitizeAlertSeverity(item.Labels["severity"]), State: item.State, StartedAt: activeAt, Service: service, ErrorCode: definition.errorCode, TraceAvailable: false})
+	}
+	return alerts
+}
+
+func sanitizeAlertSeverity(value string) string {
+	if value == "critical" || value == "warning" || value == "info" {
+		return value
+	}
+	return "unknown"
+}
+
+func sanitizeAlertService(value string) string {
+	if _, ok := allowedMetricServices[value]; ok {
+		return value
+	}
+	switch value {
+	case "otel-collector", "otel-collector-self", "contest-service":
+		return value
+	}
+	return ""
 }
 
 type observabilityService struct {
