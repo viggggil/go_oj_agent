@@ -237,11 +237,29 @@ export type ObservabilityServices = {
   }[]
 }
 
+export type ObservabilityAlerts = {
+  generated_at: string
+  scope: 'system' | 'agent'
+  state: 'available' | 'unavailable' | 'not_configured'
+  error_code?: string
+  alerts: {
+    name: string
+    severity: 'critical' | 'warning' | 'info' | 'unknown'
+    state: 'firing' | 'pending'
+    started_at: string
+    service?: string
+    error_code: string
+    trace_available: boolean
+  }[]
+}
+
 export const observabilityApi = {
   metrics: (window: MetricsWindow, signal?: AbortSignal) =>
     api.get<MetricsOverview>('/api/v1/admin/observability/metrics', { params: { window }, signal }),
   services: (signal?: AbortSignal) =>
     api.get<ObservabilityServices>('/api/v1/admin/observability/services', { signal }),
+  alerts: (signal?: AbortSignal) =>
+    api.get<ObservabilityAlerts>('/api/v1/admin/observability/alerts', { signal }),
 }
 
 export const contestApi = {

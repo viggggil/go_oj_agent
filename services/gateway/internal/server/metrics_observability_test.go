@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -248,6 +249,67 @@ func TestMetricsOverviewRoleScopeAndFixedQueries(t *testing.T) {
 	}
 	if len(targetQueries) != 2 || !strings.Contains(targetQueries[0], "contest-service") || strings.Contains(targetQueries[1], "contest-service") {
 		t.Fatalf("Prometheus role-scoped target queries = %#v", targetQueries)
+	}
+}
+
+func TestDecodeObservabilityAlertsAllowlistAndRedaction(t *testing.T) {
+	response := prometheusAlertsResponse{Status: "success"}
+	response.Data.Alerts = []struct {
+		Labels   map[string]string `json:"labels"`
+		State    string            `json:"state"`
+		ActiveAt string            `json:"activeAt"`
+	}{
+		{Labels: map[string]string{"alertname": "OJAgentModelErrorRateHigh", "severity": "warning", "service_name": "private-user-id", "summary": "secret"}, State: "firing", ActiveAt: "2026-10-28T08:00:00Z"},
+		{Labels: map[string]string{"alertname": "OJJudgeQueueLatencyHigh", "severity": "critical", "job": "judge-service"}, State: "pending", ActiveAt: "2026-10-28T08:01:00Z"},
+		{Labels: map[string]string{"alertname": "UnknownAlert", "severity": "warning"}, State: "firing", ActiveAt: "2026-10-28T08:02:00Z"},
+	}
+	agent := decodeObservabilityAlerts(response, false)
+	if len(agent) != 1 || agent[0].Name != "OJAgentModelErrorRateHigh" || agent[0].Service != "" || agent[0].ErrorCode != "AGENT_MODEL_ERROR_RATE_HIGH" {
+		t.Fatalf("agent alerts = %+v", agent)
+	}
+	system := decodeObservabilityAlerts(response, true)
+	if len(system) != 2 || system[1].Service != "judge-service" || system[1].Severity != "critical" {
+		t.Fatalf("system alerts = %+v", system)
+	}
+}
+
+func TestRequestPrometheusAlertsRejectsMissingAndNullAlerts(t *testing.T) {
+	for _, body := range []string{
+		`{"status":"success"}`,
+		`{"status":"success","data":{}}`,
+		`{"status":"success","data":{"alerts":null}}`,
+		`{"status":"success","data":{"alerts":[{}]}}`,
+		`{"status":"success","data":{"alerts":[{"labels":{},"state":"inactive","activeAt":"2026-10-28T08:00:00Z"}]}}`,
+	} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
+		base, _ := url.Parse(server.URL)
+		_, err := requestPrometheusAlerts(context.Background(), base)
+		server.Close()
+		if err == nil || err.Error() != "prometheus_invalid_response" {
+			t.Errorf("body %s error = %v", body, err)
+		}
+	}
+}
+
+func TestObservabilityAlertsEndpointRejectsInputAndUnauthorized(t *testing.T) {
+	auth, err := gatewaymw.NewAuthMiddleware(testConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHTTPServer(testConfig(), auth, service.NewGatewayService(nil, nil))
+	request := httptest.NewRequest(http.MethodGet, observabilityAlertsPath+"?query=up", nil)
+	request.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, []string{"system_admin"}))
+	result := httptest.NewRecorder()
+	handler.ServeHTTP(result, request)
+	if result.Code != http.StatusBadRequest {
+		t.Fatalf("query status=%d body=%s", result.Code, result.Body.String())
+	}
+	request = httptest.NewRequest(http.MethodGet, observabilityAlertsPath, nil)
+	request.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, []string{"user"}))
+	result = httptest.NewRecorder()
+	handler.ServeHTTP(result, request)
+	if result.Code != http.StatusForbidden {
+		t.Fatalf("role status=%d body=%s", result.Code, result.Body.String())
 	}
 }
 

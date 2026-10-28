@@ -170,6 +170,29 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
         },
       })
     }
+    if (path === '/api/v1/admin/observability/alerts') {
+      const platformAdmin = roles.some((role) => ['admin', 'system_admin'].includes(role))
+      return route.fulfill({
+        json: {
+          generated_at: new Date().toISOString(),
+          scope: platformAdmin ? 'system' : 'agent',
+          state: 'available',
+          alerts: platformAdmin
+            ? [
+                {
+                  name: 'OJJudgeQueueLatencyHigh',
+                  severity: 'warning',
+                  state: 'firing',
+                  started_at: new Date().toISOString(),
+                  service: 'judge-service',
+                  error_code: 'JUDGE_QUEUE_LATENCY_HIGH',
+                  trace_available: false,
+                },
+              ]
+            : [],
+        },
+      })
+    }
     if (path.endsWith('/observability/overview')) {
       return route.fulfill({
         json: {
@@ -220,10 +243,17 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page.getByRole('heading', { name: '流量与性能趋势' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '服务健康列表' })).toBeVisible()
   await expect(page.getByText('固定探测结果；TCP 可达不代表依赖就绪')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Prometheus 活跃告警' })).toBeVisible()
+  await expect(page.getByText('Judge 队列延迟偏高')).toBeVisible()
+  await expect(
+    page.locator('.monitoring-alert-preview').getByRole('link', { name: '判题链路 →' }),
+  ).toBeVisible()
   await expect(page.getByText('API 延迟 P95')).toBeVisible()
   await expect(page.getByText('0.08 秒')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断 →' })).toBeVisible()
-  await expect(page.getByRole('link', { name: '判题链路 →' })).toBeVisible()
+  await expect(
+    page.locator('.monitoring-module-links').getByRole('link', { name: '判题链路 →' }),
+  ).toBeVisible()
   await expect(page.getByRole('link', { name: '外部排障工具' })).toHaveAttribute(
     'href',
     /oj-system-overview/,
@@ -239,6 +269,16 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page).toHaveURL(/\/monitoring\/agent\?run_id=abc$/)
   await expect(page.getByRole('heading', { name: 'Agent 运行诊断' })).toBeVisible()
   await expect(page.getByText('abc', { exact: false }).first()).toBeVisible()
+})
+
+test('告警接口失败时展示查询不可用而不是未配置', async ({ page }) => {
+  await loginAs(page, ['admin'])
+  await page.route('**/api/v1/admin/observability/alerts', (route) => route.abort())
+  await page.goto('/monitoring')
+
+  await expect(page.getByText('告警查询暂不可用；监控指标和业务服务不受影响。')).toBeVisible()
+  await expect(page.getByText('告警查询不可用')).toBeVisible()
+  await expect(page.getByText('此环境没有配置 Prometheus 告警查询。')).toHaveCount(0)
 })
 
 test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', async ({ page }) => {
