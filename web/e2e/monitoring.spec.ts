@@ -251,7 +251,9 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page.getByText('API 延迟 P95')).toBeVisible()
   await expect(page.getByText('0.08 秒')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断 →' })).toBeVisible()
-  await expect(page.getByRole('link', { name: '判题链路 →' })).toBeVisible()
+  await expect(
+    page.locator('.monitoring-module-links').getByRole('link', { name: '判题链路 →' }),
+  ).toBeVisible()
   await expect(page.getByRole('link', { name: '外部排障工具' })).toHaveAttribute(
     'href',
     /oj-system-overview/,
