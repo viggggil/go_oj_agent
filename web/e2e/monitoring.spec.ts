@@ -151,10 +151,21 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
           services: (platformAdmin
             ? [
                 ['gateway', 'up', 'Gateway is serving the health request'],
-                ['user', 'up', 'Service TCP endpoint is reachable; dependency readiness is not implied'],
+                [
+                  'user',
+                  'up',
+                  'Service TCP endpoint is reachable; dependency readiness is not implied',
+                ],
                 ['problem', 'down', 'Fixed service probe failed'],
               ]
-            : [['agent', 'up', 'Service health endpoint is responding'], ['rag-worker', 'not_configured', 'This service does not expose an independent health endpoint']]
+            : [
+                ['agent', 'up', 'Service health endpoint is responding'],
+                [
+                  'rag-worker',
+                  'not_configured',
+                  'This service does not expose an independent health endpoint',
+                ],
+              ]
           ).map(([name, state, detail]) => ({ name, state, detail })),
         },
       })
