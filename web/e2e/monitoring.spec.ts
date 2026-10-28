@@ -169,7 +169,7 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await loginAs(page, ['admin'])
   await page.goto('/monitoring')
 
-  await expect(page.getByRole('link', { name: '监控' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '监控', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '监控总览', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '全局健康' })).toBeVisible()
   await expect(page.getByText('1.2 请求/秒')).toBeVisible()
@@ -220,7 +220,7 @@ test('指标页区分无样本与零值，并按 Agent 管理员范围显示指�
   await expect(page.getByRole('heading', { name: '指标总览' })).toBeVisible()
   await expect(page.getByText('指标源可用')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toBeVisible()
-  await expect(page.getByText('暂无样本；可能没有流量或该指标暂未导出。')).toBeVisible()
+  await expect(page.getByText('暂无样本；可能没有流量或该指标暂未导出。').first()).toBeVisible()
   await expect(page.getByRole('link', { name: '打开 Grafana' })).toHaveAttribute(
     'href',
     /oj-system-overview/,
