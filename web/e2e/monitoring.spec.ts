@@ -63,12 +63,45 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
                   key: 'request_rate',
                   label: 'HTTP 请求速率',
                   unit: '请求/秒',
+                  service: 'gateway-service',
                   state: 'available',
                   points: [{ timestamp: new Date().toISOString(), value: 1.2 }],
                 },
                 {
+                  key: 'request_error_rate',
+                  label: 'HTTP 5xx 速率',
+                  unit: '请求/秒',
+                  service: 'gateway-service',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 0 }],
+                },
+                {
                   key: 'judge_submission_rate',
                   label: '判题提交速率',
+                  unit: '次/秒',
+                  state: 'no_data',
+                  points: [],
+                },
+                {
+                  key: 'judge_queue_p95',
+                  label: 'Judge 排队 P95',
+                  unit: '秒',
+                  state: 'available',
+                  points: [
+                    { timestamp: new Date(Date.now() - 60_000).toISOString(), value: 0.2 },
+                    { timestamp: new Date().toISOString(), value: 0.3 },
+                  ],
+                },
+                {
+                  key: 'agent_run_rate',
+                  label: 'Agent Run 启动速率',
+                  unit: '次/秒',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 0.1 }],
+                },
+                {
+                  key: 'agent_model_failure_rate',
+                  label: 'Agent 模型失败速率',
                   unit: '次/秒',
                   state: 'no_data',
                   points: [],
@@ -137,7 +170,18 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await page.goto('/monitoring')
 
   await expect(page.getByRole('link', { name: '监控' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '监控', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '监控总览', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '全局健康' })).toBeVisible()
+  await expect(page.getByText('1.2 请求/秒')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '流量与性能趋势' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '服务指标接入' })).toBeVisible()
+  await expect(page.getByText('这是采集状态，不等同于服务健康探测')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Agent 运行诊断 →' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '判题链路 →' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '外部排障工具' })).toHaveAttribute(
+    'href',
+    /oj-system-overview/,
+  )
   await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
   await page.getByRole('link', { name: '判题链路', exact: true }).click()
   await expect(page).toHaveURL(/\/monitoring\/judge$/)
@@ -154,6 +198,9 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
 test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', async ({ page }) => {
   await loginAs(page, ['agent_admin'])
   await page.goto('/monitoring')
+  await expect(page.getByRole('heading', { name: '监控总览' })).toBeVisible()
+  await expect(page.getByText('API 请求速率', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Agent Run 启动速率').first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: '判题链路', exact: true })).toHaveCount(0)
 
