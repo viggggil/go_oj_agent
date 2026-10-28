@@ -105,8 +105,6 @@ Gateway 指标 API 固定查询请求速率、HTTP 5xx、判题提交/排队、W
 
 Issue #212 PR2 追加固定的 API 延迟 P50/P95/P99、Agent Run 成功率和首事件 TTFT P95 查询；这些序列基于现有 Histogram/terminal Counter，缺少样本时保持 `no_data`。`GET /api/v1/admin/observability/services` 返回固定服务清单的接入状态，未配置独立 probe 的服务为 `not_configured`，不把任意指标样本或用户传入 URL当作健康证明。
 
-Issue #212 PR3 增加 `GET /api/v1/admin/observability/alerts`，只读取 Prometheus 固定 `/api/v1/alerts`，并按告警名 allowlist 返回活动规则摘要。平台管理员查看系统告警，`agent_admin` 仅查看 Agent 模型错误率告警；未知告警、annotation、实例地址和业务标识不会透传。`available` 加空数组代表查询正常且当前无匹配活动告警，`not_configured` 代表 Gateway 没有 Prometheus URL 配置，`unavailable` 代表上游失败或响应结构无效。当前没有 Alertmanager，告警只反映 Prometheus 规则评估，不代表通知已发送。告警不含可信 trace id；排障时通过 Agent/Judge 入口，再用 Run 或 submission 详情查询受控 Trace。
-
 Dashboard provisioning 提供系统/判题、Contest 投影/缓存、Agent 运行和 Collector 健康视图。图表以空序列/无值展示“无样本”，不会以零或绿色代表健康。Prometheus recording rules 计算请求速率、判题提交速率、判题排队 P95 和 Agent 模型错误比例；告警覆盖 scrape target 失败、持续判题排队、Contest Outbox 陈旧积压和 Agent 模型错误比例。当前没有 Alertmanager 或通知渠道配置，告警在 Prometheus/Grafana 侧可检查，不会外发通知。Overlay 将 Prometheus/Grafana 绑定到本机回环地址并开放匿名 Viewer，仅用于本地开发；共享/生产环境必须使用网络与认证边界，并限制 Prometheus 原生查询入口。
 
 ## 验证要求
