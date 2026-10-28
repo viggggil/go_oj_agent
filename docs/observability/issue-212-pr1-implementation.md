@@ -19,4 +19,3 @@
 - `npm test`
 - `git diff --check`
 - 监控 E2E 用例已更新首页 KPI、趋势、服务接入状态和 Agent/Judge 入口断言；当前环境缺少 Chromium 运行库 `libnspr4.so`，浏览器用例需在 CI 或安装 Playwright 系统依赖的环境执行。
-
