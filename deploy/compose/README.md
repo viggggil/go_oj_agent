@@ -242,9 +242,11 @@ make observability-check
 make observability-smoke
 ```
 
-Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入外发通知。平台管理员可在 Gateway “监控 → 指标总览”查看服务端固定查询；`agent_admin` 只能获取 Agent 固定序列，不接收系统指标或 Grafana 链接。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入 Alertmanager 或外发通知。平台管理员可在 Gateway“监控 → 总览”查看固定指标、服务探测和 Prometheus 活跃告警；`agent_admin` 只能获取 Agent 固定序列、Agent/RAG 服务状态和 Agent 模型错误告警，不接收系统指标或 Grafana 链接。首页告警入口跳转现有 Agent/Judge 诊断页面，具体 Trace 通过 Run 或 submission 的受控详情查询。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
 
 `make observability-check` 校验观测配置和看板文件；在安装 Docker 或 `promtool` 的环境中还会执行对应的语法检查。`make observability-smoke` 需要已启动 overlay，检查健康端点、系统看板、固定 recording rule 和 Gateway 指标 API 的可达性；它不会伪造管理员凭据，也不代表已经产生真实业务流量。容量基线记录模板见 `docs/observability/issue-205-pr6-implementation.md`。
+
+首页排查流程：`no_data` 表示查询成功但所选时间窗没有样本；服务 `not_configured` 表示没有独立 probe；Metrics `stale` 表示抓取目标异常或样本过期；Alerts `unavailable` 表示 Prometheus 告警查询失败；Alerts `not_configured` 表示 Gateway 未配置 Prometheus URL。先检查 Prometheus `/targets`、`/api/v1/alerts`，再查看 `docker compose logs gateway-service otel-collector prometheus`。这些状态不能单独证明业务请求失败，应通过业务页面、稳定错误码和受控 Trace 入口核对。
 
 平台管理员的 Judge Trace 入口使用 Gateway 环境变量 `JUDGE_OBSERVABILITY_GRAFANA_URL` 生成固定 Explore 链接，不接受请求中的 URL。链接只表示可执行受控搜索，Tempo 未采样、Collector 故障或数据过期时页面会显示 Trace 不可用。
 
