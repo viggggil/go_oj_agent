@@ -342,6 +342,7 @@ services:
       KRATOS_WORKER_CONCURRENCY: "2"
       KRATOS_WORKER_TASK_TIMEOUT: "60s"
       KRATOS_RUN_CODE_ADDRESS: ":8081"
+      OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT: "judge-worker:8081"
       KRATOS_RUN_CODE_AUTH_TOKEN: "${AGENT_RUN_CODE_TOKEN:-local-development-run-code-token-change-before-sharing}"
     depends_on:
       minio-init:
@@ -380,6 +381,7 @@ services:
       KRATOS_CLIENTS_USER_ENDPOINT: "user-service:9001"
       KRATOS_CLIENTS_PROBLEM_ENDPOINT: "problem-service:9002"
       KRATOS_CLIENTS_SUBMISSION_ENDPOINT: "judge-service:9003"
+      KRATOS_CLIENTS_CONTEST_ENDPOINT: "contest-service:9005"
       KRATOS_CLIENTS_AGENT_ENABLED: "${AGENT_ENABLED:-true}"
       KRATOS_CLIENTS_AGENT_ENDPOINT: "http://agent-service:8000"
       KRATOS_REGISTRY_CONSUL_ENABLED: "false"

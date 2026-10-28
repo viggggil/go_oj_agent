@@ -103,6 +103,8 @@ Prometheus 每 15 秒抓取 Collector 的 Prometheus exporter（`otel-collector:
 
 Gateway 指标 API 固定查询请求速率、HTTP 5xx、判题提交/排队、Worker 在途、Contest Cache Outbox、Agent Run/模型/Tool/RAG/后台任务失败速率和遥测导出失败。时间窗只允许 15 分钟、1 小时和 24 小时；各窗步长分别为 15 秒、60 秒和 5 分钟。任意 PromQL、Grafana/Prometheus URL、业务 ID 和未知 label 都不会向客户端透传。平台管理员视图另返回 `up` 抓取目标；Agent 管理员视图只包含 Agent 序列与 Collector 状态，不含 Contest 抓取状态，也不返回 Grafana 链接。
 
+Issue #212 PR2 追加固定的 API 延迟 P50/P95/P99、Agent Run 成功率和首事件 TTFT P95 查询；这些序列基于现有 Histogram/terminal Counter，缺少样本时保持 `no_data`。`GET /api/v1/admin/observability/services` 返回固定服务清单的接入状态，未配置独立 probe 的服务为 `not_configured`，不把任意指标样本或用户传入 URL当作健康证明。
+
 Dashboard provisioning 提供系统/判题、Contest 投影/缓存、Agent 运行和 Collector 健康视图。图表以空序列/无值展示“无样本”，不会以零或绿色代表健康。Prometheus recording rules 计算请求速率、判题提交速率、判题排队 P95 和 Agent 模型错误比例；告警覆盖 scrape target 失败、持续判题排队、Contest Outbox 陈旧积压和 Agent 模型错误比例。当前没有 Alertmanager 或通知渠道配置，告警在 Prometheus/Grafana 侧可检查，不会外发通知。Overlay 将 Prometheus/Grafana 绑定到本机回环地址并开放匿名 Viewer，仅用于本地开发；共享/生产环境必须使用网络与认证边界，并限制 Prometheus 原生查询入口。
 
 ## 验证要求
