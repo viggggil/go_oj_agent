@@ -101,7 +101,9 @@
             ><small>Agent 工具操作失败与超时</small>
           </article>
         </div>
-        <p class="monitoring-capability-note">活跃告警和日志事件将在 Loki / Alertmanager 接入后展示；空指标不会被推断为零。</p>
+        <p class="monitoring-capability-note">
+          活跃告警和日志事件将在 Loki / Alertmanager 接入后展示；空指标不会被推断为零。
+        </p>
       </section>
 
       <section class="monitoring-section monitoring-dashboard-columns">
@@ -210,7 +212,7 @@
         <div class="monitoring-section-heading">
           <div>
             <p class="eyebrow">SERVICE SIGNALS</p>
-              <h2 id="services-title">服务健康列表</h2>
+            <h2 id="services-title">服务健康列表</h2>
           </div>
           <span class="monitoring-muted">固定探测结果；TCP 可达不代表依赖就绪</span>
         </div>
