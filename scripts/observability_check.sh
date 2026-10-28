@@ -60,6 +60,10 @@ else
 fi
 if [[ "${docker_available}" == true ]]; then
   docker compose -f "${compose_file}" -f "${observability_file}" config --quiet
+  docker run --rm --entrypoint /otelcol-contrib \
+    -v "${repo_root}/deploy/compose/otel-collector.yaml:/etc/otelcol/config.yaml:ro" \
+    otel/opentelemetry-collector-contrib:0.123.0 \
+    validate --config=file:/etc/otelcol/config.yaml
 else
   echo "docker is unavailable; Compose config check skipped" >&2
 fi
