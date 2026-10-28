@@ -15,7 +15,10 @@
         </button>
       </div>
       <nav class="monitoring-nav" aria-label="监控导航">
-        <RouterLink to="/monitoring/metrics" @click="open = false">指标总览</RouterLink>
+        <RouterLink to="/monitoring" exact-active-class="router-link-active" @click="open = false">
+          监控总览
+        </RouterLink>
+        <RouterLink to="/monitoring/metrics" @click="open = false">固定指标详情</RouterLink>
         <RouterLink to="/monitoring/agent" @click="open = false">Agent 运行诊断</RouterLink>
         <RouterLink v-if="isSystemMonitor" to="/monitoring/judge" @click="open = false">
           判题链路
