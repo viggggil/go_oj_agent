@@ -274,7 +274,13 @@ func TestDecodeObservabilityAlertsAllowlistAndRedaction(t *testing.T) {
 }
 
 func TestRequestPrometheusAlertsRejectsMissingAndNullAlerts(t *testing.T) {
-	for _, body := range []string{`{"status":"success"}`, `{"status":"success","data":{}}`, `{"status":"success","data":{"alerts":null}}`} {
+	for _, body := range []string{
+		`{"status":"success"}`,
+		`{"status":"success","data":{}}`,
+		`{"status":"success","data":{"alerts":null}}`,
+		`{"status":"success","data":{"alerts":[{}]}}`,
+		`{"status":"success","data":{"alerts":[{"labels":{},"state":"inactive","activeAt":"2026-10-28T08:00:00Z"}]}}`,
+	} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
 		base, _ := url.Parse(server.URL)
 		_, err := requestPrometheusAlerts(context.Background(), base)

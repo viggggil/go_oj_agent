@@ -281,6 +281,14 @@ func requestPrometheusAlerts(ctx context.Context, base *url.URL) (prometheusAler
 	if json.Unmarshal(data, &result) != nil || result.Data.Alerts == nil {
 		return result, errors.New("prometheus_invalid_response")
 	}
+	for _, alert := range result.Data.Alerts {
+		if alert.Labels == nil || (alert.State != "firing" && alert.State != "pending") {
+			return result, errors.New("prometheus_invalid_response")
+		}
+		if _, err := time.Parse(time.RFC3339Nano, alert.ActiveAt); err != nil {
+			return result, errors.New("prometheus_invalid_response")
+		}
+	}
 	return result, nil
 }
 
