@@ -76,6 +76,21 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
                   points: [{ timestamp: new Date().toISOString(), value: 0 }],
                 },
                 {
+                  key: 'api_latency_p95',
+                  label: 'API 延迟 P95',
+                  unit: '秒',
+                  service: 'gateway-service',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 0.08 }],
+                },
+                {
+                  key: 'agent_run_success_ratio',
+                  label: 'Agent Run 成功率',
+                  unit: '比例',
+                  state: 'available',
+                  points: [{ timestamp: new Date().toISOString(), value: 0.75 }],
+                },
+                {
                   key: 'judge_submission_rate',
                   label: '判题提交速率',
                   unit: '次/秒',
@@ -123,6 +138,24 @@ async function loginAs(page: import('@playwright/test').Page, roles: string[]) {
                   points: [],
                 },
               ],
+        },
+      })
+    }
+    if (path === '/api/v1/admin/observability/services') {
+      const platformAdmin = roles.some((role) => ['admin', 'system_admin'].includes(role))
+      return route.fulfill({
+        json: {
+          generated_at: new Date().toISOString(),
+          scope: platformAdmin ? 'system' : 'agent',
+          state: 'available',
+          services: (platformAdmin
+            ? [
+                ['gateway', 'up', 'Gateway is serving the health request'],
+                ['user', 'up', 'Service TCP endpoint is reachable; dependency readiness is not implied'],
+                ['problem', 'down', 'Fixed service probe failed'],
+              ]
+            : [['agent', 'up', 'Service health endpoint is responding'], ['rag-worker', 'not_configured', 'This service does not expose an independent health endpoint']]
+          ).map(([name, state, detail]) => ({ name, state, detail })),
         },
       })
     }
@@ -174,8 +207,10 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page.getByRole('heading', { name: '全局健康' })).toBeVisible()
   await expect(page.getByText('1.2 请求/秒')).toBeVisible()
   await expect(page.getByRole('heading', { name: '流量与性能趋势' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '服务指标接入' })).toBeVisible()
-  await expect(page.getByText('这是采集状态，不等同于服务健康探测')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '服务健康列表' })).toBeVisible()
+  await expect(page.getByText('固定探测结果；TCP 可达不代表依赖就绪')).toBeVisible()
+  await expect(page.getByText('API 延迟 P95')).toBeVisible()
+  await expect(page.getByText('0.08 秒')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断 →' })).toBeVisible()
   await expect(page.getByRole('link', { name: '判题链路 →' })).toBeVisible()
   await expect(page.getByRole('link', { name: '外部排障工具' })).toHaveAttribute(

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -33,6 +35,102 @@ func TestMetricsWindowAndTrustedURLs(t *testing.T) {
 	}
 	if got := configuredGrafanaDashboard("https://grafana.example/ops"); got != "https://grafana.example/ops/d/oj-system-overview/oj-system-overview" {
 		t.Fatalf("system dashboard link = %q", got)
+	}
+}
+
+func TestObservabilityServicesEndpointRoleScopeAndNoURLInput(t *testing.T) {
+	auth, err := gatewaymw.NewAuthMiddleware(testConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHTTPServer(testConfig(), auth, service.NewGatewayService(nil, nil))
+	get := func(roles []string, suffix string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, observabilityServicesPath+suffix, nil)
+		if roles != nil {
+			req.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, roles))
+		}
+		result := httptest.NewRecorder()
+		handler.ServeHTTP(result, req)
+		return result
+	}
+	system := get([]string{"system_admin"}, "")
+	if system.Code != http.StatusOK {
+		t.Fatalf("system status=%d body=%s", system.Code, system.Body.String())
+	}
+	var systemResponse observabilityServicesResponse
+	if err := json.Unmarshal(system.Body.Bytes(), &systemResponse); err != nil {
+		t.Fatal(err)
+	}
+	if systemResponse.Scope != "system" || len(systemResponse.Services) != len(observabilityServiceCatalog) {
+		t.Fatalf("system response=%+v", systemResponse)
+	}
+	for _, item := range systemResponse.Services {
+		if item.Name == "rag-worker" && item.State != "not_configured" {
+			t.Fatalf("service without a probe reported as configured: %+v", item)
+		}
+		if item.State == "up" && item.Name != "gateway" && (item.LatencyMS == nil || item.LastCheckedAt == nil) {
+			t.Fatalf("probed service is missing observation metadata: %+v", item)
+		}
+	}
+	agent := get([]string{"agent_admin"}, "")
+	var agentResponse observabilityServicesResponse
+	if agent.Code != http.StatusOK || json.Unmarshal(agent.Body.Bytes(), &agentResponse) != nil {
+		t.Fatalf("agent status=%d body=%s", agent.Code, agent.Body.String())
+	}
+	if agentResponse.Scope != "agent" || len(agentResponse.Services) != 2 {
+		t.Fatalf("agent scope leaked services: %+v", agentResponse)
+	}
+	for _, item := range agentResponse.Services {
+		if item.Name != "agent" && item.Name != "rag-worker" {
+			t.Fatalf("agent scope leaked service %q", item.Name)
+		}
+	}
+	for _, roles := range [][]string{{"user"}, nil} {
+		got := get(roles, "")
+		if got.Code == http.StatusOK {
+			t.Fatalf("roles=%v accessed service health", roles)
+		}
+	}
+	if got := get([]string{"system_admin"}, "?url=http://127.0.0.1:1"); got.Code != http.StatusBadRequest {
+		t.Fatalf("arbitrary probe URL status=%d body=%s", got.Code, got.Body.String())
+	}
+}
+
+func TestFixedServiceProbeResultsAreSanitized(t *testing.T) {
+	ready := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/readyz" {
+			t.Errorf("probe path = %q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ready.Close()
+	failed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("private upstream details"))
+	}))
+	defer failed.Close()
+
+	if err := probeHTTP(context.Background(), ready.URL); err != nil {
+		t.Fatalf("ready probe failed: %v", err)
+	}
+	if err := probeHTTP(context.Background(), failed.URL); err == nil || err.Error() != "service_probe_failed" {
+		t.Fatalf("failed probe error = %v", err)
+	}
+	if err := probeHTTP(context.Background(), "http://user:secret@example.test"); err == nil || err.Error() != "invalid_probe_endpoint" {
+		t.Fatalf("invalid endpoint error = %v", err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := listener.Addr().String()
+	defer listener.Close()
+	if err := probeTCP(context.Background(), address); err != nil {
+		t.Fatalf("reachable TCP probe failed: %v", err)
+	}
+	if err := probeTCP(context.Background(), "invalid-endpoint"); err == nil || err.Error() != "invalid_probe_endpoint" {
+		t.Fatalf("invalid TCP endpoint error = %v", err)
 	}
 }
 

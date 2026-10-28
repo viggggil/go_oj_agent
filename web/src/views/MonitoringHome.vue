@@ -53,6 +53,11 @@
             <strong>{{ metricValue('request_rate', '请求/秒') }}</strong>
             <small>按服务聚合的 HTTP 请求速率</small>
           </article>
+          <article class="monitoring-kpi">
+            <span>API 延迟 P95</span>
+            <strong>{{ metricValue('api_latency_p95', '秒') }}</strong>
+            <small>按服务聚合的 HTTP 延迟分位数</small>
+          </article>
           <article class="monitoring-kpi" :class="errorTone">
             <span>HTTP 5xx 错误率</span>
             <strong>{{ errorRate }}</strong>
@@ -67,6 +72,11 @@
             <span>Agent 模型失败速率</span>
             <strong>{{ metricValue('agent_model_failure_rate', '次/秒') }}</strong>
             <small>Agent 指标摘要</small>
+          </article>
+          <article class="monitoring-kpi">
+            <span>Agent Run 成功率</span>
+            <strong>{{ ratioValue('agent_run_success_ratio') }}</strong>
+            <small>已完成 terminal Run / 全部 terminal Run</small>
           </article>
         </div>
         <div v-else class="monitoring-kpi-grid monitoring-agent-kpi-grid">
@@ -91,10 +101,7 @@
             ><small>Agent 工具操作失败与超时</small>
           </article>
         </div>
-        <p class="monitoring-capability-note">
-          API 延迟分位数、Agent
-          成功率与活跃告警将在后续后端接口接入后展示；当前不以缺失数据推断健康。
-        </p>
+        <p class="monitoring-capability-note">活跃告警和日志事件将在 Loki / Alertmanager 接入后展示；空指标不会被推断为零。</p>
       </section>
 
       <section class="monitoring-section monitoring-dashboard-columns">
@@ -203,9 +210,9 @@
         <div class="monitoring-section-heading">
           <div>
             <p class="eyebrow">SERVICE SIGNALS</p>
-            <h2 id="services-title">服务指标接入</h2>
+              <h2 id="services-title">服务健康列表</h2>
           </div>
-          <span class="monitoring-muted">这是采集状态，不等同于服务健康探测</span>
+          <span class="monitoring-muted">固定探测结果；TCP 可达不代表依赖就绪</span>
         </div>
         <div class="monitoring-service-grid">
           <article v-for="service in serviceRows" :key="service.key" class="monitoring-service-row">
@@ -285,7 +292,7 @@
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { RouterLink } from 'vue-router'
   import { observabilityApi } from '../api'
-  import type { MetricsOverview, MetricsWindow } from '../api'
+  import type { MetricsOverview, MetricsWindow, ObservabilityServices } from '../api'
   import { useAuthStore } from '../stores/auth'
 
   const auth = useAuthStore()
@@ -299,6 +306,7 @@
   )
   const window = ref<MetricsWindow>('1h')
   const overview = ref<MetricsOverview>()
+  const serviceHealth = ref<ObservabilityServices>()
   const loading = ref(false)
   const requestError = ref('')
   const selectedTrend = ref('request_rate')
@@ -390,6 +398,10 @@
         ? 'kpi-warning'
         : 'kpi-good',
   )
+  function ratioValue(key: string) {
+    const value = sumLatest(key)
+    return value === undefined ? '暂无数据' : `${(value * 100).toFixed(1)}%`
+  }
   const chartStart = computed(() => {
     const first = trendSeries.value[0]?.points[0]?.timestamp
     return first ? formatTime(first) : '无样本'
@@ -423,6 +435,21 @@
         ([key]) => isPlatformAdmin.value || key === 'agent-service' || key === 'agent-rag-worker',
       )
       .map(([key, label]) => {
+        const serviceName = key.replace('-service', '').replace('agent-rag-worker', 'rag-worker')
+        const health = serviceHealth.value?.services.find((service) => service.name === serviceName)
+        if (health)
+          return {
+            key,
+            label,
+            state: health.state === 'up' ? 'available' : health.state,
+            stateLabel:
+              health.state === 'up'
+                ? '健康探测正常'
+                : health.state === 'not_configured'
+                  ? '健康探测未接入'
+                  : health.state,
+            detail: health.detail,
+          }
         const hasMetric = allSeries.value.some(
           (series) =>
             series.service === key && series.state === 'available' && series.points.length,
@@ -539,7 +566,14 @@
     loading.value = true
     requestError.value = ''
     try {
-      overview.value = (await observabilityApi.metrics(window.value, controller.signal)).data
+      const [metricsResult, servicesResult] = await Promise.allSettled([
+        observabilityApi.metrics(window.value, controller.signal),
+        observabilityApi.services(controller.signal),
+      ])
+      if (metricsResult.status === 'rejected') throw metricsResult.reason
+      overview.value = metricsResult.value.data
+      serviceHealth.value =
+        servicesResult.status === 'fulfilled' ? servicesResult.value.data : undefined
       if (!trendOptions.value.some((item) => item.key === selectedTrend.value))
         selectedTrend.value = trendOptions.value[0].key
       if (

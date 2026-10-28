@@ -30,6 +30,10 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/metrics?window=15m|1h|24h` 只接受固定时间窗，不接受 PromQL、Prometheus URL 或任意 Grafana URL。Gateway 查询服务端登记的 PromQL 模板，限制每序列最多 300 个点和每次响应 1 MiB，并只返回受控序列、单位、时间戳与采集目标状态。
 
+该接口的系统范围固定序列包括 API 请求/5xx 速率、API 延迟 P50/P95/P99、Judge 提交/排队/Worker/Contest Outbox、Agent Run/成功率/TTFT 和遥测导出失败；Agent 管理员只获得 Agent 范围的固定序列。缺少样本返回 `no_data`，不把空结果转换为零。API 延迟和 Agent TTFT 只有对应 Histogram 已被 Collector 导出时才会变为 `available`。
+
+`GET /api/v1/admin/observability/services` 返回固定服务清单的受控接入状态。Gateway 请求本身标记为 `up`；User、Problem、Judge、Contest 和 Judge Worker 使用服务端配置的固定 TCP 探测，Agent 使用固定 `/readyz` 探测，RAG Worker 当前没有独立探针并返回 `not_configured`。TCP 可达只表示端口可连接，不代表依赖已就绪。该接口不会根据指标样本推断业务健康，也不接受服务 URL。平台管理员可查看系统清单，`agent_admin` 只能查看 Agent 与 RAG Worker 条目。
+
 - `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及服务端固定 Grafana 看板链接。
 - `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列和 Collector 抓取状态；响应不含系统指标或 Grafana 链接。
 - 普通用户、无效 token 和缺少角色分别由 Gateway 认证与授权拒绝。

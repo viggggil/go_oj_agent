@@ -222,9 +222,26 @@ export type MetricsOverview = {
   }[]
 }
 
+export type ObservabilityServices = {
+  generated_at: string
+  scope: 'system' | 'agent'
+  state: 'available' | 'partial' | 'unavailable' | 'not_configured'
+  error_code?: string
+  services: {
+    name: string
+    state: 'up' | 'down' | 'stale' | 'not_configured' | 'unknown'
+    detail: string
+    last_checked_at?: string
+    latency_ms?: number
+    error_code?: string
+  }[]
+}
+
 export const observabilityApi = {
   metrics: (window: MetricsWindow, signal?: AbortSignal) =>
     api.get<MetricsOverview>('/api/v1/admin/observability/metrics', { params: { window }, signal }),
+  services: (signal?: AbortSignal) =>
+    api.get<ObservabilityServices>('/api/v1/admin/observability/services', { signal }),
 }
 
 export const contestApi = {

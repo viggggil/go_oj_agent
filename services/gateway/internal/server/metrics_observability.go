@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	kerrors "github.com/go-kratos/kratos/v3/errors"
@@ -21,9 +22,13 @@ import (
 )
 
 const metricsOverviewPath = "/api/v1/admin/observability/metrics"
+const observabilityServicesPath = "/api/v1/admin/observability/services"
 
 const systemMetricsRangeQuery = `label_replace(sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])), "series", "request_rate", "", "")
 or label_replace(sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])), "series", "request_error_rate", "", "")
+or label_replace(histogram_quantile(0.50, sum by (le, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))), "series", "api_latency_p50", "", "")
+or label_replace(histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))), "series", "api_latency_p95", "", "")
+or label_replace(histogram_quantile(0.99, sum by (le, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))), "series", "api_latency_p99", "", "")
 or label_replace(sum(rate(oj_judge_submission_total[5m])), "series", "judge_submission_rate", "", "")
 or label_replace(histogram_quantile(0.95, sum by (le) (rate(oj_judge_queue_duration_seconds_bucket[5m]))), "series", "judge_queue_p95", "", "")
 or label_replace(sum(oj_judge_worker_in_flight), "series", "judge_worker_in_flight", "", "")
@@ -35,6 +40,8 @@ or label_replace(sum(rate(oj_telemetry_export_failure_total[5m])), "series", "te
 
 const agentMetricsRangeQuery = `label_replace(sum(rate(agent_run_started_total[5m])), "series", "agent_run_rate", "", "")
 or label_replace(sum(agent_run_in_flight), "series", "agent_run_in_flight", "", "")
+or label_replace((sum(rate(agent_run_terminal_total{status="completed"}[5m])) or (sum(rate(agent_run_terminal_total[5m])) * 0)) / clamp_min(sum(rate(agent_run_terminal_total[5m])), 1e-9), "series", "agent_run_success_ratio", "", "")
+or label_replace(histogram_quantile(0.95, sum by (le) (rate(agent_run_first_event_duration_seconds_bucket[5m]))), "series", "agent_run_ttft_p95", "", "")
 or label_replace(sum(rate(agent_model_attempt_total{outcome=~"error|timeout"}[5m])), "series", "agent_model_failure_rate", "", "")
 or label_replace(sum(rate(agent_tool_total{outcome=~"error|timeout"}[5m])), "series", "agent_tool_failure_rate", "", "")
 or label_replace(sum(rate(agent_rag_total{outcome=~"error|timeout"}[5m])), "series", "agent_rag_failure_rate", "", "")
@@ -107,6 +114,9 @@ type seriesDefinition struct {
 var metricSeriesDefinitions = map[string]seriesDefinition{
 	"request_rate":                    {label: "HTTP 请求速率", unit: "请求/秒"},
 	"request_error_rate":              {label: "HTTP 5xx 速率", unit: "请求/秒"},
+	"api_latency_p50":                 {label: "API 延迟 P50", unit: "秒"},
+	"api_latency_p95":                 {label: "API 延迟 P95", unit: "秒"},
+	"api_latency_p99":                 {label: "API 延迟 P99", unit: "秒"},
 	"judge_submission_rate":           {label: "判题提交速率", unit: "次/秒"},
 	"judge_queue_p95":                 {label: "判题排队 P95", unit: "秒"},
 	"judge_worker_in_flight":          {label: "Worker 在途任务", unit: "个"},
@@ -114,6 +124,8 @@ var metricSeriesDefinitions = map[string]seriesDefinition{
 	"contest_cache_outbox_oldest_age": {label: "Contest 最老 Outbox 年龄", unit: "秒"},
 	"agent_run_rate":                  {label: "Agent Run 启动速率", unit: "次/秒"},
 	"agent_run_in_flight":             {label: "Agent 在途 Run", unit: "个"},
+	"agent_run_success_ratio":         {label: "Agent Run 成功率", unit: "比例"},
+	"agent_run_ttft_p95":              {label: "Agent TTFT P95", unit: "秒"},
 	"agent_model_failure_rate":        {label: "Agent 模型失败速率", unit: "次/秒"},
 	"agent_tool_failure_rate":         {label: "Agent Tool 失败速率", unit: "次/秒"},
 	"agent_rag_failure_rate":          {label: "Agent RAG 失败速率", unit: "次/秒"},
@@ -148,6 +160,184 @@ func registerMetricsObservabilityRoute(server *khttp.Server) {
 		_, err := handler(ctx, nil)
 		return err
 	})
+	server.Route("").GET(observabilityServicesPath, func(ctx khttp.Context) error {
+		khttp.SetOperation(ctx, client.MetricsObservabilityOperation)
+		handler := ctx.Middleware(func(requestCtx context.Context, _ interface{}) (interface{}, error) {
+			return nil, serveObservabilityServices(requestCtx, ctx)
+		})
+		_, err := handler(ctx, nil)
+		return err
+	})
+}
+
+type observabilityService struct {
+	Name          string     `json:"name"`
+	State         string     `json:"state"`
+	Detail        string     `json:"detail"`
+	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
+	LatencyMS     *int64     `json:"latency_ms,omitempty"`
+	ErrorCode     string     `json:"error_code,omitempty"`
+}
+
+type observabilityServicesResponse struct {
+	GeneratedAt time.Time              `json:"generated_at"`
+	Scope       string                 `json:"scope"`
+	State       string                 `json:"state"`
+	ErrorCode   string                 `json:"error_code,omitempty"`
+	Services    []observabilityService `json:"services"`
+}
+
+var observabilityServiceCatalog = []struct{ name, env, address, kind string }{
+	{"gateway", "", "", "self"},
+	{"user", "KRATOS_CLIENTS_USER_ENDPOINT", "", "tcp"},
+	{"problem", "KRATOS_CLIENTS_PROBLEM_ENDPOINT", "", "tcp"},
+	{"judge", "KRATOS_CLIENTS_SUBMISSION_ENDPOINT", "", "tcp"},
+	{"contest", "KRATOS_CLIENTS_CONTEST_ENDPOINT", "contest-service:9005", "tcp"},
+	{"agent", "KRATOS_CLIENTS_AGENT_ENDPOINT", "", "http"},
+	{"judge-worker", "OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT", "", "tcp"},
+	{"rag-worker", "", "", "none"},
+}
+
+func serveObservabilityServices(requestCtx context.Context, httpCtx khttp.Context) error {
+	if httpCtx.Request().URL.RawPath != "" || httpCtx.Request().URL.RawQuery != "" {
+		return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "Service health does not accept query parameters")
+	}
+	rc, ok := gatewaymw.RequestContextFromContext(requestCtx)
+	if !ok || (!platformAdministrator(rc.GetRoles()) && !client.AgentAdministrator(rc.GetRoles())) {
+		return kerrors.New(http.StatusForbidden, "GATEWAY_OBSERVABILITY_FORBIDDEN", "Service health requires an observability administrator")
+	}
+	systemScope := platformAdministrator(rc.GetRoles())
+	now := time.Now().UTC()
+	response := observabilityServicesResponse{GeneratedAt: now, Scope: "agent", State: "not_configured"}
+	if systemScope {
+		response.Scope = "system"
+	}
+	items := make([]struct {
+		name, env, address, kind string
+	}, 0, len(observabilityServiceCatalog))
+	for _, item := range observabilityServiceCatalog {
+		if !systemScope && item.name != "agent" && item.name != "rag-worker" {
+			continue
+		}
+		items = append(items, item)
+	}
+	response.Services = probeObservabilityServices(requestCtx, items, now)
+	response.State = "available"
+	for _, item := range response.Services {
+		if item.State == "not_configured" || item.State == "unknown" {
+			response.State = "partial"
+		}
+	}
+	httpCtx.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+	httpCtx.Response().Header().Set("Cache-Control", "no-store")
+	return json.NewEncoder(httpCtx.Response()).Encode(response)
+}
+
+func probeObservabilityServices(ctx context.Context, catalog []struct {
+	name, env, address, kind string
+}, now time.Time) []observabilityService {
+	results := make([]observabilityService, len(catalog))
+	var wait sync.WaitGroup
+	for index, item := range catalog {
+		wait.Add(1)
+		go func(index int, item struct {
+			name, env, address, kind string
+		}) {
+			defer wait.Done()
+			result := observabilityService{Name: item.name, State: "not_configured", Detail: "No fixed health probe is configured"}
+			if item.kind == "self" {
+				result.State = "up"
+				result.Detail = "Gateway is serving the health request"
+				checked := now
+				result.LastCheckedAt = &checked
+				results[index] = result
+				return
+			}
+			if item.kind == "none" {
+				result.Detail = "This service does not expose an independent health endpoint"
+				results[index] = result
+				return
+			}
+			address := strings.TrimSpace(os.Getenv(item.env))
+			if address == "" {
+				address = item.address
+			}
+			if address == "" {
+				results[index] = result
+				return
+			}
+			probeCtx, cancel := context.WithTimeout(ctx, 900*time.Millisecond)
+			defer cancel()
+			started := time.Now()
+			var err error
+			switch item.kind {
+			case "tcp":
+				err = probeTCP(probeCtx, address)
+			case "http":
+				err = probeHTTP(probeCtx, address)
+			default:
+				results[index] = result
+				return
+			}
+			checked := time.Now().UTC()
+			latency := time.Since(started).Milliseconds()
+			result.LastCheckedAt = &checked
+			result.LatencyMS = &latency
+			if err != nil {
+				result.State = "down"
+				result.Detail = "Fixed service probe failed"
+				result.ErrorCode = "service_probe_failed"
+			} else {
+				result.State = "up"
+				if item.kind == "tcp" {
+					result.Detail = "Service TCP endpoint is reachable; dependency readiness is not implied"
+				} else {
+					result.Detail = "Service health endpoint is responding"
+				}
+			}
+			results[index] = result
+		}(index, item)
+	}
+	wait.Wait()
+	return results
+}
+
+func probeTCP(ctx context.Context, address string) error {
+	if _, _, err := net.SplitHostPort(address); err != nil {
+		return errors.New("invalid_probe_endpoint")
+	}
+	dialer := net.Dialer{Timeout: 900 * time.Millisecond}
+	connection, err := dialer.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return errors.New("service_probe_failed")
+	}
+	return connection.Close()
+}
+
+func probeHTTP(ctx context.Context, configured string) error {
+	base, err := url.Parse(strings.TrimSpace(configured))
+	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return errors.New("invalid_probe_endpoint")
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + "/readyz"
+	base.RawPath = ""
+	client := &http.Client{
+		Timeout:       900 * time.Millisecond,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
+	if err != nil {
+		return errors.New("invalid_probe_endpoint")
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return errors.New("service_probe_failed")
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return errors.New("service_probe_failed")
+	}
+	return nil
 }
 
 func serveMetricsOverview(requestCtx context.Context, httpCtx khttp.Context) error {
@@ -257,9 +447,9 @@ func queryPrometheusMetrics(ctx context.Context, configuredURL string, window me
 }
 
 func emptyMetricSeries(systemScope bool) []metricSeries {
-	keys := []string{"agent_run_rate", "agent_run_in_flight", "agent_model_failure_rate", "agent_tool_failure_rate", "agent_rag_failure_rate", "agent_job_failure_rate"}
+	keys := []string{"agent_run_rate", "agent_run_in_flight", "agent_run_success_ratio", "agent_run_ttft_p95", "agent_model_failure_rate", "agent_tool_failure_rate", "agent_rag_failure_rate", "agent_job_failure_rate"}
 	if systemScope {
-		keys = []string{"request_rate", "request_error_rate", "judge_submission_rate", "judge_queue_p95", "judge_worker_in_flight", "contest_cache_outbox_pending", "contest_cache_outbox_oldest_age", "agent_run_rate", "agent_run_in_flight", "telemetry_export_failure_rate"}
+		keys = []string{"request_rate", "request_error_rate", "api_latency_p50", "api_latency_p95", "api_latency_p99", "judge_submission_rate", "judge_queue_p95", "judge_worker_in_flight", "contest_cache_outbox_pending", "contest_cache_outbox_oldest_age", "agent_run_rate", "agent_run_in_flight", "agent_run_success_ratio", "agent_run_ttft_p95", "telemetry_export_failure_rate"}
 	}
 	result := make([]metricSeries, 0, len(keys))
 	for _, key := range keys {
