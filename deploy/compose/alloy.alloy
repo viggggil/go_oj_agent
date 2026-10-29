@@ -28,19 +28,18 @@ loki.source.docker "oj_services" {
 
 loki.process "json" {
   stage.json {
+    drop_malformed = true
     expressions = {
       level = "level",
     }
-  }
-  stage.match {
-    selector            = "{__error__!=\"\"}"
-    action              = "drop"
-    drop_counter_reason = "json_parse_error"
   }
   stage.labels {
     values = {
       level = "level",
     }
+  }
+  stage.label_keep {
+    values = ["service_name", "environment", "level"]
   }
   forward_to = [loki.write.default.receiver]
 }
