@@ -23,6 +23,7 @@
         <RouterLink v-if="isSystemMonitor" to="/monitoring/judge" @click="open = false">
           判题链路
         </RouterLink>
+        <RouterLink to="/monitoring/logs" @click="open = false">日志中心</RouterLink>
       </nav>
       <p class="monitoring-sidebar-note">
         监控页面集中展示跨服务运行状态。Agent 配置、知识库和评测仍在 Agent 工作区管理。

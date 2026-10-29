@@ -253,6 +253,24 @@ export type ObservabilityAlerts = {
   }[]
 }
 
+export type ObservabilityLogs = {
+  generated_at: string
+  scope: 'system' | 'agent'
+  state: 'available' | 'no_data' | 'not_configured' | 'unavailable'
+  error_code?: string
+  logs: {
+    timestamp: string
+    level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+    service_name: string
+    message: string
+    error_code?: string
+    trace_id?: string
+    span_id?: string
+    run_id?: string
+    submission_id?: string
+  }[]
+}
+
 export const observabilityApi = {
   metrics: (window: MetricsWindow, signal?: AbortSignal) =>
     api.get<MetricsOverview>('/api/v1/admin/observability/metrics', { params: { window }, signal }),
@@ -260,6 +278,18 @@ export const observabilityApi = {
     api.get<ObservabilityServices>('/api/v1/admin/observability/services', { signal }),
   alerts: (signal?: AbortSignal) =>
     api.get<ObservabilityAlerts>('/api/v1/admin/observability/alerts', { signal }),
+  logs: (
+    params: {
+      service?: string
+      level?: string
+      error_code?: string
+      trace_id?: string
+      start?: string
+      end?: string
+      limit?: number
+    },
+    signal?: AbortSignal,
+  ) => api.get<ObservabilityLogs>('/api/v1/admin/observability/logs', { params, signal }),
 }
 
 export const contestApi = {
