@@ -148,3 +148,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check 'uv==0.12.23'
       - name: Run real RAG integration and corpus checks
         run: make rag-test-integration UV=uv
+
+  loki:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install smoke dependencies
+        run: python3 -m pip install --disable-pip-version-check PyYAML
+      - name: Real Loki and Alloy ingestion smoke
+        run: make loki-smoke

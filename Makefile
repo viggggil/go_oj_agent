@@ -157,3 +157,7 @@ rag-test-integration:
 
 rag-corpus-check:
 	@python3 scripts/build_algorithm_corpus.py
+
+# Isolated Docker logs smoke; never uses the business Compose project.
+loki-smoke:
+	@python3 scripts/loki_smoke.py
