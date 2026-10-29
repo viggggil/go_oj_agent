@@ -2691,6 +2691,59 @@ dd {
 .metrics-observed {
   font-size: 0.76rem;
 }
+.logs-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 18px 0;
+}
+.logs-filters label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.logs-filters input,
+.logs-filters select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+}
+.logs-table-wrap {
+  overflow-x: auto;
+}
+.logs-table-wrap table {
+  min-width: 900px;
+}
+.log-message {
+  max-width: 420px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.log-level {
+  font-weight: 700;
+}
+.log-error {
+  color: #b42318;
+}
+.log-warn {
+  color: #b54708;
+}
+.log-info {
+  color: #175cd3;
+}
+.log-debug {
+  color: var(--muted);
+}
+.logs-table-wrap td small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
 .eval-review {
   border-top: 1px solid #dfe4ed;
   padding-top: 16px;

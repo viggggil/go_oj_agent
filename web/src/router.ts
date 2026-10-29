@@ -28,6 +28,7 @@ import MonitoringWorkspace from './views/MonitoringWorkspace.vue'
 import MonitoringHome from './views/MonitoringHome.vue'
 import MonitoringMetrics from './views/MonitoringMetrics.vue'
 import JudgePipeline from './views/JudgePipeline.vue'
+import MonitoringLogs from './views/MonitoringLogs.vue'
 import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
@@ -46,6 +47,7 @@ const router = createRouter({
         { path: 'metrics', component: MonitoringMetrics, meta: { monitorMetrics: true } },
         { path: 'agent', component: MonitoringAgent, meta: { monitorAgent: true } },
         { path: 'judge', component: JudgePipeline, meta: { monitorSystem: true } },
+        { path: 'logs', component: MonitoringLogs, meta: { monitorMetrics: true } },
       ],
     },
     { path: '/problems', component: Problems, meta: { auth: true } },
