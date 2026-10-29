@@ -36,6 +36,12 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/alerts` 查询 Prometheus 当前活动规则告警，只允许平台管理员查看系统告警，`agent_admin` 只能看到 `OJAgentModelErrorRateHigh`。Gateway 仅返回固定告警名、级别、状态、开始时间、受控服务名、稳定错误码和 `trace_available`；不返回 annotation、原始错误、PromQL、Prometheus 地址或任意 TraceQL。Prometheus 未配置、查询失败和无告警分别由 `not_configured`、`unavailable` 和 `available` 加空数组表示。当前告警没有直接 Trace 链接，详情通过 Agent 诊断或 Judge 受控 Trace 接口进入。
 
+### Loki 受控日志查询（Issue #219 PR3）
+
+`GET /api/v1/admin/observability/logs` 由 Gateway 使用服务端 `OBSERVABILITY_LOKI_URL` 和固定 LogQL 模板查询 Loki。允许参数为 `service`、`level=DEBUG|INFO|WARN|ERROR`、`error_code`、32 位小写十六进制 `trace_id`、RFC3339 `start`/`end` 和 `limit=1..200`。默认时间窗为最近 15 分钟，最大范围 24 小时。接口不接受任意 LogQL、Loki URL、label selector 或其他参数。平台管理员可查固定系统服务；`agent_admin` 的服务范围只包括 Agent/Agent RAG。普通用户拒绝访问。
+
+响应仅投影 `timestamp`、`level`、`service_name`、`message`、`error_code`、`trace_id`、`span_id` 和允许的 `run_id`/`submission_id`，不返回 Loki stream labels 或内部地址。状态为 `available`、`no_data`、`not_configured`、`unavailable`。响应不缓存，Loki 请求 2.5 秒超时，最大读取 1 MiB。`GET /api/v1/admin/observability/logs/link?trace_id=...` 是 Trace 详情页可使用的受控入口，仍经同一权限、服务范围和时间窗约束；前端应直接使用返回日志数据，不构造 Loki/Grafana URL。
+
 - `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及服务端固定 Grafana 看板链接。
 - `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列和 Collector 抓取状态；响应不含系统指标或 Grafana 链接。
 - 普通用户、无效 token 和缺少角色分别由 Gateway 认证与授权拒绝。
