@@ -9,6 +9,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
       OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
+      OBSERVABILITY_LOKI_URL: http://loki:3100
       OBSERVABILITY_GRAFANA_URL: ${OBSERVABILITY_GRAFANA_URL:-http://127.0.0.1:3000}
   judge-service:
     logging: *observability-json-logging

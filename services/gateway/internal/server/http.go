@@ -64,6 +64,7 @@ func NewHTTPServerWithAgent(config *conf.Bootstrap, authMiddleware *gatewaymw.Au
 	registerSubmissionEventsRoute(server, gatewayService, sseInterval, sseMaxDuration)
 	registerJudgeObservabilityRoute(server, gatewayService)
 	registerMetricsObservabilityRoute(server)
+	registerLogsObservabilityRoute(server)
 	registerAgentChatRoute(server, agent)
 	registerAgentManagementRoutes(server, agent)
 	server.Use(client.AgentChatOperation, authMiddleware.Middleware())
