@@ -77,7 +77,11 @@ def main():
                 return [value for stream in payload['data']['result'] for value in stream['values']]
 
             def has_malformed(service):
-                return any('malformed smoke' in value[1] for value in entries(service))
+                query = '{service_name="' + service + '"} |= "malformed smoke"'
+                body = get('/loki/api/v1/query_range?' + urllib.parse.urlencode({'query': query, 'limit': 1000, 'since': '1h'}))
+                payload = json.loads(body)
+                assert payload['status'] == 'success'
+                return bool(payload['data']['result'])
 
             for service in SERVICES:
                 eventually(lambda: entries(service))
