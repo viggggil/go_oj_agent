@@ -94,19 +94,34 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, onUnmounted, reactive, ref } from 'vue'
+  import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+  import { useRoute } from 'vue-router'
+  import { useAuthStore } from '../stores/auth'
   import { observabilityApi, apiErrorMessage, type ObservabilityLogs } from '../api'
 
-  const services = [
-    'gateway-service',
-    'judge-service',
-    'judge-worker',
-    'contest-service',
-    'agent-service',
-    'agent-rag-worker',
-  ]
+  const route = useRoute()
+  const auth = useAuthStore()
+  const services = computed(() =>
+    [
+      'gateway-service',
+      'judge-service',
+      'judge-worker',
+      'contest-service',
+      'agent-service',
+      'agent-rag-worker',
+    ].filter(
+      (service) =>
+        auth.user?.roles.some((role) => ['admin', 'system_admin'].includes(role)) ||
+        service.startsWith('agent-'),
+    ),
+  )
   const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR']
-  const filters = reactive({ service: '', level: '', error_code: '', trace_id: '' })
+  const filters = reactive({
+    service: '',
+    level: '',
+    error_code: '',
+    trace_id: typeof route.query.trace_id === 'string' ? route.query.trace_id : '',
+  })
   const range = ref('15m')
   const result = ref<ObservabilityLogs>()
   const loading = ref(false)
@@ -133,19 +148,20 @@
   }
   async function load() {
     controller?.abort()
-    controller = new AbortController()
+    const current = new AbortController()
+    controller = current
     loading.value = true
     error.value = ''
     try {
       const window = rangeStart()
       result.value = (
-        await observabilityApi.logs({ ...filters, ...window, limit: 200 }, controller.signal)
+        await observabilityApi.logs({ ...filters, ...window, limit: 200 }, current.signal)
       ).data
     } catch (reason) {
       if ((reason as { code?: string })?.code !== 'ERR_CANCELED')
         error.value = apiErrorMessage(reason, '查询日志')
     } finally {
-      loading.value = false
+      if (controller === current) loading.value = false
     }
   }
   onMounted(load)

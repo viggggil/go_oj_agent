@@ -327,3 +327,19 @@ test('普通用户不能打开监控指标页', async ({ page }) => {
   await page.goto('/monitoring/metrics')
   await expect(page).toHaveURL(/\/problems$/)
 })
+
+test('日志中心带入 Trace 并限制 Agent 服务选项', async ({ page }) => {
+  await loginAs(page, ['agent_admin'])
+  const trace = '4bf92f3577b34da6a3ce929d0e0e4736'
+  await page.route('**/api/v1/admin/observability/logs?**', async (route) => {
+    expect(new URL(route.request().url()).searchParams.get('trace_id')).toBe(trace)
+    await route.fulfill({
+      json: { generated_at: new Date().toISOString(), scope: 'agent', state: 'no_data', logs: [] },
+    })
+  })
+  await page.goto('/monitoring/logs?trace_id=' + trace)
+  await expect(page.getByRole('heading', { name: '日志中心' })).toBeVisible()
+  await expect(page.getByPlaceholder('32 位 Trace ID')).toHaveValue(trace)
+  await expect(page.getByText('当前条件没有日志。')).toBeVisible()
+  await expect(page.locator('option[value="gateway-service"]')).toHaveCount(0)
+})
