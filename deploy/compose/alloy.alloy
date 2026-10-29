@@ -1,0 +1,52 @@
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "oj_services" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(gateway-service|judge-service|judge-worker|contest-service|agent-service)"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service_name"
+  }
+  rule {
+    target_label = "environment"
+    replacement  = "development"
+  }
+}
+
+loki.source.docker "oj_services" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.oj_services.output
+  forward_to = [loki.process.json.receiver]
+}
+
+loki.process "json" {
+  stage.json {
+    expressions = {
+      level = "level",
+    }
+  }
+  stage.match {
+    selector            = "{__error__!=\"\"}"
+    action              = "drop"
+    drop_counter_reason = "json_parse_error"
+  }
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

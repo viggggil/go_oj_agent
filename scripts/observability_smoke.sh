@@ -3,8 +3,28 @@ set -euo pipefail
 prometheus_url="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 grafana_url="${GRAFANA_URL:-http://127.0.0.1:3000}"
 collector_url="${COLLECTOR_URL:-http://127.0.0.1:13133}"
+loki_url="${LOKI_URL:-http://127.0.0.1:3100}"
+alloy_url="${ALLOY_URL:-http://127.0.0.1:12345}"
 gateway_url="${GATEWAY_URL:-http://127.0.0.1:8080}"
 curl --fail --silent "${collector_url}/" >/dev/null
+curl --fail --silent "${loki_url}/ready" >/dev/null
+curl --fail --silent "${loki_url}/loki/api/v1/labels" >/dev/null
+curl --fail --silent "${alloy_url}/-/ready" >/dev/null
+if [[ "${OBSERVABILITY_SMOKE_REQUIRE_LOGS:-false}" == true ]]; then
+  end_seconds="$(date +%s)"
+  start_seconds="$((end_seconds - 900))"
+  for service_name in gateway-service judge-service judge-worker contest-service agent-service; do
+    response="$(curl --fail --silent --get "${loki_url}/loki/api/v1/query_range" \
+      --data-urlencode "query={service_name=\"${service_name}\"}" \
+      --data-urlencode "start=${start_seconds}" \
+      --data-urlencode "end=${end_seconds}" \
+      --data-urlencode "limit=1")"
+    python3 -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if data.get("status") == "success" and data.get("data", {}).get("result") else 1)' <<<"${response}" || {
+      echo "no Loki log entry found for ${service_name} in the last 15 minutes" >&2
+      exit 1
+    }
+  done
+fi
 curl --fail --silent "${prometheus_url}/-/ready" >/dev/null
 curl --fail --silent "${grafana_url}/api/health" >/dev/null
 curl --fail --silent "${grafana_url}/api/dashboards/uid/oj-system-overview" >/dev/null

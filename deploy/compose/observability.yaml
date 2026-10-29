@@ -1,11 +1,17 @@
 services:
   gateway-service:
+    logging: &observability-json-logging
+      driver: json-file
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
       OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
       OBSERVABILITY_GRAFANA_URL: ${OBSERVABILITY_GRAFANA_URL:-http://127.0.0.1:3000}
   judge-service:
+    logging: *observability-json-logging
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
@@ -14,14 +20,17 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
   judge-worker:
+    logging: *observability-json-logging
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
   contest-service:
+    logging: *observability-json-logging
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_DEPLOYMENT_ENVIRONMENT: development
   agent-service:
+    logging: *observability-json-logging
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
   rag-worker:
@@ -35,6 +44,28 @@ services:
     ports:
       - "127.0.0.1:13133:13133"
     depends_on: [tempo]
+    restart: unless-stopped
+  loki:
+    image: grafana/loki:3.5.3
+    command: ["-config.file=/etc/loki/config.yaml", "-config.expand-env=true"]
+    environment:
+      LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-168h}
+    volumes:
+      - ./loki.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    restart: unless-stopped
+  alloy:
+    image: grafana/alloy:v1.10.2
+    command: ["run", "/etc/alloy/config.alloy", "--storage.path=/var/lib/alloy/data", "--server.http.listen-addr=0.0.0.0:12345"]
+    volumes:
+      - ./alloy.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:12345:12345"
+    depends_on: [loki]
     restart: unless-stopped
   tempo:
     image: grafana/tempo:2.8.2
@@ -68,10 +99,12 @@ services:
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"
-    depends_on: [prometheus, tempo]
+    depends_on: [prometheus, tempo, loki]
     restart: unless-stopped
 
 volumes:
   tempo-data:
   prometheus-data:
   grafana-data:
+  loki-data:
+  alloy-data:

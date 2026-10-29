@@ -139,7 +139,7 @@ observability-up:
 	@$(COMPOSE) -f $(COMPOSE_FILE) -f $(OBSERVABILITY_FILE) up --detach --wait
 
 observability-down:
-	@$(COMPOSE) -f $(COMPOSE_FILE) -f $(OBSERVABILITY_FILE) stop grafana prometheus tempo otel-collector
+	@$(COMPOSE) -f $(COMPOSE_FILE) -f $(OBSERVABILITY_FILE) stop grafana prometheus tempo otel-collector alloy loki
 	@$(COMPOSE) -f $(COMPOSE_FILE) up --detach gateway-service agent-service
 
 observability-check:
