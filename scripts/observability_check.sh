@@ -48,7 +48,7 @@ grep -Fq 'retention_enabled: true' "${loki_config}"
 grep -Fq 'max_entries_limit_per_query: 1000' "${loki_config}"
 grep -Fq 'action        = "keep"' "${alloy_config}"
 grep -Fq 'trace_id' "${alloy_config}" && { echo "trace_id must not be a Loki label" >&2; exit 1; }
-grep -Fq 'json_parse_error' "${alloy_config}"
+grep -Fq 'drop_malformed = true' "${alloy_config}"
 grep -Fq 'DOCKER_LOG_MAX_SIZE:-10m' "${observability_file}"
 grep -Fq 'DOCKER_LOG_MAX_FILE:-3' "${observability_file}"
 docker_available=false
@@ -82,7 +82,7 @@ if [[ "${docker_available}" == true ]]; then
     -config.file=/etc/loki/config.yaml -config.expand-env=true -verify-config
   docker run --rm --entrypoint alloy \
     -v "${alloy_config}:/etc/alloy/config.alloy:ro" \
-    grafana/alloy:v1.10.2 fmt --write=false /etc/alloy/config.alloy
+    grafana/alloy:v1.10.2 validate /etc/alloy/config.alloy
 else
   echo "docker is unavailable; Compose config check skipped" >&2
 fi
