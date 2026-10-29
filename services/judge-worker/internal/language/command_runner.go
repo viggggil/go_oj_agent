@@ -52,10 +52,10 @@ func (r *CommandRunner) Compile(ctx context.Context, source []byte) (biz.Compile
 	}
 	if result.Status == sandbox.StatusNonZeroExit {
 		message := commandDiagnostic(result)
-		slog.Warn("language compilation rejected", "language", r.language, "status", result.Status, "exit_code", result.ExitStatus, "stderr", message)
+		slog.WarnContext(ctx, "language compilation rejected", "error_code", "JUDGE_COMPILE_REJECTED", "language", r.language, "status", result.Status, "exit_code", result.ExitStatus, "stderr", message)
 		return biz.CompileResult{Verdict: biz.VerdictCE, Message: message}, nil
 	}
-	return biz.CompileResult{}, commandCompileSystemError(result, r.language)
+	return biz.CompileResult{}, commandCompileSystemError(ctx, result, r.language)
 }
 
 func (r *CommandRunner) Run(ctx context.Context, artifact biz.Artifact, input []byte, limits biz.ResourceLimits) (biz.ExecutionResult, error) {
@@ -69,7 +69,7 @@ func (r *CommandRunner) Run(ctx context.Context, artifact biz.Artifact, input []
 	}
 	verdict, message, systemFailure := commandMapRunStatus(result.Status)
 	if systemFailure {
-		slog.Error("language execution sandbox failure", "language", r.language, "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", commandDiagnostic(result), "error", result.Error)
+		slog.ErrorContext(ctx, "language execution sandbox failure", "error_code", "JUDGE_EXECUTION_SANDBOX_FAILURE", "language", r.language, "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", commandDiagnostic(result), "error", result.Error)
 		return biz.ExecutionResult{}, biz.NewSystemError(message, true, nil)
 	}
 	return biz.ExecutionResult{Verdict: verdict, Time: result.Time, Memory: result.Memory, Output: append([]byte(nil), result.Files["stdout"]...), Message: message}, nil
@@ -114,7 +114,7 @@ func commandMapRunStatus(status sandbox.Status) (string, string, bool) {
 	}
 }
 
-func commandCompileSystemError(result sandbox.Result, language string) error {
+func commandCompileSystemError(ctx context.Context, result sandbox.Result, language string) error {
 	reason := "SANDBOX_COMPILE_FAILURE"
 	switch result.Status {
 	case sandbox.StatusTimeLimitExceeded:
@@ -127,7 +127,7 @@ func commandCompileSystemError(result sandbox.Result, language string) error {
 		reason = "SANDBOX_INTERNAL_ERROR"
 	}
 	diagnostic := commandDiagnostic(result)
-	slog.Error("language compilation sandbox failure", "language", language, "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", diagnostic, "error", result.Error)
+	slog.ErrorContext(ctx, "language compilation sandbox failure", "error_code", "JUDGE_COMPILE_SANDBOX_FAILURE", "language", language, "status", result.Status, "exit_code", result.ExitStatus, "cpu_time", result.Time, "clock_time", result.RunTime, "memory", result.Memory, "stderr", diagnostic, "error", result.Error)
 	return biz.NewSystemError(reason, true, fmt.Errorf("%s", diagnostic))
 }
 

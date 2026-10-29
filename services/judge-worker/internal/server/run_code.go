@@ -107,7 +107,7 @@ func NewRunCodeHandler(runners map[string]biz.LanguageRunner, token string) http
 			cleanup, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 			defer cleanupCancel()
 			if err := runner.DeleteArtifact(cleanup, compiled.Artifact); err != nil {
-				slog.Error("run-code artifact cleanup failed", "language", request.Language, "error_type", fmt.Sprintf("%T", err))
+				slog.ErrorContext(cleanup, "run-code artifact cleanup failed", "error_code", "JUDGE_RUN_CODE_CLEANUP_FAILED", "language", request.Language, "error_type", fmt.Sprintf("%T", err))
 			}
 		}()
 		result, err := runner.Run(ctx, compiled.Artifact, input, biz.ResourceLimits{TimeLimit: runCodeTimeLimit, MemoryBytes: runCodeMemoryMax})

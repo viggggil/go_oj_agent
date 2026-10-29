@@ -110,12 +110,13 @@ func (s *ResultConsumerServer) Start(ctx context.Context) error {
 			if !ok {
 				return fmt.Errorf("contest consumer channel closed")
 			}
+			deliveryCtx := mq.ContextFromTraceHeaders(run, d.Headers)
 			envelope, parseErr := mq.UnmarshalEnvelope(d.Body, d.Type, &map[string]any{})
 			if parseErr == nil && d.RoutingKey != envelope.EventType {
 				parseErr = fmt.Errorf("contest event routing mismatch")
 			}
 			if parseErr != nil {
-				slog.Warn("contest event rejected", "message_id", d.MessageId, "error", parseErr)
+				slog.WarnContext(deliveryCtx, "contest event rejected", "error_code", "CONTEST_EVENT_INVALID", "message_id", d.MessageId, "error", parseErr)
 				err = d.Reject(false)
 			} else {
 				handleCtx := mq.ContextFromMessage(run, d.Headers, d.Body)
@@ -132,10 +133,10 @@ func (s *ResultConsumerServer) Start(ctx context.Context) error {
 				case err == nil:
 					err = d.Ack(false)
 				case status.Code(err) == grpcCodes.InvalidArgument:
-					slog.Warn("contest event rejected", "event_id", envelope.EventID, "error", err)
+					slog.WarnContext(handleCtx, "contest event rejected", "error_code", "CONTEST_EVENT_REJECTED", "event_id", envelope.EventID, "error", err)
 					err = d.Reject(false)
 				default:
-					slog.Warn("contest event requeued", "event_id", envelope.EventID, "error", err)
+					slog.WarnContext(handleCtx, "contest event requeued", "error_code", "CONTEST_EVENT_REQUEUED", "event_id", envelope.EventID, "error", err)
 					err = d.Nack(false, true)
 					// 避免持久业务错误造成无界热循环，停止期间仍可及时退出。
 					timer := time.NewTimer(100 * time.Millisecond)

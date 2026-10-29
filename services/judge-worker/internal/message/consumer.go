@@ -78,7 +78,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 			if metadata, ok := d.(interface{ GetMessageID() string }); ok {
 				attrs = append(attrs, "message_id", metadata.GetMessageID())
 			}
-			c.Logger.Warn("task rejected", attrs...)
+			c.Logger.WarnContext(traceCtx, "task rejected", attrs...)
 		}
 		if rejectErr := d.Reject(false); rejectErr == nil {
 			observability.Judge().OutboxDead(traceCtx, "invalid_message")
@@ -90,7 +90,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		if metadata, ok := d.(interface{ IsRedelivered() bool }); ok {
 			redelivered = metadata.IsRedelivered()
 		}
-		c.Logger.Info("task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
+		c.Logger.InfoContext(traceCtx, "task received", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "problem_id", task.ProblemID, "attempt", task.Attempt, "redelivered", redelivered)
 	}
 	startedAt := time.Now()
 	metrics := observability.Judge()
@@ -115,7 +115,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	taskCtx, cancel := context.WithDeadline(traceCtx, deadline)
 	defer cancel()
 	if c.Logger != nil {
-		c.Logger.Info("judge started", "event_id", envelope.EventID, "submission_id", task.SubmissionID)
+		c.Logger.InfoContext(traceCtx, "judge started", "event_id", envelope.EventID, "submission_id", task.SubmissionID)
 	}
 	if c.Engine == nil || c.Reporter == nil {
 		span.SetStatus(codes.Error, "worker dependency unavailable")
@@ -134,7 +134,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		if err := d.Ack(false); err != nil {
 			span.SetStatus(codes.Error, "task ack failed")
 			if c.Logger != nil {
-				c.Logger.Error("task ack failed", "event_id", envelope.EventID, "error", err)
+				c.Logger.ErrorContext(traceCtx, "task ack failed", "error_code", "JUDGE_TASK_ACK_FAILED", "event_id", envelope.EventID, "error", err)
 			}
 			return
 		}
@@ -144,7 +144,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	outcome := c.Engine.Execute(taskCtx, task)
 	if outcome.Completed != nil {
 		if c.Logger != nil {
-			c.Logger.Info("judge completed", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "verdict", outcome.Completed.Verdict)
+			c.Logger.InfoContext(traceCtx, "judge completed", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "verdict", outcome.Completed.Verdict)
 		}
 		// The execution deadline must not cancel publication of the resulting
 		// verdict; otherwise an expired task could be requeued forever.
@@ -176,7 +176,7 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 		// preserving the structured diagnostic code and message.
 		outcome.Failed.Retryable = false
 		if c.Logger != nil {
-			c.Logger.Warn("judge failed", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "reason", outcome.Failed.Reason)
+			c.Logger.WarnContext(traceCtx, "judge failed", "error_code", "JUDGE_TASK_FAILED", "event_id", envelope.EventID, "submission_id", task.SubmissionID, "reason", outcome.Failed.Reason)
 		}
 		err = c.Reporter.ReportFailed(traceCtx, envelope, *outcome.Failed)
 	} else {
@@ -185,16 +185,16 @@ func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	if err != nil {
 		span.SetStatus(codes.Error, "result publish failed")
 		if c.Logger != nil {
-			c.Logger.Error("result publish failed", "event_id", envelope.EventID, "error", err)
+			c.Logger.ErrorContext(traceCtx, "result publish failed", "error_code", "JUDGE_RESULT_PUBLISH_FAILED", "event_id", envelope.EventID, "error", err)
 		}
 		_ = d.Nack(false, true)
 		return
 	}
 	if c.Logger != nil {
-		c.Logger.Info("result publish confirmed", "event_id", envelope.EventID)
+		c.Logger.InfoContext(traceCtx, "result publish confirmed", "event_id", envelope.EventID)
 	}
 	if err = d.Ack(false); err != nil && c.Logger != nil {
-		c.Logger.Error("task ack failed", "event_id", envelope.EventID, "error", err)
+		c.Logger.ErrorContext(traceCtx, "task ack failed", "error_code", "JUDGE_TASK_ACK_FAILED", "event_id", envelope.EventID, "error", err)
 	}
 	if err == nil {
 		workerOutcome = "success"

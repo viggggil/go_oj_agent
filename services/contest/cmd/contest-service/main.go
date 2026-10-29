@@ -25,47 +25,48 @@ func main() {
 	flag.Parse()
 	logger := newJSONLogger(os.Stdout)
 	errorLogger := newJSONLogger(os.Stderr)
+	slog.SetDefault(logger)
 	c := config.New(config.WithSource(file.NewSource(*flagconf), env.NewSource("KRATOS")))
 	if err := c.Load(); err != nil {
-		errorLogger.Error("failed to load config", "error", err)
+		errorLogger.Error("failed to load config", "error_code", "CONTEST_CONFIG_LOAD_FAILED", "error", err)
 		os.Exit(1)
 	}
 	var bootstrap conf.Bootstrap
 	if err := c.Scan(&bootstrap); err != nil {
-		errorLogger.Error("failed to scan config", "error", err)
+		errorLogger.Error("failed to scan config", "error_code", "CONTEST_CONFIG_SCAN_FAILED", "error", err)
 		os.Exit(1)
 	}
 	if err := conf.ValidateConfig(&bootstrap); err != nil {
-		errorLogger.Error("invalid contest service config", "error", err)
+		errorLogger.Error("invalid contest service config", "error_code", "CONTEST_CONFIG_INVALID", "error", err)
 		os.Exit(1)
 	}
 	shutdownTelemetry, telemetryErr := observability.Init(context.Background(), "contest-service")
 	if telemetryErr != nil {
-		errorLogger.Error("failed to initialize OpenTelemetry", "error_type", "exporter_init")
+		errorLogger.Error("failed to initialize OpenTelemetry", "error_code", "OTEL_INIT_FAILED", "error_type", "exporter_init")
 		shutdownTelemetry = func(context.Context) error { return nil }
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		if err := shutdownTelemetry(ctx); err != nil {
-			errorLogger.Error("failed to shut down OpenTelemetry", "error_type", "shutdown")
+			errorLogger.Error("failed to shut down OpenTelemetry", "error_code", "OTEL_SHUTDOWN_FAILED", "error_type", "shutdown")
 		}
 	}()
 	app, cleanup, err := initApp(&bootstrap)
 	if err != nil {
-		errorLogger.Error("failed to initialize contest-service", "error", err)
+		errorLogger.Error("failed to initialize contest-service", "error_code", "CONTEST_INIT_FAILED", "error", err)
 		os.Exit(1)
 	}
 	defer cleanup()
 	logger.Info("starting contest-service")
 	if err := app.Run(); err != nil {
-		errorLogger.Error("contest-service exited with error", "error", err)
+		errorLogger.Error("contest-service exited with error", "error_code", "CONTEST_EXITED", "error", err)
 		os.Exit(1)
 	}
 }
 
 func newJSONLogger(output *os.File) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{}))
+	return observability.NewJSONLogger(output, "contest-service")
 }
 
 func newApp(bootstrap *conf.Bootstrap, grpcServer *kgrpc.Server, registrar registry.Registrar, consumer *server.ResultConsumerServer, cacheRelay *server.CacheRelayServer, maintenance *server.CacheMaintenanceServer) (*kratos.App, error) {
