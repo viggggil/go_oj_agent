@@ -261,7 +261,7 @@ func (r *Repository) maintainLeaderboard(ctx context.Context, id int64) {
 		delay := time.Second << min(work.failures, 6)
 		work.rebuildAt = time.Now().Add(delay)
 		if ctx.Err() == nil {
-			slog.Warn("leaderboard rebuild failed", "contest_id", id, "error", err)
+			slog.WarnContext(ctx, "leaderboard rebuild failed", "error_code", "CONTEST_LEADERBOARD_REBUILD_FAILED", "contest_id", id, "error", err)
 		}
 	}
 }

@@ -26,6 +26,7 @@ func main() {
 
 	logger := newJSONLogger(os.Stdout)
 	errorLogger := newJSONLogger(os.Stderr)
+	slog.SetDefault(logger)
 
 	c := config.New(
 		config.WithSource(
@@ -34,29 +35,29 @@ func main() {
 		),
 	)
 	if err := c.Load(); err != nil {
-		errorLogger.Error("加载配置失败", "error", err)
+		errorLogger.Error("加载配置失败", "error_code", "GATEWAY_CONFIG_LOAD_FAILED", "error", err)
 		os.Exit(1)
 	}
 
 	var bc conf.Bootstrap
 	if err := c.Scan(&bc); err != nil {
-		errorLogger.Error("解析配置失败", "error", err)
+		errorLogger.Error("解析配置失败", "error_code", "GATEWAY_CONFIG_SCAN_FAILED", "error", err)
 		os.Exit(1)
 	}
 	if err := applyAgentEnableOverride(c, &bc); err != nil {
-		errorLogger.Error("解析 Agent 配置失败", "error", err)
+		errorLogger.Error("解析 Agent 配置失败", "error_code", "GATEWAY_AGENT_CONFIG_FAILED", "error", err)
 		os.Exit(1)
 	}
 	shutdownTelemetry, telemetryErr := observability.Init(context.Background(), "gateway-service")
 	if telemetryErr != nil {
 		// Telemetry failure must not prevent the gateway from serving traffic.
-		errorLogger.Error("初始化 OpenTelemetry 失败", "error_type", "exporter_init")
+		errorLogger.Error("初始化 OpenTelemetry 失败", "error_code", "OTEL_INIT_FAILED", "error_type", "exporter_init")
 		shutdownTelemetry = func(context.Context) error { return nil }
 	}
 
 	app, cleanup, err := initApp(&bc)
 	if err != nil {
-		errorLogger.Error("初始化 gateway-service 失败", "error", err)
+		errorLogger.Error("初始化 gateway-service 失败", "error_code", "GATEWAY_INIT_FAILED", "error", err)
 		os.Exit(1)
 	}
 	defer cleanup()
@@ -68,13 +69,13 @@ func main() {
 
 	logger.Info("启动 gateway-service")
 	if err := app.Run(); err != nil {
-		errorLogger.Error("gateway-service 异常退出", "error", err)
+		errorLogger.Error("gateway-service 异常退出", "error_code", "GATEWAY_EXITED", "error", err)
 		os.Exit(1)
 	}
 }
 
 func newJSONLogger(output *os.File) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{}))
+	return observability.NewJSONLogger(output, "gateway-service")
 }
 
 // newApp 组装 Kratos 应用，由 Kratos 统一管理 Server 和 Registrar 生命周期。

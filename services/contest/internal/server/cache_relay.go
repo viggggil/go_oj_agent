@@ -53,7 +53,7 @@ func (s *CacheRelayServer) Start(ctx context.Context) error {
 					if ctx.Err() != nil {
 						return nil
 					}
-					slog.Warn("leaderboard cache relay retry", "error", err)
+					slog.WarnContext(ctx, "leaderboard cache relay retry", "error_code", "CONTEST_CACHE_RELAY_RETRY", "error", err)
 					break
 				}
 				if !claimed {
