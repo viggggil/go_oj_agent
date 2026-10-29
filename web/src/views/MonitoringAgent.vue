@@ -96,6 +96,12 @@
           rel="noopener noreferrer"
           >在 Tempo 中打开 Trace</a
         >
+        <RouterLink
+          v-if="selected.trace_id"
+          class="button secondary"
+          :to="{ path: '/monitoring/logs', query: { trace_id: selected.trace_id } }"
+          >查看相关日志</RouterLink
+        >
         <span v-else>Trace 不可用或没有本地 Trace</span>
         <a
           v-if="selected.langsmith_url"
@@ -124,7 +130,7 @@
 </template>
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
+  import { RouterLink, useRoute, useRouter } from 'vue-router'
   import { agentApi, agentError } from '../agent/api'
   import type { AgentOverview, AgentRun } from '../agent/types'
   const statuses = ['RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'] as const

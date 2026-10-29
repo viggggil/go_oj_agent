@@ -21,6 +21,13 @@
         >
           查看判题 Trace
         </a>
+        <RouterLink
+          v-if="isAdmin && trace?.link_available"
+          class="button secondary"
+          to="/monitoring/logs"
+        >
+          查看相关日志
+        </RouterLink>
         <RouterLink class="button secondary" to="/submissions">返回提交记录</RouterLink>
       </div>
     </div>
