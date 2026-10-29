@@ -5,7 +5,9 @@ compose_file="${repo_root}/deploy/compose/compose.yaml"
 observability_file="${repo_root}/deploy/compose/observability.yaml"
 prometheus_config="${repo_root}/deploy/compose/prometheus.yaml"
 rules_file="${repo_root}/deploy/compose/prometheus-rules/observability.yaml"
-for file in "${compose_file}" "${observability_file}" "${prometheus_config}" "${rules_file}"; do
+loki_config="${repo_root}/deploy/compose/loki.yaml"
+alloy_config="${repo_root}/deploy/compose/alloy.alloy"
+for file in "${compose_file}" "${observability_file}" "${prometheus_config}" "${rules_file}" "${loki_config}" "${alloy_config}"; do
   test -f "${file}" || { echo "missing observability file: ${file}" >&2; exit 1; }
 done
 python3 - "${repo_root}" <<'PY'
@@ -23,6 +25,7 @@ for relative in (
     "deploy/compose/prometheus.yaml",
     "deploy/compose/prometheus-rules/observability.yaml",
     "deploy/compose/otel-collector.yaml",
+    "deploy/compose/loki.yaml",
     "deploy/compose/grafana/provisioning/datasources/datasources.yaml",
     "deploy/compose/grafana/provisioning/dashboards/dashboards.yaml",
 ):
@@ -40,6 +43,14 @@ for path in dashboards:
         raise SystemExit(f"dashboard missing uid/panels: {path}")
 print(f"validated {len(dashboards)} Grafana dashboards")
 PY
+grep -Fq 'retention_period: ${LOKI_RETENTION_PERIOD}' "${loki_config}"
+grep -Fq 'retention_enabled: true' "${loki_config}"
+grep -Fq 'max_entries_limit_per_query: 1000' "${loki_config}"
+grep -Fq 'action        = "keep"' "${alloy_config}"
+grep -Fq 'trace_id' "${alloy_config}" && { echo "trace_id must not be a Loki label" >&2; exit 1; }
+grep -Fq 'json_parse_error' "${alloy_config}"
+grep -Fq 'DOCKER_LOG_MAX_SIZE:-10m' "${observability_file}"
+grep -Fq 'DOCKER_LOG_MAX_FILE:-3' "${observability_file}"
 docker_available=false
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   docker_available=true
@@ -64,6 +75,14 @@ if [[ "${docker_available}" == true ]]; then
     -v "${repo_root}/deploy/compose/otel-collector.yaml:/etc/otelcol/config.yaml:ro" \
     otel/opentelemetry-collector-contrib:0.123.0 \
     validate --config=file:/etc/otelcol/config.yaml
+  docker run --rm \
+    -e LOKI_RETENTION_PERIOD=168h \
+    -v "${loki_config}:/etc/loki/config.yaml:ro" \
+    grafana/loki:3.5.3 \
+    -config.file=/etc/loki/config.yaml -config.expand-env=true -verify-config
+  docker run --rm --entrypoint alloy \
+    -v "${alloy_config}:/etc/alloy/config.alloy:ro" \
+    grafana/alloy:v1.10.2 fmt --write=false /etc/alloy/config.alloy
 else
   echo "docker is unavailable; Compose config check skipped" >&2
 fi

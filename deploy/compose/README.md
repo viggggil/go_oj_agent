@@ -242,7 +242,9 @@ make observability-check
 make observability-smoke
 ```
 
-Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入 Alertmanager 或外发通知。平台管理员可在 Gateway“监控 → 总览”查看固定指标、服务探测和 Prometheus 活跃告警；`agent_admin` 只能获取 Agent 固定序列、Agent/RAG 服务状态和 Agent 模型错误告警，不接收系统指标或 Grafana 链接。首页告警入口跳转现有 Agent/Judge 诊断页面，具体 Trace 通过 Run 或 submission 的受控详情查询。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`，Loki 位于 `http://127.0.0.1:3100`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入 Alertmanager 或外发通知。平台管理员可在 Gateway“监控 → 总览”查看固定指标、服务探测和 Prometheus 活跃告警；`agent_admin` 只能获取 Agent 固定序列、Agent/RAG 服务状态和 Agent 模型错误告警，不接收系统指标或 Grafana 链接。首页告警入口跳转现有 Agent/Judge 诊断页面，具体 Trace 通过 Run 或 submission 的受控详情查询。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
+
+启用 overlay 后，Grafana Alloy 从 Docker API 收集 Gateway、Judge Service、Judge Worker、Contest 和 Agent 容器 stdout/stderr，并把固定的 `service_name`、`environment` 作为 Loki labels。Agent 通过 Docker socket 读取容器日志，因此此配置仅用于受控开发机；共享/生产部署应使用受保护的主机采集器或经审查的日志代理权限，不能把 Docker socket 暴露给不可信容器。采集器解析 JSON 的 `level` 字段作为低基数 label；业务 ID 和 Trace ID 不作为 Loki labels，完整关联字段由后续日志字段 PR 统一。Loki 默认保留 7 天，Compactor 每 10 分钟执行清理；删除是异步的，保留期不是精确到秒的磁盘配额。Docker `json-file` 日志默认轮转为每容器 10 MiB × 3 文件，可用 `LOKI_RETENTION_PERIOD`、`DOCKER_LOG_MAX_SIZE`、`DOCKER_LOG_MAX_FILE` 覆盖。该开发栈使用本地 Loki volume，硬性磁盘上限需由部署环境的文件系统/卷配额设置；存储耗尽可能导致写入被拒，应由部署监控磁盘用量和 Loki 写入错误，`/ready` 只表示 Loki 服务就绪，不能作为磁盘容量告警。Compose 不使用 Loki 容器内的 wget/curl 做 healthcheck，避免依赖基础镜像工具；Compose smoke 从宿主机检查 `/ready`，Collector、Loki 和 Alloy 的开发端口都绑定在 loopback。
 
 `make observability-check` 校验观测配置和看板文件；在安装 Docker 或 `promtool` 的环境中还会执行对应的语法检查。`make observability-smoke` 需要已启动 overlay，检查健康端点、系统看板、固定 recording rule 和 Gateway 指标 API 的可达性；它不会伪造管理员凭据，也不代表已经产生真实业务流量。容量基线记录模板见 `docs/observability/issue-205-pr6-implementation.md`。
 
@@ -258,7 +260,7 @@ make observability-down
 
 本栈端口仅绑定 loopback。OTLP gRPC/HTTP 与 Collector metrics endpoint 只在 Compose 网络内部开放。
 
-本地 Grafana 使用 loopback 和匿名 Viewer，不能直接复制到共享或生产环境。部署时应通过现有反向代理/SSO 与内部网络边界保护 Prometheus、Grafana、Collector、各业务 metrics 端口，并仅允许平台管理员使用系统看板；`OBSERVABILITY_GRAFANA_URL` 只用于 Gateway 生成固定系统看板链接。管理 API 通过 `OBSERVABILITY_PROMETHEUS_URL` 查询 Prometheus；该地址仅由服务端环境配置，浏览器不能覆盖查询语句或上游 URL。
+本地 Grafana 使用 loopback 和匿名 Viewer，不能直接复制到共享或生产环境。部署时应通过现有反向代理/SSO 与内部网络边界保护 Prometheus、Grafana、Loki、Collector、各业务 metrics 端口，并仅允许平台管理员使用系统看板；`OBSERVABILITY_GRAFANA_URL` 只用于 Gateway 生成固定系统看板链接。管理 API 通过 `OBSERVABILITY_PROMETHEUS_URL` 查询 Prometheus；该地址仅由服务端环境配置，浏览器不能覆盖查询语句或上游 URL。
 
 ### Agent LangSmith 脱敏导出
 
