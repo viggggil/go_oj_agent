@@ -232,36 +232,22 @@ PR1 未提供管理页面和聊天检索工具，分别由后续 PR2 / PR3 完�
 先部署新增 Contest CheckKnowledgeAccess RPC 和 Problem/Contest 的 Agent 调用白名单，再部署 Agent。现有容器不会因绑定挂载配置文件内容改变自动重启，更新 configs/problem.yaml、configs/contest.yaml 后执行 `docker compose -f deploy/compose/compose.yaml restart problem-service contest-service` 加载白名单。干净启动由 make infra-up 完成。Agent 地址为 AGENT_CONTEST_SERVICE_ENDPOINT=contest-service:9005；不授予 Agent 其他 Contest RPC，不向公网增加授权入口。旧业务服务未升级时检索失败关闭，不能以普通管理搜索绕过。
 
 管理员启用题解文档并在 Agent 表单绑定“题解”组后，可以正常聊天，由模型按需检索；RAG 页支持按 Run 查询来源版本。未关联题号的资料按分组授权使用，题解应填写真实题号，以便执行比赛与题目检查。现有 Agent/Contest 数据库迁移须按原说明先应用，PR3 没有新表/列。
-# 本地 Observability（阶段一）
+# 本地 Observability
 
-可选启动本地 OpenTelemetry Collector、Tempo、Prometheus 与 Grafana：
+可选观测栈由 OpenTelemetry Collector、Tempo、Prometheus、Grafana、Loki 和 Alloy 组成；默认业务 Compose 不启动这些组件。开发命令如下：
 
 ```bash
 make observability-up
 make observability-check
 make observability-smoke
-```
-
-Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`，Loki 位于 `http://127.0.0.1:3100`。默认业务 Compose 不加载该栈。Overlay 为 Go/Agent 服务设置 OTLP endpoint，并让 Prometheus 抓取 Collector Metrics exporter（9464）、Collector 自身 Metrics（8888）和 Contest `contest-service:9105/metrics`；8888 只在 Compose 网络内部开放。Grafana 自动加载系统/判题、Contest、Agent 和 Collector 看板，Prometheus 启用固定 recording/alert rules；当前告警只在 Prometheus 中评估，不接入 Alertmanager 或外发通知。平台管理员可在 Gateway“监控 → 总览”查看固定指标、服务探测和 Prometheus 活跃告警；`agent_admin` 只能获取 Agent 固定序列、Agent/RAG 服务状态和 Agent 模型错误告警，不接收系统指标或 Grafana 链接。首页告警入口跳转现有 Agent/Judge 诊断页面，具体 Trace 通过 Run 或 submission 的受控详情查询。没有 overlay 时 Prometheus 不运行，Collector 使用 no-op/无导出行为，Contest `/metrics` 仍可供内部运维直接抓取。
-
-启用 overlay 后，Grafana Alloy 从 Docker API 收集 Gateway、Judge Service、Judge Worker、Contest 和 Agent 容器 stdout/stderr，并把固定的 `service_name`、`environment` 作为 Loki labels。Agent 通过 Docker socket 读取容器日志，因此此配置仅用于受控开发机；共享/生产部署应使用受保护的主机采集器或经审查的日志代理权限，不能把 Docker socket 暴露给不可信容器。采集器解析 JSON 的 `level` 字段作为低基数 label；业务 ID 和 Trace ID 不作为 Loki labels，完整关联字段由后续日志字段 PR 统一。Loki 默认保留 7 天，Compactor 每 10 分钟执行清理；删除是异步的，保留期不是精确到秒的磁盘配额。Docker `json-file` 日志默认轮转为每容器 10 MiB × 3 文件，可用 `LOKI_RETENTION_PERIOD`、`DOCKER_LOG_MAX_SIZE`、`DOCKER_LOG_MAX_FILE` 覆盖。该开发栈使用本地 Loki volume，硬性磁盘上限需由部署环境的文件系统/卷配额设置；存储耗尽可能导致写入被拒，应由部署监控磁盘用量和 Loki 写入错误，`/ready` 只表示 Loki 服务就绪，不能作为磁盘容量告警。Compose 不使用 Loki 容器内的 wget/curl 做 healthcheck，避免依赖基础镜像工具；Compose smoke 从宿主机检查 `/ready`，Collector、Loki 和 Alloy 的开发端口都绑定在 loopback。
-
-`make observability-check` 校验观测配置和看板文件；在安装 Docker 或 `promtool` 的环境中还会执行对应的语法检查。`make observability-smoke` 需要已启动 overlay，检查健康端点、系统看板、固定 recording rule 和 Gateway 指标 API 的可达性；它不会伪造管理员凭据，也不代表已经产生真实业务流量。容量基线记录模板见 `docs/observability/issue-205-pr6-implementation.md`。
-
-首页排查流程：`no_data` 表示查询成功但所选时间窗没有样本；服务 `not_configured` 表示没有独立 probe；Metrics `stale` 表示抓取目标异常或样本过期；Alerts `unavailable` 表示 Prometheus 告警查询失败；Alerts `not_configured` 表示 Gateway 未配置 Prometheus URL。先检查 Prometheus `/targets`、`/api/v1/alerts`，再查看 `docker compose logs gateway-service otel-collector prometheus`。这些状态不能单独证明业务请求失败，应通过业务页面、稳定错误码和受控 Trace 入口核对。
-
-平台管理员的 Judge Trace 入口使用 Gateway 环境变量 `JUDGE_OBSERVABILITY_GRAFANA_URL` 生成固定 Explore 链接，不接受请求中的 URL。链接只表示可执行受控搜索，Tempo 未采样、Collector 故障或数据过期时页面会显示 Trace 不可用。
-
-测试 Agent Trace 时，可在 `.env` 设置 `AGENT_RUNTIME_MODE=langgraph_fake`，再调用现有 Gateway Chat API。Trace/Metric 不记录请求响应正文；Agent 的 LangSmith tracing 仍保持关闭。Collector/Tempo/Prometheus/Grafana 本地卷会保留数据，使用 `make observability-down` 停止栈，不会删除业务数据卷。
-
-```bash
+make loki-smoke
 make observability-down
 ```
 
-本栈端口仅绑定 loopback。OTLP gRPC/HTTP 与 Collector metrics endpoint 只在 Compose 网络内部开放。
+Grafana 位于 `http://127.0.0.1:3000`，Prometheus 位于 `http://127.0.0.1:9090`，Tempo 查询 API 位于 `http://127.0.0.1:3200`，Loki 位于 `http://127.0.0.1:3100`。观测端口绑定到 loopback；Grafana 使用匿名 Viewer。Prometheus 每 15 秒抓取 Collector 和 Contest 指标，默认保留 7 天；Loki 默认保留 7 天，Docker `json-file` 日志默认轮转为每容器 10 MiB × 3 文件。保留期不构成磁盘配额，实际数据使用本地命名卷。
 
-本地 Grafana 使用 loopback 和匿名 Viewer，不能直接复制到共享或生产环境。部署时应通过现有反向代理/SSO 与内部网络边界保护 Prometheus、Grafana、Loki、Collector、各业务 metrics 端口，并仅允许平台管理员使用系统看板；`OBSERVABILITY_GRAFANA_URL` 只用于 Gateway 生成固定系统看板链接。管理 API 通过 `OBSERVABILITY_PROMETHEUS_URL` 查询 Prometheus；该地址仅由服务端环境配置，浏览器不能覆盖查询语句或上游 URL。
+Web“监控”工作区是产品管理员的主要入口；Grafana 用于本地详细指标和 Trace 排障。Prometheus 告警规则在本地可见，未配置 Alertmanager 或外发通知。服务接入状态区分 HTTP readiness、TCP 可达、抓取状态和未配置探针；这些状态不能单独证明业务健康。完整数据流、当前 API、权限和采集限制见 [`docs/observability/design.md`](../../docs/observability/design.md)，指标字典见 [`docs/observability/metrics.md`](../../docs/observability/metrics.md)，日志配置与运维限制见 [`docs/observability/loki.md`](../../docs/observability/loki.md)。
 
-### Agent LangSmith 脱敏导出
+Compose 中的 Loki/Alloy、Prometheus、Grafana 和 Collector 配置仅适用于受控开发机。共享/生产环境须另行设置网络认证边界、Docker 主机日志采集权限和存储配额；只读挂载 Docker socket 并不限制 Docker API 的操作权限。
 
-Agent → LangSmith Cloud 导出默认关闭。需要启用时，在未提交的本地 `.env` 或部署 Secret 中设置 `AGENT_LANGSMITH_EXPORT_ENABLED=true` 和 `LANGSMITH_API_KEY`，再重建 Agent 容器。适配器只发送 Run UUID、OTel Trace ID、受控模型/工具别名、状态、耗时和 Token 元数据；inputs/outputs 留空。不会开启 LangGraph 自动内容追踪。停用时将开关设为 `false` 并重建 Agent。
+Agent → LangSmith Cloud 元数据导出默认关闭，需显式设置 `AGENT_LANGSMITH_EXPORT_ENABLED=true` 并通过部署 Secret 提供 `LANGSMITH_API_KEY`。适配器只发送安全 Run 投影、受控模型/工具状态和 Token 元数据，inputs/outputs 留空；不会开启 LangGraph 自动内容追踪。
