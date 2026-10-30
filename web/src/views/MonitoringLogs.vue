@@ -1,5 +1,5 @@
 <template>
-  <section class="monitoring-page logs-page">
+  <section class="monitoring-page logs-page" :class="{ embedded }">
     <header class="page-header">
       <div>
         <p class="eyebrow">Loki observability</p>
@@ -94,6 +94,13 @@
 </template>
 
 <script setup lang="ts">
+  const props = defineProps<{
+    traceId?: string
+    embedded?: boolean
+    start?: string
+    end?: string
+  }>()
+  const embedded = props.embedded || false
   import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
   import { useRoute } from 'vue-router'
   import { useAuthStore } from '../stores/auth'
@@ -120,7 +127,8 @@
     service: '',
     level: '',
     error_code: '',
-    trace_id: typeof route.query.trace_id === 'string' ? route.query.trace_id : '',
+    trace_id:
+      props.traceId || (typeof route.query.trace_id === 'string' ? route.query.trace_id : ''),
   })
   const range = ref('15m')
   const result = ref<ObservabilityLogs>()
@@ -131,8 +139,8 @@
     const end = new Date()
     const minutes = range.value === '24h' ? 1440 : range.value === '1h' ? 60 : 15
     return {
-      start: new Date(end.getTime() - minutes * 60_000).toISOString(),
-      end: end.toISOString(),
+      start: props.start || new Date(end.getTime() - minutes * 60_000).toISOString(),
+      end: props.end || end.toISOString(),
     }
   }
   function format(value: string) {

@@ -271,6 +271,43 @@ export type ObservabilityLogs = {
   }[]
 }
 
+export type TraceSpan = {
+  span_id: string
+  parent_span_id?: string
+  service_name: string
+  name: string
+  kind: string
+  started_at: string
+  duration_ms: number
+  status: string
+  attributes: Record<string, string | number | boolean>
+  events: {
+    name: string
+    timestamp: string
+    attributes: Record<string, string | number | boolean>
+  }[]
+  links: { trace_id: string; span_id: string }[]
+}
+export type TraceDetail = {
+  trace_id: string
+  scope: 'system' | 'agent'
+  state: 'available' | 'no_data' | 'not_configured' | 'unavailable'
+  error_code?: string
+  spans: TraceSpan[]
+}
+export type TraceSummary = {
+  trace_id: string
+  service_name: string
+  name: string
+  started_at: string
+  duration_ms: number
+}
+export type TraceSearch = {
+  state: 'available' | 'no_data' | 'not_configured' | 'unavailable'
+  error_code?: string
+  traces: TraceSummary[]
+  limit: number
+}
 export const observabilityApi = {
   metrics: (window: MetricsWindow, signal?: AbortSignal) =>
     api.get<MetricsOverview>('/api/v1/admin/observability/metrics', { params: { window }, signal }),
@@ -278,6 +315,14 @@ export const observabilityApi = {
     api.get<ObservabilityServices>('/api/v1/admin/observability/services', { signal }),
   alerts: (signal?: AbortSignal) =>
     api.get<ObservabilityAlerts>('/api/v1/admin/observability/alerts', { signal }),
+  trace: (traceId: string, signal?: AbortSignal) =>
+    api.get<TraceDetail>(`/api/v1/admin/observability/traces/${encodeURIComponent(traceId)}`, {
+      signal,
+    }),
+  judgeTraces: (
+    params: { window?: MetricsWindow; submission_id?: number } = {},
+    signal?: AbortSignal,
+  ) => api.get<TraceSearch>('/api/v1/admin/observability/judge/traces', { params, signal }),
   logs: (
     params: {
       service?: string

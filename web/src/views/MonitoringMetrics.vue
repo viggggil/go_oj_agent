@@ -18,14 +18,6 @@
         <button class="button secondary" type="button" :disabled="loading" @click="load">
           {{ loading ? '查询中…' : '刷新' }}
         </button>
-        <a
-          v-if="overview?.grafana_url"
-          class="button secondary"
-          :href="overview.grafana_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          >打开 Grafana</a
-        >
       </div>
     </header>
 

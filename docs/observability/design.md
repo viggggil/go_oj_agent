@@ -38,7 +38,7 @@ Prometheus 告警规则当前包括抓取目标异常、持续判题积压、Con
 
 Go 与 Python 服务通过 W3C Trace Context 传播 Trace。Gateway 对公网请求建立自己的根上下文，不接受客户端传入的 `traceparent` 作为可信根。同步链路覆盖 Gateway → Judge → Problem；Judge Outbox 将 Trace Context 持久化到事件并通过 RabbitMQ 传播，Worker、Judge 结果处理、Contest 投影和 Contest Cache Outbox 继续创建关联 Span。Agent Chat Trace 覆盖 Run、模型 attempt、Tool、RAG 和业务 gRPC；Memory、Eval/Review 与 RAG ingestion 后台任务各自建立任务 Trace。
 
-Trace 发往 Tempo，Grafana 提供 Tempo Explore。Judge 管理员入口基于受控的 submission 属性生成固定查询链接；链接可用不表示一定存在采样数据。Agent Run 诊断详情会显示可用的 Tempo 链接。Trace 与业务存储的保留、采样和可用性相互独立。
+Trace 发往 Tempo。Gateway 使用服务端固定查询和字段白名单返回 Trace 摘要、Span 树及关联日志，监控总览不依赖 Grafana 跳转。Trace 是否存在仍取决于采样、导出和 Tempo 保留期；Trace 与业务存储的保留、采样和可用性相互独立。
 
 ### 日志
 
@@ -52,7 +52,7 @@ Agent 可按部署配置将安全投影后的 Run/模型/Tool/RAG 元数据异�
 
 ## 管理界面与查询接口
 
-Vue 顶栏的“监控”工作区包含系统总览、固定 Metrics、Agent 运行诊断、Judge 链路和日志中心。Grafana 保留为本地开发/运维工具，不作为正式业务总览界面。页面状态区分有数据、无数据、未配置、部分接入、过期和上游不可用，不把空数据当成健康或零值。
+Vue 顶栏的“监控”工作区只进入总览页面；固定 Metrics、Agent/判题 Trace、Span 详情和日志筛选都在总览或站内详情页完成。Grafana 保留为本地开发/运维工具，不作为正式业务总览界面。页面状态区分有数据、无数据、未配置、部分接入、过期和上游不可用，不把空数据当成健康或零值。
 
 | 接口 | 数据来源与用途 | 访问范围 |
 | --- | --- | --- |

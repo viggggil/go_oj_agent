@@ -240,7 +240,6 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(page.getByRole('heading', { name: '监控总览', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '全局健康' })).toBeVisible()
   await expect(page.getByText('1.2 请求/秒')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '流量与性能趋势' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '服务健康列表' })).toBeVisible()
   await expect(page.getByText('固定探测结果；TCP 可达不代表依赖就绪')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Prometheus 活跃告警' })).toBeVisible()
@@ -254,21 +253,13 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(
     page.locator('.monitoring-module-links').getByRole('link', { name: '判题链路 →' }),
   ).toBeVisible()
-  await expect(page.getByRole('link', { name: '外部排障工具' })).toHaveAttribute(
-    'href',
-    /oj-system-overview/,
-  )
-  await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
-  await page.getByRole('link', { name: '判题链路', exact: true }).click()
-  await expect(page).toHaveURL(/\/monitoring\/judge$/)
-  await expect(page.getByRole('heading', { name: '判题链路' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'RabbitMQ' })).toBeVisible()
-  await expect(page.getByText('指标接入中').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Agent 运行 Trace' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Agent 运行诊断 →', exact: true })).toBeVisible()
 
   await page.goto('/agent/observability?run_id=abc')
-  await expect(page).toHaveURL(/\/monitoring\/agent\?run_id=abc$/)
-  await expect(page.getByRole('heading', { name: 'Agent 运行诊断' })).toBeVisible()
-  await expect(page.getByText('abc', { exact: false }).first()).toBeVisible()
+  await expect(page).toHaveURL(/\/monitoring\?run_id=abc$/)
+  await expect(page.getByRole('heading', { name: '监控总览' })).toBeVisible()
 })
 
 test('告警接口失败时展示查询不可用而不是未配置', async ({ page }) => {
@@ -294,32 +285,29 @@ test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', asyn
   await expect(page).toHaveURL(/\/problems$/)
 })
 
-test('system_admin 可进入判题链路监控', async ({ page }) => {
+test('system_admin 访问旧判题路径回到总览', async ({ page }) => {
   await loginAs(page, ['system_admin'])
   await page.goto('/monitoring/judge')
-  await expect(page.getByRole('heading', { name: '判题链路' })).toBeVisible()
+  await expect(page).toHaveURL(/\/monitoring$/)
+  await expect(page.getByRole('heading', { name: '监控总览' })).toBeVisible()
 })
 
 test('指标页区分无样本与零值，并按 Agent 管理员范围显示指标', async ({ page }) => {
   await loginAs(page, ['system_admin'])
   await page.goto('/monitoring/metrics')
-  await expect(page.getByRole('heading', { name: '指标总览' })).toBeVisible()
+  await expect(page).toHaveURL(/\/monitoring$/)
+  await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
   await expect(page.getByText('指标源可用')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toBeVisible()
-  await expect(page.getByText('暂无样本；可能没有流量或该指标暂未导出。').first()).toBeVisible()
-  await expect(page.getByRole('link', { name: '打开 Grafana' })).toHaveAttribute(
-    'href',
-    /oj-system-overview/,
-  )
+  await expect(page.getByText('当前时间范围没有样本，不能推断为零。').first()).toBeVisible()
   await expect(page.getByText('Contest 独立指标端点')).toBeVisible()
 
   await loginAs(page, ['agent_admin'])
   await page.goto('/monitoring/metrics')
   await expect(page.getByText('仅展示 Agent Run、模型和后台任务的固定摘要')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Agent 在途 Run' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toHaveCount(0)
   await expect(page.getByText('Contest 独立指标端点')).toHaveCount(0)
-  await expect(page.getByRole('link', { name: '打开 Grafana' })).toHaveCount(0)
 })
 
 test('普通用户不能打开监控指标页', async ({ page }) => {

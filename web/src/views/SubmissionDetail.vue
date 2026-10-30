@@ -12,15 +12,12 @@
         <button v-if="isAdmin" class="danger" :disabled="rejudging" @click="rejudge">
           {{ rejudging ? '重判中…' : '管理员重判' }}
         </button>
-        <a
+        <RouterLink
           v-if="isAdmin && trace?.link_available"
           class="button secondary"
-          :href="trace.tempo_url"
-          target="_blank"
-          rel="noopener noreferrer"
+          :to="{ path: '/monitoring', query: { submission_id: String(id) } }"
+          >查看判题 Trace</RouterLink
         >
-          查看判题 Trace
-        </a>
         <RouterLink
           v-if="isAdmin && trace?.link_available"
           class="button secondary"

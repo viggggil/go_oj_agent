@@ -24,7 +24,7 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 ### Judge Trace 管理员排障接口
 
-`GET /api/v1/admin/observability/judge/submissions/{submission_id}` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `JUDGE_OBSERVABILITY_GRAFANA_URL` 返回 Tempo Explore 检索链接。请求不得提供 Grafana/Tempo URL 或任意 TraceQL；`agent_admin` 不具备该权限。响应中的 `SEARCHABLE` 表示检索链接可用，不代表 Trace 一定被采样或保留，`trace_available` 为 `false`。
+`GET /api/v1/admin/observability/judge/traces?window=15m|1h|24h&submission_id=<id>` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `OBSERVABILITY_TEMPO_URL` 查询固定判题服务范围的 Trace 摘要；请求不得提供 Tempo URL 或任意 TraceQL。`GET /api/v1/admin/observability/traces/{trace_id}` 返回单条 Trace 的 Span 树，使用服务端属性白名单和数量/响应大小限制。`agent_admin` 只能查询 Agent/RAG Trace。
 
 ### 固定 Metrics 概览
 
@@ -36,14 +36,23 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/alerts` 查询 Prometheus 当前活动规则告警，只允许平台管理员查看系统告警，`agent_admin` 只能看到 `OJAgentModelErrorRateHigh`。Gateway 仅返回固定告警名、级别、状态、开始时间、受控服务名、稳定错误码和 `trace_available`；不返回 annotation、原始错误、PromQL、Prometheus 地址或任意 TraceQL。Prometheus 未配置、查询失败和无告警分别由 `not_configured`、`unavailable` 和 `available` 加空数组表示。当前告警没有直接 Trace 链接，详情通过 Agent 诊断或 Judge 受控 Trace 接口进入。
 
+### 站内 Trace / Span 查询
+
+监控总览使用以下受控接口直接展示 Trace，不需要跳转 Grafana：
+
+- `GET /api/v1/admin/observability/judge/traces?window=15m|1h|24h&submission_id=<id>`：平台管理员查询固定判题服务范围的 Trace 摘要；提交编号会先由 Judge 校验。
+- `GET /api/v1/admin/observability/traces/{trace_id}`：管理员查询单条 Trace 的 Span 树。返回服务端白名单字段、受控属性、事件和链接，`agent_admin` 只能看到 Agent/RAG 服务。
+
+Tempo 未配置、查询失败、无采样数据分别返回 `not_configured`、`unavailable`、`no_data` 状态；接口限制超时、响应大小和 Span 数量，不接受任意 TraceQL、Tempo URL 或查询参数。日志仍通过下方 Loki 接口按同一 Trace ID 独立查询。
+
 ### Loki 受控日志查询
 
 `GET /api/v1/admin/observability/logs` 由 Gateway 使用服务端 `OBSERVABILITY_LOKI_URL` 和固定 LogQL 模板查询 Loki。允许参数为 `service`、`level=DEBUG|INFO|WARN|ERROR`、`error_code`、32 位小写十六进制 `trace_id`、RFC3339 `start`/`end` 和 `limit=1..200`。默认时间窗为最近 15 分钟，最大范围 24 小时。接口不接受任意 LogQL、Loki URL、label selector 或其他参数。平台管理员可查固定系统服务；`agent_admin` 的服务范围只包括 Agent/Agent RAG。普通用户拒绝访问。
 
 响应仅投影 `timestamp`、`level`、`service_name`、`message`、`error_code`、`trace_id`、`span_id` 和允许的 `run_id`/`submission_id`，不返回 Loki stream labels 或内部地址。状态为 `available`、`no_data`、`not_configured`、`unavailable`。响应不缓存，Loki 请求 2.5 秒超时，最大读取 1 MiB。`GET /api/v1/admin/observability/logs/link?trace_id=...` 是 Trace 详情页可使用的受控入口，仍经同一权限、服务范围和时间窗约束；前端应直接使用返回日志数据，不构造 Loki/Grafana URL。
 
-- `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及服务端固定 Grafana 看板链接。
-- `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列和 Collector 抓取状态；响应不含系统指标或 Grafana 链接。
+- `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及 Trace/Span 详情。
+- `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列、Collector 抓取状态和 Agent Trace；响应不含系统指标或判题 Trace。
 - 普通用户、无效 token 和缺少角色分别由 Gateway 认证与授权拒绝。
 - `state` 为 `available`、`no_data`、`stale`、`unavailable` 或 `not_configured`。`no_data` 表示采集目标可访问但所选时间窗内没有指标样本；单条 `series.state=no_data` 保持空点数组，不合成为零。
 - Prometheus 未配置或暂不可用时返回受控状态与可选稳定 `error_code`，不转发上游错误正文。查询字段 `generated_at`、`targets[].last_scrape_at` 与 `series[].points[].timestamp` 使用 UTC。
