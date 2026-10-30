@@ -16,6 +16,9 @@ class FakeDatabase:
         self.checks += 1
         return self.status
 
+    async def close(self) -> None:
+        return None
+
 
 class FakeClients:
     def __init__(self, status: Literal["ready", "unavailable"] = "ready") -> None:
