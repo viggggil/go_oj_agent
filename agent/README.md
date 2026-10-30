@@ -78,7 +78,7 @@ make agent-check       # Agent 格式、静态检查和类型检查
 
 Compose 部署说明、端口、环境变量和模型凭据配置见 [`deploy/compose/README.md`](../deploy/compose/README.md)。Agent 环境变量示例见 [`.env.example`](.env.example)。服务提供 `/healthz` 存活探针和 `/readyz` 数据库就绪探针。
 
-Agent Metrics 通过 OpenTelemetry OTLP 发往可选 Collector；设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 后由 Prometheus 抓取 Collector。当前包含 Run 终态与耗时、模型 attempt/retry、Tool 与知识检索调用，以及 Memory、Eval/Review、RAG ingestion 后台任务结果、耗时和在途数量。指标只使用受控 purpose/model/tool/status/outcome 标签；Prompt、对话、Run/用户/会话 ID、工具参数和结果、RAG 文本及原始异常不会成为指标属性。未配置 Collector 或指标记录失败时，Agent 业务处理继续运行。详细名称与计数口径见 [`Metrics 字典`](../docs/observability/metrics.md)。
+Agent Metrics 通过 OpenTelemetry OTLP 发往可选 Collector；设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 后由 Prometheus 抓取 Collector。当前包含 Run 终态与耗时、模型 attempt/retry、Tool 与知识检索调用，以及 Memory、Eval/Review、RAG ingestion 后台任务结果、耗时和在途数量。指标只使用受控 purpose/model/tool/status/outcome 标签；Prompt、对话、Run/用户/会话 ID、工具参数和结果、RAG 文本及原始异常不会成为指标属性。未配置 Collector 或指标记录失败时，Agent 业务处理继续运行。Agent Chat、后台任务和安全 LangSmith 导出的当前边界见 [`Observability 系统设计`](../docs/observability/design.md)，详细指标名称与计数口径见 [`Metrics 字典`](../docs/observability/metrics.md)。
 
 ## 设计文档
 

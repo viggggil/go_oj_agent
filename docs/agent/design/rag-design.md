@@ -38,4 +38,4 @@ Run 创建时固定分组和已发布版本列表。管理员可以查看 RAG �
 
 ## 运维边界
 
-RAG Worker、Embedding 服务和 Qdrant 都有健康检查。Embedding 不依赖回答 Provider，模型调用失败不会改变索引状态；Qdrant 不可用时检索失败关闭并返回稳定依赖错误。索引和检索都使用有界并发、超时和结果大小限制。
+RAG Worker 独立提供 `/healthz` 和 `/readyz`；就绪检查验证 Agent 数据库、Embedding、Qdrant 和 Agent MinIO bucket，失败只返回稳定的依赖状态，不返回连接信息或上游错误正文。Embedding 服务和 Qdrant 也有自己的健康检查。Embedding 不依赖回答 Provider，模型调用失败不会改变索引状态；Qdrant 不可用时检索失败关闭并返回稳定依赖错误。索引和检索都使用有界并发、超时和结果大小限制。

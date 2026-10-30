@@ -872,20 +872,23 @@ flowchart LR
     MQ --> Worker["Worker"]
 
     Gateway -. "同步 gRPC 已接入" .-> OTel["OpenTelemetry"]
-    Agent -. "阶段一已接入" .-> OTel
+    Agent -. "Trace / Metrics 已接入" .-> OTel
     Judge -. "同步调用已接入" .-> OTel
     Problem -. "同步调用已接入" .-> OTel
     Worker -. "异步 Trace 已接入" .-> OTel
 
     OTel --> Metrics["Prometheus"]
-    OTel --> Traces["Jaeger / Tempo"]
+    OTel --> Traces["Tempo"]
     Metrics --> Grafana["Grafana"]
 ```
 
-RabbitMQ Header 中传播 Trace Context。
+RabbitMQ Header、事件 Envelope 与 Outbox 持久化字段携带 W3C Trace Context。判题追踪覆盖 Gateway → Judge → Problem 同步调用，以及 Judge Outbox → RabbitMQ → Worker → Judge Result → Contest Projection/Cache Outbox 的异步链路。Agent Trace 覆盖 Chat Run、模型 attempt、Tool、RAG、业务 gRPC 和 Memory/Eval/Review/RAG ingestion 后台任务。Agent 可选择将安全元数据投递到 LangSmith；云端导出默认关闭。
 
-可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不启动观测组件。Gateway、Judge、Problem、Contest、Judge Worker 与 Agent 可将 Trace/Metric 发往 Collector，Trace 存入 Tempo，Collector 暴露 Prometheus 指标，Grafana 预置 Prometheus 与 Tempo 数据源。同步判题链路已接通 Gateway gRPC → Judge gRPC → Problem gRPC，并在 Judge 提交、重判入口创建业务 Span。Issue #200 PR2 已将 Judge Outbox 的 W3C 上下文持久化，并接通 Relay → RabbitMQ → Worker → Judge Result 的异步父子 Trace；Issue #200 PR3 接通 Judge Result 事务 → `submission.judged` → Contest Projection → Contest Cache Outbox/Relay。Issue #200 PR4 提供固定 Grafana 地址的管理员排障入口。Issue #205 PR1 已统一 Go/Agent Metrics 的低基数属性策略和遥测健康计数；PR2 接入 HTTP/gRPC 自动请求指标及 Judge/Outbox/Worker/Result 指标；PR3 对齐 Contest 投影、排行榜缓存与 Outbox Metrics，并将 Contest 独立端口纳入 Prometheus 抓取；PR4 补齐 Agent Run、模型 attempt/retry、Tool/RAG 操作及 Memory/Eval/Review/RAG ingestion 后台任务指标；PR5 加入 Collector 自身 scrape、Prometheus recording/alert rules、Grafana 系统/判题/Contest/Agent/Collector 看板，以及 Gateway 角色隔离的固定指标查询 API。旧消息、无 Header 消息和历史 NULL 上下文仍可正常处理。未设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 时使用 no-op provider。Collector/Tempo 不作为服务启动依赖；此阶段不启用 LangSmith 上传。
-PR4 为平台管理员提供 Gateway 受控 Judge Trace 检索入口。Gateway 不访问 Judge 数据库，先调用 Judge `GetSubmission` 做授权，再使用固定 `JUDGE_OBSERVABILITY_GRAFANA_URL` 构造按 `submission.id` 检索的 Tempo Explore 链接。普通用户和 `agent_admin` 不可见；Trace 缺失、未采样或保留期结束时显示不可用，不改变判题业务状态。Issue #212 PR1 将监控首页改为 Web 内部的固定 Metrics 总览，Grafana 降级为可选排障入口；PR2 增加 API 延迟分位数、Agent Run 成功率/TTFT 和固定服务接入状态查询。首页明确显示 no-data、stale、未配置和未接入服务，不把指标样本当作业务健康探测。PR3 增加受控 Prometheus 活跃告警摘要；Gateway 只返回固定告警字段和稳定错误码，平台管理员与 `agent_admin` 按范围隔离。告警不携带可验证 Trace 时，首页跳转现有 Agent/Judge 诊断入口；Loki、Alertmanager 外发通知和完整异常时间线另行建设。
+可选本地观测栈通过 `make observability-up` 启动，默认 `make infra-up` 不依赖监控组件。OpenTelemetry Collector 接收 Go/Agent 的 Trace 和 Metrics，向 Tempo 导出 Trace、并暴露 Prometheus Metrics exporter；Contest 另提供独立 `/metrics`。日志由 Alloy 从 Docker API 收集 Gateway、Judge、Judge Worker、Contest 和 Agent 的 JSON stdout/stderr 并写入 Loki。Loki、Tempo、Prometheus、Alloy 和 Collector 使用独立存储卷；指标与日志默认保留 7 天，Tempo 按本地存储配置运行。
+
+Gateway 的固定查询 API 为 Vue“监控”工作区提供指标、服务接入状态、活动告警摘要、日志查询和 Judge Trace 搜索链接；Agent 管理 API 提供 Run 安全摘要与详情。`admin`/`system_admin` 可查看系统范围，`agent_admin` 只可查看 Agent 范围。空数据、未配置、过期和查询故障保持独立状态。Grafana 是本地开发与详细排障工具，不作为产品正式监控页面。Prometheus 当前没有 Alertmanager 外发通知，基础设施 exporter、日志实时 tail、完整日志分页和硬磁盘配额尚未配置。开发环境的端口绑定 loopback，Grafana 使用匿名 Viewer，Alloy 读取 Docker socket；该配置不能直接作为共享或生产环境安全边界。
+
+详细数据流、查询范围和当前限制见 [Observability 系统设计](observability/design.md)、[Metrics 指标字典](observability/metrics.md) 与 [Loki 日志说明](observability/loki.md)。
 
 关键 Metrics：
 

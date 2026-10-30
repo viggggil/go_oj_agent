@@ -40,6 +40,16 @@ func TestMetricsWindowAndTrustedURLs(t *testing.T) {
 }
 
 func TestObservabilityServicesEndpointRoleScopeAndNoURLInput(t *testing.T) {
+	ready := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/readyz" {
+			t.Errorf("probe path = %q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ready.Close()
+	t.Setenv("OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT", ready.URL)
+	t.Setenv("OBSERVABILITY_PROBE_RAG_WORKER_ENDPOINT", ready.URL)
+
 	auth, err := gatewaymw.NewAuthMiddleware(testConfig())
 	if err != nil {
 		t.Fatal(err)
@@ -67,8 +77,8 @@ func TestObservabilityServicesEndpointRoleScopeAndNoURLInput(t *testing.T) {
 		t.Fatalf("system response=%+v", systemResponse)
 	}
 	for _, item := range systemResponse.Services {
-		if item.Name == "rag-worker" && item.State != "not_configured" {
-			t.Fatalf("service without a probe reported as configured: %+v", item)
+		if (item.Name == "judge-worker" || item.Name == "rag-worker") && item.State != "up" {
+			t.Fatalf("worker health probe did not report up: %+v", item)
 		}
 		if item.State == "up" && item.Name != "gateway" && (item.LatencyMS == nil || item.LastCheckedAt == nil) {
 			t.Fatalf("probed service is missing observation metadata: %+v", item)
@@ -148,10 +158,10 @@ func TestMetricsOverviewRoleScopeAndFixedQueries(t *testing.T) {
 			rangeQueries = append(rangeQueries, query)
 			mu.Unlock()
 			var body string
-			if strings.Contains(query, "agent_model_attempt_total") {
+			if !strings.Contains(query, "oj_judge_submission_total") {
 				body = `{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"series":"agent_run_in_flight"},"values":[[1793088000,"3"]]},{"metric":{"series":"agent_model_failure_rate","service_name":"f04a8e2b-9a04-4f01-9a6d-c32db22741af"},"values":[[1793088000,"0.25"]]}]}}`
 			} else {
-				body = `{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"series":"request_rate","service_name":"gateway-service"},"values":[[1793088000,"2.5"]]},{"metric":{"series":"judge_queue_p95","user_id":"private-user-id"},"values":[[1793088000,"0.2"]]},{"metric":{"series":"request_error_rate","service_name":"private-user-id"},"values":[[1793088000,"0.1"]]}]}}`
+				body = `{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"series":"request_rate","service_name":"gateway-service"},"values":[[1793088000,"2.5"]]},{"metric":{"series":"judge_queue_p95","user_id":"private-user-id"},"values":[[1793088000,"0.2"]]},{"metric":{"series":"request_error_rate","service_name":"private-user-id"},"values":[[1793088000,"0.1"]]},{"metric":{"series":"agent_run_success_ratio"},"values":[[1793088000,"1"]]},{"metric":{"series":"agent_run_ttft_p95"},"values":[[1793088000,"0.3"]]},{"metric":{"series":"agent_model_failure_rate"},"values":[[1793088000,"0"]]}]}}`
 			}
 			_, _ = w.Write([]byte(body))
 		case "/api/v1/query":
@@ -209,6 +219,15 @@ func TestMetricsOverviewRoleScopeAndFixedQueries(t *testing.T) {
 	if strings.Contains(system.Body.String(), "private-user-id") || strings.Contains(system.Body.String(), "f04a8e2b") {
 		t.Fatalf("uncontrolled Prometheus labels leaked: %s", system.Body.String())
 	}
+	systemSeries := make(map[string]metricSeries, len(systemResult.Series))
+	for _, series := range systemResult.Series {
+		systemSeries[series.Key] = series
+	}
+	for _, key := range []string{"agent_run_success_ratio", "agent_run_ttft_p95", "agent_model_failure_rate"} {
+		if series := systemSeries[key]; series.State != "available" || len(series.Points) == 0 {
+			t.Fatalf("system scope Agent series %q = %+v, want available sample", key, series)
+		}
+	}
 
 	agent := get([]string{"agent_admin"}, "?window=1h")
 	if agent.Code != http.StatusOK {
@@ -244,7 +263,7 @@ func TestMetricsOverviewRoleScopeAndFixedQueries(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(rangeQueries) != 2 || !strings.Contains(rangeQueries[0], "oj_judge_submission_total") || strings.Contains(rangeQueries[0], "query=up") || !strings.Contains(rangeQueries[1], "agent_model_attempt_total") {
+	if len(rangeQueries) != 2 || !strings.Contains(rangeQueries[0], "oj_judge_submission_total") || !strings.Contains(rangeQueries[0], "agent_run_success_ratio") || !strings.Contains(rangeQueries[0], "agent_run_ttft_p95") || !strings.Contains(rangeQueries[0], "agent_model_attempt_total") || strings.Contains(rangeQueries[0], "query=up") || !strings.Contains(rangeQueries[1], "agent_model_attempt_total") {
 		t.Fatalf("Prometheus fixed range queries = %#v", rangeQueries)
 	}
 	if len(targetQueries) != 2 || !strings.Contains(targetQueries[0], "contest-service") || strings.Contains(targetQueries[1], "contest-service") {

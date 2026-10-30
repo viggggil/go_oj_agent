@@ -22,11 +22,11 @@ Go Services / Agent Tools
 
 Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。Gateway 当前已接入认证、用户、Problem、Submission/Judge 和 Contest API。
 
-### Judge Trace 管理员排障接口（Issue #200 PR4）
+### Judge Trace 管理员排障接口
 
 `GET /api/v1/admin/observability/judge/submissions/{submission_id}` 仅允许 `admin`、`system_admin`。Gateway 先通过 Judge Service `GetSubmission` 做资源授权检查，再根据服务端固定配置 `JUDGE_OBSERVABILITY_GRAFANA_URL` 返回 Tempo Explore 检索链接。请求不得提供 Grafana/Tempo URL 或任意 TraceQL；`agent_admin` 不具备该权限。响应中的 `SEARCHABLE` 表示检索链接可用，不代表 Trace 一定被采样或保留，`trace_available` 为 `false`。
 
-### 固定 Metrics 概览（Issue #205 PR5）
+### 固定 Metrics 概览
 
 `GET /api/v1/admin/observability/metrics?window=15m|1h|24h` 只接受固定时间窗，不接受 PromQL、Prometheus URL 或任意 Grafana URL。Gateway 查询服务端登记的 PromQL 模板，限制每序列最多 300 个点和每次响应 1 MiB，并只返回受控序列、单位、时间戳与采集目标状态。
 
@@ -36,7 +36,7 @@ Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gat
 
 `GET /api/v1/admin/observability/alerts` 查询 Prometheus 当前活动规则告警，只允许平台管理员查看系统告警，`agent_admin` 只能看到 `OJAgentModelErrorRateHigh`。Gateway 仅返回固定告警名、级别、状态、开始时间、受控服务名、稳定错误码和 `trace_available`；不返回 annotation、原始错误、PromQL、Prometheus 地址或任意 TraceQL。Prometheus 未配置、查询失败和无告警分别由 `not_configured`、`unavailable` 和 `available` 加空数组表示。当前告警没有直接 Trace 链接，详情通过 Agent 诊断或 Judge 受控 Trace 接口进入。
 
-### Loki 受控日志查询（Issue #219 PR3）
+### Loki 受控日志查询
 
 `GET /api/v1/admin/observability/logs` 由 Gateway 使用服务端 `OBSERVABILITY_LOKI_URL` 和固定 LogQL 模板查询 Loki。允许参数为 `service`、`level=DEBUG|INFO|WARN|ERROR`、`error_code`、32 位小写十六进制 `trace_id`、RFC3339 `start`/`end` 和 `limit=1..200`。默认时间窗为最近 15 分钟，最大范围 24 小时。接口不接受任意 LogQL、Loki URL、label selector 或其他参数。平台管理员可查固定系统服务；`agent_admin` 的服务范围只包括 Agent/Agent RAG。普通用户拒绝访问。
 

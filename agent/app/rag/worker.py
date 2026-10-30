@@ -6,11 +6,14 @@ import hashlib
 import logging
 from typing import Any
 
+import uvicorn
+
 from app.core.database import DatabaseProbe
 from app.core.settings import load_settings
 from app.models.configuration import ConfigError
 from app.observability import configure, job_metrics, job_span, job_status
 from app.rag.clients import RagClients
+from app.rag.health import create_health_app
 from app.rag.models import REVISION, SPLITTER
 from app.rag.store import KnowledgeStore
 
@@ -87,8 +90,22 @@ async def main() -> None:
     database = DatabaseProbe(settings)
     assert database.engine is not None
     store, clients = KnowledgeStore(database.engine), RagClients(settings)
+    health_server = uvicorn.Server(
+        uvicorn.Config(
+            create_health_app(database, clients),
+            host=settings.host,
+            port=settings.port,
+            log_config=None,
+            access_log=False,
+            timeout_graceful_shutdown=settings.shutdown_timeout_seconds,
+        )
+    )
+    health_task = asyncio.create_task(health_server.serve())
     try:
         while True:
+            if health_task.done():
+                health_task.result()
+                break
             try:
                 worked = await process_one(store, clients)
             except Exception as exc:
@@ -99,6 +116,9 @@ async def main() -> None:
             if not worked:
                 await asyncio.sleep(2)
     finally:
+        health_server.should_exit = True
+        with contextlib.suppress(asyncio.CancelledError):
+            await health_task
         try:
             await clients.close()
             await database.close()
