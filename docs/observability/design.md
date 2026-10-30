@@ -77,7 +77,7 @@ Vue 顶栏的“监控”工作区包含系统总览、固定 Metrics、Agent �
 ## 当前限制
 
 - Alertmanager、通知渠道和基础设施 exporters 尚未配置。
-- 服务探测不是全覆盖健康探测；部分服务仅检查 TCP，RAG Worker 没有独立探针。
+- 服务探测不是全覆盖健康探测：User、Problem、Judge、Contest 仍检查固定 TCP 端口；Judge Worker 和 RAG Worker 使用各自的 `/readyz`，分别反映执行器/消息消费者以及数据库、Embedding、Qdrant、MinIO 的就绪状态。
 - 日志查询最多覆盖 24 小时、返回最多 200 条，没有游标分页或实时 tail；Problem Service 与 RAG Worker 尚未被 Alloy 收集。
 - Judge 入口用 submission 属性搜索 Tempo，不返回预先解析的 Trace ID；链接可用与 Trace 实际存在是不同状态。
 - 本地日志、指标、Trace 有各自保留窗口，且日志/Trace 查询不是业务记录的完整替代。

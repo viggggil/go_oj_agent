@@ -57,6 +57,17 @@ type Consumer struct {
 	mu                   sync.Mutex
 }
 
+// Ready reports whether the consumer has established a live AMQP connection
+// and channel. It intentionally exposes no broker details.
+func (c *Consumer) Ready() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.started && c.conn != nil && !c.conn.IsClosed() && c.channel != nil && !c.channel.IsClosed()
+}
+
 func (c *Consumer) Handle(ctx context.Context, d Delivery) {
 	if c == nil || d == nil {
 		return

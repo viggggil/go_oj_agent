@@ -3,7 +3,7 @@
 import asyncio
 import io
 import math
-from typing import Any
+from typing import Any, Literal
 from uuid import NAMESPACE_URL, uuid5
 
 import httpx
@@ -23,6 +23,7 @@ COLLECTION = "oj_knowledge_bge_small_zh_v1_5"
 class RagClients:
     def __init__(self, settings: Settings) -> None:
         self.http = httpx.AsyncClient(timeout=20, trust_env=False, follow_redirects=False)
+        self.readiness_timeout = settings.readiness_timeout_seconds
         self.embed_url = settings.rag_embedding_url.rstrip("/")
         self.vector_url = settings.rag_qdrant_url.rstrip("/")
         self.bucket = settings.rag_minio_bucket
@@ -36,6 +37,28 @@ class RagClients:
 
     async def close(self) -> None:
         await self.http.aclose()
+
+    async def _check_http(self, url: str) -> Literal["ready", "unavailable"]:
+        try:
+            async with asyncio.timeout(self.readiness_timeout):
+                response = await self.http.get(url, timeout=self.readiness_timeout)
+            return "ready" if 200 <= response.status_code < 300 else "unavailable"
+        except Exception:
+            return "unavailable"
+
+    async def check_embedding(self) -> Literal["ready", "unavailable"]:
+        return await self._check_http(f"{self.embed_url}/healthz")
+
+    async def check_qdrant(self) -> Literal["ready", "unavailable"]:
+        return await self._check_http(f"{self.vector_url}/readyz")
+
+    async def check_minio(self) -> Literal["ready", "unavailable"]:
+        try:
+            async with asyncio.timeout(self.readiness_timeout):
+                exists = await asyncio.to_thread(self.objects.bucket_exists, self.bucket)
+            return "ready" if exists else "unavailable"
+        except Exception:
+            return "unavailable"
 
     async def call(self, method: str, url: str, body: Any = None) -> dict[str, Any]:
         try:

@@ -342,7 +342,6 @@ services:
       KRATOS_WORKER_CONCURRENCY: "2"
       KRATOS_WORKER_TASK_TIMEOUT: "60s"
       KRATOS_RUN_CODE_ADDRESS: ":8081"
-      OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT: "judge-worker:8081"
       KRATOS_RUN_CODE_AUTH_TOKEN: "${AGENT_RUN_CODE_TOKEN:-local-development-run-code-token-change-before-sharing}"
     depends_on:
       minio-init:
@@ -352,7 +351,7 @@ services:
       go-judge:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8081/readyz"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -367,6 +366,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_DEPLOYMENT_ENVIRONMENT: "development"
       JUDGE_OBSERVABILITY_GRAFANA_URL: "${JUDGE_OBSERVABILITY_GRAFANA_URL:-http://localhost:3000}"
+      OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT: "http://judge-worker:8081"
+      OBSERVABILITY_PROBE_RAG_WORKER_ENDPOINT: "http://rag-worker:8002"
       KRATOS_SERVER_HTTP_ADDRESS: ":8080"
       KRATOS_AUTH_ACCESS_TOKEN_KEY: "${AUTH_ACCESS_TOKEN_KEY:-local-development-access-token-key-change-before-sharing}"
       KRATOS_AUTH_ISSUER: "go-oj-agent"
@@ -537,6 +538,8 @@ services:
     entrypoint: ["python", "-m", "app.rag.worker"]
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      AGENT_HOST: "0.0.0.0"
+      AGENT_PORT: "8002"
       AGENT_DATABASE_URL: "${AGENT_DATABASE_URL:-mysql+asyncmy://oj_agent:local-agent-password@mysql:3306/oj_agent}"
       AGENT_RAG_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       AGENT_RAG_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -550,7 +553,7 @@ services:
       embedding:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/readyz', timeout=3).close()"]
       interval: 5s
       timeout: 3s
       retries: 20

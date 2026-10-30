@@ -37,16 +37,22 @@ or label_replace(sum(oj_contest_cache_outbox_pending), "series", "contest_cache_
 or label_replace(sum(oj_contest_cache_outbox_oldest_age_seconds), "series", "contest_cache_outbox_oldest_age", "", "")
 or label_replace(sum(rate(agent_run_started_total[5m])), "series", "agent_run_rate", "", "")
 or label_replace(sum(agent_run_in_flight), "series", "agent_run_in_flight", "", "")
+or label_replace((sum(rate(agent_run_terminal_total{status="completed"}[5m])) or (sum(rate(agent_run_terminal_total[5m])) * 0)) / clamp_min(sum(rate(agent_run_terminal_total[5m])), 1e-9), "series", "agent_run_success_ratio", "", "")
+or label_replace(histogram_quantile(0.95, sum by (le) (rate(agent_run_first_event_duration_seconds_bucket[5m]))), "series", "agent_run_ttft_p95", "", "")
+or label_replace(sum(rate(agent_model_attempt_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_model_attempt_total[5m])) * 0), "series", "agent_model_failure_rate", "", "")
+or label_replace(sum(rate(agent_tool_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_tool_total[5m])) * 0), "series", "agent_tool_failure_rate", "", "")
+or label_replace(sum(rate(agent_rag_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_rag_total[5m])) * 0), "series", "agent_rag_failure_rate", "", "")
+or label_replace(sum(rate(agent_job_total{status=~"failed|lease_lost"}[5m])) or (sum(rate(agent_job_total[5m])) * 0), "series", "agent_job_failure_rate", "", "")
 or label_replace(sum(rate(oj_telemetry_export_failure_total[5m])), "series", "telemetry_export_failure_rate", "", "")`
 
 const agentMetricsRangeQuery = `label_replace(sum(rate(agent_run_started_total[5m])), "series", "agent_run_rate", "", "")
 or label_replace(sum(agent_run_in_flight), "series", "agent_run_in_flight", "", "")
 or label_replace((sum(rate(agent_run_terminal_total{status="completed"}[5m])) or (sum(rate(agent_run_terminal_total[5m])) * 0)) / clamp_min(sum(rate(agent_run_terminal_total[5m])), 1e-9), "series", "agent_run_success_ratio", "", "")
 or label_replace(histogram_quantile(0.95, sum by (le) (rate(agent_run_first_event_duration_seconds_bucket[5m]))), "series", "agent_run_ttft_p95", "", "")
-or label_replace(sum(rate(agent_model_attempt_total{outcome=~"error|timeout"}[5m])), "series", "agent_model_failure_rate", "", "")
-or label_replace(sum(rate(agent_tool_total{outcome=~"error|timeout"}[5m])), "series", "agent_tool_failure_rate", "", "")
-or label_replace(sum(rate(agent_rag_total{outcome=~"error|timeout"}[5m])), "series", "agent_rag_failure_rate", "", "")
-or label_replace(sum(rate(agent_job_total{status=~"failed|lease_lost"}[5m])), "series", "agent_job_failure_rate", "", "")`
+or label_replace(sum(rate(agent_model_attempt_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_model_attempt_total[5m])) * 0), "series", "agent_model_failure_rate", "", "")
+or label_replace(sum(rate(agent_tool_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_tool_total[5m])) * 0), "series", "agent_tool_failure_rate", "", "")
+or label_replace(sum(rate(agent_rag_total{outcome=~"error|timeout"}[5m])) or (sum(rate(agent_rag_total[5m])) * 0), "series", "agent_rag_failure_rate", "", "")
+or label_replace(sum(rate(agent_job_total{status=~"failed|lease_lost"}[5m])) or (sum(rate(agent_job_total[5m])) * 0), "series", "agent_job_failure_rate", "", "")`
 
 const metricsTargetQuery = `label_replace(up{job=~"otel-collector|otel-collector-self|contest-service"}, "series", "target_up", "", "")
 or label_replace(timestamp(scrape_samples_scraped{job=~"otel-collector|otel-collector-self|contest-service"}), "series", "target_scrape_timestamp", "", "")`
@@ -355,8 +361,8 @@ var observabilityServiceCatalog = []struct{ name, env, address, kind string }{
 	{"judge", "KRATOS_CLIENTS_SUBMISSION_ENDPOINT", "", "tcp"},
 	{"contest", "KRATOS_CLIENTS_CONTEST_ENDPOINT", "contest-service:9005", "tcp"},
 	{"agent", "KRATOS_CLIENTS_AGENT_ENDPOINT", "", "http"},
-	{"judge-worker", "OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT", "", "tcp"},
-	{"rag-worker", "", "", "none"},
+	{"judge-worker", "OBSERVABILITY_PROBE_JUDGE_WORKER_ENDPOINT", "", "http"},
+	{"rag-worker", "OBSERVABILITY_PROBE_RAG_WORKER_ENDPOINT", "", "http"},
 }
 
 func serveObservabilityServices(requestCtx context.Context, httpCtx khttp.Context) error {
@@ -610,7 +616,7 @@ func queryPrometheusMetrics(ctx context.Context, configuredURL string, window me
 func emptyMetricSeries(systemScope bool) []metricSeries {
 	keys := []string{"agent_run_rate", "agent_run_in_flight", "agent_run_success_ratio", "agent_run_ttft_p95", "agent_model_failure_rate", "agent_tool_failure_rate", "agent_rag_failure_rate", "agent_job_failure_rate"}
 	if systemScope {
-		keys = []string{"request_rate", "request_error_rate", "api_latency_p50", "api_latency_p95", "api_latency_p99", "judge_submission_rate", "judge_queue_p95", "judge_worker_in_flight", "contest_cache_outbox_pending", "contest_cache_outbox_oldest_age", "agent_run_rate", "agent_run_in_flight", "agent_run_success_ratio", "agent_run_ttft_p95", "telemetry_export_failure_rate"}
+		keys = []string{"request_rate", "request_error_rate", "api_latency_p50", "api_latency_p95", "api_latency_p99", "judge_submission_rate", "judge_queue_p95", "judge_worker_in_flight", "contest_cache_outbox_pending", "contest_cache_outbox_oldest_age", "agent_run_rate", "agent_run_in_flight", "agent_run_success_ratio", "agent_run_ttft_p95", "agent_model_failure_rate", "agent_tool_failure_rate", "agent_rag_failure_rate", "agent_job_failure_rate", "telemetry_export_failure_rate"}
 	}
 	result := make([]metricSeries, 0, len(keys))
 	for _, key := range keys {

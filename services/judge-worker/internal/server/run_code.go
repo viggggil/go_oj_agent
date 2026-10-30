@@ -18,6 +18,8 @@ import (
 
 const (
 	runCodePath       = "/internal/run-code"
+	healthPath        = "/healthz"
+	readinessPath     = "/readyz"
 	runCodeSourceMax  = 64 << 10
 	runCodeInputMax   = 16 << 10
 	runCodeOutputMax  = 16 << 10
@@ -41,10 +43,30 @@ type runCodeResponse struct {
 	MemoryBytes uint64 `json:"memory_bytes,omitempty"`
 }
 
-func NewRunCodeHandler(runners map[string]biz.LanguageRunner, token string) http.Handler {
+func NewRunCodeHandler(runners map[string]biz.LanguageRunner, token string, readiness ...func() bool) http.Handler {
 	allowed := map[string]struct{}{"c": {}, "cpp": {}, "go": {}, "java": {}, "python": {}}
 	capacity := make(chan struct{}, 1)
+	isReady := func() bool { return len(runners) > 0 }
+	if len(readiness) > 0 && readiness[0] != nil {
+		isReady = readiness[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			switch r.URL.Path {
+			case healthPath:
+				writeRunCodeJSON(w, http.StatusOK, map[string]string{"service": "judge-worker", "status": "ok"})
+				return
+			case readinessPath:
+				status := http.StatusOK
+				state := "ready"
+				if !isReady() {
+					status = http.StatusServiceUnavailable
+					state = "not_ready"
+				}
+				writeRunCodeJSON(w, status, map[string]string{"service": "judge-worker", "status": state})
+				return
+			}
+		}
 		if r.URL.Path != runCodePath || r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return

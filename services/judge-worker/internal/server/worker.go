@@ -43,7 +43,9 @@ func NewWorkerWithConsumer(executor sandbox.Executor, engine *biz.Engine, consum
 	if len(options) > 0 {
 		option := options[0]
 		worker.runCode = &http.Server{
-			Addr: option.Address, Handler: NewRunCodeHandler(option.Runners, option.Token),
+			Addr: option.Address, Handler: NewRunCodeHandler(option.Runners, option.Token, func() bool {
+				return len(option.Runners) > 0 && worker.engine != nil && (worker.consumer == nil || worker.consumer.Ready())
+			}),
 			ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second,
 			WriteTimeout: 75 * time.Second, IdleTimeout: 15 * time.Second,
 			MaxHeaderBytes: 8 << 10,

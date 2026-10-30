@@ -63,6 +63,30 @@ func TestRunCodeRequiresInternalCredentialAndRejectsUnsafeInputs(t *testing.T) {
 	}
 }
 
+func TestRunCodeHealthEndpointsDoNotRequireInternalCredential(t *testing.T) {
+	handler := NewRunCodeHandler(map[string]biz.LanguageRunner{"cpp": &runCodeRunner{}}, "01234567890123456789012345678901")
+	for _, path := range []string{healthPath, readinessPath} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	request := httptest.NewRequest(http.MethodGet, readinessPath, nil)
+	response := httptest.NewRecorder()
+	NewRunCodeHandler(nil, "01234567890123456789012345678901").ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("empty runner readiness status=%d body=%s", response.Code, response.Body.String())
+	}
+	request = httptest.NewRequest(http.MethodGet, readinessPath, nil)
+	response = httptest.NewRecorder()
+	NewRunCodeHandler(map[string]biz.LanguageRunner{"cpp": &runCodeRunner{}}, "token", func() bool { return false }).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable consumer readiness status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestRunCodeCompilesRunsAndDeletesTemporaryArtifact(t *testing.T) {
 	runner := &runCodeRunner{
 		compile: biz.CompileResult{Artifact: biz.Artifact{ID: "artifact"}, Verdict: biz.VerdictAC},
