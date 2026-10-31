@@ -2868,3 +2868,26 @@ dd {
 .logs-page.embedded > .page-header {
   display: none;
 }
+/* 监控侧栏已移除，总览内容使用完整的 shell 宽度。 */
+.monitoring-workspace.monitoring-workspace-flat {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+.monitoring-workspace-flat > .monitoring-main,
+.monitoring-workspace-flat .monitoring-page,
+.monitoring-workspace-flat .monitoring-dashboard,
+.monitoring-workspace-flat .monitoring-dashboard-content,
+.monitoring-workspace-flat .monitoring-section {
+  width: 100%;
+  max-width: none;
+}
+.monitoring-workspace-flat .monitoring-selected-metric {
+  width: 100%;
+  max-width: none;
+}
+.monitoring-workspace-flat .monitoring-kpi-grid,
+.monitoring-workspace-flat .monitoring-target-grid,
+.monitoring-workspace-flat .monitoring-service-grid {
+  width: 100%;
+}
