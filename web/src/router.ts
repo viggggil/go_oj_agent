@@ -29,6 +29,7 @@ import MonitoringHome from './views/MonitoringHome.vue'
 import MonitoringMetrics from './views/MonitoringMetrics.vue'
 import JudgePipeline from './views/JudgePipeline.vue'
 import MonitoringLogs from './views/MonitoringLogs.vue'
+import MonitoringTrace from './views/MonitoringTrace.vue'
 import { agentAdministrator } from './agent/state'
 
 const router = createRouter({
@@ -44,10 +45,26 @@ const router = createRouter({
       meta: { auth: true },
       children: [
         { path: '', component: MonitoringHome },
-        { path: 'metrics', component: MonitoringMetrics, meta: { monitorMetrics: true } },
-        { path: 'agent', component: MonitoringAgent, meta: { monitorAgent: true } },
-        { path: 'judge', component: JudgePipeline, meta: { monitorSystem: true } },
-        { path: 'logs', component: MonitoringLogs, meta: { monitorMetrics: true } },
+        {
+          path: 'metrics',
+          redirect: (to) => ({ path: '/monitoring', query: to.query, hash: to.hash }),
+        },
+        {
+          path: 'agent',
+          redirect: (to) => ({ path: '/monitoring', query: to.query, hash: to.hash }),
+          meta: { monitorAgent: true },
+        },
+        {
+          path: 'judge',
+          redirect: (to) => ({ path: '/monitoring', query: to.query, hash: to.hash }),
+          meta: { monitorSystem: true },
+        },
+        {
+          path: 'logs',
+          redirect: (to) => ({ path: '/monitoring', query: to.query, hash: to.hash }),
+          meta: { monitorMetrics: true },
+        },
+        { path: 'traces/:trace_id', component: MonitoringTrace, meta: { monitorMetrics: true } },
       ],
     },
     { path: '/problems', component: Problems, meta: { auth: true } },

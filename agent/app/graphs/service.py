@@ -9,6 +9,7 @@ from time import monotonic
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
+from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
@@ -232,18 +233,24 @@ class RunService:
             deadline_at=record.deadline_at,
         )
         try:
-            summary = await self._store.get_conversation_summary(
-                principal.user_id, record.conversation_id
-            )
-            turns = await self._store.list_completed_turn_records(
-                principal.user_id,
-                record.conversation_id,
-                after_message_id=summary.covered_until_message_id if summary else None,
-                limit=24,
-            )
-            assembled = self._context_assembler.assemble(summary, turns)
-            state.history = assembled.history
-            state.memory_summary = assembled.summary
+            async with span("agent.context.load") as context_span:
+                summary = await self._store.get_conversation_summary(
+                    principal.user_id, record.conversation_id
+                )
+                turns = await self._store.list_completed_turn_records(
+                    principal.user_id,
+                    record.conversation_id,
+                    after_message_id=summary.covered_until_message_id if summary else None,
+                    limit=24,
+                )
+                assembled = self._context_assembler.assemble(summary, turns)
+                state.history = assembled.history
+                state.memory_summary = assembled.summary
+                context_span.set_attribute("agent.history_turn_count", len(turns))
+                context_span.set_attribute(
+                    "agent.history_summary_used", assembled.summary is not None
+                )
+                context_span.set_attribute("agent.status", "completed")
         except asyncio.CancelledError:
             await self._terminate(state, "CANCELLED", "AGENT_CANCELLED")
             raise
@@ -260,29 +267,44 @@ class RunService:
     ) -> AsyncIterator[StreamEvent]:
         attributes: dict[str, str] = {
             "agent.purpose": current_purpose(),
-            "run.id": str(state.run_id),
+            "agent.run_id": str(state.run_id),
         }
         async with span("agent.run", attributes) as run_span:
+            run_span.set_attribute("agent.status", "running")
             iterator = self._events(state, trace_id, tracker)
+            run_context = trace.set_span_in_context(run_span)
+            completed = False
             try:
-                async for event in iterator:
+                while True:
+                    context_token = otel_context.attach(run_context)
+                    try:
+                        event = await anext(iterator)
+                    except StopAsyncIteration:
+                        break
+                    finally:
+                        otel_context.detach(context_token)
                     if event.type == "done":
-                        run_span.set_attribute("run.status", "completed")
+                        completed = True
+                        run_span.set_attribute("agent.status", "completed")
                     elif event.type == "error":
-                        run_span.set_attribute("run.status", "failed")
+                        run_span.set_attribute("agent.status", "failed")
                         code = event.data.get("code")
                         if isinstance(code, str) and code.isascii() and len(code) <= 64:
-                            run_span.set_attribute("error.code", code)
+                            run_span.set_attribute("agent.error_code", code)
                         run_span.set_status(Status(StatusCode.ERROR))
                     yield event
             except (asyncio.CancelledError, GeneratorExit):
-                run_span.set_attribute("run.status", "cancelled")
+                if not completed:
+                    run_span.set_attribute("agent.status", "cancelled")
                 close = getattr(iterator, "aclose", None)
                 if close is not None:
                     await close()
                 raise
-            except Exception:
-                run_span.set_attribute("run.status", "failed")
+            except Exception as error:
+                run_span.set_attribute("agent.status", "failed")
+                error_code = getattr(error, "code", None)
+                if isinstance(error_code, str) and error_code.isascii() and len(error_code) <= 64:
+                    run_span.set_attribute("agent.error_code", error_code)
                 raise
 
     async def _events(

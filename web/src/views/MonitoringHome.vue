@@ -101,84 +101,98 @@
             ><small>Agent 工具操作失败与超时</small>
           </article>
         </div>
-        <p class="monitoring-capability-note">
-          活跃告警和日志事件将在 Loki / Alertmanager 接入后展示；空指标不会被推断为零。
-        </p>
+        <p class="monitoring-capability-note">日志查询位于页面底部；空指标不会被推断为零。</p>
       </section>
 
-      <section class="monitoring-section monitoring-dashboard-columns">
-        <article class="monitoring-panel monitoring-trend-panel">
-          <div class="monitoring-section-heading">
-            <div>
-              <p class="eyebrow">TRAFFIC & PERFORMANCE</p>
-              <h2>流量与性能趋势</h2>
+      <div class="monitoring-detail-columns">
+        <section
+          class="monitoring-section monitoring-metric-detail"
+          aria-labelledby="metric-detail-title"
+        >
+          <article class="monitoring-detail-card monitoring-metric-card">
+            <div class="monitoring-section-heading">
+              <div>
+                <h2 id="metric-detail-title">指标详情</h2>
+              </div>
+              <div class="metrics-actions">
+                <label
+                  >指标<select v-model="selectedMetric">
+                    <option
+                      v-for="series in metricOptions"
+                      :key="series.key + (series.service || '')"
+                      :value="series.key + '|' + (series.service || '')"
+                    >
+                      {{ series.label
+                      }}{{ series.service ? ` · ${serviceLabel(series.service)}` : '' }}
+                    </option>
+                  </select></label
+                >
+                <label
+                  >时间范围<select v-model="window" :disabled="loading" @change="load">
+                    <option value="15m">最近 15 分钟</option>
+                    <option value="1h">最近 1 小时</option>
+                    <option value="24h">最近 24 小时</option>
+                  </select></label
+                >
+              </div>
             </div>
-            <label class="monitoring-filter">
-              指标
-              <select v-model="selectedTrend">
-                <option v-for="option in trendOptions" :key="option.key" :value="option.key">
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
-          </div>
-          <div class="monitoring-chart-legend">
-            <label
-              class="monitoring-filter"
-              v-if="selectedTrend === 'request_rate' || selectedTrend === 'request_error_rate'"
+            <svg
+              class="metrics-chart monitoring-metric-chart"
+              viewBox="0 0 760 300"
+              role="img"
+              aria-label="指标折线图"
             >
-              服务
-              <select v-model="selectedService">
-                <option value="all">所有服务</option>
-                <option v-for="service in availableServices" :key="service" :value="service">
-                  {{ serviceLabel(service) }}
-                </option>
-              </select>
-            </label>
-            <span class="monitoring-muted">{{ trendLabel }}</span>
-          </div>
-          <div
-            v-if="trendSeries.length"
-            class="monitoring-chart"
-            role="img"
-            :aria-label="`${trendLabel}趋势图`"
-          >
-            <div class="monitoring-chart-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-hidden="true">
-              <polyline
-                v-for="(series, index) in trendSeries"
-                :key="`${series.key}:${series.service || 'all'}`"
-                :points="
-                  sparkline(
-                    series.points.map((point) => point.value),
-                    720,
-                    205,
-                  )
-                "
-                :class="`chart-line chart-line-${index % 5}`"
-              />
+              <template v-if="metricChart.hasData">
+                <line
+                  class="metrics-chart-axis"
+                  :x1="metricChart.plotLeft"
+                  :x2="metricChart.plotRight"
+                  :y1="metricChart.plotBottom"
+                  :y2="metricChart.plotBottom"
+                />
+                <line
+                  class="metrics-chart-axis"
+                  :x1="metricChart.plotLeft"
+                  :x2="metricChart.plotLeft"
+                  :y1="metricChart.plotTop"
+                  :y2="metricChart.plotBottom"
+                />
+                <g v-for="tick in metricChart.yTicks" :key="`y-${tick.value}`">
+                  <line
+                    class="metrics-chart-gridline"
+                    :x1="metricChart.plotLeft"
+                    :x2="metricChart.plotRight"
+                    :y1="tick.y"
+                    :y2="tick.y"
+                  />
+                  <text class="metrics-chart-label metrics-chart-y-label" x="48" :y="tick.y + 4">
+                    {{ tick.label }}
+                  </text>
+                </g>
+                <g v-for="tick in metricChart.xTicks" :key="`x-${tick.index}`">
+                  <line
+                    class="metrics-chart-tick"
+                    :x1="tick.x"
+                    :x2="tick.x"
+                    :y1="metricChart.plotBottom"
+                    :y2="metricChart.plotBottom + 6"
+                  />
+                  <text
+                    class="metrics-chart-label metrics-chart-x-label"
+                    :x="tick.x"
+                    :y="metricChart.plotBottom + 24"
+                  >
+                    {{ tick.label }}
+                  </text>
+                </g>
+                <polyline class="metrics-chart-line" :points="metricChart.polyline" />
+              </template>
+              <text v-else class="metrics-chart-empty" x="380" y="150">暂无数据</text>
             </svg>
-          </div>
-          <div v-else class="monitoring-chart-empty">
-            <strong>{{ trendEmptyTitle }}</strong>
-            <span>{{ trendEmptyDescription }}</span>
-          </div>
-          <div v-if="trendSeries.length" class="monitoring-series-legend">
-            <span
-              v-for="(series, index) in trendSeries"
-              :key="`${series.key}:${series.service || 'all'}`"
-            >
-              <i :class="`legend-dot chart-line-${index % 5}`"></i
-              >{{ series.service ? serviceLabel(series.service) : series.label }}
-            </span>
-          </div>
-          <footer class="monitoring-chart-footer">
-            <span>{{ chartStart }}</span
-            ><span>{{ chartEnd }}</span>
-          </footer>
-        </article>
+          </article>
+        </section>
 
-        <article class="monitoring-panel monitoring-business-panel">
+        <section class="monitoring-section monitoring-panel monitoring-business-panel">
           <div class="monitoring-section-heading">
             <div>
               <p class="eyebrow">BUSINESS OPERATIONS</p>
@@ -205,9 +219,147 @@
               >判题链路 →</RouterLink
             >
           </div>
-        </article>
+        </section>
+      </div>
+      <section
+        class="monitoring-section monitoring-trace-records"
+        aria-labelledby="trace-records-title"
+      >
+        <div class="monitoring-section-heading">
+          <div>
+            <p class="eyebrow">TRACE RECORDS</p>
+            <h2 id="trace-records-title">链路记录</h2>
+          </div>
+          <button
+            class="button secondary"
+            :disabled="traceRecordsLoading"
+            @click="loadTraceRecords"
+          >
+            {{ traceRecordsLoading ? '刷新中…' : '刷新记录' }}
+          </button>
+        </div>
+        <div class="trace-record-columns">
+          <article class="trace-record-card">
+            <div class="trace-record-card-heading">
+              <h3>Agent 运行 Trace</h3>
+              <span>{{ agentRuns.length }} 条</span>
+            </div>
+            <p v-if="traceRecordsError" class="error">{{ traceRecordsError }}</p>
+            <p v-else-if="traceRecordsLoading" class="empty">正在加载记录…</p>
+            <p v-else-if="!pagedAgentRuns.length" class="empty">暂无 Agent Trace 记录。</p>
+            <div v-else class="trace-record-list">
+              <article v-for="run in pagedAgentRuns" :key="run.run_id" class="trace-record-item">
+                <div>
+                  <strong>{{ run.status }}</strong
+                  ><small
+                    >{{ formatTime(run.started_at) }} · {{ run.duration_ms ?? '运行中' }} ms</small
+                  >
+                </div>
+                <button
+                  class="button secondary"
+                  type="button"
+                  @click="openTraceDetail(run.trace_id || '')"
+                >
+                  详情
+                </button>
+              </article>
+            </div>
+            <nav class="trace-record-pagination" aria-label="Agent Trace 分页">
+              <button class="button secondary" :disabled="agentPage <= 1" @click="agentPage--">
+                上一页</button
+              ><span>第 {{ agentPage }} / {{ agentPageCount }} 页</span
+              ><button
+                class="button secondary"
+                :disabled="agentPage >= agentPageCount"
+                @click="agentPage++"
+              >
+                下一页
+              </button>
+            </nav>
+          </article>
+          <article v-if="isPlatformAdmin" class="trace-record-card">
+            <div class="trace-record-card-heading">
+              <h3>判题 Trace</h3>
+              <span>{{ judgeTraces.length }} 条</span>
+            </div>
+            <p v-if="traceRecordsError" class="error">{{ traceRecordsError }}</p>
+            <p v-else-if="traceRecordsLoading" class="empty">正在加载记录…</p>
+            <p v-else-if="!pagedJudgeTraces.length" class="empty">暂无判题 Trace 记录。</p>
+            <div v-else class="trace-record-list">
+              <article
+                v-for="trace in pagedJudgeTraces"
+                :key="trace.trace_id"
+                class="trace-record-item"
+              >
+                <div>
+                  <strong>{{ spanName(trace.name) }}</strong
+                  ><small
+                    >{{ formatTime(trace.started_at) }} · {{ serviceName(trace.service_name) }} ·
+                    {{ trace.duration_ms }} ms</small
+                  >
+                </div>
+                <button
+                  class="button secondary"
+                  type="button"
+                  @click="openTraceDetail(trace.trace_id)"
+                >
+                  详情
+                </button>
+              </article>
+            </div>
+            <nav class="trace-record-pagination" aria-label="判题 Trace 分页">
+              <button class="button secondary" :disabled="judgePage <= 1" @click="judgePage--">
+                上一页</button
+              ><span>第 {{ judgePage }} / {{ judgePageCount }} 页</span
+              ><button
+                class="button secondary"
+                :disabled="judgePage >= judgePageCount"
+                @click="judgePage++"
+              >
+                下一页
+              </button>
+            </nav>
+          </article>
+          <article v-else class="trace-record-card trace-record-card-locked">
+            <h3>判题 Trace</h3>
+            <p>当前账号没有查看系统判题链路的权限。</p>
+          </article>
+        </div>
       </section>
-
+      <article
+        v-if="selectedTraceId"
+        class="monitoring-modal-window trace-detail-window"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Trace 详情"
+      >
+        <button class="link close" type="button" @click="closeTraceDetail">关闭</button>
+        <h2>Trace 详情</h2>
+        <p>
+          <code>{{ selectedTraceId }}</code>
+        </p>
+        <p v-if="traceDetailError" class="error">{{ traceDetailError }}</p>
+        <p v-else-if="traceDetailLoading" class="empty">正在加载 Trace 详情…</p>
+        <template v-else-if="traceDetail?.state === 'available'">
+          <TraceTimeline
+            :detail="traceDetail"
+            :selected-span-id="selectedSpanId"
+            @select="selectedSpanId = $event"
+          />
+          <section class="trace-logs-section">
+            <h3>所选阶段日志</h3>
+            <MonitoringLogs
+              :trace-id="selectedTraceId"
+              :span-id="selectedSpanId || undefined"
+              :start="traceLogStart"
+              :end="traceLogEnd"
+              :hide-filters="true"
+              embedded
+            />
+          </section>
+        </template>
+        <p v-else class="empty">当前 Trace 没有可展示的数据。</p>
+      </article>
       <section class="monitoring-section monitoring-panel" aria-labelledby="services-title">
         <div class="monitoring-section-heading">
           <div>
@@ -285,9 +437,6 @@
             <p class="eyebrow">PROMETHEUS SCRAPES</p>
             <h2>实际采集目标</h2>
           </div>
-          <RouterLink to="/monitoring/metrics" class="monitoring-inline-link"
-            >查看完整指标 →</RouterLink
-          >
         </div>
         <div class="monitoring-target-grid">
           <article
@@ -305,16 +454,13 @@
         </div>
       </section>
 
+      <section class="monitoring-section monitoring-logs-bottom">
+        <h2>日志筛选查询</h2>
+        <MonitoringLogs embedded />
+      </section>
+
       <footer class="monitoring-dashboard-footer">
         <span>数据更新时间 {{ formatTime(overview.generated_at) }} · 页面隐藏时暂停自动刷新</span>
-        <RouterLink to="/monitoring/metrics">固定指标详情</RouterLink>
-        <a
-          v-if="overview.grafana_url"
-          :href="overview.grafana_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Grafana 外部排障</a
-        >
       </footer>
     </div>
     <div v-else-if="loading" class="monitoring-dashboard-loading" role="status">
@@ -327,6 +473,11 @@
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { RouterLink } from 'vue-router'
+  import MonitoringLogs from './MonitoringLogs.vue'
+  import TraceTimeline from '../components/observability/TraceTimeline.vue'
+  import { agentApi } from '../agent/api'
+  import type { AgentRun } from '../agent/types'
+  import type { TraceDetail, TraceSummary } from '../api'
   import { observabilityApi } from '../api'
   import type {
     MetricsOverview,
@@ -352,8 +503,18 @@
   const alertsLoadFailed = ref(false)
   const loading = ref(false)
   const requestError = ref('')
-  const selectedTrend = ref('request_rate')
-  const selectedService = ref('all')
+  const selectedMetric = ref('')
+  const agentRuns = ref<AgentRun[]>([])
+  const judgeTraces = ref<TraceSummary[]>([])
+  const agentPage = ref(1)
+  const judgePage = ref(1)
+  const traceRecordsLoading = ref(false)
+  const traceRecordsError = ref('')
+  const selectedTraceId = ref('')
+  const traceDetail = ref<TraceDetail>()
+  const selectedSpanId = ref('')
+  const traceDetailLoading = ref(false)
+  const traceDetailError = ref('')
   let timer: ReturnType<typeof setInterval> | undefined
   let controller: AbortController | undefined
 
@@ -365,49 +526,108 @@
     if (!alerts.value || alerts.value.state === 'not_configured') return '未配置'
     return `${alerts.value.alerts.length} 条活跃告警`
   })
-  const trendOptions = computed(() =>
-    isPlatformAdmin.value
-      ? [
-          { key: 'request_rate', label: 'API 请求速率' },
-          { key: 'request_error_rate', label: 'HTTP 5xx 速率' },
-          { key: 'judge_queue_p95', label: 'Judge 排队 P95' },
-        ]
-      : [
-          { key: 'agent_run_rate', label: 'Agent Run 启动速率' },
-          { key: 'agent_model_failure_rate', label: '模型失败速率' },
-          { key: 'agent_tool_failure_rate', label: 'Tool 失败速率' },
-        ],
-  )
-  const trendLabel = computed(
-    () => trendOptions.value.find((item) => item.key === selectedTrend.value)?.label || '指标趋势',
-  )
   const allSeries = computed(() => overview.value?.series || [])
-  const availableServices = computed(() =>
-    [
-      ...new Set(
-        allSeries.value
-          .filter((series) => series.key === selectedTrend.value && series.service)
-          .map((series) => series.service as string),
-      ),
-    ].sort(),
-  )
-  const trendSeries = computed(() =>
-    allSeries.value.filter((series) => {
-      if (
-        series.key !== selectedTrend.value ||
-        series.state !== 'available' ||
-        !series.points.length
-      )
-        return false
-      if (
-        (selectedTrend.value === 'request_rate' || selectedTrend.value === 'request_error_rate') &&
-        selectedService.value !== 'all'
-      ) {
-        return series.service === selectedService.value
+  const metricOptions = computed(() => allSeries.value)
+  const selectedMetricSeries = computed(() => {
+    const value =
+      selectedMetric.value ||
+      (allSeries.value[0] ? allSeries.value[0].key + '|' + (allSeries.value[0].service || '') : '')
+    const [key, service] = value.split('|')
+    return allSeries.value.find(
+      (series) => series.key === key && (series.service || '') === service,
+    )
+  })
+  const metricChart = computed(() => {
+    const points = selectedMetricSeries.value?.points || []
+    const plotLeft = 64
+    const plotRight = 744
+    const plotTop = 22
+    const plotBottom = 250
+    if (!points.length) {
+      return {
+        hasData: false,
+        plotLeft,
+        plotRight,
+        plotTop,
+        plotBottom,
+        yTicks: [],
+        xTicks: [],
+        polyline: '',
       }
-      return true
-    }),
+    }
+
+    const values = points.map((point) => point.value)
+    let low = Math.min(...values)
+    let high = Math.max(...values)
+    if (low === high) {
+      const padding = Math.abs(low) * 0.1 || 1
+      low -= padding
+      high += padding
+    } else {
+      const padding = (high - low) * 0.08
+      low -= padding
+      high += padding
+    }
+    const yTicks = Array.from({ length: 5 }, (_, index) => {
+      const value = high - ((high - low) * index) / 4
+      const y = plotTop + ((plotBottom - plotTop) * index) / 4
+      return { value, y, label: formatValue(value) }
+    })
+    const polyline = points
+      .map((point, index) => {
+        const x =
+          plotLeft +
+          (points.length === 1 ? 0 : (index / (points.length - 1)) * (plotRight - plotLeft))
+        const y = plotBottom - ((point.value - low) / (high - low)) * (plotBottom - plotTop)
+        return `${x.toFixed(1)},${y.toFixed(1)}`
+      })
+      .join(' ')
+    const xIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])]
+    const xTicks = xIndexes.map((index) => {
+      const point = points[index]
+      const date = new Date(point.timestamp)
+      const label = Number.isNaN(date.getTime())
+        ? ''
+        : date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      return {
+        index,
+        x:
+          plotLeft +
+          (points.length === 1 ? 0 : (index / (points.length - 1)) * (plotRight - plotLeft)),
+        label,
+      }
+    })
+    return { hasData: true, plotLeft, plotRight, plotTop, plotBottom, yTicks, xTicks, polyline }
+  })
+  const agentPageCount = computed(() => Math.max(1, Math.ceil(agentRuns.value.length / 5)))
+  const judgePageCount = computed(() => Math.max(1, Math.ceil(judgeTraces.value.length / 5)))
+  const pagedAgentRuns = computed(() =>
+    agentRuns.value.slice((agentPage.value - 1) * 5, agentPage.value * 5),
   )
+  const pagedJudgeTraces = computed(() =>
+    judgeTraces.value.slice((judgePage.value - 1) * 5, judgePage.value * 5),
+  )
+  const traceLogStart = computed(() => {
+    const times =
+      traceDetail.value?.spans.map((span) => Date.parse(span.started_at)).filter(Number.isFinite) ||
+      []
+    return times.length
+      ? new Date(Math.max(0, Math.min(...times) - 5 * 60_000)).toISOString()
+      : undefined
+  })
+  const traceLogEnd = computed(() => {
+    const spans = traceDetail.value?.spans || []
+    if (!spans.length) return undefined
+    const end =
+      Math.max(
+        ...spans
+          .map((span) => Date.parse(span.started_at) + span.duration_ms)
+          .filter(Number.isFinite),
+      ) +
+      5 * 60_000
+    return new Date(end).toISOString()
+  })
+
   const businessMetrics = computed(() =>
     isPlatformAdmin.value
       ? [
@@ -465,23 +685,6 @@
       }[value] || '系统告警'
     )
   }
-  const chartStart = computed(() => {
-    const first = trendSeries.value[0]?.points[0]?.timestamp
-    return first ? formatTime(first) : '无样本'
-  })
-  const chartEnd = computed(() => {
-    const last = trendSeries.value[0]?.points.at(-1)?.timestamp
-    return last ? formatTime(last) : '无样本'
-  })
-  const trendEmptyTitle = computed(() =>
-    overview.value?.state === 'unavailable' ? '指标服务暂不可用' : '当前范围没有可绘制的样本',
-  )
-  const trendEmptyDescription = computed(() =>
-    overview.value?.state === 'not_configured'
-      ? '此环境没有启用可选 Prometheus 观测栈。'
-      : '可能尚无流量，或该指标当前未导出。页面不会将空结果显示为零。',
-  )
-
   const serviceNames = [
     ['gateway-service', 'Gateway'],
     ['user-service', 'User'],
@@ -609,19 +812,6 @@
     const date = new Date(value)
     return Number.isNaN(date.getTime()) ? '未知' : date.toLocaleString()
   }
-  function sparkline(values: number[], width = 360, height = 72) {
-    if (values.length < 2) return `0,${height / 2} ${width},${height / 2}`
-    const low = Math.min(...values)
-    const high = Math.max(...values)
-    const span = high - low || 1
-    return values
-      .map((value, index) => {
-        const x = (index / (values.length - 1)) * width
-        const y = height - 8 - ((value - low) / span) * (height - 16)
-        return `${x.toFixed(1)},${y.toFixed(1)}`
-      })
-      .join(' ')
-  }
   async function load() {
     if (loading.value || document.visibilityState === 'hidden') return
     controller?.abort()
@@ -636,17 +826,13 @@
       ])
       if (metricsResult.status === 'rejected') throw metricsResult.reason
       overview.value = metricsResult.value.data
+      if (!selectedMetric.value && overview.value.series[0])
+        selectedMetric.value =
+          overview.value.series[0].key + '|' + (overview.value.series[0].service || '')
       serviceHealth.value =
         servicesResult.status === 'fulfilled' ? servicesResult.value.data : undefined
       alerts.value = alertsResult.status === 'fulfilled' ? alertsResult.value.data : undefined
       alertsLoadFailed.value = alertsResult.status === 'rejected' && !controller.signal.aborted
-      if (!trendOptions.value.some((item) => item.key === selectedTrend.value))
-        selectedTrend.value = trendOptions.value[0].key
-      if (
-        selectedService.value !== 'all' &&
-        !availableServices.value.includes(selectedService.value)
-      )
-        selectedService.value = 'all'
     } catch (error) {
       if (controller.signal.aborted) return
       const status = (error as { response?: { status?: number } }).response?.status
@@ -655,6 +841,94 @@
     } finally {
       if (!controller.signal.aborted) loading.value = false
     }
+  }
+  async function loadTraceRecords() {
+    traceRecordsLoading.value = true
+    traceRecordsError.value = ''
+    try {
+      agentPage.value = 1
+      judgePage.value = 1
+      const requests: Promise<unknown>[] = [agentApi.runs(1, undefined)]
+      if (isPlatformAdmin.value)
+        requests.push(observabilityApi.judgeTraces({ window: window.value }))
+      const [agentResult, judgeResult] = (await Promise.all(requests)) as [
+        Awaited<ReturnType<typeof agentApi.runs>>,
+        Awaited<ReturnType<typeof observabilityApi.judgeTraces>>?,
+      ]
+      agentRuns.value = agentResult.data.items.filter((run) => Boolean(run.trace_id))
+      agentPage.value = Math.min(agentPage.value, agentPageCount.value)
+      if (judgeResult) {
+        judgeTraces.value = judgeResult.data.traces
+        judgePage.value = Math.min(judgePage.value, judgePageCount.value)
+      }
+    } catch {
+      traceRecordsError.value = 'Trace 记录暂不可用，请稍后重试。'
+    } finally {
+      traceRecordsLoading.value = false
+    }
+  }
+  async function openTraceDetail(traceId: string) {
+    if (!traceId) return
+    selectedTraceId.value = traceId
+    traceDetail.value = undefined
+    selectedSpanId.value = ''
+    traceDetailError.value = ''
+    traceDetailLoading.value = true
+    try {
+      traceDetail.value = (await observabilityApi.trace(traceId)).data
+      selectedSpanId.value =
+        traceDetail.value.spans.find((span) => span.name === 'agent.run')?.span_id ||
+        traceDetail.value.spans[0]?.span_id ||
+        ''
+    } catch {
+      traceDetailError.value = 'Trace 详情暂不可用，请稍后重试。'
+    } finally {
+      traceDetailLoading.value = false
+    }
+  }
+  function closeTraceDetail() {
+    selectedTraceId.value = ''
+    traceDetail.value = undefined
+    selectedSpanId.value = ''
+    traceDetailError.value = ''
+  }
+  function spanName(value: string) {
+    return (
+      (
+        {
+          'gateway.http': 'Gateway HTTP 请求',
+          'agent.run': 'Agent 运行',
+          'agent.tool': 'Agent 工具调用',
+          'agent.rag.retrieve': 'Agent 知识检索',
+          'agent.grpc.client': 'Agent 业务 RPC',
+          'judge.submission.create': '创建判题提交',
+          'judge.outbox.publish': '发布判题任务',
+          'judge.worker.task': 'Worker 执行判题任务',
+          'judge.worker.result.publish': '发布判题结果',
+          'judge.worker.retry.publish': '发布判题重试',
+          'judge.result.consume': '消费判题结果',
+          'judge.result.apply': '应用判题结果',
+          'contest.result.consume': 'Contest 消费判题结果',
+          'contest.projection.apply': '更新 Contest 投影',
+          'contest.cache_outbox.apply': '应用排行榜缓存',
+        } as Record<string, string>
+      )[value] || '观测阶段'
+    )
+  }
+  function serviceName(value: string) {
+    return (
+      (
+        {
+          'gateway-service': 'Gateway',
+          'judge-service': '判题服务',
+          'judge-worker': '判题 Worker',
+          'contest-service': '比赛服务',
+          'agent-service': 'Agent 服务',
+          'agent-rag-worker': 'Agent RAG Worker',
+          'problem-service': '题目服务',
+        } as Record<string, string>
+      )[value] || value
+    )
   }
   function onVisibilityChange() {
     if (document.visibilityState === 'hidden') {
@@ -666,6 +940,7 @@
   }
   onMounted(() => {
     void load()
+    void loadTraceRecords()
     document.addEventListener('visibilitychange', onVisibilityChange)
     timer = setInterval(() => void load(), 30_000)
   })

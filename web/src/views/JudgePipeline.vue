@@ -11,7 +11,7 @@
 
     <div class="pipeline-note">
       <strong>如何使用</strong>
-      <span>先从提交详情查看业务状态，再沿 Trace 链接进入 Tempo 检查跨服务 Span。</span>
+      <span>先从提交详情查看业务状态，再在站内 Trace 详情页检查跨服务 Span。</span>
     </div>
 
     <form class="pipeline-note trace-search" @submit.prevent="searchTrace">
@@ -27,20 +27,10 @@
       <button class="button secondary" :disabled="searching">
         {{ searching ? '查询中…' : '查找 Trace' }}
       </button>
-      <a
-        v-if="trace?.link_available"
-        class="button"
-        :href="trace.tempo_url"
-        target="_blank"
-        rel="noopener noreferrer"
-        >在 Grafana 中打开</a
-      >
       <RouterLink v-if="trace?.link_available" class="button secondary" to="/monitoring/logs"
         >查看相关日志</RouterLink
       >
-      <span v-if="trace && !trace.link_available" class="muted"
-        >Grafana 未配置，或 Trace 尚不可用 / 未采样。</span
-      >
+      <span v-if="trace && !trace.link_available" class="muted">Trace 尚未配置或未采样。</span>
       <span v-else-if="trace?.link_available" class="muted"
         >搜索无结果可能表示未采样或已超过留存时间。</span
       >

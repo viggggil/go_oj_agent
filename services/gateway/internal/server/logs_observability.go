@@ -84,14 +84,14 @@ func serveObservabilityLogs(ctx context.Context, httpCtx khttp.Context) error {
 	}
 	q := httpCtx.Request().URL.Query()
 	for key := range q {
-		if key != "query" && key != "url" && key != "service" && key != "level" && key != "error_code" && key != "trace_id" && key != "start" && key != "end" && key != "limit" {
+		if key != "query" && key != "url" && key != "service" && key != "level" && key != "error_code" && key != "trace_id" && key != "span_id" && key != "start" && key != "end" && key != "limit" {
 			return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "Unsupported log query parameter")
 		}
 	}
 	if q.Get("query") != "" || q.Get("url") != "" {
 		return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "Arbitrary LogQL is not accepted")
 	}
-	service, level, code, traceID := q.Get("service"), q.Get("level"), q.Get("error_code"), q.Get("trace_id")
+	service, level, code, traceID, spanID := q.Get("service"), q.Get("level"), q.Get("error_code"), q.Get("trace_id"), q.Get("span_id")
 	system := platformAdministrator(rc.GetRoles())
 	if !system && service != "" && service != "agent-service" && service != "agent-rag-worker" {
 		return kerrors.New(http.StatusForbidden, "GATEWAY_OBSERVABILITY_FORBIDDEN", "Agent administrators may only query Agent logs")
@@ -114,6 +114,9 @@ func serveObservabilityLogs(ctx context.Context, httpCtx khttp.Context) error {
 	}
 	if traceID != "" && !traceIDPattern.MatchString(traceID) {
 		return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "Invalid trace ID")
+	}
+	if spanID != "" && (!spanIDPattern.MatchString(spanID) || traceID == "") {
+		return kerrors.BadRequest("GATEWAY_OBSERVABILITY_INVALID_ARGUMENT", "span_id requires a valid trace_id")
 	}
 	end := time.Now().UTC()
 	start := end.Add(-15 * time.Minute)
@@ -150,7 +153,7 @@ func serveObservabilityLogs(ctx context.Context, httpCtx khttp.Context) error {
 	if err != nil {
 		return writeLogsResponse(httpCtx, response)
 	}
-	query := buildLokiQuery(service, level, code, traceID, system)
+	query := buildLokiQuery(service, level, code, traceID, spanID, system)
 	values := url.Values{"query": {query}, "limit": {strconv.Itoa(limit)}, "direction": {"backward"}, "start": {strconv.FormatInt(start.UnixNano(), 10)}, "end": {strconv.FormatInt(end.UnixNano(), 10)}}
 	requestCtx, cancel := context.WithTimeout(ctx, logsQueryTimeout)
 	defer cancel()
@@ -226,7 +229,7 @@ func serveObservabilityLogsLink(ctx context.Context, httpCtx khttp.Context) erro
 	return serveObservabilityLogs(ctx, httpCtx)
 }
 
-func buildLokiQuery(service, level, code, traceID string, system bool) string {
+func buildLokiQuery(service, level, code, traceID, spanID string, system bool) string {
 	labels := []string{}
 	if service != "" {
 		labels = append(labels, `service_name="`+service+`"`)
@@ -245,6 +248,9 @@ func buildLokiQuery(service, level, code, traceID string, system bool) string {
 	}
 	if traceID != "" {
 		query += ` | trace_id="` + traceID + `"`
+	}
+	if spanID != "" {
+		query += ` | span_id="` + spanID + `"`
 	}
 	return query
 }

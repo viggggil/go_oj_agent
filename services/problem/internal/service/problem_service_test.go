@@ -112,7 +112,7 @@ func TestCreateProblemHandler(t *testing.T) {
 	repo := &serviceFakeRepository{}
 	server := NewProblemService(biz.NewProblemUsecase(repo))
 	response, err := server.CreateProblem(internalauth.WithPrincipal(context.Background(), internalauth.Principal{ActorID: 9, ActorRoles: []string{"admin"}}), &problemv1.CreateProblemRequest{
-		Problem: &problemv1.ProblemInput{Title: "Two Sum", Slug: "two-sum", Description: "Statement",
+		Problem: &problemv1.ProblemInput{Title: "Two Sum", Slug: "two-sum", Description: "Statement", Constraints: "n <= 10", Samples: []*problemv1.ProblemSample{{Input: "1 2", Output: "3"}},
 			Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536},
 	})
 	if err != nil {
@@ -120,6 +120,9 @@ func TestCreateProblemHandler(t *testing.T) {
 	}
 	if response.GetProblem().GetId() != 101 || response.GetProblem().GetCreatedBy() != 9 || response.GetProblem().GetStatus() != problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL {
 		t.Fatalf("CreateProblem() response = %+v", response.GetProblem())
+	}
+	if repo.found.Constraints != "n <= 10" || len(repo.found.Samples) != 1 || response.GetProblem().GetSamples()[0].GetOutput() != "3" {
+		t.Fatalf("statement fields were not forwarded: stored=%+v response=%+v", repo.found, response.GetProblem())
 	}
 }
 

@@ -21,6 +21,10 @@
         >语言<select v-model="filters.language">
           <option value="">全部语言</option>
           <option value="go">Go</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+          <option value="python">Python</option>
         </select></label
       >
       <label

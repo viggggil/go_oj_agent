@@ -1,6 +1,7 @@
 """后台任务 Trace 根节点、并发隔离和导出字段边界。"""
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
@@ -54,4 +55,37 @@ async def test_background_jobs_are_detached_roots_and_keep_context_isolated(
     assert failed.attributes["error.code"] == "AGENT_MODEL_QUOTA"
     assert failed.status.status_code.name == "ERROR"
     assert all("secret-marker" not in repr(item.attributes) for item in spans)
+    provider.shutdown()
+
+
+async def test_agent_business_spans_form_a_parented_tool_chain_without_raw_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(observability, "_tracer", provider.get_tracer("test"))
+
+    class ToolExecutor:
+        @observability.traced_async("agent.tool")
+        async def execute(self, name: str) -> SimpleNamespace:
+            return SimpleNamespace(ok=True, error_code=None)
+
+    async with observability.span("agent.run", {"agent.run_id": "run-1"}):
+        async with observability.business_step(2, "tool"):
+            await ToolExecutor().execute("get_problem")
+
+    spans = exporter.get_finished_spans()
+    by_name = {item.name: item for item in spans}
+    assert {"agent.run", "agent.step", "agent.tool"}.issubset(by_name)
+    run = by_name["agent.run"]
+    step = by_name["agent.step"]
+    tool = by_name["agent.tool"]
+    assert step.parent is not None and step.parent.span_id == run.context.span_id
+    assert tool.parent is not None and tool.parent.span_id == step.context.span_id
+    assert step.attributes is not None and step.attributes["agent.step"] == 2
+    assert step.attributes is not None and step.attributes["agent.phase"] == "tool"
+    assert tool.attributes is not None and tool.attributes["agent.tool"] == "get_problem"
+    assert tool.attributes is not None and tool.attributes["agent.status"] == "completed"
+    assert all("private" not in repr(item.attributes) for item in spans)
     provider.shutdown()

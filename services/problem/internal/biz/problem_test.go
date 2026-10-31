@@ -196,6 +196,9 @@ func TestCreateProblem(t *testing.T) {
 	if repo.input.Title != "Two Sum" || repo.input.Status != problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL || repo.input.CreatedBy != 7 {
 		t.Fatalf("repository problem = %+v", repo.input)
 	}
+	if repo.input.Constraints != "n <= 10" || len(repo.input.Samples) != 1 || repo.input.Samples[0] != (ProblemSample{Input: "1 2", Output: "3"}) {
+		t.Fatalf("statement fields were not preserved: %+v", repo.input)
+	}
 	if len(repo.tags) != 2 || repo.tags[0] != "array" || repo.tags[1] != "hash" {
 		t.Fatalf("repository tags = %v", repo.tags)
 	}
@@ -234,7 +237,23 @@ func validCreateInput() CreateProblemInput {
 	return CreateProblemInput{
 		Context: &commonv1.RequestContext{UserId: 7, Roles: []string{"admin"}},
 		Problem: Problem{Title: "Two Sum", Slug: "two-sum", Description: "Find two values.",
+			Constraints: "n <= 10", Samples: []ProblemSample{{Input: "1 2", Output: "3"}},
 			Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536},
+	}
+}
+
+func TestValidateStatementLimits(t *testing.T) {
+	for _, problem := range []Problem{
+		{Samples: []ProblemSample{{Input: strings.Repeat("a", 65537)}}},
+		{Constraints: strings.Repeat("a", 10001)},
+		{Samples: []ProblemSample{{}, {}, {}, {}}},
+	} {
+		if err := validateStatement(problem); !problemv1.IsProblemErrorReasonInvalidArgument(err) {
+			t.Fatalf("validateStatement(%+v) error = %v, want invalid argument", problem, err)
+		}
+	}
+	if err := validateStatement(Problem{Constraints: "范围", Samples: []ProblemSample{{Input: " 输入 ", Output: " 输出 "}}}); err != nil {
+		t.Fatalf("valid statement rejected: %v", err)
 	}
 }
 
@@ -553,6 +572,28 @@ func TestUpdateProblem(t *testing.T) {
 	}
 	if updated.Title != "New" || updated.CreatedBy != 3 || len(repo.tags) != 1 || repo.tags[0] != "dp" {
 		t.Fatalf("Update() = %+v, tags %v", updated, repo.tags)
+	}
+}
+
+func TestUpdateProblemPreservesStatementForLegacyClients(t *testing.T) {
+	current := Problem{
+		ID: 4, Status: problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL,
+		Constraints: "n <= 10", Samples: []ProblemSample{{Input: "1 2", Output: "3"}},
+		ActiveJudgeRevision: "01K5C6Y7N8P9Q0R1S2T3V4W5X6",
+	}
+	repo := &fakeProblemRepository{created: current}
+	updated, err := NewProblemUsecase(repo).Update(context.Background(),
+		&commonv1.RequestContext{UserId: 1, Roles: []string{"admin"}}, 4,
+		Problem{Title: "Renamed", Slug: "renamed", Description: "Statement",
+			Difficulty: problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY, TimeLimitMs: 1000, MemoryLimitKb: 65536}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Constraints != current.Constraints || len(updated.Samples) != 1 || updated.Samples[0] != current.Samples[0] {
+		t.Fatalf("legacy update lost statement metadata: %+v", updated)
+	}
+	if updated.ActiveJudgeRevision != "01K5C6Y7N8P9Q0R1S2T3V4W5X6" {
+		t.Fatalf("metadata update changed judge revision: %q", updated.ActiveJudgeRevision)
 	}
 }
 

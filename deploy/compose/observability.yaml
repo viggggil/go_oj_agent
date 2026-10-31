@@ -10,6 +10,7 @@ services:
       OTEL_DEPLOYMENT_ENVIRONMENT: development
       OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
       OBSERVABILITY_LOKI_URL: http://loki:3100
+      OBSERVABILITY_TEMPO_URL: http://tempo:3200
       OBSERVABILITY_GRAFANA_URL: ${OBSERVABILITY_GRAFANA_URL:-http://127.0.0.1:3000}
   judge-service:
     logging: *observability-json-logging

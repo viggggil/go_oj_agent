@@ -189,7 +189,13 @@ class DirectAnswer:
                     tools=tools,
                     result=result,
                 )
-                async with span("agent.model.attempt"):
+                async with span(
+                    "agent.model.attempt",
+                    {
+                        "agent.model": metric_attempt[1]["model"],
+                        "agent.attempt": index + 1,
+                    },
+                ) as model_span:
                     async for text in iterator:
                         answer_bytes += len(text.encode())
                         emitted = True
@@ -199,6 +205,13 @@ class DirectAnswer:
                             # 保留取消来源，供 ResponsesClient 的总超时上下文正确转换异常。
                             await iterator.athrow(error)
                             raise
+                    model_span.set_attribute("agent.status", "completed")
+                    if attempt.input_tokens >= 0:
+                        model_span.set_attribute("agent.input_tokens", attempt.input_tokens)
+                    if attempt.output_tokens >= 0:
+                        model_span.set_attribute("agent.output_tokens", attempt.output_tokens)
+                    if attempt.usage_source in {"provider", "estimated"}:
+                        model_span.set_attribute("agent.usage_source", attempt.usage_source)
                 if result is not None and result.calls:
                     answer_bytes = sum(
                         len(json.dumps(call.input_item()).encode()) for call in result.calls

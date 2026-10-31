@@ -16,12 +16,17 @@ func toProtoProblem(problem biz.Problem) *problemv1.Problem {
 		Title:         problem.Title,
 		Slug:          problem.Slug,
 		Description:   problem.Description,
+		Constraints:   problem.Constraints,
 		Difficulty:    problem.Difficulty,
 		TimeLimitMs:   problem.TimeLimitMs,
 		MemoryLimitKb: problem.MemoryLimitKb,
 		Status:        problem.Status,
 		CreatedBy:     problem.CreatedBy,
 		Tags:          tags,
+	}
+	result.Samples = make([]*problemv1.ProblemSample, 0, len(problem.Samples))
+	for _, sample := range problem.Samples {
+		result.Samples = append(result.Samples, &problemv1.ProblemSample{Input: sample.Input, Output: sample.Output})
 	}
 	if !problem.CreatedAt.IsZero() {
 		result.CreatedAt = timestamppb.New(problem.CreatedAt)
@@ -47,6 +52,17 @@ func toBizTestcaseContents(inputs []*problemv1.TestcaseInput) []biz.TestcaseCont
 	result := make([]biz.TestcaseContent, 0, len(inputs))
 	for _, input := range inputs {
 		result = append(result, biz.TestcaseContent{CaseNo: input.GetCaseNo(), Input: input.GetInputContent(), Output: input.GetOutputContent()})
+	}
+	return result
+}
+
+func toBizProblemSamples(inputs []*problemv1.ProblemSample) []biz.ProblemSample {
+	result := make([]biz.ProblemSample, 0, len(inputs))
+	for _, input := range inputs {
+		if input == nil {
+			continue
+		}
+		result = append(result, biz.ProblemSample{Input: input.GetInput(), Output: input.GetOutput()})
 	}
 	return result
 }

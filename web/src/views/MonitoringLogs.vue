@@ -1,5 +1,5 @@
 <template>
-  <section class="monitoring-page logs-page">
+  <section class="monitoring-page logs-page" :class="{ embedded }">
     <header class="page-header">
       <div>
         <p class="eyebrow">Loki observability</p>
@@ -8,7 +8,7 @@
       </div>
       <button class="button secondary" :disabled="loading" @click="load">刷新</button>
     </header>
-    <form class="logs-filters" @submit.prevent="load">
+    <form v-if="!props.hideFilters" class="logs-filters" @submit.prevent="load">
       <label
         >服务<select v-model="filters.service">
           <option value="">全部</option>
@@ -66,10 +66,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="item in result.logs"
-            :key="item.timestamp + item.message + (item.span_id || '')"
-          >
+          <tr v-for="item in pagedLogs" :key="item.timestamp + item.message + (item.span_id || '')">
             <td class="mono">{{ format(item.timestamp) }}</td>
             <td>
               <span class="log-level" :class="'log-' + item.level.toLowerCase()">{{
@@ -89,12 +86,28 @@
           </tr>
         </tbody>
       </table>
+      <nav v-if="pageCount > 1" class="logs-pagination" aria-label="日志分页">
+        <button class="button secondary" :disabled="page <= 1" @click="page--">上一页</button>
+        <span>第 {{ page }} / {{ pageCount }} 页（每页 10 条）</span>
+        <button class="button secondary" :disabled="page >= pageCount" @click="page++">
+          下一页
+        </button>
+      </nav>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+  const props = defineProps<{
+    traceId?: string
+    spanId?: string
+    embedded?: boolean
+    start?: string
+    end?: string
+    hideFilters?: boolean
+  }>()
+  const embedded = props.embedded || false
+  import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
   import { useRoute } from 'vue-router'
   import { useAuthStore } from '../stores/auth'
   import { observabilityApi, apiErrorMessage, type ObservabilityLogs } from '../api'
@@ -120,19 +133,29 @@
     service: '',
     level: '',
     error_code: '',
-    trace_id: typeof route.query.trace_id === 'string' ? route.query.trace_id : '',
+    trace_id:
+      props.traceId || (typeof route.query.trace_id === 'string' ? route.query.trace_id : ''),
+    span_id: props.spanId || '',
   })
   const range = ref('15m')
   const result = ref<ObservabilityLogs>()
   const loading = ref(false)
   const error = ref('')
+  const page = ref(1)
+  const pageSize = 10
+  const pageCount = computed(() =>
+    Math.max(1, Math.ceil((result.value?.logs.length || 0) / pageSize)),
+  )
+  const pagedLogs = computed(() =>
+    (result.value?.logs || []).slice((page.value - 1) * pageSize, page.value * pageSize),
+  )
   let controller: AbortController | null = null
   function rangeStart() {
     const end = new Date()
     const minutes = range.value === '24h' ? 1440 : range.value === '1h' ? 60 : 15
     return {
-      start: new Date(end.getTime() - minutes * 60_000).toISOString(),
-      end: end.toISOString(),
+      start: props.start || new Date(end.getTime() - minutes * 60_000).toISOString(),
+      end: props.end || end.toISOString(),
     }
   }
   function format(value: string) {
@@ -157,6 +180,7 @@
       result.value = (
         await observabilityApi.logs({ ...filters, ...window, limit: 200 }, current.signal)
       ).data
+      page.value = 1
     } catch (reason) {
       if ((reason as { code?: string })?.code !== 'ERR_CANCELED')
         error.value = apiErrorMessage(reason, '查询日志')
@@ -165,5 +189,12 @@
     }
   }
   onMounted(load)
+  watch(
+    () => props.spanId,
+    (value) => {
+      filters.span_id = value || ''
+      if (props.traceId) void load()
+    },
+  )
   onUnmounted(() => controller?.abort())
 </script>

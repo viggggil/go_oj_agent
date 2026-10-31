@@ -53,12 +53,8 @@
             <td>{{ format(run.started_at) }}</td>
             <td>{{ run.duration_ms == null ? '运行中' : run.duration_ms + ' ms' }}</td>
             <td>
-              <a
-                v-if="run.tempo_url"
-                :href="run.tempo_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                >在 Tempo 查看</a
+              <RouterLink v-if="run.trace_id" :to="`/monitoring/traces/${run.trace_id}`"
+                >查看 Trace</RouterLink
               >
               <code v-else-if="run.trace_id">{{ run.trace_id }}</code
               ><span v-else>无本地 Trace</span>
@@ -89,12 +85,8 @@
         <dd>{{ selected.finished_at ? format(selected.finished_at) : '运行中' }}</dd>
       </dl>
       <p class="observability-links">
-        <a
-          v-if="selected.tempo_url"
-          :href="selected.tempo_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          >在 Tempo 中打开 Trace</a
+        <RouterLink v-if="selected.trace_id" :to="`/monitoring/traces/${selected.trace_id}`"
+          >查看 Trace 详情</RouterLink
         >
         <RouterLink
           v-if="selected.trace_id"

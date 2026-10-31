@@ -100,18 +100,23 @@ func TestProblemManagementFlow(t *testing.T) {
 	decodeJSON(t, response.Body, &tokens)
 	response.Body.Close()
 
-	create := map[string]any{"problem": map[string]any{"title": "Integration A+B", "slug": fmt.Sprintf("integration-a-plus-b-%d", unique), "description": "Add two integers.", "difficulty": 1, "time_limit_ms": 1000, "memory_limit_kb": 65536, "tags": []string{"math"}}}
+	create := map[string]any{"problem": map[string]any{"title": "Integration A+B", "slug": fmt.Sprintf("integration-a-plus-b-%d", unique), "description": "Add two integers.", "difficulty": 1, "time_limit_ms": 1000, "memory_limit_kb": 65536, "tags": []string{"math"}, "constraints": "2 <= n <= 100", "samples": []map[string]string{{"input": "1 2\n", "output": "3\n"}}}}
 	var created struct {
 		Problem struct {
-			ID int64 `json:"id"`
+			ID          int64  `json:"id"`
+			Constraints string `json:"constraints"`
+			Samples     []struct {
+				Input  string `json:"input"`
+				Output string `json:"output"`
+			} `json:"samples"`
 		} `json:"problem"`
 	}
 	response = api.request(t, http.MethodPost, "/api/v1/problems", create, tokens.AccessToken)
 	assertStatus(t, response, http.StatusOK)
 	decodeJSON(t, response.Body, &created)
 	response.Body.Close()
-	if created.Problem.ID <= 0 {
-		t.Fatal("create problem did not return an id")
+	if created.Problem.ID <= 0 || created.Problem.Constraints != "2 <= n <= 100" || len(created.Problem.Samples) != 1 || created.Problem.Samples[0].Input != "1 2\n" || created.Problem.Samples[0].Output != "3\n" {
+		t.Fatalf("create problem did not preserve statement fields: %+v", created.Problem)
 	}
 
 	cacheKey := fmt.Sprintf("%s:problem:%d", integrationEnvOr("PROBLEM_TEST_REDIS_NAMESPACE", "go_oj_agent:problem"), created.Problem.ID)
@@ -137,13 +142,58 @@ func TestProblemManagementFlow(t *testing.T) {
 	if secondRevision == firstRevision {
 		t.Fatal("adding a testcase did not publish a new judge revision")
 	}
+	metadataUpdate := map[string]any{
+		"title": "Integration A+B", "slug": fmt.Sprintf("integration-a-plus-b-%d", unique),
+		"description": "Add two integers.", "difficulty": 1, "time_limit_ms": 1000,
+		"memory_limit_kb": 65536, "tags": []string{"math"},
+		"constraints": "2 <= n <= 200",
+		"samples":     []map[string]string{{"input": "4 5\n", "output": "9\n"}},
+	}
+	response = api.request(t, http.MethodPut, fmt.Sprintf("/api/v1/problems/%d", created.Problem.ID), metadataUpdate, tokens.AccessToken)
+	assertStatus(t, response, http.StatusOK)
+	var updatedStatement struct {
+		Problem struct {
+			Constraints string `json:"constraints"`
+			Samples     []struct {
+				Input  string `json:"input"`
+				Output string `json:"output"`
+			} `json:"samples"`
+		} `json:"problem"`
+	}
+	decodeJSON(t, response.Body, &updatedStatement)
+	response.Body.Close()
+	if updatedStatement.Problem.Constraints != "2 <= n <= 200" || len(updatedStatement.Problem.Samples) != 1 || updatedStatement.Problem.Samples[0].Input != "4 5\n" {
+		t.Fatalf("statement update did not round trip: %+v", updatedStatement.Problem)
+	}
+	if got := problemRevision(t, problemDB, created.Problem.ID); got != secondRevision {
+		t.Fatalf("statement-only update changed judge revision: got=%q want=%q", got, secondRevision)
+	}
+	legacyUpdate := map[string]any{
+		"title": "Integration A+B", "slug": fmt.Sprintf("integration-a-plus-b-%d", unique),
+		"description": "Legacy client edit.", "difficulty": 1, "time_limit_ms": 1000,
+		"memory_limit_kb": 65536, "tags": []string{"math"},
+	}
+	response = api.request(t, http.MethodPut, fmt.Sprintf("/api/v1/problems/%d", created.Problem.ID), legacyUpdate, tokens.AccessToken)
+	assertStatus(t, response, http.StatusOK)
+	decodeJSON(t, response.Body, &updatedStatement)
+	response.Body.Close()
+	if updatedStatement.Problem.Constraints != "2 <= n <= 200" || len(updatedStatement.Problem.Samples) != 1 || updatedStatement.Problem.Samples[0].Input != "4 5\n" {
+		t.Fatalf("legacy update dropped statement metadata: %+v", updatedStatement.Problem)
+	}
+	if got := problemRevision(t, problemDB, created.Problem.ID); got != secondRevision {
+		t.Fatalf("legacy statement-preserving update changed judge revision: got=%q want=%q", got, secondRevision)
+	}
 	secondManifest := loadJudgeManifest(t, minioClient, created.Problem.ID, secondRevision)
 	assertManifestCases(t, secondManifest, created.Problem.ID, secondRevision, []int32{1, 2})
 	assertManifestObjects(t, minioClient, secondManifest)
 
 	response = api.request(t, http.MethodGet, fmt.Sprintf("/api/v1/problems/%d", created.Problem.ID), nil, tokens.AccessToken)
 	assertStatus(t, response, http.StatusOK)
+	decodeJSON(t, response.Body, &updatedStatement)
 	response.Body.Close()
+	if updatedStatement.Problem.Constraints != "2 <= n <= 200" || len(updatedStatement.Problem.Samples) != 1 || updatedStatement.Problem.Samples[0].Output != "9\n" {
+		t.Fatalf("stored statement fields were not returned: %+v", updatedStatement.Problem)
+	}
 	response = api.request(t, http.MethodGet, fmt.Sprintf("/api/v1/problems/%d/testcases", created.Problem.ID), nil, tokens.AccessToken)
 	assertStatus(t, response, http.StatusOK)
 	response.Body.Close()
