@@ -48,6 +48,8 @@ func (s *ProblemService) CreateProblem(ctx context.Context, req *problemv1.Creat
 			Title:         in.GetTitle(),
 			Slug:          in.GetSlug(),
 			Description:   in.GetDescription(),
+			Constraints:   in.GetConstraints(),
+			Samples:       toBizProblemSamples(in.GetSamples()),
 			Difficulty:    in.GetDifficulty(),
 			TimeLimitMs:   in.GetTimeLimitMs(),
 			MemoryLimitKb: in.GetMemoryLimitKb(),
@@ -114,8 +116,8 @@ func (s *ProblemService) UpdateProblem(ctx context.Context, req *problemv1.Updat
 		return nil, biz.ErrorInvalidArgument("trusted principal is missing")
 	}
 	problem, err := s.uc.Update(ctx, requestContext, req.GetProblemId(), biz.Problem{
-		Title: in.GetTitle(), Description: in.GetDescription(), Slug: in.GetSlug(), Difficulty: in.GetDifficulty(),
-		TimeLimitMs: in.GetTimeLimitMs(), MemoryLimitKb: in.GetMemoryLimitKb(),
+		Title: in.GetTitle(), Description: in.GetDescription(), Constraints: in.GetConstraints(), Slug: in.GetSlug(), Difficulty: in.GetDifficulty(),
+		TimeLimitMs: in.GetTimeLimitMs(), MemoryLimitKb: in.GetMemoryLimitKb(), Samples: toBizProblemSamples(in.GetSamples()),
 	}, in.GetTags())
 	if err != nil {
 		return nil, err

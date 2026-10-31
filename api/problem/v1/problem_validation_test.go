@@ -2,6 +2,7 @@ package problemv1
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
@@ -88,5 +89,37 @@ func TestJudgeProfileContractValidate(t *testing.T) {
 	profile.ActiveJudgeRevision = "mutable"
 	if err := profile.Validate(); err == nil {
 		t.Fatal("expected invalid revision to fail validation")
+	}
+}
+
+func TestProblemInputStatementValidation(t *testing.T) {
+	legacy := &ProblemInput{
+		Title: "A", Slug: "a", Description: "Statement",
+		Difficulty:  ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+	}
+	if err := legacy.Validate(); err != nil {
+		t.Fatalf("legacy input without optional statement metadata rejected: %v", err)
+	}
+	valid := *legacy
+	valid.Samples = []*ProblemSample{{Input: "1 2", Output: "3"}, {Input: "2 3", Output: "5"}, {Input: "3 4", Output: "7"}}
+	valid.Constraints = "n <= 10"
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid statement metadata rejected: %v", err)
+	}
+	tooMany := valid
+	tooMany.Samples = append(append([]*ProblemSample(nil), valid.Samples...), &ProblemSample{})
+	if err := tooMany.Validate(); err == nil {
+		t.Fatal("more than 3 samples were accepted")
+	}
+	tooLarge := valid
+	tooLarge.Constraints = strings.Repeat("x", 10001)
+	if err := tooLarge.Validate(); err == nil {
+		t.Fatal("constraints over 10000 bytes were accepted")
+	}
+	tooLargeSample := valid
+	tooLargeSample.Samples = []*ProblemSample{{Input: strings.Repeat("x", 65537)}}
+	if err := tooLargeSample.Validate(); err == nil {
+		t.Fatal("sample input over 65536 bytes was accepted")
 	}
 }

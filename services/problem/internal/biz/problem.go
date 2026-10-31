@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	commonv1 "github.com/viggggil/go_oj_agent/api/common/v1"
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
@@ -17,6 +18,8 @@ type Problem struct {
 	Title               string
 	Slug                string
 	Description         string
+	Constraints         string
+	Samples             []ProblemSample
 	Difficulty          problemv1.ProblemDifficulty
 	TimeLimitMs         int32
 	MemoryLimitKb       int32
@@ -26,6 +29,11 @@ type Problem struct {
 	Tags                []Tag
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+type ProblemSample struct {
+	Input  string `json:"input"`
+	Output string `json:"output"`
 }
 
 type Tag struct {
@@ -105,6 +113,9 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	if err := requireAdmin(requestContext); err != nil {
 		return Problem{}, err
 	}
+	if err := validateStatement(input); err != nil {
+		return Problem{}, err
+	}
 	unlock := uc.lockProblem(problemID)
 	defer unlock()
 	current, err := uc.repo.FindByID(ctx, problemID)
@@ -114,10 +125,19 @@ func (uc *ProblemUsecase) Update(ctx context.Context, requestContext *commonv1.R
 	if current.Status == problemv1.ProblemStatus_PROBLEM_STATUS_ARCHIVED {
 		return Problem{}, ErrorInvalidStatus("archived problem cannot be updated")
 	}
+	// Older clients do not send the statement metadata fields. Keep existing
+	// public statement content when those fields are omitted from an update.
+	if strings.TrimSpace(input.Constraints) == "" {
+		input.Constraints = current.Constraints
+	}
+	if len(input.Samples) == 0 {
+		input.Samples = current.Samples
+	}
 	input.ID = problemID
 	input.Title = strings.TrimSpace(input.Title)
 	input.Slug = strings.TrimSpace(input.Slug)
 	input.Description = strings.TrimSpace(input.Description)
+	input.Constraints = strings.TrimSpace(input.Constraints)
 	input.Status = current.Status
 	input.CreatedBy = current.CreatedBy
 	input.CreatedAt = current.CreatedAt
@@ -275,11 +295,29 @@ func normalizeTags(values []string) []string {
 	return tags
 }
 
+func validateStatement(problem Problem) error {
+	if !utf8.ValidString(problem.Constraints) || len(problem.Constraints) > 10000 {
+		return ErrorInvalidArgument("constraints must be valid UTF-8 and at most 10000 bytes")
+	}
+	if len(problem.Samples) > 3 {
+		return ErrorInvalidArgument("at most 3 samples are allowed")
+	}
+	for _, sample := range problem.Samples {
+		if !utf8.ValidString(sample.Input) || !utf8.ValidString(sample.Output) || len(sample.Input) > 65536 || len(sample.Output) > 65536 {
+			return ErrorInvalidArgument("sample input and output must be valid UTF-8 and at most 65536 bytes each")
+		}
+	}
+	return nil
+}
+
 func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) (Problem, error) {
 	if uc == nil || uc.repo == nil {
 		return Problem{}, ErrorInternal("problem repository is not configured")
 	}
 	if err := requireAdmin(input.Context); err != nil {
+		return Problem{}, err
+	}
+	if err := validateStatement(input.Problem); err != nil {
 		return Problem{}, err
 	}
 	if len(input.Testcases) > 0 && (uc.testcases == nil || uc.objects == nil || uc.compensator == nil) {
@@ -289,6 +327,7 @@ func (uc *ProblemUsecase) Create(ctx context.Context, input CreateProblemInput) 
 	problem.Title = strings.TrimSpace(problem.Title)
 	problem.Slug = strings.TrimSpace(problem.Slug)
 	problem.Description = strings.TrimSpace(problem.Description)
+	problem.Constraints = strings.TrimSpace(problem.Constraints)
 	problem.Status = problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL
 	problem.CreatedBy = input.Context.GetUserId()
 	created, err := uc.repo.Create(ctx, problem, normalizeTags(input.Tags))

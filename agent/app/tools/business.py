@@ -85,6 +85,8 @@ def _problem(value: Any) -> dict[str, Any]:
         "title": value.title,
         "slug": value.slug,
         "description": value.description,
+        "constraints": value.constraints,
+        "samples": [{"input": sample.input, "output": sample.output} for sample in value.samples],
         "difficulty": value.difficulty,
         "time_limit_ms": value.time_limit_ms,
         "memory_limit_kb": value.memory_limit_kb,

@@ -23,7 +23,49 @@
           :disabled="archived"
           required
         ></textarea></label
-      ><label
+      ><label class="wide"
+        >数据范围<textarea
+          v-model="form.constraints"
+          :disabled="archived"
+          maxlength="10000"
+          required
+          placeholder="例如：\n- 1 ≤ n ≤ 2×10⁵\n- |aᵢ| ≤ 10⁹"
+        ></textarea>
+      </label>
+      <div class="wide problem-samples-editor">
+        <div class="section-head"><h2>样例（最多 3 组）</h2></div>
+        <div v-for="(sample, index) in form.samples" :key="index" class="sample-editor-row">
+          <h3>样例 {{ index + 1 }}</h3>
+          <label
+            >输入<textarea
+              v-model="sample.input"
+              :disabled="archived"
+              maxlength="65536"
+              required
+            ></textarea>
+          </label>
+          <label
+            >输出<textarea
+              v-model="sample.output"
+              :disabled="archived"
+              maxlength="65536"
+              required
+            ></textarea>
+          </label>
+          <button v-if="!archived" type="button" class="danger-text" @click="removeSample(index)">
+            删除
+          </button>
+        </div>
+        <button
+          v-if="!archived && form.samples.length < 3"
+          type="button"
+          class="button secondary"
+          @click="addSample"
+        >
+          添加样例
+        </button>
+      </div>
+      <label
         >难度<select v-model.number="form.difficulty" :disabled="archived">
           <option :value="1">简单</option>
           <option :value="2">中等</option>
@@ -120,6 +162,8 @@
     time_limit_ms: 1000,
     memory_limit_kb: 65536,
     tags: [],
+    constraints: '',
+    samples: [{ input: '', output: '' }],
   })
   async function save() {
     if (archived.value) return
@@ -143,6 +187,17 @@
     if (normalizedTags.some((tag) => tag.length > 64))
       return failValidation('单个标签不能超过 64 字符')
     form.tags = normalizedTags
+    const byteLength = (value: string) => new TextEncoder().encode(value).length
+    if (!form.constraints.trim()) return failValidation('请填写数据范围')
+    if (form.samples.length < 1 || form.samples.length > 3)
+      return failValidation('请填写 1 至 3 组样例')
+    if (byteLength(form.constraints) > 10000) return failValidation('数据范围不能超过 10,000 字节')
+    if (
+      form.samples.some(
+        (sample) => byteLength(sample.input) > 65536 || byteLength(sample.output) > 65536,
+      )
+    )
+      return failValidation('每组样例的输入和输出分别不能超过 65,536 字节')
     try {
       const data = editing
         ? (await problemApi.update(id, form)).data
@@ -155,6 +210,12 @@
     } finally {
       saving.value = false
     }
+  }
+  function addSample() {
+    if (form.samples.length < 3) form.samples.push({ input: '', output: '' })
+  }
+  function removeSample(index: number) {
+    form.samples.splice(index, 1)
   }
   function failValidation(text: string) {
     messageIsError.value = true
@@ -224,6 +285,11 @@
         difficulty: data.problem.difficulty,
         time_limit_ms: data.problem.time_limit_ms,
         memory_limit_kb: data.problem.memory_limit_kb,
+        constraints: data.problem.constraints || '',
+        samples: (data.problem.samples || []).map((sample) => ({
+          input: sample.input,
+          output: sample.output,
+        })),
       })
       tags.value = data.problem.tags.map((t) => t.name).join(', ')
       await loadTestcases()

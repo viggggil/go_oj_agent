@@ -276,6 +276,42 @@ func (m *Problem) validate(all bool) error {
 		}
 	}
 
+	for idx, item := range m.GetSamples() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ProblemValidationError{
+						field:  fmt.Sprintf("Samples[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ProblemValidationError{
+						field:  fmt.Sprintf("Samples[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ProblemValidationError{
+					field:  fmt.Sprintf("Samples[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Constraints
+
 	if len(errors) > 0 {
 		return ProblemMultiError(errors)
 	}
@@ -352,6 +388,128 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ProblemValidationError{}
+
+// Validate checks the field values on ProblemSample with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ProblemSample) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ProblemSample with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ProblemSampleMultiError, or
+// nil if none found.
+func (m *ProblemSample) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ProblemSample) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetInput()) > 65536 {
+		err := ProblemSampleValidationError{
+			field:  "Input",
+			reason: "value length must be at most 65536 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetOutput()) > 65536 {
+		err := ProblemSampleValidationError{
+			field:  "Output",
+			reason: "value length must be at most 65536 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return ProblemSampleMultiError(errors)
+	}
+
+	return nil
+}
+
+// ProblemSampleMultiError is an error wrapping multiple validation errors
+// returned by ProblemSample.ValidateAll() if the designated constraints
+// aren't met.
+type ProblemSampleMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ProblemSampleMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ProblemSampleMultiError) AllErrors() []error { return m }
+
+// ProblemSampleValidationError is the validation error returned by
+// ProblemSample.Validate if the designated constraints aren't met.
+type ProblemSampleValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ProblemSampleValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ProblemSampleValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ProblemSampleValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ProblemSampleValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ProblemSampleValidationError) ErrorName() string { return "ProblemSampleValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ProblemSampleValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sProblemSample.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ProblemSampleValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ProblemSampleValidationError{}
 
 // Validate checks the field values on Tag with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
@@ -783,6 +941,73 @@ func (m *ProblemInput) validate(all bool) error {
 			errors = append(errors, err)
 		}
 
+	}
+
+	if len(m.GetSamples()) > 3 {
+		err := ProblemInputValidationError{
+			field:  "Samples",
+			reason: "value must contain no more than 3 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetSamples() {
+		_, _ = idx, item
+
+		if item == nil {
+			err := ProblemInputValidationError{
+				field:  fmt.Sprintf("Samples[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ProblemInputValidationError{
+						field:  fmt.Sprintf("Samples[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ProblemInputValidationError{
+						field:  fmt.Sprintf("Samples[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ProblemInputValidationError{
+					field:  fmt.Sprintf("Samples[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(m.GetConstraints()) > 10000 {
+		err := ProblemInputValidationError{
+			field:  "Constraints",
+			reason: "value length must be at most 10000 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
 	}
 
 	if len(errors) > 0 {

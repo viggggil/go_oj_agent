@@ -25,12 +25,18 @@ export interface ProblemSummary {
 }
 export interface Problem extends ProblemSummary {
   description: string
+  constraints: string
+  samples: ProblemSample[]
   time_limit_ms: number
   memory_limit_kb: number
   created_by: number
   tags: Tag[]
   created_at: string
   updated_at: string
+}
+export interface ProblemSample {
+  input: string
+  output: string
 }
 export interface ProblemInput {
   title: string
@@ -40,6 +46,8 @@ export interface ProblemInput {
   time_limit_ms: number
   memory_limit_kb: number
   tags: string[]
+  constraints: string
+  samples: ProblemSample[]
 }
 export type ContestStatus = 0 | 1 | 2 | 3 | 4 | string
 export interface ContestProblem {

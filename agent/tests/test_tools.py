@@ -172,6 +172,8 @@ class FakeProblemClient:
             title="二分查找",
             slug="binary-search",
             description="有界题面",
+            constraints="1 <= n <= 100",
+            samples=[problem_pb2.ProblemSample(input="3\\n1 2 3", output="2")],
             difficulty=2,
             time_limit_ms=1000,
             memory_limit_kb=65536,
@@ -268,6 +270,24 @@ async def test_run_code_is_registered_with_bounded_input_and_output() -> None:
         ),
     )
     assert rejected.error_code == "TOOL_INVALID_ARGUMENT"
+
+
+@pytest.mark.asyncio
+async def test_get_problem_includes_public_samples_and_constraints() -> None:
+    clients = BusinessClients(FakeProblemClient(), FakeJudgeClient())  # type: ignore[arg-type]
+    registry = build_business_tool_registry(clients)
+    result = await ToolExecutor(registry).execute(
+        "get_problem",
+        {"problem_id": 3},
+        ToolContext(
+            principal=Principal(user_id=7, request_id="request-1"),
+            remaining_seconds=60,
+            allowed_tools=frozenset({"get_problem"}),
+        ),
+    )
+    assert result.ok
+    assert result.data["data"]["problem"]["constraints"] == "1 <= n <= 100"
+    assert result.data["data"]["problem"]["samples"] == [{"input": "3\\n1 2 3", "output": "2"}]
 
 
 @pytest.mark.asyncio

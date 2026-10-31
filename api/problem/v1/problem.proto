@@ -68,6 +68,13 @@ message Problem {
   repeated Tag tags = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
+  repeated ProblemSample samples = 13;
+  string constraints = 14;
+}
+
+message ProblemSample {
+  string input = 1 [(validate.rules).string = {max_bytes: 65536}];
+  string output = 2 [(validate.rules).string = {max_bytes: 65536}];
 }
 
 message Tag {
@@ -109,6 +116,11 @@ message ProblemInput {
     max_items: 20,
     items: {string: {min_len: 1, max_len: 64}}
   }];
+  repeated ProblemSample samples = 8 [(validate.rules).repeated = {
+    max_items: 3,
+    items: {message: {required: true}}
+  }];
+  string constraints = 9 [(validate.rules).string = {max_bytes: 10000}];
 }
 
 message CreateProblemRequest {

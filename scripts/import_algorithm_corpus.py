@@ -14,6 +14,8 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 
+from problem_statement import statement_details
+
 ROOT = Path(__file__).resolve().parents[1] / 'data/algorithm-corpus'
 PREFIX = '/api/v1/admin/agent/rag'
 
@@ -66,7 +68,7 @@ def run(args):
                 payload = {'problem': {
                     'title': item['title'], 'slug': slug,
                     'description': (folder / 'statement.md').read_text(),
-                    'difficulty': 2,
+                    'difficulty': 2, **statement_details(folder),
                     'time_limit_ms': 5000, 'memory_limit_kb': 262144, 'tags': item['tags'],
                 }, 'testcases': tests}
                 try:

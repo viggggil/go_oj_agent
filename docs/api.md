@@ -47,9 +47,9 @@ Tempo 未配置、查询失败、无采样数据分别返回 `not_configured`、
 
 ### Loki 受控日志查询
 
-`GET /api/v1/admin/observability/logs` 由 Gateway 使用服务端 `OBSERVABILITY_LOKI_URL` 和固定 LogQL 模板查询 Loki。允许参数为 `service`、`level=DEBUG|INFO|WARN|ERROR`、`error_code`、32 位小写十六进制 `trace_id`、RFC3339 `start`/`end` 和 `limit=1..200`。默认时间窗为最近 15 分钟，最大范围 24 小时。接口不接受任意 LogQL、Loki URL、label selector 或其他参数。平台管理员可查固定系统服务；`agent_admin` 的服务范围只包括 Agent/Agent RAG。普通用户拒绝访问。
+`GET /api/v1/admin/observability/logs` 由 Gateway 使用服务端 `OBSERVABILITY_LOKI_URL` 和固定 LogQL 模板查询 Loki。允许参数为 `service`、`level=DEBUG|INFO|WARN|ERROR`、`error_code`、32 位小写十六进制 `trace_id`、16 位小写十六进制 `span_id`、RFC3339 `start`/`end` 和 `limit=1..200`。`span_id` 必须与有效的 `trace_id` 一起提供，用于查看某个 Trace 阶段的日志。默认时间窗为最近 15 分钟，最大范围 24 小时。接口不接受任意 LogQL、Loki URL、label selector 或其他参数。平台管理员可查固定系统服务；`agent_admin` 的服务范围只包括 Agent/Agent RAG。普通用户拒绝访问。
 
-响应仅投影 `timestamp`、`level`、`service_name`、`message`、`error_code`、`trace_id`、`span_id` 和允许的 `run_id`/`submission_id`，不返回 Loki stream labels 或内部地址。状态为 `available`、`no_data`、`not_configured`、`unavailable`。响应不缓存，Loki 请求 2.5 秒超时，最大读取 1 MiB。`GET /api/v1/admin/observability/logs/link?trace_id=...` 是 Trace 详情页可使用的受控入口，仍经同一权限、服务范围和时间窗约束；前端应直接使用返回日志数据，不构造 Loki/Grafana URL。
+响应仅投影 `timestamp`、`level`、`service_name`、`message`、`error_code`、`trace_id`、`span_id` 和允许的 `run_id`/`submission_id`，不返回 Loki stream labels 或内部地址。状态为 `available`、`no_data`、`not_configured`、`unavailable`。响应不缓存，Loki 请求 2.5 秒超时，最大读取 1 MiB。`GET /api/v1/admin/observability/logs/link?trace_id=...&span_id=...` 是 Trace 详情页可使用的受控入口，`span_id` 可选且必须与 Trace ID 一起提供，仍经同一权限、服务范围和时间窗约束；前端应直接使用返回日志数据，不构造 Loki/Grafana URL。
 
 - `admin`、`system_admin` 获取 HTTP、Judge、Contest、Agent 和 Collector 观测摘要及 Trace/Span 详情。
 - `agent_admin` 仅获取 Agent Run、模型、Tool、RAG、后台任务系列、Collector 抓取状态和 Agent Trace；响应不含系统指标或判题 Trace。
@@ -412,15 +412,23 @@ Response：
 
 返回题面、限制、标签等公开信息。
 
+响应中的 `constraints` 是管理员填写的数据范围文本，`samples` 最多包含 3 组题面样例，
+每组包含 `input` 和 `output`。这两类内容只用于题面展示，不会被用作隐藏判题测试点。
+
 普通用户接口不返回测试用例元信息、MinIO object key 或隐藏测试数据正文。
 
 ### POST `/api/v1/problems`
 
 管理员创建题目。
 
-### PATCH `/api/v1/problems/{problem_id}`
+`problem` 可选字段：`constraints`（最多 10,000 字节）和 `samples`（最多 3 组，每组输入、
+输出最多 65,536 字节）。
+
+### PUT `/api/v1/problems/{problem_id}`
 
 管理员更新题目。
+
+更新题面时可同时修改数据范围和最多 3 组样例；该修改不会改变判题 revision。兼容旧版客户端时，更新请求若省略数据范围或样例，会保留当前字段值。
 
 ### DELETE `/api/v1/problems/{problem_id}`
 

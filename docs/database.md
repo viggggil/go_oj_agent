@@ -153,6 +153,8 @@ Refresh Token 元数据优先放 Redis；如果后续需要长期审计，再新
 | `title` | VARCHAR(255) | NOT NULL |
 | `slug` | VARCHAR(255) | UNIQUE |
 | `description` | TEXT | NOT NULL |
+| `constraints_text` | TEXT | 数据范围文本，默认空，最多 10,000 UTF-8 字节 |
+| `samples_json` | MEDIUMTEXT | 最多 3 组公开样例的 JSON，默认 `[]`，输入输出各最多 65,536 字节 |
 | `difficulty` | VARCHAR(32) | NOT NULL |
 | `time_limit_ms` | INT | NOT NULL |
 | `memory_limit_kb` | INT | NOT NULL |
@@ -169,6 +171,12 @@ UNIQUE(slug)
 INDEX(status, difficulty, id)
 INDEX(created_by, created_at)
 ```
+
+迁移 `000006_add_problem_samples_constraints` 由 Problem Service 的 `oj_problem` schema 保存公开题面信息。
+MySQL 8 的表达式默认值保证旧代码创建题目时仍可省略新列；应用需先迁移后部署。
+题面修改复用已有事务及 Redis 删除规则（Problem Service 所有，TTL 10 分钟），不改变 judge revision、MinIO 或 MQ。
+新字段不参与列表查询和索引。Down 迁移会删除公开样例和数据范围，需先备份；不会删除判题数据。
+现有语料题库通过 `scripts/backfill_problem_statements.py --token-file <管理员令牌文件>` 经 API 补齐，只写空字段，可重跑。
 
 ## 5.2 `tags`
 

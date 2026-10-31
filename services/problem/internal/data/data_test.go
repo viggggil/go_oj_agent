@@ -30,7 +30,7 @@ func TestArchiveProblemRepository(t *testing.T) {
 	defer db.Close()
 	now := time.Now()
 	mock.ExpectExec("UPDATE problems SET status").WithArgs("PROBLEM_STATUS_ARCHIVED", int64(3), "PROBLEM_STATUS_NORMAL").WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}).AddRow(3, "A+B", "a-plus-b", "S", "PROBLEM_DIFFICULTY_EASY", 1000, 65536, nil, "PROBLEM_STATUS_ARCHIVED", 1, now, now))
+	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id", "title", "slug", "description", "constraints_text", "samples_json", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}).AddRow(3, "A+B", "a-plus-b", "S", "", "[]", "PROBLEM_DIFFICULTY_EASY", 1000, 65536, nil, "PROBLEM_STATUS_ARCHIVED", 1, now, now))
 	mock.ExpectQuery("SELECT t.id, t.name").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id", "name"}))
 	got, err := NewStoreSet(db).Archive(context.Background(), 3)
 	if err != nil || got.ID != 3 {
@@ -67,8 +67,8 @@ func TestFindProblemByID(t *testing.T) {
 	defer db.Close()
 	now := time.Now().UTC()
 	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(9)).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}).
-			AddRow(9, "A+B", "a-plus-b", "Statement", "PROBLEM_DIFFICULTY_EASY", 1000, 65536, "01K5C6Y7N8P9Q0R1S2T3V4W5X6", "PROBLEM_STATUS_NORMAL", 1, now, now),
+		sqlmock.NewRows([]string{"id", "title", "slug", "description", "constraints_text", "samples_json", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}).
+			AddRow(9, "A+B", "a-plus-b", "Statement", "1 <= n <= 10", `[{"input":"1 2","output":"3"}]`, "PROBLEM_DIFFICULTY_EASY", 1000, 65536, "01K5C6Y7N8P9Q0R1S2T3V4W5X6", "PROBLEM_STATUS_NORMAL", 1, now, now),
 	)
 	mock.ExpectQuery("SELECT t.id, t.name").WithArgs(int64(9)).WillReturnRows(
 		sqlmock.NewRows([]string{"id", "name"}).AddRow(2, "math"),
@@ -80,6 +80,9 @@ func TestFindProblemByID(t *testing.T) {
 	}
 	if problem.Difficulty != problemv1.ProblemDifficulty_PROBLEM_DIFFICULTY_EASY || problem.Status != problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL || len(problem.Tags) != 1 {
 		t.Fatalf("FindByID() = %+v", problem)
+	}
+	if problem.Constraints != "1 <= n <= 10" || len(problem.Samples) != 1 || problem.Samples[0] != (biz.ProblemSample{Input: "1 2", Output: "3"}) {
+		t.Fatalf("statement fields = %+v", problem)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
@@ -93,7 +96,7 @@ func TestFindProblemByIDNotFound(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectQuery("SELECT id, title, slug, description").WithArgs(int64(404)).WillReturnRows(
-		sqlmock.NewRows([]string{"id", "title", "slug", "description", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}),
+		sqlmock.NewRows([]string{"id", "title", "slug", "description", "constraints_text", "samples_json", "difficulty", "time_limit_ms", "memory_limit_kb", "active_judge_revision", "status", "created_by", "created_at", "updated_at"}),
 	)
 	_, err = NewStoreSet(db).FindByID(context.Background(), 404)
 	if !problemv1.IsProblemErrorReasonNotFound(err) {
@@ -288,7 +291,7 @@ func TestCreateProblemRepositoryCommitsProblemAndTags(t *testing.T) {
 	now := time.Now().UTC()
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO problems").WithArgs(
-		"Two Sum", "two-sum", "Statement", "PROBLEM_DIFFICULTY_EASY", int32(1000), int32(65536), "PROBLEM_STATUS_NORMAL", int64(7),
+		"Two Sum", "two-sum", "Statement", "", "[]", "PROBLEM_DIFFICULTY_EASY", int32(1000), int32(65536), "PROBLEM_STATUS_NORMAL", int64(7),
 	).WillReturnResult(sqlmock.NewResult(42, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name FROM tags WHERE name = ?")).WithArgs("array").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(3, "array"))
@@ -380,9 +383,11 @@ func TestUpdateProblemRepositoryReplacesTags(t *testing.T) {
 	defer db.Close()
 	p := repositoryProblem()
 	p.ID = 4
+	p.Constraints = "n <= 10"
+	p.Samples = []biz.ProblemSample{{Input: " 1 2 \n", Output: "3\n"}}
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE problems SET").
-		WithArgs(p.Title, p.Slug, p.Description, p.Difficulty.String(), p.TimeLimitMs, p.MemoryLimitKb, "", p.ID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String(), "").
+		WithArgs(p.Title, p.Slug, p.Description, p.Constraints, `[{"input":" 1 2 \n","output":"3\n"}]`, p.Difficulty.String(), p.TimeLimitMs, p.MemoryLimitKb, "", p.ID, problemv1.ProblemStatus_PROBLEM_STATUS_NORMAL.String(), "").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("DELETE FROM problem_tags").WithArgs(int64(4)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("SELECT id, name FROM tags").WithArgs("dp").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(2, "dp"))

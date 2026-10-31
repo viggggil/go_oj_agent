@@ -27,20 +27,24 @@
       <label
         >语言<select v-model="form.language">
           <option value="go">Go</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+          <option value="python">Python</option>
         </select></label
       >
       <label
-        >源码文件<input ref="fileInput" type="file" accept=".go,.txt,text/plain" @change="readFile"
+        >源码文件<input ref="fileInput" type="file" :accept="sourceAccept" @change="readFile"
       /></label>
       <label class="wide"
         >代码<textarea
           v-model="form.source_code"
           class="code-input"
           spellcheck="false"
-          placeholder="package main&#10;&#10;func main() {&#10;}"
+          :placeholder="sourcePlaceholder"
           required
         ></textarea
-        ><small>{{ form.source_code.length.toLocaleString() }} / 1,048,576 字节</small></label
+        ><small>{{ sourceByteLength.toLocaleString() }} / 1,048,576 字节</small></label
       >
       <div class="wide actions">
         <button :disabled="submitting || !valid">{{ submitting ? '提交中…' : '提交代码' }}</button>
@@ -70,11 +74,33 @@
     language: 'go',
     source_code: '',
   })
+  const sourceByteLength = computed(() => new TextEncoder().encode(form.source_code).length)
   const valid = computed(
     () =>
       form.problem_id > 0 &&
       form.source_code.trim().length > 0 &&
-      new TextEncoder().encode(form.source_code).length <= 1048576,
+      sourceByteLength.value <= 1048576,
+  )
+  const sourceAccept = computed(() => {
+    const extensions: Record<string, string> = {
+      c: '.c',
+      cpp: '.cpp,.cc,.cxx',
+      go: '.go',
+      java: '.java',
+      python: '.py',
+    }
+    return `${extensions[form.language] || '.txt'},.txt,text/plain`
+  })
+
+  const sourcePlaceholder = computed(
+    () =>
+      ({
+        go: 'package main\n\nfunc main() {\n}',
+        c: '#include <stdio.h>\n\nint main(void) {\n    return 0;\n}',
+        cpp: '#include <iostream>\n\nint main() {\n    return 0;\n}',
+        java: 'public class Main {\n    public static void main(String[] args) {\n    }\n}',
+        python: 'import sys\n\ndef main():\n    pass\n\nif __name__ == "__main__":\n    main()',
+      })[form.language] || '',
   )
 
   async function readFile() {
