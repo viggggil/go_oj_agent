@@ -101,24 +101,40 @@ func TestProblemInputStatementValidation(t *testing.T) {
 	if err := legacy.Validate(); err != nil {
 		t.Fatalf("legacy input without optional statement metadata rejected: %v", err)
 	}
-	valid := *legacy
-	valid.Samples = []*ProblemSample{{Input: "1 2", Output: "3"}, {Input: "2 3", Output: "5"}, {Input: "3 4", Output: "7"}}
-	valid.Constraints = "n <= 10"
+	valid := &ProblemInput{
+		Title: "A", Slug: "a", Description: "Statement",
+		Difficulty:  ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		Samples:     []*ProblemSample{{Input: "1 2", Output: "3"}, {Input: "2 3", Output: "5"}, {Input: "3 4", Output: "7"}},
+		Constraints: "n <= 10",
+	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid statement metadata rejected: %v", err)
 	}
-	tooMany := valid
-	tooMany.Samples = append(append([]*ProblemSample(nil), valid.Samples...), &ProblemSample{})
+	tooMany := &ProblemInput{
+		Title: "A", Slug: "a", Description: "Statement",
+		Difficulty:  ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		Samples: []*ProblemSample{{}, {}, {}, {}}, Constraints: "n <= 10",
+	}
 	if err := tooMany.Validate(); err == nil {
 		t.Fatal("more than 3 samples were accepted")
 	}
-	tooLarge := valid
-	tooLarge.Constraints = strings.Repeat("x", 10001)
+	tooLarge := &ProblemInput{
+		Title: "A", Slug: "a", Description: "Statement",
+		Difficulty:  ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		Constraints: strings.Repeat("x", 10001),
+	}
 	if err := tooLarge.Validate(); err == nil {
 		t.Fatal("constraints over 10000 bytes were accepted")
 	}
-	tooLargeSample := valid
-	tooLargeSample.Samples = []*ProblemSample{{Input: strings.Repeat("x", 65537)}}
+	tooLargeSample := &ProblemInput{
+		Title: "A", Slug: "a", Description: "Statement",
+		Difficulty:  ProblemDifficulty_PROBLEM_DIFFICULTY_EASY,
+		TimeLimitMs: 1000, MemoryLimitKb: 65536,
+		Samples: []*ProblemSample{{Input: strings.Repeat("x", 65537)}},
+	}
 	if err := tooLargeSample.Validate(); err == nil {
 		t.Fatal("sample input over 65536 bytes was accepted")
 	}
