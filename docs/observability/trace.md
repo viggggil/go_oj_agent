@@ -45,11 +45,15 @@ Span 会附带受控的提交、题目、比赛、事件、路由键、判题尝
 
 Agent Chat 的本地 Trace 包括：
 
-- `agent.run`：一次聊天 Run 的生命周期、完成/失败/取消状态和 Run ID。
-- 模型调用 attempt：模型名称、成功/错误/超时/取消结果和耗时通过 Span 与 Metrics 记录。
-- `agent.tool`：工具调用及受控工具状态。
+- `agent.run`：一次聊天 Run 的生命周期、完成/失败/取消状态和 Run ID。每条用户消息对应一个独立 Run Trace；会话级历史通过 Agent 业务记录查看。
+- `agent.context.load`：加载历史会话上下文的阶段和历史轮数。
+- `agent.step`：ReAct 推理轮次、工具执行和最终回答整理阶段，通过 `agent.step`、`agent.phase` 表示业务顺序。
+- `agent.model.attempt`：模型名称、调用序号、输入/输出 Token、用量来源和成功/错误/超时/取消结果。
+- `agent.tool`：受控工具名称及工具状态；`agent.rag.retrieve` 会记录结果数量和截断状态。
 - `agent.rag.retrieve`：RAG 检索操作。
 - `agent.grpc.client`：Agent 调用 User、Problem、Contest、Judge 等业务 gRPC 的客户端 Span。
+
+Trace 详情按 `ParentSpanID` 构建树形时间线，底层 RPC Span 默认收纳在工具阶段下；短耗时 Span 不会被丢弃，只在界面中折叠。Run、模型、工具和 RAG 阶段的错误日志可以按 Trace ID 与 Span ID 查询。
 
 Agent 的后台任务各自建立任务 Trace，当前任务用途包括：
 

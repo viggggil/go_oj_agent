@@ -29,7 +29,7 @@ func TestProjectTraceFiltersScopeAndSensitiveAttributes(t *testing.T) {
 	child, _ := hex.DecodeString(strings.Repeat("3", 16))
 	payload := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{
 		{Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{{Key: "service.name", Value: avString("judge-service")}}}, ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{TraceId: traceBytes, SpanId: root, Name: "judge.root", StartTimeUnixNano: 10, EndTimeUnixNano: 20, Attributes: []*commonpb.KeyValue{{Key: "submission.id", Value: avInt(42)}, {Key: "prompt", Value: avString("private")}}}, {TraceId: traceBytes, SpanId: child, ParentSpanId: root, Name: "judge.worker", StartTimeUnixNano: 20, EndTimeUnixNano: 40}}}}},
-		{Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{{Key: "service.name", Value: avString("agent-service")}}}, ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{TraceId: traceBytes, SpanId: []byte{0, 0, 0, 0, 0, 0, 0, 4}, Name: "agent.run", StartTimeUnixNano: 10, EndTimeUnixNano: 20}}}}},
+		{Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{{Key: "service.name", Value: avString("agent-service")}}}, ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{TraceId: traceBytes, SpanId: []byte{0, 0, 0, 0, 0, 0, 0, 4}, Name: "agent.run", StartTimeUnixNano: 10, EndTimeUnixNano: 20, Attributes: []*commonpb.KeyValue{{Key: "agent.run_id", Value: avString("run-1")}, {Key: "agent.status", Value: avString("completed")}, {Key: "agent.step", Value: avInt(2)}, {Key: "prompt", Value: avString("private")}}}}}}},
 	}}
 	agent, err := projectTrace(payload, traceID, false)
 	if err != nil {
@@ -62,6 +62,18 @@ func TestProjectTraceFiltersScopeAndSensitiveAttributes(t *testing.T) {
 	}
 	if _, ok := rootSpan.Attributes["prompt"]; ok {
 		t.Fatal("private prompt escaped allowlist")
+	}
+	var agentRoot traceSpan
+	for _, span := range agent {
+		if span.Name == "agent.run" {
+			agentRoot = span
+		}
+	}
+	if agentRoot.Attributes["agent.run_id"] != "run-1" || agentRoot.Attributes["agent.status"] != "completed" {
+		t.Fatalf("Agent summary attributes were not projected: %+v", agentRoot.Attributes)
+	}
+	if _, ok := agentRoot.Attributes["prompt"]; ok {
+		t.Fatal("Agent prompt escaped allowlist")
 	}
 }
 

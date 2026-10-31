@@ -31,6 +31,7 @@ from app.models.provider import (
     ToolTraceStep,
 )
 from app.models.runtime import StreamEvent
+from app.observability import business_step
 from app.storage.repository import utc_now
 from app.tools.registry import ToolContext, ToolExecutor, ToolPermissionDenied, ToolRegistry
 
@@ -111,6 +112,7 @@ def build_react_graph(
 
     async def reason(state: ReActState, runtime: Runtime[ReActContext]) -> ReActState:
         value = state["agent_state"]
+        step = state["step_count"] + 1
         await emit(StreamEvent.progress(value, "analyzing", "正在分析任务并选择下一步", 1))
         response = ModelResponse()
         parts: list[str] = []
@@ -123,23 +125,25 @@ def build_react_graph(
             accumulated_input=state["spent_input"],
             accumulated_output=state["spent_output"],
         )
-        try:
-            async for text in stream:
-                # 工具轮次可能在正式调用前产生不可信正文；确认 Finish 后才能发送。
-                parts.append(text)
-                # 无工具时唯一合法决策为 Finish，保留即时 token 流和背压。
-                if not state["tools"]:
-                    if len(parts) == 1:
-                        await emit(StreamEvent.progress(value, "answering", "正在生成最终回答", 1))
-                    await emit(StreamEvent.token(value, text, 1))
-        except asyncio.CancelledError as error:
-            await stream.athrow(error)
-            raise
-        finally:
-            await stream.aclose()
+        async with business_step(step, "reason"):
+            try:
+                async for text in stream:
+                    # 工具轮次可能在正式调用前产生不可信正文；确认 Finish 后才能发送。
+                    parts.append(text)
+                    # 无工具时唯一合法决策为 Finish，保留即时 token 流和背压。
+                    if not state["tools"]:
+                        if len(parts) == 1:
+                            await emit(
+                                StreamEvent.progress(value, "answering", "正在生成最终回答", 1)
+                            )
+                        await emit(StreamEvent.token(value, text, 1))
+            except asyncio.CancelledError as error:
+                await stream.athrow(error)
+                raise
+            finally:
+                await stream.aclose()
         runtime.context.continuation_items = response.continuation_items
         response.continuation_items = ()
-        step = state["step_count"] + 1
         if response.reasoning_summary:
             await emit(
                 StreamEvent.reasoning_summary(value, response.reasoning_summary, 1, step=step)
@@ -275,16 +279,17 @@ def build_react_graph(
                 )
             )
             started = monotonic()
-            result = await executor.execute(
-                call.name,
-                parsed,
-                ToolContext(
-                    principal=value.principal,
-                    remaining_seconds=min(60, tool_timeout_seconds, remaining_seconds(state)),
-                    allowed_tools=allowed,
-                    state=value,
-                ),
-            )
+            async with business_step(state["step_count"], "tool"):
+                result = await executor.execute(
+                    call.name,
+                    parsed,
+                    ToolContext(
+                        principal=value.principal,
+                        remaining_seconds=min(60, tool_timeout_seconds, remaining_seconds(state)),
+                        allowed_tools=allowed,
+                        state=value,
+                    ),
+                )
             duration = min(300_000, int((monotonic() - started) * 1000))
             status: Literal["succeeded", "failed"] = "succeeded" if result.ok else "failed"
             summary = "已获取授权信息" if result.ok else "读取失败：" + str(result.error_code)
@@ -378,10 +383,11 @@ def build_react_graph(
         value = state["agent_state"]
         if not state["tools"]:
             return {}
-        await emit(StreamEvent.progress(value, "answering", "正在整理最终回答", 1))
-        for text in state["token_parts"]:
-            if text:
-                await emit(StreamEvent.token(value, text, 1))
+        async with business_step(state["step_count"], "finalize"):
+            await emit(StreamEvent.progress(value, "answering", "正在整理最终回答", 1))
+            for text in state["token_parts"]:
+                if text:
+                    await emit(StreamEvent.token(value, text, 1))
         return {}
 
     graph = StateGraph(ReActState, context_schema=ReActContext)

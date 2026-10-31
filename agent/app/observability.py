@@ -367,6 +367,25 @@ async def span(
             raise
 
 
+@asynccontextmanager
+async def business_step(step: int, phase: str) -> AsyncIterator[Span]:
+    """A meaningful Agent turn or tool stage, with bounded semantic attributes."""
+    safe_phase = phase if phase in {"reason", "tool", "observe", "finalize"} else "other"
+    async with span(
+        "agent.step", {"agent.step": max(0, min(step, 1_000_000)), "agent.phase": safe_phase}
+    ) as item:
+        item.set_attribute("agent.status", "running")
+        try:
+            yield item
+            item.set_attribute("agent.status", "completed")
+        except asyncio.CancelledError:
+            item.set_attribute("agent.status", "cancelled")
+            raise
+        except Exception:
+            item.set_attribute("agent.status", "failed")
+            raise
+
+
 def traced_async(
     name: str,
 ) -> Callable[[Callable[P, Coroutine[Any, Any, T]]], Callable[P, Coroutine[Any, Any, T]]]:
@@ -377,15 +396,30 @@ def traced_async(
     ) -> Callable[P, Coroutine[Any, Any, T]]:
         @wraps(function)
         async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            tool = kwargs.get("name")
+            if tool is None and len(args) > 1:
+                tool = args[1]
+            safe_tool = safe_metric_attributes(tool=tool).get("tool", "other")
+
             async def invoke() -> T:
-                async with span(name):
+                attributes = {"agent.tool": safe_tool} if name == "agent.tool" else {}
+                async with span(name, attributes) as current_span:
                     value = await function(*args, **kwargs)
                     error_code = getattr(value, "error_code", None)
                     if isinstance(error_code, str):
-                        current = trace.get_current_span()
-                        current.set_attribute("tool.status", "error" if error_code else "ok")
+                        current_span.set_attribute(
+                            "agent.status", "failed" if error_code else "completed"
+                        )
                         if error_code:
-                            current.set_attribute("error.code", error_code)
+                            current_span.set_attribute("error.code", error_code)
+                    elif name in {"agent.tool", "agent.rag.retrieve"}:
+                        current_span.set_attribute("agent.status", "completed")
+                        matches = getattr(value, "matches", None)
+                        if isinstance(matches, list):
+                            current_span.set_attribute("agent.result_count", len(matches))
+                        truncated = getattr(value, "truncated", None)
+                        if isinstance(truncated, bool):
+                            current_span.set_attribute("agent.truncated", truncated)
                     return value
 
             if name == "agent.tool":

@@ -329,6 +329,7 @@ export const observabilityApi = {
       level?: string
       error_code?: string
       trace_id?: string
+      span_id?: string
       start?: string
       end?: string
       limit?: number

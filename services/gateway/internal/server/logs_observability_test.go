@@ -12,8 +12,8 @@ import (
 )
 
 func TestBuildLokiQueryUsesAllowlistedFilters(t *testing.T) {
-	query := buildLokiQuery("agent-service", "ERROR", "AGENT_RUN_FAILED", "4bf92f3577b34da6a3ce929d0e0e4736", false)
-	for _, want := range []string{`service_name="agent-service"`, `level="ERROR"`, `error_code="AGENT_RUN_FAILED"`, `trace_id="4bf92f3577b34da6a3ce929d0e0e4736"`, `| json`} {
+	query := buildLokiQuery("agent-service", "ERROR", "AGENT_RUN_FAILED", "4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7", false)
+	for _, want := range []string{`service_name="agent-service"`, `level="ERROR"`, `error_code="AGENT_RUN_FAILED"`, `trace_id="4bf92f3577b34da6a3ce929d0e0e4736"`, `span_id="00f067aa0ba902b7"`, `| json`} {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query %q missing %q", query, want)
 		}
@@ -58,7 +58,7 @@ func TestLogsEndpointUsesFixedQueryAndProjectsSanitizedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := NewHTTPServer(testConfig(), auth, service.NewGatewayService(nil, nil))
-	request := httptest.NewRequest(http.MethodGet, observabilityLogsPath+"?service=agent-service&level=ERROR&trace_id=4bf92f3577b34da6a3ce929d0e0e4736&limit=20", nil)
+	request := httptest.NewRequest(http.MethodGet, observabilityLogsPath+"?service=agent-service&level=ERROR&trace_id=4bf92f3577b34da6a3ce929d0e0e4736&span_id=00f067aa0ba902b7&limit=20", nil)
 	request.Header.Set("Authorization", "Bearer "+testAccessTokenRoles(t, []string{"agent_admin"}))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -67,6 +67,9 @@ func TestLogsEndpointUsesFixedQueryAndProjectsSanitizedFields(t *testing.T) {
 	}
 	if strings.Contains(gotQuery, "gateway-service") || !strings.Contains(gotQuery, `service_name="agent-service"`) {
 		t.Fatalf("query escaped agent scope: %s", gotQuery)
+	}
+	if !strings.Contains(gotQuery, `span_id="00f067aa0ba902b7"`) {
+		t.Fatalf("span filter missing from Loki query: %s", gotQuery)
 	}
 	var result observabilityLogsResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
@@ -88,7 +91,7 @@ func TestLogsEndpointUsesFixedQueryAndProjectsSanitizedFields(t *testing.T) {
 }
 
 func TestLogsEndpointRejectsInvalidTraceAndRange(t *testing.T) {
-	for _, suffix := range []string{"?trace_id=not-a-trace", "?start=2026-10-28T00:00:00Z&end=2026-10-30T00:00:00Z", "?limit=201", "?foo=bar"} {
+	for _, suffix := range []string{"?trace_id=not-a-trace", "?span_id=00f067aa0ba902b7", "?trace_id=4bf92f3577b34da6a3ce929d0e0e4736&span_id=bad", "?start=2026-10-28T00:00:00Z&end=2026-10-30T00:00:00Z", "?limit=201", "?foo=bar"} {
 		t.Run(suffix, func(t *testing.T) {
 			auth, _ := middleware.NewAuthMiddleware(testConfig())
 			handler := NewHTTPServer(testConfig(), auth, service.NewGatewayService(nil, nil))

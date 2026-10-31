@@ -247,14 +247,14 @@ test('监控顶层导航包含 Agent 诊断与后端判题拓扑，旧诊断地�
   await expect(
     page.locator('.monitoring-alert-preview').getByRole('link', { name: '判题链路 →' }),
   ).toBeVisible()
-  await expect(page.getByText('API 延迟 P95')).toBeVisible()
+  await expect(page.getByText('API 延迟 P95', { exact: true })).toBeVisible()
   await expect(page.getByText('0.08 秒')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断 →' })).toBeVisible()
   await expect(
     page.locator('.monitoring-module-links').getByRole('link', { name: '判题链路 →' }),
   ).toBeVisible()
   await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Agent 运行 Trace' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agent 运行 Trace' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Agent 运行诊断 →', exact: true })).toBeVisible()
 
   await page.goto('/agent/observability?run_id=abc')
@@ -278,11 +278,11 @@ test('agent_admin 可查看 Agent 诊断但不能进入系统判题监控', asyn
   await expect(page.getByRole('heading', { name: '监控总览' })).toBeVisible()
   await expect(page.getByText('API 请求速率', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Agent Run 启动速率').first()).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Agent 运行诊断', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Agent 运行诊断 →', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: '判题链路', exact: true })).toHaveCount(0)
 
   await page.goto('/monitoring/judge')
-  await expect(page).toHaveURL(/\/problems$/)
+  await expect(page).toHaveURL(/\/monitoring$/)
 })
 
 test('system_admin 访问旧判题路径回到总览', async ({ page }) => {
@@ -298,16 +298,26 @@ test('指标页区分无样本与零值，并按 Agent 管理员范围显示指�
   await expect(page).toHaveURL(/\/monitoring$/)
   await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
   await expect(page.getByText('指标源可用')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toBeVisible()
-  await expect(page.getByText('当前时间范围没有样本，不能推断为零。').first()).toBeVisible()
-  await expect(page.getByText('Contest 独立指标端点')).toBeVisible()
+  const metric = page.locator('.monitoring-metric-card select').first()
+  await metric.selectOption('judge_submission_rate|')
+  await expect(metric).toHaveValue('judge_submission_rate|')
+  await expect(page.locator('.monitoring-metric-chart .metrics-chart-empty')).toBeVisible()
+  await metric.selectOption('request_error_rate|gateway-service')
+  await expect(page.locator('.monitoring-metric-chart .metrics-chart-empty')).toHaveCount(0)
+  await expect(page.locator('.monitoring-metric-chart .metrics-chart-line')).toHaveAttribute(
+    'points',
+    /\d/,
+  )
+  await expect(page.getByText('Contest Metrics')).toBeVisible()
 
   await loginAs(page, ['agent_admin'])
   await page.goto('/monitoring/metrics')
-  await expect(page.getByText('仅展示 Agent Run、模型和后台任务的固定摘要')).toBeVisible()
+  await expect(
+    page.getByText('仅展示 Agent 运行与采集摘要；平台和判题指标不会返回给当前角色。'),
+  ).toBeVisible()
   await expect(page.getByRole('heading', { name: '指标详情' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'HTTP 请求速率' })).toHaveCount(0)
-  await expect(page.getByText('Contest 独立指标端点')).toHaveCount(0)
+  await expect(page.locator('option[value="request_rate|gateway-service"]')).toHaveCount(0)
+  await expect(page.getByText('Contest Metrics')).toHaveCount(0)
 })
 
 test('普通用户不能打开监控指标页', async ({ page }) => {
@@ -326,7 +336,8 @@ test('日志中心带入 Trace 并限制 Agent 服务选项', async ({ page }) =
     })
   })
   await page.goto('/monitoring/logs?trace_id=' + trace)
-  await expect(page.getByRole('heading', { name: '日志中心' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/monitoring\\?trace_id=${trace}$`))
+  await expect(page.getByRole('heading', { name: '日志筛选查询' })).toBeVisible()
   await expect(page.getByPlaceholder('32 位 Trace ID')).toHaveValue(trace)
   await expect(page.getByText('当前条件没有日志。')).toBeVisible()
   await expect(page.locator('option[value="gateway-service"]')).toHaveCount(0)

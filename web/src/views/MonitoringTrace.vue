@@ -18,34 +18,22 @@
     <p v-else-if="detail?.state !== 'available'" class="empty">
       当前 Trace 没有可展示的 Span，可能尚未采样、已过留存期或观测后端不可用。
     </p>
-    <section v-else class="trace-layout">
-      <article
-        v-for="span in detail.spans"
-        :key="span.span_id"
-        class="trace-span-card"
-        :style="{ marginLeft: `${depth(span)}rem` }"
-      >
-        <div class="trace-span-heading">
-          <strong>{{ span.name }}</strong
-          ><span>{{ span.service_name }}</span
-          ><small>{{ span.duration_ms.toFixed(2) }} ms</small>
-        </div>
-        <div class="trace-span-meta">
-          <span>{{ format(span.started_at) }}</span
-          ><span>{{ span.kind }} · {{ span.status }}</span
-          ><code>{{ span.span_id }}</code>
-        </div>
-        <dl v-if="Object.keys(span.attributes).length" class="trace-attributes">
-          <template v-for="(value, key) in span.attributes" :key="key"
-            ><dt>{{ key }}</dt>
-            <dd>{{ value }}</dd></template
-          >
-        </dl>
-      </article>
-    </section>
+    <TraceTimeline
+      v-else
+      :detail="detail"
+      :selected-span-id="selectedSpanId"
+      @select="selectedSpanId = $event"
+    />
     <section class="trace-logs-section">
-      <h2>关联日志</h2>
-      <MonitoringLogs :trace-id="traceId" :start="logStart" :end="logEnd" embedded />
+      <h2>所选阶段日志</h2>
+      <MonitoringLogs
+        :trace-id="traceId"
+        :span-id="selectedSpanId || undefined"
+        :start="logStart"
+        :end="logEnd"
+        :hide-filters="true"
+        embedded
+      />
     </section>
   </section>
 </template>
@@ -53,12 +41,14 @@
   import { computed, onMounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
   import { apiErrorMessage, observabilityApi, type TraceDetail } from '../api'
+  import TraceTimeline from '../components/observability/TraceTimeline.vue'
   import MonitoringLogs from './MonitoringLogs.vue'
   const route = useRoute()
   const traceId = computed(() => String(route.params.trace_id || ''))
   const detail = ref<TraceDetail>()
   const loading = ref(false)
   const error = ref('')
+  const selectedSpanId = ref('')
   const logStart = computed(() => {
     const times =
       detail.value?.spans.map((span) => Date.parse(span.started_at)).filter(Number.isFinite) || []
@@ -83,23 +73,53 @@
     error.value = ''
     try {
       detail.value = (await observabilityApi.trace(traceId.value)).data
+      selectedSpanId.value =
+        detail.value.spans.find((span) => span.name === 'agent.run')?.span_id ||
+        detail.value.spans[0]?.span_id ||
+        ''
     } catch (cause) {
       error.value = apiErrorMessage(cause, '查询 Trace')
     } finally {
       loading.value = false
     }
   }
-  function depth(span: TraceDetail['spans'][number]) {
-    let depth = 0
-    let parent = span.parent_span_id
-    const spans = detail.value?.spans || []
-    while (parent && depth < 8) {
-      const found = spans.find((item) => item.span_id === parent)
-      if (!found) break
-      depth++
-      parent = found.parent_span_id
-    }
-    return depth
+  function spanName(value: string) {
+    return (
+      (
+        {
+          'gateway.http': 'Gateway HTTP 请求',
+          'agent.run': 'Agent 运行',
+          'agent.tool': 'Agent 工具调用',
+          'agent.rag.retrieve': 'Agent 知识检索',
+          'agent.grpc.client': 'Agent 业务 RPC',
+          'judge.submission.create': '创建判题提交',
+          'judge.outbox.publish': '发布判题任务',
+          'judge.worker.task': 'Worker 执行判题任务',
+          'judge.worker.result.publish': '发布判题结果',
+          'judge.worker.retry.publish': '发布判题重试',
+          'judge.result.consume': '消费判题结果',
+          'judge.result.apply': '应用判题结果',
+          'contest.result.consume': 'Contest 消费判题结果',
+          'contest.projection.apply': '更新 Contest 投影',
+          'contest.cache_outbox.apply': '应用排行榜缓存',
+        } as Record<string, string>
+      )[value] || '观测阶段'
+    )
+  }
+  function serviceName(value: string) {
+    return (
+      (
+        {
+          'gateway-service': 'Gateway',
+          'judge-service': '判题服务',
+          'judge-worker': '判题 Worker',
+          'contest-service': '比赛服务',
+          'agent-service': 'Agent 服务',
+          'agent-rag-worker': 'Agent RAG Worker',
+          'problem-service': '题目服务',
+        } as Record<string, string>
+      )[value] || value
+    )
   }
   function format(value: string) {
     return new Date(value).toLocaleString()
