@@ -151,12 +151,15 @@ observability-smoke:
 dev:
 	@echo "dev workflow is not wired yet"
 
-.PHONY: rag-test-integration rag-corpus-check observability-smoke
+.PHONY: rag-test-integration rag-corpus-check observability-smoke load-test
 rag-test-integration:
 	@UV="$(UV)" ./tests/rag/run.sh
 
 rag-corpus-check:
 	@python3 scripts/build_algorithm_corpus.py
+
+load-test:
+	@python3 scripts/load_test.py $(LOADTEST_ARGS)
 
 # Isolated Docker logs smoke; never uses the business Compose project.
 loki-smoke:
