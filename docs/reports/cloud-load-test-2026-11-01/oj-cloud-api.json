@@ -1,0 +1,114 @@
+{
+  "generated_at": "2026-11-01T10:08:25.972284+00:00",
+  "base_url": "http://118.195.132.28:5173",
+  "results": [
+    {
+      "test": "api",
+      "concurrency": 10,
+      "duration_seconds": 120.0,
+      "path": "/api/v1/problems?page.page=1&page.page_size=20",
+      "summary": {
+        "requests": 11126,
+        "successes": 11126,
+        "errors": 0,
+        "error_rate": 0.0,
+        "throughput_rps": 92.71666666666667,
+        "latency_ms": {
+          "p50": 106.39,
+          "p95": 115.94,
+          "p99": 133.26,
+          "max": 234.91
+        },
+        "ttft_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "completion_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "token_events": 0,
+        "completed_streams": 0,
+        "statuses": {
+          "200": 11126
+        },
+        "error_reasons": {},
+        "error_samples": []
+      }
+    },
+    {
+      "test": "api",
+      "concurrency": 30,
+      "duration_seconds": 120.0,
+      "path": "/api/v1/problems?page.page=1&page.page_size=20",
+      "summary": {
+        "requests": 32800,
+        "successes": 32800,
+        "errors": 0,
+        "error_rate": 0.0,
+        "throughput_rps": 273.3333333333333,
+        "latency_ms": {
+          "p50": 107.53,
+          "p95": 122.04,
+          "p99": 186.76,
+          "max": 482.41
+        },
+        "ttft_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "completion_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "token_events": 0,
+        "completed_streams": 0,
+        "statuses": {
+          "200": 32800
+        },
+        "error_reasons": {},
+        "error_samples": []
+      }
+    },
+    {
+      "test": "api",
+      "concurrency": 50,
+      "duration_seconds": 120.0,
+      "path": "/api/v1/problems?page.page=1&page.page_size=20",
+      "summary": {
+        "requests": 53474,
+        "successes": 53474,
+        "errors": 0,
+        "error_rate": 0.0,
+        "throughput_rps": 445.6166666666667,
+        "latency_ms": {
+          "p50": 109.26,
+          "p95": 128.88,
+          "p99": 171.0,
+          "max": 1118.84
+        },
+        "ttft_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "completion_ms": {
+          "p50": null,
+          "p95": null,
+          "p99": null
+        },
+        "token_events": 0,
+        "completed_streams": 0,
+        "statuses": {
+          "200": 53474
+        },
+        "error_reasons": {},
+        "error_samples": []
+      }
+    }
+  ]
+}
