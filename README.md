@@ -1,52 +1,38 @@
 # Go OJ Agent
 
-Go OJ Agent 是一个面向编程学习者和题目管理员的分布式在线判题与智能编程平台。项目把题目管理、代码提交、自动判题、比赛排行榜和 Agent 服务放在同一套可扩展的工程中，前端通过 Gateway 使用统一的认证和业务接口。
+Go OJ Agent 是一个集在线判题、比赛和 AI 编程辅助于一体的平台。当前版本提供完整的题目提交与异步判题链路、比赛排行榜、Agent 管理和流式对话，以及面向运维的监控与链路追踪。
 
-## 当前能力
+## 当前功能
 
-- **题库与提交**：管理员可以维护题目和测试点；用户可以浏览题目、提交 Go/Python 等代码，并查看提交状态、判题结果和源码。
-- **自动判题**：Judge Service 和 Judge Worker 在隔离环境中编译、运行用户代码，通过 RabbitMQ 驱动异步判题和结果投影。
-- **比赛与排行榜**：支持比赛创建、编辑、报名、提交和排行榜。排行榜以 MySQL 为事实来源，Redis 作为可重建的查询投影，支持版本保护、回源和故障恢复。
-- **Agent Service**：Python + FastAPI 服务已经接入 Gateway 的可信 RS256 委托和 SSE 流式链路，支持会话、消息和 Run 状态持久化。支持 su8 Responses 真实单轮回答，以及管理员配置 Agent/Prompt/Skill、不可变 UUID 绑定与历史恢复。Fake Runtime 仅显式用于测试。
-- **Web 前端**：Vue 3 + Pinia + Axios + Vue Router 前端提供首页、登录、注册、题库、提交记录、比赛、个人资料、Agent 管理与流式对话页面。
+- **在线判题**：用户可浏览题目、选择编程语言并提交代码；Judge Service 通过 RabbitMQ 将任务分发给独立 Worker，在 Sandbox 中编译和运行代码，并提供提交状态与测试点结果。
+- **比赛**：支持比赛管理、报名、比赛提交和排行榜。MySQL 保存成绩事实，Redis 保存可重建的排行榜投影。
+- **AI 编程 Agent**：支持有界多轮对话、LangGraph ReAct、受限只读业务工具、RAG 知识检索、SSE 流式输出、停止运行、配置管理和 Eval。Agent 通过 Gateway 委托身份调用业务服务，不直接读取业务数据库。
+- **平台监控**：提供指标详情、业务运行状态、Agent/Judge Trace 和日志查询；Trace 可查看链路阶段与关联日志。
+- **Web 应用**：Vue 3 前端包含题库、提交记录、比赛、个人资料、Agent 对话与管理、监控页面。
 
-Agent 对话已完成页面配置 test Agent 后经 Gateway 获得流式回答的闭环，支持 Agent/Skill 选择、停止、新对话和安全 Markdown。真实模型多轮上下文、工具调用、RAG 和完整观测/评估仍在后续范围。Fake Runtime 只用于本地开发和测试，必须显式启用。
+## 技术栈
 
-## 技术组成
+| 范围 | 技术 |
+| --- | --- |
+| 后端服务 | Go、Go-Kratos、gRPC、Protobuf |
+| Agent | Python、FastAPI、LangGraph、SSE |
+| 前端 | Vue 3、Pinia、Axios、Vue Router |
+| 数据与消息 | MySQL、Redis、RabbitMQ、MinIO、Qdrant |
+| 判题 | Go Judge Worker、隔离 Sandbox |
+| 可观测性 | OpenTelemetry、Prometheus、Grafana、Loki、Tempo |
+| 本地环境 | Docker Compose、Make |
 
-- Go / Go-Kratos：用户、题目、提交、判题和比赛服务
-- Python / FastAPI：Agent Service、会话存储和流式运行时
-- Vue 3 / Pinia / Axios：Web 前端
-- gRPC / Protobuf：Go 服务之间的同步契约
-- RabbitMQ：判题任务和结果事件
-- MySQL：业务事实、会话、消息和运行状态
-- Redis：比赛排行榜查询缓存
-- MinIO：题目测试数据和提交源码对象
-- Docker Compose：本地开发和集成测试环境
+主要服务包括 Gateway、User、Problem、Judge、Judge Worker、Contest 和 Agent Service。判题提交、Outbox 事件意图在同一 MySQL 事务中保存；消息按至少一次语义投递，由消费者幂等处理。
 
-## 仓库结构
+## 本地运行
 
-```text
-api/        Protobuf 合约
-services/   Go 业务服务
-pkg/        Go 共享包
-agent/      Python Agent Service
-web/        Vue 前端
-migrations/ MySQL 初始化和服务迁移
-tests/      集成、契约和端到端测试
-deploy/     Docker Compose 与部署文件
-docs/       API、架构、数据库和运维文档
-```
-
-## 本地启动
-
-项目需要 Go、Node.js、Python 3.12、uv 和 Docker Compose。先启动后端基础设施：
+需要 Go、Node.js、Python 3.12、uv 和 Docker Compose。启动本地依赖：
 
 ```bash
 make infra-up
 ```
 
-然后启动前端：
+启动 Web 前端：
 
 ```bash
 cd web
@@ -55,17 +41,14 @@ npm install
 npm run dev
 ```
 
-前端默认地址是 `http://127.0.0.1:5173`，通过 `VITE_API_BASE_URL` 指向 Gateway，默认 Gateway 地址为 `http://127.0.0.1:8080`。
-
-Agent 本地开发需要先准备 `oj_agent` 数据库并应用 [Agent migration](migrations/agent/000001_create_agent_runtime.up.sql)，再执行：
+开发 Agent 前，按 [Agent 服务说明](agent/README.md) 配置环境变量、Agent 数据库迁移和模型 Provider，再运行：
 
 ```bash
-cp agent/.env.example agent/.env
 make agent-init
 make agent-dev
 ```
 
-如需启用 Agent Chat，必须显式配置 `AGENT_RUNTIME_MODE=fake` 或 `langgraph_fake`、数据库地址和 Gateway 公钥；生产环境禁止 Fake Runtime。通过 Compose 启用 Agent profile 的命令和密钥挂载方式见 [部署说明](deploy/compose/README.md)。
+Compose 部署、服务配置和迁移说明见[部署文档](deploy/compose/README.md)及[迁移目录说明](migrations/README.md)。
 
 ## 常用检查
 
@@ -78,7 +61,7 @@ make build
 make test-integration
 ```
 
-Agent 的 Python 检查和测试：
+Agent 检查：
 
 ```bash
 make agent-check
@@ -86,15 +69,9 @@ make agent-test-unit
 make agent-test-integration
 ```
 
-`make test-integration` 和 `make agent-test-integration` 会创建独立的 Docker Compose project、网络和数据卷，测试结束后清理测试资源。已有数据库卷不会因为服务启动而自动应用新 migration，升级前请按照对应文档显式执行迁移和回填。
+## 文档
 
-## 相关文档
-
-- [API 文档](docs/api.md)
-- [架构说明](docs/architecture.md)
-- [数据库说明](docs/database.md)
-- [Agent 服务说明](agent/README.md)
-- [比赛排行榜缓存运维说明](docs/contest-cache-operations.md)
-- [Compose 部署说明](deploy/compose/README.md)
-
-项目首页也提供了面向使用者的简要介绍；访问前端根路径 `/` 即可查看。首页与本 README 的项目状态保持同步。
+- [文档索引](docs/README.md)：按主题分类的架构、接口、数据、Agent、可观测性、部署和测试文档。
+- [架构说明](docs/architecture.md) · [API 契约](docs/api.md) · [数据库设计](docs/database.md)
+- [Agent 服务](agent/README.md) · [本地 Compose](deploy/compose/README.md)
+- [压力测试工具说明](docs/load-testing.md) · [云端压力测试报告](docs/reports/cloud-load-test-2026-11-01/REPORT.md)

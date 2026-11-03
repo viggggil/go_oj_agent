@@ -1,6 +1,6 @@
-# Contest 排行榜缓存的部署与验证
+# Contest 排行榜缓存运维
 
-本阶段对应 issue #134。MySQL 保存提交事实、题目结果和用户汇总；Redis 保存可重建的查询投影。缓存允许短暂投递延迟，单次页面的总数、排名和各题内容在一个 Lua 读取内保持一致。不同页面请求仍使用实时榜单。
+MySQL 保存提交事实、题目结果和用户汇总；Redis 保存可重建的查询投影。缓存允许短暂投递延迟，单次页面的总数、排名和各题内容在一个 Lua 读取内保持一致。不同页面请求仍使用实时榜单。
 
 ## 启用和升级
 
@@ -17,13 +17,13 @@
      go run ./services/contest/cmd/leaderboard-backfill
    ```
 
-4. 更新 Judge 和 Contest。PR4 的比赛内部提交新增开始/结束时间字段，旧 Contest 不能和新 Judge 继续创建比赛提交；同时部署后恢复比赛提交。普通题库提交无此字段要求。更新调用 `UpdateContest` 的客户端，使其原样携带详情中的 `updated_at` 到 `expected_updated_at`。
+4. 更新 Judge 和 Contest。比赛提交请求携带比赛窗口信息；Judge 与 Contest 服务需部署兼容版本后再恢复比赛提交。普通题库提交无此字段要求。更新调用 `UpdateContest` 的客户端，使其原样携带详情中的 `updated_at` 到 `expected_updated_at`。
 5. 确认 Redis 地址、密码、DB、namespace 和超时配置，启动 Contest。访问一个已授权比赛的排行榜，首次缺失回源 SQL，后台登记比赛并重建。仅报名、尚无结果的用户仍不上榜。
 6. 观察命中率、SQL 回源、Outbox 积压和最老事件年龄。冷启动没有活动代次时 relay 会重试；首次访问触发重建后恢复投递。没有启动时全量扫描全部比赛，以免大量历史比赛同时消耗数据库。
 
-迁移顺序为 `000001` → `000002` → `000003` → `000004`。PR4/PR5 不增加新的业务表。新安装在 Compose 初始化流程中应用全部迁移。不得清空业务事实或数据库卷来完成升级。
+迁移顺序为 `000001` → `000002` → `000003` → `000004`。升级所需的业务表由对应 Contest migrations 管理。新安装在 Compose 初始化流程中应用全部迁移。不得清空业务事实或数据库卷来完成升级。
 
-临时禁用：将 `leaderboard_cache.enabled` 设为 `false`，或使用 `KRATOS_LEADERBOARD_CACHE_ENABLED=false` 覆盖配置，然后按正常部署流程重启 Contest。此时 relay/maintenance 不启动，排行榜直接查询 MySQL，结果事务继续生成 Outbox。重新启用后首次访问触发重建，保留的 pending 事件继续重试。
+禁用缓存：将 `leaderboard_cache.enabled` 设为 `false`，或使用 `KRATOS_LEADERBOARD_CACHE_ENABLED=false` 覆盖配置，然后按正常部署流程重启 Contest。此时 relay/maintenance 不启动，排行榜直接查询 MySQL，结果事务继续生成 Outbox。重新启用后首次访问触发重建，保留的 pending 事件继续重试。
 
 应用回滚时优先关闭缓存，保留 `000003` 的用户版本和投递状态。删除派生表会丢失版本栅栏和投递进度，再升级需要回填并重建全新的 Redis 代次；不能重置单个用户版本后继续使用原代次。`000004` 的 down 仅删除索引。
 
@@ -94,7 +94,7 @@ Docker runner 使用独立 project 和测试卷、随机端口；测试创建/�
 | 归档权限、命中不读 SQL、回源合并/取消 | biz leaderboard access 测试、`leaderboard_cache_test.go` |
 | 100 用户/10 题的混合读写负载、分页逐项 SQL 对比、丢失后恢复 | `leaderboard_load_integration_test.go` |
 
-独立运行负载测试（地址指向专用测试依赖，不能指向生产实例）：
+运行独立负载测试（地址指向专用测试依赖，不能指向生产实例）：
 
 ```bash
 CONTEST_TEST_MYSQL_DSN='.../oj_contest?parseTime=true' \

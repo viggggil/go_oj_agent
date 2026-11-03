@@ -1,4 +1,4 @@
-# 架构设计文档（Architecture Design）
+# 系统架构与当前实现
 
 ## 1. 设计目标
 
@@ -356,7 +356,7 @@ BEGIN
 COMMIT
 ```
 
-之后由 `judge-service` 内部的 Outbox Relay 读取事件，完成任务规范化和语言路由，直接发布到 `judge.task.<language>` 并等待 Publisher Confirm。首版只启动一个 `judge-service` 实例，API、Relay 和 Result Consumer 在同一进程中作为独立模块运行；后续可以拆成运行角色，但不会形成新的业务服务。
+由 `judge-service` 内部的 Outbox Relay 读取事件，完成任务规范化和语言路由，直接发布到 `judge.task.<language>` 并等待 Publisher Confirm。当前 API、Relay 和 Result Consumer 在一个 `judge-service` 进程中作为独立模块运行。
 
 ### 6.2 Delivery Model
 
@@ -462,12 +462,11 @@ revision，MySQL 仍只保存最新 active 指针。
 
 ## 8. Judge Worker
 
-首版 Worker 通过 gRPC 调用独立的 `go-judge v1.12.3` Sandbox Service。Worker 不直接
+Worker 通过 gRPC 调用独立的 `go-judge v1.12.3` Sandbox Service。Worker 不直接
 执行用户代码，go-judge 不持有 RabbitMQ、MinIO、MySQL 或业务 JWT 凭据；Worker 使用
 固定的 Go 编译参数和 manifest 中的题目级资源限制。Worker 已接入 MinIO immutable
 input loader：源码来自 `submission-source`，manifest 和测试点来自 `problem-data`，
-下载后验证 revision、对象 key、size 与 SHA-256。正式消息消费仍按后续 Worker Issue
-接入。
+下载后验证 revision、对象 key、size 与 SHA-256。Worker 消费任务并执行隔离判题。
 
 目录建议：
 
@@ -576,7 +575,7 @@ flowchart TB
 
 - Context Resolver 只解析 submission_id、problem_id、语言和时间范围等实体，不自动预取业务数据。
 - Agent 从当前策略允许的 Tool 集合中选择工具；工具选择和参数必须经过程序校验。
-- 第一阶段保持单 Agent + LangGraph Workflow，不为了展示技术强行拆多 Agent。
+- 当前使用单 Agent + LangGraph Workflow。
 - ReAct 用于有限的动态取证；Plan-and-Solve 用于学习计划、历史复盘等多步骤任务。
 - Reflection 只检查证据、引用、安全和不确定性，不负责授予权限。
 - LLM、Prompt、Skill 和知识库内容都不是授权边界。
@@ -585,10 +584,7 @@ flowchart TB
 
 ### 10.1 Agent Runtime
 
-PR2 提供 RunService、typed State/Event、Fake Runtime、最小 LangGraph 和 oj_agent 存储。
-PR3 增加 Gateway → Agent HTTP SSE：Gateway 验证外部 Access JWT，再签发绑定 Agent
-与 HTTP 操作的 RS256 委托；Agent 只从验证后的 actor/roles/request_id 创建 Principal。
-默认 Chat/Runtime disabled，开发明确启用 Fake，生产禁止 Fake；真实 Direct Answer 在 PR6 接入，配置管理 HTTP 在 PR7 接入。
+Agent 通过 Gateway 的受保护 HTTP/SSE 接口运行。Gateway 验证外部 Access JWT，并签发绑定 Agent 与 HTTP 操作的 RS256 委托；Agent 只从验证后的 actor/roles/request_id 创建 Principal。Fake Runtime 仅用于明确启用的测试和开发配置。
 
 身份、输入、owner 和并发在响应头前校验，之后仅输出 SSE。Gateway 按路由设置独立
 Agent 总预算，保留普通预算和父级取消；按有界 UTF-8 SSE 帧增量转发并校验 ID/序号/终态。
@@ -613,17 +609,17 @@ answer_draft / final_answer
 
 真实模型统一执行 ReAct 图；历史 execution_mode 仅用于兼容旧配置读取，不再决定运行分支。
 
-每次 Agent Run 开始时固定 Agent、Prompt、Skill、Tool Catalog、模型和知识库索引的具体配置 UUID 快照。一次回答执行期间不得切换配置；PR5 的替换会创建新 UUID，已开始的 Run 继续使用原快照。
+每次 Agent Run 开始时固定 Agent、Prompt、Skill、Tool Catalog、模型和知识库索引的具体配置 UUID 快照。一次回答执行期间不得切换配置；配置替换会创建新 UUID，已开始的 Run 继续使用原快照。
 
-### PR6 模型边界
+### 模型与凭据边界
 
 真实 Direct Answer 使用版本化的 Agent → Model Profile → Provider → Credential，固定单 Provider。Provider/模型选择由管理员手动配置，不做调用顺序、自动切换、比价或余额查询。首个适配器为 Responses，su8 的三个 DeepSeek 模型请求固定 store=false；Future Chat Completions/其他厂商协议由独立适配器扩展。
 
-凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。PR7 提供 Agent、Prompt、Skill 管理 HTTP，PR8 的 Vue 管理工作区通过 Gateway 接入；历史 UUID 详情仅管理员可见，模型详情严格脱敏，不返回 Provider/凭据。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
+凭据由 Agent 自有仓储 AES-GCM 加密，部署 keyring 独立于数据库；Provider、Credential 继续通过本机 CLI 管理。Agent、Prompt、Skill 管理 HTTP 与 Vue 管理工作区通过 Gateway 接入；历史 UUID 详情仅管理员可见，模型详情严格脱敏，不返回 Provider/凭据。归档用于配置历史，撤销凭据用于阻止新调用；安全检查不允许模型/用户覆盖。部署 origin allowlist、禁用环境代理和重定向限制凭据发送目标；网络出口与 DNS 的信任由部署侧控制。
 
 Provider 文本经类型/大小/终态校验转换为既有 SSE，取消贯穿 HTTP stream；最终答案和模型摘要随 Run 终态事务保存后才发送 done。默认不重试，仅在显式设置后对输出前的可分类临时 HTTP 故障在同一 Provider 有限重试。模型预算/超时受 Run 剩余上限约束，缺失精确 usage 时标记 estimated。
 
-### Issue #180：统一真实 ReAct 工作流
+### 真实模型工作流
 
 所有真实 Run 经过 ModelRuntime 构建的同一张 ReAct Graph：
 
@@ -637,9 +633,9 @@ Skill 只声明任务说明与授权工具，不再配置执行模式；历史 e
 
 工具执行前整批校验 JSON、Schema、call_id、相同参数重复调用、权限和预算；ToolExecutor 与拥有数据的 Go 服务仍做最终授权。失败返回 Observation，只有成功结果成为 Evidence。有工具的轮次确认 Finish 后才发正文，无工具的 Finish 保留实时 token 流和消费确认。进度、官方公开摘要和安全工具时间线与正文分离，摘要能力未启用时不生成虚构摘要。
 
-取消、deadline、背压及唯一终态继续由 RunService 协调；答案与 COMPLETED 在本地事务提交后才发 done。ModelSummary JSON 保存有界工具摘要（含 Run 归属），历史会话在归属校验后可恢复，失败/取消 Run 也保留已有工具轨迹。新配置、历史兼容、前后评测方案见 [重构说明](agent/react-refactor.md)。
+取消、deadline、背压及唯一终态继续由 RunService 协调；答案与 COMPLETED 在本地事务提交后才发 done。ModelSummary JSON 保存有界工具摘要（含 Run 归属），历史会话在归属校验后可恢复，失败/取消 Run 也保留已有工具轨迹。运行和评测数据由 Agent 自有存储持久化；评测结果及限制见 [ReAct 评测报告](agent/react-eval-comparison.md)。
 
-### Issue #162 PR2：有界多轮上下文
+### 有界多轮上下文
 
 RunService 在创建本轮 Run 后，通过 AgentStore 查询本人、同会话的成功问答。
 仅选择 COMPLETED Run 中由同一 run_id 关联的 user/assistant 对，按用户消息 ID
@@ -685,28 +681,18 @@ list_submissions
 retrieve_knowledge
 ```
 
-后续增加：
+每个 Tool 声明 `read_scope`、`allowed_roles`、`side_effect`、`sensitivity`、超时、成本和是否需要确认。管理员可以在 Skill 层调整 Tool allowlist 和启用状态，但不能修改 RPC 方法、目标服务或授权实现。当前 Registry 仅注册只读 Tool；写操作需由代码侧增加实现、权限策略和确认流程。
 
-```text
-get_learning_profile
-search_problems
-recommend_problem
-create_submission
-rejudge_submission
-```
-
-每个 Tool 声明 `read_scope`、`allowed_roles`、`side_effect`、`sensitivity`、超时、成本和是否需要确认。管理员可以在 Skill 层调整 Tool allowlist 和启用状态，但不能修改 RPC 方法、目标服务或授权实现。写 Tool 默认关闭。
-
-Issue #160 简化当前表单：后端生成稳定资源 key，管理员填写名称；Prompt 负责基础规则，Skill
+当前管理表单：后端生成稳定资源 key，管理员填写名称；Prompt 负责基础规则，Skill
 直接保存任务说明，Agent 高级设置承载运行预算。版本仍不可变、依赖仍绑定具体 UUID。
 开发 Compose 检测宿主 su8.key 后准备单 su8 Provider 和三个模型并运行真实 Direct Answer，
 无 Key 时保留 Fake。Provider/凭据仍仅部署侧管理，浏览器不接触 Key。
 
 ### 10.3 Agent Control Plane
 
-PR7 的已实现接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
+管理接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
 
-普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。PR8/PR9 已交付管理页面和对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。多轮上下文及 RAG PR1–PR3 已实现；完整质量评测继续由后续阶段完成。
+普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。Web 提供 Agent 管理页面和流式对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。多轮上下文和 RAG 已接入真实运行流程；质量信号可通过 Eval 运行结果查看。
 
 Control Plane 管理以下可版本化资源：
 
@@ -718,7 +704,7 @@ Knowledge Document / Knowledge Version / Index
 Eval Case / Eval Dataset / Eval Run
 ```
 
-PR5 的 Prompt、Skill、Model Profile 和 Agent 不使用草稿状态：
+Prompt、Skill、Model Profile 和 Agent 不使用草稿状态：
 
 ```text
 CREATED → CURRENT → ARCHIVED
@@ -793,7 +779,7 @@ language
 document_type
 ```
 
-开发与部署统一使用 Qdrant。中文向量化固定采用本地 `BAAI/bge-small-zh-v1.5`，与 su8 回答模型独立。PR1 的管理员摄取/检索 API、MySQL 租约 worker 和文档版本发布，PR2 的按组管理，以及 PR3 的 LangGraph retrieve_knowledge 已实现。Run 固定已发布版本；检索前后重新确认 Agent 分组交集、文档启用状态及 Problem/Contest 业务授权。Contest 的内部批量 RPC 排除未来或进行中的比赛题解，依赖故障失败关闭。检索片段只给模型，Run JSON 只记录有界来源元数据，管理员可追溯，普通 SSE 不透传工具结果。选型与边界见 ADR-0002。
+开发与部署统一使用 Qdrant。中文向量化固定采用本地 `BAAI/bge-small-zh-v1.5`，与 su8 回答模型独立。管理员文档管理、MySQL 租约索引任务、知识分组管理和 LangGraph `retrieve_knowledge` 工具均已实现。Run 固定已发布版本；检索前后重新确认 Agent 分组交集、文档启用状态及 Problem/Contest 业务授权。Contest 的内部批量 RPC 排除未来或进行中的比赛题解，依赖故障失败关闭。检索片段只给模型，Run JSON 只记录有界来源元数据，管理员可追溯，普通 SSE 不透传工具结果。选型与边界见 ADR-0002。
 
 ---
 
@@ -856,9 +842,9 @@ Production-like：
 Kubernetes
 ```
 
-本地开发和非 Kubernetes 部署使用 Consul 提供服务注册与发现；进入 Kubernetes 后优先使用 Kubernetes Service Discovery，不强行叠加第二套发现机制。当前 `user-service` 已使用 Kratos Consul Registrar 完成服务注册和注销，并开启 Consul 健康检查；其他服务在各自接入阶段复用相同模式。
+本地开发和非 Kubernetes 部署使用 Consul 提供服务注册与发现；进入 Kubernetes 后优先使用 Kubernetes Service Discovery，不强行叠加第二套发现机制。Gateway、User、Problem、Judge 和 Contest 均使用 Kratos Consul Registrar 注册服务并启用健康检查。
 
-当前 Gateway 骨架位于 `services/gateway`，使用 `cmd/server` 作为入口，先提供 HTTP Server、配置、middleware、client 与 service 扩展点。Gateway 后续通过 gRPC 调用 `user-service`，不会直接访问用户数据库。
+Gateway 位于 `services/gateway`，提供 HTTP API、身份认证、业务 gRPC 客户端和受保护的 Agent SSE 代理；它不直接访问业务数据库。
 
 ---
 

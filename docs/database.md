@@ -1,4 +1,4 @@
-# 数据库设计文档（Database Design）
+# 数据库与存储设计
 
 ## 1. 设计原则
 
@@ -14,7 +14,7 @@
 6. DB State Change + MQ Event 需要可靠一致性时使用 Transactional Outbox。
 7. 跨服务关联通过 ID、gRPC 或 Event，不使用跨服务 SQL Join。
 
-v0 建议逻辑 Schema：
+当前逻辑 Schema：
 
 ```text
 oj_user
@@ -74,9 +74,13 @@ erDiagram
 
     CONTESTS ||--o{ CONTEST_PROBLEMS : contains
     CONTESTS ||--o{ CONTEST_PARTICIPANTS : has
-    CONTESTS ||--o{ CONTEST_SCORES : ranks
+    CONTESTS ||--o{ CONTEST_SUBMISSION_RESULTS : projects
+    CONTESTS ||--o{ CONTEST_USER_RESULTS : ranks
+    CONTESTS ||--o{ CONTEST_CACHE_OUTBOX : refreshes
 
     AGENT_CONVERSATIONS ||--o{ AGENT_MESSAGES : contains
+    AGENT_CONVERSATIONS ||--o{ AGENT_RUNS : executes
+    AGENT_CONFIG_RESOURCES ||--o{ AGENT_CONFIG_VERSIONS : versions
 ```
 
 注意：图中关系描述逻辑关系；不同 Service Schema 之间不建立跨库外键。
@@ -139,7 +143,7 @@ system_admin
 PRIMARY KEY(user_id, role_id)
 ```
 
-Refresh Token 元数据优先放 Redis；如果后续需要长期审计，再新增持久化 Session 表。
+Refresh Token 元数据优先放 Redis；登录刷新状态通过 Redis 保存；当前没有持久化 Refresh Session 表。
 
 ---
 
@@ -242,7 +246,7 @@ problem-{problem_id}/judge-revisions/{judge_revision}/testcases/{case_no}.out
 校验成功后，Problem Service 才在提交测试用例最新状态的同一个 MySQL 事务中
 切换 `problems.active_judge_revision`。revision 历史和 manifest 仅保存在 MinIO，
 MySQL 不保存 revision 历史表。失败的未发布前缀由后台 GC 清理；
-首版所有已发布 revision 均不可覆盖、不可物理删除。未来若需要回收，必须
+首版所有已发布 revision 均不可覆盖、不可物理删除。回收时必须
 通过显式事件或内部 API 建立引用与保留期，禁止 Problem Service 跨库查询
 Judge Service 的 Submission 引用。
 
@@ -406,7 +410,7 @@ INDEX(expires_at)
 
 # 7. `oj_contest`
 
-Contest 为后续阶段。
+Contest Service 使用独立 `oj_contest` Schema 保存比赛、参赛者和排行榜投影。
 
 ## 7.1 `contests`
 
@@ -453,27 +457,11 @@ PRIMARY KEY(contest_id, user_id)
 Contest Service 的 `JoinContest` 在比赛开始前向该表幂等插入报名记录。`user_id` 由认证
 上下文提供，不能由客户端指定；重复报名返回已有 `joined_at`。
 
-## 7.4 `contest_scores`
+## 7.4 排行榜事实与缓存
 
-最终结果或快照。
-
-| Column | Type | Note |
-| --- | --- | --- |
-| `contest_id` | BIGINT | FK |
-| `user_id` | BIGINT | External User ID |
-| `score` | INT | NOT NULL |
-| `penalty` | BIGINT | NOT NULL |
-| `accepted_count` | INT | NOT NULL |
-| `updated_at` | DATETIME(3) | NOT NULL |
-
-约束：
-
-```text
-PRIMARY KEY(contest_id, user_id)
-INDEX(contest_id, score, penalty)
-```
-
-该表为旧设计预留，本版排行榜不读写 `contest_scores`，不使用 Redis ZSET。
+`contest_scores` 不作为运行时事实来源。排行榜以 `contest_submission_results`、
+`contest_problem_results` 和 `contest_user_results` 为 MySQL 投影，通过
+`contest_cache_outbox` 更新 Redis 查询缓存。
 
 ## 7.5 Contest 结果投影
 
@@ -548,19 +536,19 @@ INDEX(conversation_id, id)
 INDEX(run_id)
 ```
 
-敏感源码、Prompt、Tool Result 是否持久化应由后续隐私策略明确；默认避免无必要长期保存。
+消息表保存用户消息和完成后的 assistant 答案；原始 Tool Result、源码正文和模型隐藏推理不写入消息表。
 
-PR2 实际保存用户输入和完成后的 assistant 答案，不写入 tool 消息、源码对象或原始模型
+Agent 消息保存用户输入和完成后的 assistant 答案，不写入 tool 消息、源码对象或原始模型
 Prompt。每条消息上限 32,000 字符，页面消息查询最近最多 200 条并按 ID 升序返回。表结构见
 `migrations/agent/000001_create_agent_runtime.up.sql`；应用不运行自动建表。
 
-Issue #162 PR2 的模型历史查询独立于页面消息列表：在 oj_agent 内按 run_id 关联
+模型历史查询独立于页面消息列表：在 oj_agent 内按 run_id 关联
 user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 conversation_id，
 按 user 消息 ID 取最近最多 20 个完整轮次，恢复升序后再限制 64,000 字符。
 运行中、失败、取消、中断、tool、run_id=NULL 和缺少 user/assistant 的记录不进入上下文。
 查询复用 conversation 与 run_id 索引，无新 DDL、无回填、不修改历史消息；旧应用可继续读取原表。
 
-### Issue #184 PR1 `agent_conversation_summaries`
+### `agent_conversation_summaries`
 
 会话摘要表以 `conversation_id` 为主键，保存 `user_id`、`purpose`、结构化 `summary_json`、
 `covered_until_message_id`、`schema_version`、`version` 和时间戳。摘要游标只能由应用推进到
@@ -570,7 +558,7 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 推理。异步 Worker 在成功 Run 后被通知，摘要增量合并、批次处理、版本冲突重试和游标推进
 均复用既有列，不新增迁移。摘要生成失败不影响聊天终态；新的成功 Run 会再次触发补处理。
 
-### PR2 `agent_runs` 实际字段与一致性
+### `agent_runs` 字段与一致性
 
 | Column | Type | Note |
 | --- | --- | --- |
@@ -597,7 +585,7 @@ user/assistant 消息和 COMPLETED Run，同时限定 Run owner、Run/消息 con
 这些索引不改变用户侧列表排序与权限边界。
 `UNIQUE(active_conversation_id)` 利用多个 NULL 可共存，强制同会话最多一个 RUNNING。
 MySQL 不允许这里的生成列基础字段外键使用级联删除，所以 Run → Conversation 使用
-RESTRICT；未来物理清理需按 messages、runs、conversations 顺序，不跨 Schema 删除。
+RESTRICT；物理清理按 messages、runs、conversations 顺序执行，不跨 Schema 删除。
 
 创建必要的会话、用户消息、Run 是一个事务；完成答案与终态更新是另一个事务。运行
 期间不持有事务。状态只允许 RUNNING 转移到终态，重复完成/更改终态返回冲突，不重复写答案。
@@ -605,12 +593,12 @@ RESTRICT；未来物理清理需按 messages、runs、conversations 顺序，不
 INTERRUPTED，后续请求按 deadline 清理过期 RUNNING，不重放消息。清理只改变该 Run
 状态，其生成列自动释放，不会清除其他新 Run 的关联。
 
-迁移为增量建表：旧 PR1 可在新 Schema 上继续健康检查；PR2 存储需要先执行 up SQL。
+迁移为增量建表：Agent Schema 通过增量迁移初始化；运行存储需先应用对应的 up migration。
 down SQL 删除三张表及全部历史数据，不应作为保留数据的应用回滚方式。
 
 ---
 
-PR3 不改变表结构和索引，复用 PR2 migration；HTTP Chat 接入相同 RunService 事务。
+HTTP Chat 与其他 Agent 入口复用相同 RunService 事务。
 开发 Compose 的 `agent-user.sql` 只初始化本地开发账户并授予 oj_agent 的
 SELECT/INSERT/UPDATE/DELETE，应用不持有跨业务库权限。该文件不替代表 migration，
 本地开发的 `agent-db-init` 在启动前复用现有 Agent 迁移和账户 SQL，补齐旧数据卷，
@@ -622,9 +610,9 @@ SELECT/INSERT/UPDATE/DELETE，应用不持有跨业务库权限。该文件不�
 Agent 的 Prompt、Skill、Tool 策略和知识库属于 `oj_agent` 自有控制面。它们不能保存
 User、Problem、Submission 或 Contest 的业务镜像。
 
-### PR5 `agent_config_resources` / `agent_config_versions`
+### `agent_config_resources` / `agent_config_versions`
 
-PR5 将 Prompt、Skill、Model Profile 和 Agent 统一存储在 `agent_config_resources` 与
+Prompt、Skill、Model Profile 和 Agent 统一存储在 `agent_config_resources` 与
 `agent_config_versions`。资源以 `(kind, config_key)` 稳定标识，当前版本由 `current_id`
 指向；每次创建生成新的 UUID，正文不可原地修改，旧版本填充 `archived_at` 后永久保留。
 删除只是归档，恢复通过复制历史正文创建新 UUID。配置正文由 Python 严格 Schema 校验，
@@ -636,16 +624,16 @@ Prompt 变量、Skill 工具、Agent 绑定、模型类型和预算都在切换�
 共享 Prompt 或 Skill 更新不会自动修改其他 Agent；已有配置按 links 中的历史 UUID 继续读取。
 新配置不能引用归档或停用版本，依赖停用后新的 Agent Run 会被拒绝。
 
-PR5 的 Fake Profile 保持兼容；PR6 增加 Responses Model Profile 与 Provider，API Key 独立加密保存。RAG PR2 起知识范围扩展为分组 UUID。
+Fake Profile 与 Responses Model Profile 并存；Provider 凭据独立加密保存。Agent 知识范围以知识分组 UUID 表示。
 
-PR7 不改变表结构，管理 HTTP 复用这套事务与审计。当前资源查询按资源 `(created_at,id)` 稳定降序，历史按版本 `(created_at,id)` 降序；同一只读事务计算总数和分页结果。聊天目录在分页前使用版本 links、资源 disabled、凭据 revoked 和部署 Provider 策略过滤；依赖深度有界，不访问业务 Schema。资源 `kind/config_key`、版本 `resource_id` 和 links 索引复用既有 migration；搜索仅按稳定 key 子串匹配，分页上限见 API 文档。管理员 HTTP 仅暴露 Agent/Prompt/Skill 正文与模型选项，不暴露 Provider、Credential 数据。
+管理 HTTP 复用这套事务与审计。当前资源查询按资源 `(created_at,id)` 稳定降序，历史按版本 `(created_at,id)` 降序；同一只读事务计算总数和分页结果。聊天目录在分页前使用版本 links、资源 disabled、凭据 revoked 和部署 Provider 策略过滤；依赖深度有界，不访问业务 Schema。资源 `kind/config_key`、版本 `resource_id` 和 links 索引复用既有 migration；搜索仅按稳定 key 子串匹配，分页上限见 API 文档。管理员 HTTP 仅暴露 Agent/Prompt/Skill 正文与模型选项，不暴露 Provider、Credential 数据。
 
 ### `agent_config_links`
 
 保存 Agent → Prompt/Skill/Model、Skill → Prompt 的具体版本绑定；该表不能覆盖 Tool Registry 的
 `rpc_method`、目标服务、最终授权和敏感级别。工具 allowlist 只允许 Registry 中已注册且启用的只读 Tool。
 
-### PR6 Provider、Credential 与模型调用摘要
+### Provider、Credential 与模型调用摘要
 
 `000003_create_model_provider` 是 expand 迁移：配置 kind 增加 `provider`，新增 `agent_credentials`、`agent_credential_audits`、`agent_provider_credentials`，Run 增加可空 JSON `model_summary`，不回填历史凭据或业务消息。所有表归 `oj_agent`，没有跨 Schema 引用、Redis/MQ 或 Outbox。
 
@@ -657,7 +645,7 @@ Provider 的不可变 JSON 保存协议、base URL、Credential ID、超时和�
 
 上线先迁移再部署/启用 model Runtime。旧 Fake Profile 正文仍可解析；旧应用不能使用新增 Provider kind，因此恢复旧应用前先停用真实模型。Down 迁移首先以原子 CHECK 变更拒绝仍有 Provider 配置的库；需要人工处理新配置及引用后才能回滚。Down 会删除加密凭据、凭据审计和模型摘要，不删除 Conversation/Message/Run；需要保留真实凭据/运行证据时应继续保留 expand Schema。主密钥/加密数据库备份分别保管，丢失 keyring 无法靠数据库恢复 Key。
 
-### RAG 自有知识表（PR1 / 000004）
+### RAG 自有知识表
 
 `agent_knowledge_bases` 保存知识库 UUID、管理员名称、创建者与时间；标识由后端生成。
 `agent_knowledge_documents` 保存所属知识库、当前待处理版本、完整发布的 `active_version` 及启用开关。
@@ -674,20 +662,20 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 相同请求重放首次结果，身份或指纹不一致返回 409。上传对象在登记版本前写入，失败回滚不删除旧对象。
 对象键 `bases/{base_uuid}/versions/{version_uuid}/{sha256}.txt`，独立 `agent-knowledge` bucket。
 上传与孤立对象 GC 共用知识库行锁，GC 仅清理超过 24 小时且没有任何版本引用的对象，默认 dry-run，
-每次最多扫描 500 个，可用 start-after 继续。已引用旧版本和向量暂不物理删除，为后续 Run 快照保留。
+每次最多扫描 500 个，可用 start-after 继续。已引用旧版本和向量保留，以支持 Run 固定版本快照。
 
 查询顺序为 created_at/id 稳定降序，分页最多 50；任务领取索引覆盖状态/重试时间/租约时间。
 无 Redis/MQ 新状态。迁移是增加 5 张自有表，不改已有聊天数据；部署先迁移再启用 RAG。
 旧应用可以忽略新表，新应用开启 RAG 时要求迁移。Down 删除知识元数据及审计，不删除 MinIO/Qdrant，
 是破坏性回滚，仅停用 RAG 并备份后执行，常规回退应保留扩展表。
 
-### RAG PR3 的 Run 版本及证据持久化
+### Run 版本及证据持久化
 
 不新增 DDL、回填或跨服务外键。既有 `agent_runs.config_snapshot` 增加 knowledge_scope（最多 20 组）与 knowledge_versions（最多 2000 个当前启用/已发布版本）；创建 Run 的既有事务固定该清单。旧 Run 检索通过版本 document_id 联接文档和 READY 任务，允许旧发布版本而不跟随 active_version 切换；每次前后检查最新 enabled 与 Agent 范围。已引用旧版本及向量继续保留，现有 GC 不删除引用版本，不能随发布立即清理。
 
 `model_summary.knowledge` 保存最多 32 项检索记录，每项最多 5 个来源元数据，与完成/失败/取消终态一起写入；不保存检索 query、片段或原文。管理员按 Run 主键读取严格投影，不向本人历史消息 API 暴露快照或证据。旧代码可忽略新增 JSON 字段，旧记录缺失字段按空集合处理；代码回退无需数据库 down，旧版本仍保留。
 
-比赛题解授权只由 Contest 查询 `oj_contest.contest_problems/contests`，不跨库读取。当前查询使用 contest 主键联接与有界题号 IN；题目反向索引的成本在 PR4 按比赛规模评测，当前不为小语料额外引入迁移。
+比赛题解授权只由 Contest 查询 `oj_contest.contest_problems/contests`，不跨库读取。查询使用 contest 主键联接与有界题号列表。
 
 ## 8.4 Eval、运行和审计实体
 
@@ -698,11 +686,10 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 
 ### `agent_eval_runs` / `agent_eval_results`
 
-运行表保存数据集、模型、Prompt/Skill/Tool Catalog/知识库版本快照、开始结束时间和
-整体指标；结果表保存每个 Case 的工具选择、参数、权限、引用、质量评分、失败原因
-和人工标注。
+Eval 运行表保存数据集与配置版本快照、时间和整体指标；结果表保存每个 Case 的回答、
+程序检查、模型/人工评分、失败原因和标注。
 
-当前数据集阶段已落地 `migrations/agent/000005_create_eval`：
+Eval 数据集由 `migrations/agent/000005_create_eval` 创建：
 `agent_eval_datasets` 保存数据集元数据、内容哈希和 MinIO 原文对象键，
 `agent_eval_cases` 保存严格校验后的 Case 投影。原始 JSONL 不进入数据库；同一内容哈希
 重复上传只返回已有数据集。`migrations/agent/000006_create_eval_runs` 增加运行和结果表；
@@ -712,27 +699,25 @@ active_version，过时版本的晚到任务不能覆盖新 current_version。�
 避免评测账号通过普通历史 API 读取原始评测内容。索引 `(user_id,purpose,updated_at,id)` 支持
 隔离后的稳定分页。状态与进度/结果写入同一本地事务，不引入 MQ。人工评审由 000007 增加，评审 Agent 结果由 000008 增加。单实例重启中断遗留批次并保留已完成结果，评审 RUNNING/PENDING 状态收敛为不可用，尚无跨实例续跑。
 
-### `agent_runs` / `agent_run_events`
+### `agent_runs`
 
-PR2 只实现上面列出的最小运行表，以下 Skill、模型、Token、延迟及事件表仍是后续规划。
-运行表保存用户、会话、Skill、配置快照、模型、状态、Token、延迟和最终状态。事件表
-保存意图、计划步骤、Tool 调用、Tool 结果摘要、Reflection、错误和 SSE 状态。源码、
-凭据、完整 Prompt 和原始敏感 Tool Result 默认只保存脱敏摘要或对象引用。
+`agent_runs` 保存 Run 状态、配置快照、Trace ID、模型调用摘要、工具步骤、知识检索来源和
+后台导出状态。Agent 对话正文保存在 `agent_messages`；模型内部推理、Provider 凭据和原始
+敏感 Tool Result 不持久化。
 
-### `agent_admin_audits`
+### `agent_config_audits`
 
-后续管理员 HTTP 控制面使用该表记录角色、资源类型、资源标识、动作、旧版本、新版本、
-请求 ID、Trace ID、结果和时间。PR5 的本机 `app.config_cli` 已通过 `agent_config_audits`
-记录配置创建、替换、归档、停用和恢复。
+配置管理记录资源、操作者、动作、版本变化、请求 ID、结果和时间。HTTP 管理接口与
+`app.config_cli` 共用配置仓储和审计数据。
 
 ## 8.5 一致性和发布规则
 
-- PR5 不采用草稿/发布状态机；校验成功的创建在事务提交后立即影响新 Run。
+- 配置不采用草稿/发布状态机；校验成功的创建在事务提交后立即影响新 Run。
 - 配置版本不可变，Agent Run 开始时记录完整配置快照和哈希。
 - Prompt、Skill、Agent 和 Model 的替换使用 `expected_id` 做乐观并发控制。
 - 替换失败不能切换当前指针，重试不会生成重复版本。
 - 恢复基于历史正文创建新 UUID，不修改历史版本；已有 Agent 的历史引用继续可解析。
-- 后续缓存必须以具体配置 UUID 为 Key，并在当前指针替换或停用后失效。
+- 配置缓存以具体配置 UUID 为 Key，并在当前指针替换或停用后失效。
 - Admin API 只能访问 `oj_agent`，不能跨 Schema SQL Join。
 
 # 9. Redis Key 约定
@@ -746,10 +731,11 @@ submission:{submission_id}:status
 rate:{scope}:{identity}
 idempotency:{scope}:{key}
 contest:{contest_id}:leaderboard
+contest:{contest_id}:leaderboard:generation:{generation}
 sse:submission:{submission_id}
 ```
 
-`contest:{contest_id}:leaderboard` 仅为未来缓存规划，本版 Contest 排行榜不使用 Redis。
+Contest 排行榜 Redis 键由 Contest Repository 按部署的 namespace 和 generation 管理；MySQL 结果表与 Outbox 是恢复缓存的事实来源。
 
 每个 Key 必须定义：
 
@@ -819,7 +805,7 @@ Migration 必须：
 000008_add_outbox_failure_reason.up.sql
 ```
 
-具体 Migration 工具在实现阶段确定并固定，不维护第二套平行流程。
+各服务通过仓库内 migration 文件维护 Schema 版本，不维护第二套平行流程。
 
 ---
 
@@ -884,15 +870,15 @@ SELECT *
 
 # 14. 数据删除与保留
 
-v0 原则：
+当前数据保留约定：
 
 - 用户账户优先软禁用，不立即物理删除。
 - Problem 可使用 `status=archived`。
 - Submission 作为判题历史原则上保留。
-- Agent Conversation 的保留时间以后续隐私策略为准。
+- Agent Conversation 的保留时长由部署隐私策略配置。
 - Outbox / Processed Event 需要定期归档或清理，清理策略必须保证幂等窗口和故障恢复需求。
 
-具体保留时长属于后续运维策略，本版本不预设数值。
+Agent Conversation 保留时间由部署侧隐私策略确定。
 
 ---
 
@@ -909,9 +895,9 @@ v0 原则：
 - [ ] 是否会暴露敏感数据。
 - [ ] 是否同步更新 API / Event Contract。
 
-### Agent 表单内容兼容（Issue #160）
+### Agent 配置内容与版本兼容
 
-本次只扩展 Agent 自有版本表 JSON 内容，不新增 DDL，也不原地更新历史版本。
+Agent 自有版本表 JSON 内容支持配置字段扩展，不新增 DDL，也不原地更新历史版本。
 Prompt 增加 name；Skill 增加 text/description 和兼容模板 variables。旧 Skill 的 prompt_id/budget
 仍能解析，仍沿旧 links 读取指定 Prompt；新 Skill 内置文本不产生 Prompt link，预算默认继承。
 前端编辑旧内容时复制文本，正常保存新 UUID/审计；Agent 需明确重绑才采用新版本。
@@ -924,7 +910,7 @@ Prompt 增加 name；Skill 增加 text/description 和兼容模板 variables。�
 回滚前端可继续读取旧内容；旧后端不能解析新内置 Skill，部署应同时升级 Agent/Web，
 回滚需先让 Agent 绑定保留的旧版本，不应删除新版本或历史审计。
 
-### Agent 会话展示与默认助手升级（Issue #167）
+### Agent 会话与默认助手
 
 会话列表和消息读取仅访问 Agent 自有表，复用
 `idx_agent_conversations_user_updated_id` 与会话消息索引，无 DDL/回填迁移。

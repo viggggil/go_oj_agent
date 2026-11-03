@@ -1,4 +1,4 @@
-# API 接口定义文档（API Specification）
+# API 与消息契约
 
 ## 1. 目标
 
@@ -18,7 +18,7 @@ Go Services / Agent Tools
 
 异步业务通过 RabbitMQ Event Contract 交互。
 
-本文件定义 v0 阶段的接口边界。最终字段以 `api/*/v1/*.proto` 和生成的 OpenAPI 为准。
+本文汇总当前接口边界。字段定义以 `api/*/v1/*.proto` 和生成的 OpenAPI 为准。
 
 Gateway 外部 HTTP 请求/响应的结构化契约记录在 `api/gateway/v1/gateway.proto`。Gateway 的 `service GatewayService` 使用 `google.api.http` 声明 REST 路由，由 `protoc-gen-go-http` 生成 `gateway_http.pb.go`，服务启动时通过 `RegisterGatewayServiceHTTPServer` 注册。Gateway 当前已接入认证、用户、Problem、Submission/Judge 和 Contest API。
 
@@ -237,7 +237,7 @@ Response：
 }
 ```
 
-当前 Gateway 已接入该接口，内部转发到 `user.v1.UserService/Register`。
+Gateway 将该接口转发到 `user.v1.UserService/Register`。
 
 ## 3.2 Problem
 
@@ -322,7 +322,7 @@ Response：
 
 user-service 会撤销同一 Session 下的全部 Refresh Token。对未知、过期或已撤销的 Refresh Token 幂等返回成功；内部依赖故障仍返回错误。Access Token 是无状态 JWT，退出登录不会使已签发的 Access Token 立即失效，它仍按短 TTL 自然过期。客户端收到成功响应后必须清除本地 Access Token、Refresh Token 和用户状态。
 
-当前 Gateway 已接入注册、登录、刷新令牌和退出登录四个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则、Refresh Token 策略和 Session 注销仍由 user-service 执行。
+Gateway 提供注册、登录、刷新令牌和退出登录四个公开认证接口。参数校验使用 `api/gateway/v1/gateway.proto` 的 `validate.rules` 生成代码，认证业务规则、Refresh Token 策略和 Session 注销仍由 user-service 执行。
 
 ### 前端认证流程
 
@@ -383,7 +383,7 @@ page
 page_size
 ```
 
-当前版本只实现分页。名称搜索、难度筛选和标签筛选在后续版本增加。
+该接口支持分页；可用筛选字段以当前 Proto/OpenAPI 定义为准。
 
 Response：
 
@@ -628,9 +628,9 @@ GET /readyz
 探针不会创建表，也不会
 访问其他服务的数据库。
 
-### Chat 接入状态（PR3）
+### Chat 运行与接入
 
-PR3 已接通 `Gateway -> Agent Service` 的受保护 SSE 链路。业务客户端只能访问 Gateway
+`Gateway -> Agent Service` 使用受保护的 SSE 链路。业务客户端只能访问 Gateway
 的外部地址；开发 Compose 中 Agent 不映射宿主机端口，只挂载 Gateway 的公钥。
 Gateway 始终注册受保护的路由，`clients.agent.enabled=false` 时返回 503；Agent 只有
 在 `AGENT_CHAT_ENABLED=true` 并配置数据库、公钥与运行时后才注册内部 Chat 路由。Agent
@@ -689,7 +689,7 @@ Agent 都会检查该限制。请求字段如下：
 
 `message` 必须是 1–32,000 个字符且不能全为空白；新会话可省略 `conversation_id`，
 继续会话时必须提供 UUID；
-PR5 新增可选 `agent_key`、`skill_key`，格式为 `[a-z][a-z0-9_]{1,63}`。数据库模式省略
+请求支持可选 `agent_key`、`skill_key`，格式为 `[a-z][a-z0-9_]{1,63}`。数据库模式省略
 Agent 时使用部署默认 key。数据库真实模型模式省略 Skill 时，固定 Agent 绑定的可用技能
 UUID、名称、适用说明和渲染文本，交给模型在本次回答中自行参考；缺少 Context 的技能不参与，
 若全部缺少则返回 `AGENT_PROMPT_CONTEXT_REQUIRED`。默认 Skill 排在参考集合首位，
@@ -738,7 +738,7 @@ event: thinking
 data: {"type":"thinking","run_id":"...","conversation_id":"...","sequence":1,"data":{"text":"正在整理信息"}}
 
 event: token
-data: {"type":"token","run_id":"...","conversation_id":"...","sequence":2,"data":{"text":"【演示回答】尚未接入真实模型。"}}
+data: {"type":"token","run_id":"...","conversation_id":"...","sequence":2,"data":{"text":"【演示模式】示例回答文本。"}}
 
 event: done
 data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":{}}
@@ -763,23 +763,23 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 客户端断开、Gateway 总时限/空闲时限、上游 EOF 或写入失败都会取消 Run 或发送稳定的
 `error` 事件；没有收到 `done` 的 EOF 不能视为成功。一次接受请求创建新 Run，不按
 `request_id` 幂等，调用方不能自动重试 Chat POST。普通用户（包括管理员身份）只能访问
-本人会话；跨用户管理查询属于后续控制面。
+本人会话；管理员运行诊断接口另行提供，不返回其他用户的聊天正文。
 
-### PR6 真实 Responses 模型
+### Responses 模型调用
 
 外部 Chat 请求和 SSE envelope 不变，Gateway 仍验证 Access JWT、签发可信委托并校验/转发有界 SSE。新增模型错误只使用已有 error 事件的稳定 code：`AGENT_MODEL_AUTH_FAILED`、`AGENT_MODEL_QUOTA`、`AGENT_MODEL_RATE_LIMIT`、`AGENT_MODEL_UNAVAILABLE`、`AGENT_MODEL_TIMEOUT`、`AGENT_MODEL_INVALID_RESPONSE`、`AGENT_MODEL_REJECTED`、`AGENT_MODEL_INPUT_LIMIT`、`AGENT_MODEL_OUTPUT_LIMIT`、`AGENT_MODEL_CALL_LIMIT`、`AGENT_TOOL_CALL_LIMIT`、`AGENT_MODEL_BLOCKED`、`AGENT_MODEL_UNSUPPORTED_OUTPUT`、`AGENT_MODEL_ENDPOINT_DENIED`、`AGENT_CREDENTIAL_UNAVAILABLE`。不透传 Provider HTTP 错误正文。
 
 模型配置与选定 Skill 不兼容时，建流前返回 409 `AGENT_CONFIGURATION_UNSUPPORTED`；凭据引用不存在或撤销时返回 503。Gateway 使用已有状态映射，不透传内部错误正文。建流后的模型失败由 SSE error 表示，即使已有部分 token，也不能当成成功答案；done 仍表示最终持久化成功。
 
-内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。Issue #162 PR2 在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；没有授权工具时不传 tools，仍使用同一 ReAct Graph。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
+内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。请求在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；没有授权工具时不传 tools，仍使用同一 ReAct Graph。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
 
 同会话续聊自动取本人最近最多 20 个成功完整轮次（候选最多 64,000 字符），再为本轮必需输入和输出预留预算，按 UTF-8 字节上界与逐消息开销裁剪最旧整轮。失败、取消、中断、RUNNING 和残缺消息不进入模型输入。历史被裁剪不会新增 SSE 事件；必需输入本身超限仍返回已有 AGENT_MODEL_INPUT_LIMIT。新对话没有历史。外部 Chat 请求、响应、错误码、Gateway 委托和 SSE envelope 不变，无需前端传递历史正文或供应商会话 ID。
 
-本阶段没有公开凭据读写 API。`app.credential_cli` 仅提供本机 create/get/list/revoke 和 init-keyring，读取 Key 使用 600 文件或 stdin；查询不会返回原始 Key。`app.config_cli` 扩展 provider kind 和可选的 bootstrap credential-id；仍不能把 actor-id 当作可信管理员角色。
+没有公开凭据读写 API。`app.credential_cli` 仅提供本机 create/get/list/revoke 和 init-keyring，读取 Key 使用 600 文件或 stdin；查询不会返回原始 Key。`app.config_cli` 扩展 provider kind 和可选的 bootstrap credential-id；仍不能把 actor-id 当作可信管理员角色。
 
-### Issue #162 PR3：只读工具循环
+### 只读工具循环
 
-Issue #180 后 Skill 不再选择回答方式，所有真实 Run 使用统一 ReAct Graph。
+Skill 提供任务说明和工具授权；所有真实 Run 使用统一 ReAct Graph。
 授权目录使用 Agent/Skill 工具白名单与 Registry 已启用、角色允许的只读工具交集，模型不能扩大权限。
 Responses 请求携带 function schema、parallel_tool_calls=false；校验 completed 中的 function_call 后，
 通过现有带 Agent 委托身份的 gRPC 执行工具，再按 call_id 回传 function_call_output。
@@ -805,7 +805,7 @@ REST/SSE envelope、Proto、数据库表均兼容；更新时应一起发布 Gat
 
 ### 管理员 Agent Control Plane API
 
-PR7 提供 Agent、Prompt、Skill 的管理 HTTP API 和聊天目录，全部经 Gateway。两端均校验
+Agent、Prompt、Skill 管理 HTTP API 和聊天目录均经 Gateway。两端均校验
 管理员角色 `admin`、`system_admin`、`agent_admin`，普通用户的管理请求返回 403。
 内部 RS256 委托绑定 `HTTP <method> <具体路径>`，含资源 key/UUID；Chat、查询或其他资源的
 委托不能用于本次写操作。Agent 只接受 Gateway 签名身份，不信任正文 actor_id/role 或身份 Header。
@@ -857,11 +857,11 @@ PUT 正文为 `{"expected_id":"<当前 UUID>","content":{...完整内容...}}`�
 历史版本按版本 created_at/id 降序；total/items 在同一数据库快照中查询。详情无分页参数，
 允许读取归档记录；历史 UUID 必须匹配路径 kind/key。拒绝重复/未知查询参数。
 历史列表、模型选项与 Tools 不支持状态筛选，非 active 的 state 返回 400。
-PR8 增加按 kind/UUID 查询历史详情的只读入口（无需先查 key）；UUID 必须为规范小写格式，
+按 kind/UUID 查询历史详情的只读入口（无需先查 key）；UUID 必须为规范小写格式，
 kind 不匹配返回 404，详情禁止查询参数。与 key/UUID 详情使用相同配置 DTO、管理员权限及具体路径委托。
 
 创建已有 key（含归档）或 stale expected_id 返回 409 `AGENT_CONFIGURATION_STALE`，不会
-自动覆盖。输入/引用/工具不合法返回 400，未实现执行模式/非允许模型返回 409
+自动覆盖。输入/引用/工具不合法返回 400，不支持的执行模式或模型返回 409
 `AGENT_CONFIGURATION_UNSUPPORTED`，不存在返回 404，数据库/凭据依赖不可用返回 503。
 Gateway 只返回允许的稳定错误码，不透传异常正文。请求体默认最多 256 KiB，JSON 响应最多
 1 MiB，均不接受压缩请求；管理请求使用普通 HTTP deadline，不占用 Chat 的长时间预算。
@@ -875,7 +875,7 @@ Skill 不设置预算时继承 Agent 和部署上限。兼容旧 Skill 的 promp
 内置 variables 仅用于兼容迁移，声明时沿用 Prompt 模板校验。
 新 Skill 管理写请求出现 execution_mode 返回 409 AGENT_CONFIGURATION_UNSUPPORTED；历史不可变版本和 Run/Eval 快照仍可读取该字段，但它不参与图选择。复制旧版恢复使用历史解析，不改写原版本及其哈希。新 Run 带 runtime_version=react_v2。
 Agent 为 name/prompt_id/skill_ids/default_skill_id/model_profile_id/allowed_tools/budget/
-visibility/is_test/test_expires_at/knowledge_scope。RAG PR2 起知识范围支持分组 UUID；所有真实 Run 统一使用 ReAct。
+visibility/is_test/test_expires_at/knowledge_scope。知识范围支持分组 UUID；所有真实 Run 统一使用 ReAct。
 test Agent 必须管理员可见、到期时间带时区且在未来。程序安全前缀不可编辑。
 
 真实模式的模型选项是只读分页接口，返回已有 Responses Model Profile 的 UUID/key/model、可选生成
@@ -903,10 +903,7 @@ Agent/Prompt/Skill/模型配置不采用草稿发布；创建完整校验后立�
 UUID。停用是资源级操作，会阻止后续 Run 使用其任一版本；已开始 Run 保留配置快照。
 Agent 自身归档也会阻止新的 Run。恢复不自动启用已停用资源。
 
-以下旧目标列表中超出上述 PR7 接口的功能（Tools 详情/统计、RAG、Eval、观测等）仍为后续
-设计；PR8 已接管理页面、配置版本绑定和顶栏/工作区路由，PR9 已接 Agent/Skill 目录选择和
-Gateway 流式对话。Chat 不自动重试，401 刷新后由用户再次发送；停止、新对话、切换 Agent
-和离开页面会中止流，只有合法 done 才表示完成。多轮上下文仍未实现。
+Chat 不自动重试；401 刷新后由用户再次发送。停止、新对话、切换 Agent 和离开页面会中止流，只有合法 `done` 才表示完成。
 
 Prompt：
 
@@ -1029,7 +1026,7 @@ COMPLETED 表示调度执行完成，质量结论看每条 checks.pass 以及 ha
 取消使用 `POST /runs/{uuid}/cancel?version={正整数}` 与规范 UUID `X-Request-ID`，
 JSON 正文为 `{}`。version 不匹配或已终态返回 409 AGENT_EVAL_VERSION_CONFLICT；同一取消 request ID
 即使 version 已过期仍幂等返回当前状态。取消停止活跃 SSE/模型流并将排队 Case 记为 CANCELLED。
-单实例服务重启时遗留运行标记 FAILED，保留已保存结果，本阶段不自动续跑。
+单实例服务重启时将遗留运行标记为 FAILED，并保留已保存结果；运行不自动续跑。
 Run 冻结后，配置替换/停用不改变该批次的固定内容；新建 Run 会重新校验停用状态。
 凭据撤销、业务 RPC 权限与 RAG 当前授权仍由原 Runtime 在实际调用时检查，不因快照豁免。
 
@@ -1095,7 +1092,7 @@ service UserService {
 }
 ```
 
-User Service 第一阶段需要实现以下接口：
+User Service 提供以下接口：
 
 ### `Register`
 
@@ -1110,7 +1107,7 @@ User Service 第一阶段需要实现以下接口：
 - 使用 bcrypt 保存密码 Hash，默认 cost 为 12，禁止保存明文密码。
 - 创建用户后分配默认 `user` 角色。
 - 返回新用户的基础资料，不返回 `password_hash`。
-- 当前已接入 user-service 的 Proto handler 和 MySQL Repository。
+- User Service 通过 Proto handler 和 MySQL Repository 提供该能力。
 
 ### `Login`
 
@@ -1121,11 +1118,11 @@ User Service 第一阶段需要实现以下接口：
 - 返回短生命周期 Access Token，默认 TTL 为 15 分钟。
 - Access Token 使用 JWT，签名算法为 HS256，payload 可以携带 `roles`。
 - HS256 secret 只允许 `user-service` 和 `gateway` 持有。
-- Access Token Claims 与 HS256 校验语义由公共 Go 包 `pkg/auth` 维护，Gateway 后续复用该 verifier 生成可信请求上下文。
+- Access Token Claims 与 HS256 校验语义由公共 Go 包 `pkg/auth` 维护，Gateway 使用该 verifier 生成可信请求上下文。
 - 返回 Refresh Token，Refresh Token 使用高熵不透明字符串，服务端保存 SHA-256 hash。
 - 登录失败时不要泄露“用户不存在”或“密码错误”的具体差异。
-- 当前已接入账号查询、bcrypt 密码校验和 `TokenIssuer` 调用。
-- 当前已接入 HS256 JWT 签发和 Redis Refresh Token 保存。
+- User Service 执行账号查询与 bcrypt 密码校验，并调用 `TokenIssuer`。
+- User Service 签发 HS256 JWT，并将 Refresh Token 状态保存在 Redis。
 
 ### `RefreshToken`
 
@@ -1248,13 +1245,7 @@ manifest 格式为：
 归档最后一个有效测试点时不生成空 revision，而是清空 active 指针并保留旧
 MinIO 快照，因此新 Submission 会被拒绝，历史 Submission 仍可复现。
 
-Agent Tool 映射：
-
-```text
-get_problem      -> GetProblem
-search_problems  -> 后续扩展 ListProblems 筛选能力
-recommend_problem -> 后续使用 List + Agent strategy
-```
+Agent 的 `get_problem` Tool 调用 `GetProblem`。
 
 ---
 
@@ -1286,8 +1277,7 @@ GetJudgeResult 在判题尚未完成时返回当前状态和空的 Case Results�
 复用源码对象且固定当前 revision 的新 QUEUED Submission，并写入新的
 `judge.requested` Outbox；相同幂等键会重放首次响应。
 
-本阶段只开放内部 gRPC；上文 `/api/v1/submissions` REST 路由仍由后续 Gateway
-接入实现。
+此处描述内部 gRPC 契约；外部提交 REST 路由由 Gateway 提供。
 
 Agent Tool 映射：
 
@@ -1299,10 +1289,9 @@ list_recent_submissions  -> ListSubmissions(page=1, bounded page_size)
 
 Authorization 必须由 Judge Service 执行，而不是 Agent 判断。
 
-### Agent PR4 只读 Tool 与内部身份
+### Agent 只读 Tool 与内部身份
 
-PR4 在不改变外部 Chat/SSE 契约的前提下，增加 Agent Service 到 Problem/Judge Service
-的只读 gRPC Client。首批映射如下：
+Agent Service 通过只读 gRPC Client 访问 Problem/Judge Service。当前映射如下：
 
 ```text
 get_problem            -> /problem.v1.ProblemService/GetProblem
@@ -1314,7 +1303,7 @@ list_submissions       -> /submission.v1.SubmissionService/ListSubmissions
 ```
 
 Tool 按请求和已发布 allowlist 选择，不构成固定的提交预取链路。算法解释、通用知识问答
-和学习计划可以不调用这些 Tool。PR4 不开放 CreateSubmission、RejudgeSubmission、
+和学习计划可以不调用这些 Tool。当前不开放 CreateSubmission、RejudgeSubmission、
 测试数据或 Judge Worker 内部 RPC。
 
 Agent 使用独立 RSA 私钥为每次调用签发短期 JWT。Token 的 `iss`、`aud`、`sub`、`actor_id`、
@@ -1669,7 +1658,7 @@ page
 page_size
 ```
 
-v0 阶段保持简单。
+当前接口使用页码分页。
 
 要求：
 
@@ -1687,7 +1676,7 @@ v0 阶段保持简单。
 - Outbox Relay。
 - Judge Result Consumer。
 - Contest Event Consumer。
-- Agent 中产生写操作的未来 Tool。
+- Agent 中产生写操作的 Tool（启用前须定义授权、确认与幂等语义）。
 
 MQ Consumer 以 `event_id` 或业务唯一约束实现去重。
 
@@ -1727,7 +1716,7 @@ RabbitMQ：
 - [ ] 是否需要 Contract Test。
 - [ ] 是否更新 OpenAPI / Proto Docs。
 
-### 本人 Agent 会话（Issue #167）
+### 本人 Agent 会话
 
 `GET /api/v1/agent/conversations?page=1`：登录用户的历史会话，固定每页 20 条，
 `page` 为 1–10000，按 `updated_at DESC, id DESC` 排序。
@@ -1746,7 +1735,7 @@ RabbitMQ：
 两条只读接口均经 Gateway 用户鉴权、具体路径委托与 Agent owner 校验，无需管理员角色。
 恢复会话后聊天仍使用原 Agent；选择其他 Agent 会开始新对话。Chat POST 不自动重放。
 
-### 自动 Skill 参考（Issue #169）
+### 自动 Skill 参考
 
 Run 快照新增 `skill_selection`（automatic/explicit）、`skill_references`，仅 Agent 自有库保存；
 不增加 REST/SSE 字段，不向用户暴露技能正文或原始配置。自动模式的工具范围为可用 react
@@ -1760,9 +1749,9 @@ Run 快照新增 `skill_selection`（automatic/explicit）、`skill_references`�
 
 前缀 `/api/v1/admin/agent/rag`。Gateway 和 Agent 均只允许 `admin`、`system_admin`、`agent_admin`；
 Gateway 签署绑定具体方法/路径的短期委托。普通用户没有知识列表/原文/下载接口，RAG API 不属于聊天 SSE。
-`AGENT_ADMIN_ENABLED` 与 `AGENT_RAG_ENABLED` 均须开启。PR2 允许 `knowledge_scope` 绑定 0–20 个不重复且已存在的知识分组 UUID；空数组表示不访问任何知识库。
+`AGENT_ADMIN_ENABLED` 与 `AGENT_RAG_ENABLED` 均须开启。`knowledge_scope` 绑定 0–20 个不重复且已存在的知识分组 UUID；空数组表示不访问任何知识库。
 分组复用 knowledge_base，每份文档属于一个分组，Agent 不逐篇绑定；分组改名不改变 UUID。
-PR3 再接入模型工具和 Run 固定版本清单，不能把管理员测试搜索开放给普通用户。
+真实模型工具使用 Run 固定的知识版本清单；管理员检索接口不对普通用户开放。
 
 | 方法与相对路径 | 请求 | 响应 |
 | --- | --- | --- |
@@ -1791,16 +1780,16 @@ PR3 再接入模型工具和 Run 固定版本清单，不能把管理员测试�
 hash/大小、模型 revision、splitter 版本、创建者/时间、state/chunk_count/error_code；仅详情额外含 content，
 不返回 MinIO object key 或凭据。检索测试仅管理员可用，匹配项含 score、内部文档/版本/知识库 UUID、标题、
 problem_id、number、text、section、start/end（原文 Unicode 字符偏移，非字节）。最多 2000 个启用版本，超出返回 AGENT_UNAVAILABLE，不部分检索或回退全库；
-Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。PR2 仍不对普通模型开放此管理员测试接口。
+Qdrant 前置过滤版本，返回后重新检查 MySQL 发布/启用状态。管理员测试接口不对普通模型开放。
 
 错误沿用单字段 `{code}`：400 AGENT_INVALID_ARGUMENT；403 AGENT_FORBIDDEN；404 AGENT_RAG_NOT_FOUND；
 409 AGENT_RAG_STALE / AGENT_RAG_NOT_READY / AGENT_RAG_REQUEST_CONFLICT；413/415 沿用请求错误；
 503 AGENT_RAG_DEPENDENCY_UNAVAILABLE / AGENT_UNAVAILABLE / AGENT_MANAGEMENT_DISABLED。依赖错误脱敏，
-不返回第三方原始正文。本阶段扩展管理员 REST 与 Agent knowledge_scope 校验，默认空范围兼容已有配置；Go Gateway allowlist/响应校验、Python 服务及 Web 客户端同步更新，不改变 gRPC/SSE，不新增 MQ 事件。
+不返回第三方原始正文。管理员 REST、Gateway allowlist/响应校验、Python 服务及 Web 客户端共同执行 `knowledge_scope` 校验；不改变 gRPC/SSE，也不新增 MQ 事件。
 
 管理员页面位于 `/agent/rag`，保留 Agent 左侧导航，仅管理角色可见；支持分组创建/改名、文档上传与版本编辑、状态刷新/失败重试、启用/归档、切分预览和当前分组检索。正文以纯文本显示，不执行上传 Markdown/HTML。文件在浏览器按 UTF-8 校验后作为受限 JSON 上传。Agent 编辑页按组多选；普通用户直接进入管理 URL 会返回对话页，后端仍独立拒绝管理 API。
 
-### RAG PR3：内部模型检索与管理员证据
+### RAG 内部模型检索与管理员证据
 
 `retrieve_knowledge` 是内部只读工具，不是普通用户可调用的 REST 搜索接口。绑定分组且开启 RAG 的真实模型 Agent 自动获得该工具，仍消耗全局工具/模型预算。输入为 `query`（1–400 字符、非空白）、可空 `problem_id`（正 int64）、`top_k`（1–5，默认 3），拒绝其他字段；分组、版本和身份均取可信 Run 状态。默认每 Run 最多 4 次查询（`AGENT_RAG_MAX_QUERIES_PER_RUN` 可设 1–8）、`AGENT_RAG_MIN_SCORE=0.35`，匹配正文及元数据总计至多 24KB 并服从全局结果上限。
 
@@ -1816,12 +1805,12 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 
 新增兼容性 gRPC：`contest.v1.ContestService/CheckKnowledgeAccess`，请求 `problem_ids` 为 1–100 个不重复正 int64，返回 `allowed_problem_ids` 子集，不返回比赛列表/身份。需可信内部主体；Contest 从自身数据库排除所有 `status != archived AND end_at > UTC_TIMESTAMP(3)` 的关联题目，管理员同样不豁免。该结果只确认比赛限制，Agent 还必须通过 Problem `BatchGetProblems` 确认题目 normal/可见；未知、归档及不可访问题目均排除。Python bindings、Go generated server/client、Agent RPC 白名单与部署配置同步更新；Gateway 不公开此 RPC。无新增事件/表/列，升级先部署业务 RPC 与白名单并重启加载配置，再部署 Agent；旧服务返回 Unimplemented 时检索失败关闭。
 
-### Eval PR3：运行页面与人工评审
+### Eval 运行页面与人工评审
 
 管理员 `/agent/eval` 页面保留左侧导航，支持分页数据集与样例、上传 UTF-8 JSONL 文件或文本、选择 Agent/数据集/并发/重复次数、运行进度和取消、结果筛选/详情、人工评分与修改记录。
 `?tab=runs&run={uuid}` 可恢复运行详情；轮询在离开页面时停止，切换批次不复用旧结果。
 所有新运行均执行程序化检查，并由固定的管理员专用评审 Agent 评审通过程序门禁的回答。
-导出和 CLI 仍在后续阶段。
+当前页面提供运行管理、结果筛选、详情和人工评审。
 
 运行详情增加 `metrics`：`recorded_cases`、`check_passes`、`effective_passes`、`reviewed_cases`、
 `model_reviewed_cases`、`model_review_unavailable`、`model_passes`、`average_latency_ms`（无结果时为 null）。
@@ -1869,7 +1858,7 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 兼容发布：先执行 `000007_create_eval_reviews` 和 `000008_create_eval_model_reviews`，再一起部署 Agent/Gateway 和 web。旧 Agent 应用可忽略新列/表；
 新 Gateway 采用扩展后的严格结果契约，不能长期与旧 Agent 混用。
 
-### Issue #180：脱敏工具轨迹与历史兼容
+### 脱敏工具轨迹与历史兼容
 
 ModelSummary 保留 tools/attempts/knowledge，并增加最多 128 条 tool_steps：step、call_id、tool_name、parameter_validation（valid/invalid/rejected）、status（succeeded/failed/rejected）、error_code、duration_ms、summary、evidence_refs。仅存稳定安全元数据，不存原始参数/结果、源码或内部推理。旧 JSON 没有 tool_steps 时按空列表解析。
 

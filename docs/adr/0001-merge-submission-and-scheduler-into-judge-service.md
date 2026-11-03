@@ -33,7 +33,7 @@ Client
   -> MySQL submission + case results
 ```
 
-首版只启动一个 `judge-service` 实例，在同一进程内运行 API Server、Outbox Relay 和 Result Consumer。三者仍保持独立模块、独立生命周期和有界并发，便于后续按运行角色拆分；当前不增加额外部署单元。
+首版只启动一个 `judge-service` 实例，在同一进程内运行 API Server、Outbox Relay 和 Result Consumer。三者作为独立模块运行，分别管理生命周期与并发。
 
 ## 不变量
 
@@ -62,7 +62,7 @@ Client
 
 ## 首版实现决策
 
-1. **Proto 边界。** 服务实现与部署名使用 `judge-service`；Submission 资源 API 保留 `submission.v1`，Worker、内部判题和管理契约使用 `judge.v1`，暂不合并 Proto 包。
+1. **Proto 边界。** 服务实现与部署名使用 `judge-service`；Submission 资源 API 保留 `submission.v1`，Worker、内部判题和管理契约使用 `judge.v1`，保持独立 Proto 包。
 2. **运行形态。** 首版仅运行一个 `judge-service` 实例，并在同一进程中启动 API、Relay 和 Result Consumer。每个后台组件必须支持优雅停止，启动失败必须使服务启动失败，不能静默降级。
 3. **Outbox 领取。** 使用 MySQL 8 `SELECT ... FOR UPDATE SKIP LOCKED` 在短事务中领取批次，并记录 lease、attempt、next retry time。Publisher Confirm 前不得标记 published；整体仍按至少一次语义设计。
 4. **优先级。** 首版所有任务都是普通优先级，不接受客户端提供的 priority，也不创建多级优先队列。未来引入比赛或管理员优先级时另行版本化契约。
@@ -73,7 +73,7 @@ Client
 9. **取消、作废与超时。** Judge Service 是终态所有者。取消、管理员作废或系统超时通过 Submission 条件更新产生终态；Worker 的迟到消息不能改写已终止的 Submission。
 10. **SSE 来源。** MySQL 是事实来源，Redis 只作为实时状态视图。结果事务提交后再更新或失效 Redis；SSE 断线重连必须从 MySQL 恢复状态。
 
-## Issue #127：比赛结果投影
+## 比赛结果投影兼容
 
 维持作废旧 Submission、生成新 ID 的重判规则。比赛替代 Submission 的 `created_at`
 保留原提交时间，deadline/updated_at 使用重判时刻，使赛后重判仍能按原比赛时间计分。
