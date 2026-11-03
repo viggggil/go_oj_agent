@@ -11,6 +11,10 @@ make infra-up
 curl http://127.0.0.1:8080/healthz
 ```
 
+Compose 默认启动 3 个 Judge Worker 实例，每实例并发 2。比较压测结果时需在记录中注明
+`JUDGE_WORKER_REPLICAS` 和 `JUDGE_WORKER_CONCURRENCY`；实例共同竞争消费相同 RabbitMQ
+语言队列，RabbitMQ 根据未确认消息配额分配任务。
+
 普通 API 每档 2 分钟：
 
 ```bash

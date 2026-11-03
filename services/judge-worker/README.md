@@ -8,7 +8,7 @@ toolchain runner；编译产物以 go-judge cached file 传给测试点执行。
 
 Loader 严格校验源码 key 的语言后缀和 ULID、manifest identity、测试点对象 key、对象
 size 与 SHA-256。存储读取失败是可重试系统错误；快照或完整性不匹配不可重试。
-RabbitMQ consumer 使用 manual ACK、固定并发和 prefetch；结果与 retry task 都使用
+RabbitMQ consumer 使用 manual ACK、固定并发和 channel 级共享 prefetch；结果与 retry task 都使用
 Publisher Confirm，确认成功后才 ACK 原任务。Worker 采用 at-least-once 语义，任务
 可能在连接故障后重复执行，结果消费者依靠 event idempotency 和 submission terminal
 state 去重。
@@ -60,7 +60,17 @@ go-judge file store 并在任务结束删除。
 
 ## 配置和测试
 
-`worker.concurrency` 同时控制 worker 数量和 RabbitMQ prefetch。常用配置：
+`worker.concurrency` 同时控制进程内执行 worker 数量和同一 RabbitMQ channel 上所有语言队列
+consumer 共享的 prefetch 上限。Compose 默认运行 3 个 Worker 实例、每实例并发 2；各实例共同
+消费同一组 durable 语言队列，RabbitMQ 将消息交给有未确认消息配额的 consumer。这样单实例最多
+保留 2 条未确认任务，不会因语言队列数量而预取并囤积任务。实例累计处理数不保证严格相等，
+分配随消费者空闲状态、ACK 和处理速度动态变化。可通过 `JUDGE_WORKER_REPLICAS` 和
+`JUDGE_WORKER_CONCURRENCY` 覆盖 Compose 默认值。
+
+Agent 的 `run_code` 工具是独立 HTTP 辅助路径，使用 `judge-worker:8081` Compose 服务名解析；
+正式提交的判题任务通过 RabbitMQ consumer 分配，不经过该 HTTP 路径。
+
+常用 Worker 配置：
 
 ```yaml
 worker:

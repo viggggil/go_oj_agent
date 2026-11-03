@@ -123,6 +123,10 @@ flowchart TB
 | `judge-worker` | Go | 编译、Sandbox 执行、结果聚合 | RabbitMQ、MinIO |
 | `agent-service` | Python + FastAPI | Agent、RAG、Tool Calling、Streaming | gRPC、Vector DB、Redis |
 
+Compose 默认部署 3 个 `judge-worker` 实例，每个实例并发 2。各实例共同订阅相同的 RabbitMQ
+语言任务队列，由 broker 按未确认消息配额分发；每个实例使用 channel 级共享 prefetch，最多
+保留与本地并发数相同的未确认任务。Worker 数量可独立于 Judge Service 扩展。
+
 ### 3.1 数据所有权
 
 禁止：

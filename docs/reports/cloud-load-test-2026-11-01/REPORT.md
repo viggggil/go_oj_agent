@@ -9,7 +9,7 @@
 
 云主机为 4 vCPU、约 7.4 GiB 内存、50 GiB 系统盘。测试期间 Compose 中的 Gateway、Agent、Judge Worker、Judge Service、RabbitMQ、MySQL、Redis 和 Web 均为 healthy；测试结束时 Gateway `/healthz` 返回 200，`judge.task.go` 的 `messages`、`messages_ready` 和 `messages_unacknowledged` 均为 0。
 
-Agent 容器配置为 `AGENT_RUNTIME_MODE=auto`、`AGENT_MAX_CONCURRENT_RUNS=8`。Judge Worker 配置为 `KRATOS_WORKER_CONCURRENCY=2`。Agent 实际选择的模型 Provider 未从运行配置查询确认，因此 SSE 数字只作为当前云环境的黑盒结果。
+Agent 容器配置为 `AGENT_RUNTIME_MODE=auto`、`AGENT_MAX_CONCURRENT_RUNS=8`。当时云端运行 1 个 Judge Worker 实例，配置 `KRATOS_WORKER_CONCURRENCY=2`。Agent 实际选择的模型 Provider 未从运行配置查询确认，因此 SSE 数字只作为当前云环境的黑盒结果。
 
 ## 测试数据
 
