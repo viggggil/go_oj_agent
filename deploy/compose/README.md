@@ -9,10 +9,17 @@ HTTP Client -> gateway-service -> gRPC -> user-service -> MySQL / Redis
 
 MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保存 Refresh Token
 及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
-启动 user-service、problem-service、judge-service、contest-service、judge-worker、go-judge、
+启动 user-service、problem-service、judge-service、contest-service、3 个 judge-worker 实例、go-judge、
 RabbitMQ、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜，Consul 默认关闭。
 `make infra-up` 默认启动全部应用组件，包括 Agent Service，并开启 Gateway Agent 路由。
 启动顺序为 MySQL 健康 → `agent-db-init` 准备数据库 → Agent 健康 → Gateway → Web。
+
+Judge Worker 默认 3 个实例、每实例并发 2。各实例作为 RabbitMQ competing consumers
+订阅相同的 `judge.task.{c,cpp,go,java,python}` 队列，由 broker 按未确认消息配额分发；
+channel 级共享 prefetch 限制每个实例最多持有 2 条未确认任务。副本数与单实例并发可通过
+`JUDGE_WORKER_REPLICAS`、`JUDGE_WORKER_CONCURRENCY` 调整。本地机器资源有限时可降低并发或副本数。
+例如，在 Compose `.env` 中设置 `JUDGE_WORKER_REPLICAS=1`、`JUDGE_WORKER_CONCURRENCY=1`
+可用于资源较小的开发机。
 
 Contest 消费配置位于 `configs/contest.yaml`：exchange=`oj.events`，queue=`contest.submission-judged`，
 DLQ=`contest.results.dlq`，prefetch=16。RabbitMQ URL 由 `KRATOS_MESSAGING_URL` 注入，使用 Compose 的
@@ -108,7 +115,7 @@ Agent 容器只挂载 `agent-auth-public` 中的 Gateway 公钥，以及单独�
 PR4 的业务 Tool 默认关闭。设置 `AGENT_BUSINESS_TOOLS_ENABLED=true` 后，Agent 使用该
 独立私钥调用 Problem/Judge 的只读 gRPC RPC；目标服务通过 `agent-public.pem` 和 RPC
 allowlist 验证调用。Agent 不会直接挂载业务数据库。
-`run_code` 通过 judge-worker 内部接口复用 Go-Judge 沙箱，不会创建正式提交；它默认启用，管理员仍需将工具加入 Agent 和 Skill 的允许列表。
+`run_code` 通过 `judge-worker:8081` 内部接口复用 Go-Judge 沙箱，不会创建正式提交；它默认启用，管理员仍需将工具加入 Agent 和 Skill 的允许列表。该辅助 HTTP 请求使用 Compose 服务 DNS；正式提交判题由 RabbitMQ 在 Worker 实例间分配。
 生产部署应将 `AGENT_RUN_CODE_TOKEN` 设置为至少 32 个字符的随机密钥；Compose 会把同一密钥只注入 Agent 与 judge-worker，接口不映射到宿主机。
 
 `agent-db-init` 在 MySQL 健康后检查 Agent `000001`～`000005` 的表、增量列和约束，

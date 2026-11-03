@@ -269,6 +269,14 @@ func (c *Consumer) Start(ctx context.Context) error {
 		_ = conn.Close()
 		return err
 	}
+	// Share the prefetch limit across this channel's per-language consumers.
+	// Per-consumer QoS would let one process reserve concurrency tasks from
+	// every queue before its bounded worker pool has a chance to run them.
+	if err = ch.Qos(c.Concurrency, 0, true); err != nil {
+		_ = ch.Close()
+		_ = conn.Close()
+		return err
+	}
 	deliveryChannels := make([]<-chan amqp091.Delivery, 0, len(queues))
 	for _, queue := range queues {
 		if err = declareTopologyForLanguage(ch, c.Exchange, queue, c.DLQ, c.RetryDelay); err != nil {
@@ -285,11 +293,6 @@ func (c *Consumer) Start(ctx context.Context) error {
 			return err
 		}
 		deliveryChannels = append(deliveryChannels, deliveries)
-	}
-	if err = ch.Qos(c.Concurrency, 0, false); err != nil {
-		_ = ch.Close()
-		_ = conn.Close()
-		return err
 	}
 	runCtx, stop := context.WithCancel(ctx)
 	done := make(chan struct{})

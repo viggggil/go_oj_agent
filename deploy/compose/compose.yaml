@@ -329,6 +329,8 @@ services:
     restart: unless-stopped
 
   judge-worker:
+    deploy:
+      replicas: ${JUDGE_WORKER_REPLICAS:-3}
     build:
       context: ../..
       dockerfile: services/judge-worker/Dockerfile
@@ -340,7 +342,7 @@ services:
       KRATOS_STORAGE_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       KRATOS_MESSAGING_RABBITMQ_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
       KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
-      KRATOS_WORKER_CONCURRENCY: "2"
+      KRATOS_WORKER_CONCURRENCY: ${JUDGE_WORKER_CONCURRENCY:-2}
       KRATOS_WORKER_TASK_TIMEOUT: "60s"
       KRATOS_RUN_CODE_ADDRESS: ":8081"
       KRATOS_RUN_CODE_AUTH_TOKEN: "${AGENT_RUN_CODE_TOKEN:-local-development-run-code-token-change-before-sharing}"
