@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kratos/kratos/v3/registry"
+	grpcdiscovery "github.com/go-kratos/kratos/v3/transport/grpc/resolver/discovery"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -16,6 +18,7 @@ import (
 
 	problemv1 "github.com/viggggil/go_oj_agent/api/problem/v1"
 	"github.com/viggggil/go_oj_agent/pkg/internalauth"
+	"github.com/viggggil/go_oj_agent/pkg/servicediscovery"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/biz"
 	"github.com/viggggil/go_oj_agent/services/judge/internal/conf"
 )
@@ -47,17 +50,37 @@ func NewProblemClient(config *conf.Bootstrap) (*ProblemClient, func(), error) {
 			return nil, nil, fmt.Errorf("judge problem client timeout must be positive")
 		}
 	}
-	conn, err := grpc.NewClient(
-		cfg.GetEndpoint(),
+	discoveryClient, err := newJudgeServiceDiscovery(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	endpoint := cfg.GetEndpoint()
+	grpcOptions := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithChainUnaryInterceptor(newTimeoutInterceptor(timeout), interceptor),
-	)
+	}
+	if discoveryClient != nil {
+		endpoint = "discovery:///problem-service"
+		grpcOptions = append(grpcOptions, grpc.WithResolvers(grpcdiscovery.NewBuilder(discoveryClient)))
+	}
+	conn, err := grpc.NewClient(endpoint, grpcOptions...)
 	if err != nil {
 		return nil, nil, err
 	}
 	cleanup := func() { _ = conn.Close() }
 	return &ProblemClient{client: problemv1.NewProblemServiceClient(conn)}, cleanup, nil
+}
+
+func newJudgeServiceDiscovery(config *conf.Bootstrap) (registry.Discovery, error) {
+	if config == nil || config.GetRegistry() == nil || config.GetRegistry().GetConsul() == nil {
+		return nil, nil
+	}
+	c := config.GetRegistry().GetConsul()
+	return servicediscovery.New(servicediscovery.Config{
+		Enabled: c.GetEnabled(), Address: c.GetAddress(), Scheme: c.GetScheme(),
+		Datacenter: c.GetDatacenter(), Token: c.GetToken(),
+	})
 }
 
 func newTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {

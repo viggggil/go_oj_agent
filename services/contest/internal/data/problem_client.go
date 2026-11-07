@@ -53,13 +53,28 @@ func NewProblemClient(ctx context.Context, config *conf.Bootstrap) (*problemClie
 			return internalauth.Actor{ID: principal.ActorID, Roles: principal.ActorRoles, RequestID: principal.RequestID, TraceID: principal.TraceID}
 		}))
 	}
-	options := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()}
+	discovery, err := newServiceDiscovery(config)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	endpoint := cfg.GetEndpoint()
+	if discovery != nil {
+		if strings.TrimSpace(cfg.GetName()) == "" {
+			return nil, func() {}, fmt.Errorf("contest problem service name is required when Consul discovery is enabled")
+		}
+		endpoint = "discovery:///" + cfg.GetName()
+	}
+	options := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	if discovery == nil {
+		options = append(options, grpc.WithBlock())
+	}
+	options = addDiscovery(options, discovery)
 	if len(interceptors) > 0 {
 		options = append(options, grpc.WithChainUnaryInterceptor(interceptors...))
 	}
 	connectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	conn, err := grpc.DialContext(connectCtx, cfg.GetEndpoint(), options...)
+	conn, err := grpc.DialContext(connectCtx, endpoint, options...)
 	if err != nil {
 		return nil, func() {}, err
 	}

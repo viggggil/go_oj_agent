@@ -45,4 +45,6 @@ clients:
     timeout: "3s"
 registry:
   consul:
-    enabled: false
+    enabled: true
+    address: consul:8500
+    scheme: http
