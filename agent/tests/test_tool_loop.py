@@ -84,6 +84,14 @@ async def test_tool_loop_keeps_trusted_identity_and_bounded_protocol(failure: st
         else:
             output = body["input"][-1]
             assert output["type"] == "function_call_output" and output["call_id"] == "call_1"
+            if failure == "arguments":
+                assert json.loads(output["output"])["error_code"] == "TOOL_INVALID_ARGUMENT"
+                data = frame(delta("参数校验失败后继续回答")) + frame(
+                    complete("参数校验失败后继续回答")
+                )
+                return httpx.Response(
+                    200, headers={"content-type": "text/event-stream"}, stream=Stream([data])
+                )
             assert json.loads(output["output"])["data"] == {"number": 739216}
             assert all(item.get("type") != "reasoning" for item in body["input"])
             assert set(body["input"][-2]) == {"type", "name", "arguments", "call_id"}
@@ -119,12 +127,13 @@ async def test_tool_loop_keeps_trusted_identity_and_bounded_protocol(failure: st
                 "input_budget": "AGENT_MODEL_INPUT_LIMIT",
                 "output_budget": "AGENT_MODEL_OUTPUT_LIMIT",
             }
-            assert failure and error.code == expected[failure]
+            assert failure and failure != "arguments" and error.code == expected[failure]
         else:
-            assert failure is None and events[-1].type == "done"
+            assert failure in {None, "arguments"} and events[-1].type == "done"
+            expected_answer = "参数校验失败后继续回答" if failure == "arguments" else "739216"
             assert (
                 "".join(event.data.get("text", "") for event in events if event.type == "token")
-                == "739216"
+                == expected_answer
             )
         assert len(invoked) == (0 if failure in {"unknown", "arguments"} else 1)
         assert all(principal == value.principal for principal in invoked)
@@ -132,7 +141,7 @@ async def test_tool_loop_keeps_trusted_identity_and_bounded_protocol(failure: st
         assert len(requests) <= 2
         assert requests[0]["parallel_tool_calls"] is False
         assert [tool["name"] for tool in requests[0]["tools"]] == ["read_number"]
-        if failure:
+        if failure and failure != "arguments":
             assert all(event.type != "done" for event in events)
     finally:
         await client.close()
@@ -283,9 +292,11 @@ async def test_unified_react_decisions_and_rejected_calls(scenario: str) -> None
             )
         else:
             observation = json.loads(body["input"][-1]["output"])
-            assert observation["ok"] is (scenario != "failed_tool")
+            assert observation["ok"] is (scenario not in {"failed_tool", "schema", "json"})
             if scenario == "failed_tool":
                 assert observation["error_code"] == "TOOL_TIMEOUT"
+            elif scenario in {"schema", "json"}:
+                assert observation["error_code"] == "TOOL_INVALID_ARGUMENT"
             payload = frame(delta("已依据实际观察回答")) + frame(complete("已依据实际观察回答"))
         return httpx.Response(
             200, headers={"content-type": "text/event-stream"}, stream=Stream([payload])
@@ -297,28 +308,32 @@ async def test_unified_react_decisions_and_rejected_calls(scenario: str) -> None
     value.allowed_tools = ("read_number",)
     events = []
     try:
-        if scenario in {"multi", "failed_tool"}:
+        if scenario in {"multi", "failed_tool", "schema", "json", "mixed"}:
             events = [
                 event async for event in ModelRuntime(client, Credentials(), tools).run(value)
             ]
             assert events[-1].type == "done"
-            assert invoked == ([1, 2] if scenario == "multi" else [1])
-            assert value.model_summary is not None
-            assert len(value.model_summary.tool_steps) == len(invoked)
-            assert value.model_summary.tool_steps[-1].status == (
-                "failed" if scenario == "failed_tool" else "succeeded"
+            assert invoked == (
+                [1, 2] if scenario == "multi" else [] if scenario in {"schema", "json"} else [1]
             )
+            assert value.model_summary is not None
+            if scenario in {"schema", "json"}:
+                assert value.model_summary.tool_steps[-1].status == "rejected"
+                assert value.model_summary.tool_steps[-1].error_code == "TOOL_INVALID_ARGUMENT"
+            else:
+                assert len(value.model_summary.tool_steps) == len(invoked)
+                assert value.model_summary.tool_steps[-1].status == (
+                    "failed" if scenario == "failed_tool" else "succeeded"
+                )
             assert not any("number" in event.data or "output" in event.data for event in events)
+            assert "unconfirmed-private-text" not in repr(events)
         else:
             with pytest.raises(ModelFailure):
                 async for event in ModelRuntime(client, Credentials(), tools).run(value):
                     events.append(event)
             assert invoked == ([1] if scenario in {"repeat", "duplicate_id"} else [])
             assert not any(event.type in {"token", "done"} for event in events)
-            if scenario != "mixed":
-                assert (
-                    value.model_summary and value.model_summary.tool_steps[-1].status == "rejected"
-                )
+            assert value.model_summary and value.model_summary.tool_steps[-1].status == "rejected"
     finally:
         await client.close()
 

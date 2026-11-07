@@ -133,6 +133,7 @@ class ResponsesClient:
         completed = False
         headers_received = False
         event_count = 0
+        current_event: str | None = None
         output_index: int | None = None
         argument_bytes = 0
         try:
@@ -177,6 +178,7 @@ class ResponsesClient:
                             if event_count > max_events:
                                 raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
                             kind = event.get("type")
+                            current_event = kind if isinstance(kind, str) else None
                             if not isinstance(kind, str) or (name is not None and name != kind):
                                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
                             if kind == "response.output_text.delta":
@@ -231,6 +233,13 @@ class ResponsesClient:
                                     {"function_call"} if tools else set()
                                 )
                                 if not isinstance(item, dict) or item.get("type") not in allowed:
+                                    logger.warning(
+                                        "Unsupported model output item (type=%s, tools=%s)",
+                                        str(item.get("type", "missing"))[:64]
+                                        if isinstance(item, dict)
+                                        else type(item).__name__,
+                                        bool(tools),
+                                    )
                                     raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
                                 if item.get("type") == "reasoning" and result is not None:
                                     summary = self._public_reasoning_summary(item)
@@ -251,11 +260,42 @@ class ResponsesClient:
                                 if argument_bytes > 32 * 8192 * 2:
                                     raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
                             elif "function_call" in kind or "tool" in kind:
+                                logger.warning("Unsupported model tool event (%s)", kind[:96])
                                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                            elif kind.startswith("response.") and kind not in {
+                                "response.created",
+                                "response.in_progress",
+                                "response.queued",
+                                "response.output_item.done",
+                                "response.content_part.added",
+                                "response.content_part.done",
+                                "response.output_text.done",
+                                "response.reasoning_summary_text.delta",
+                                "response.reasoning_summary_text.done",
+                                "response.reasoning_text.delta",
+                                "response.reasoning_text.done",
+                                "response.reasoning_summary_part.added",
+                                "response.reasoning_summary_part.done",
+                            }:
+                                logger.warning("Unsupported model stream event (%s)", kind[:96])
                     finally:
                         await iterator.aclose()
             if not completed:
                 raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+        except ModelFailure as error:
+            # A malformed/early-closed stream is safe to replay only when no
+            # answer text has reached the caller. DirectAnswer also guards on
+            # its public-token flag, so a partial answer is never duplicated.
+            if not answer and error.code == "AGENT_MODEL_INVALID_RESPONSE" and not error.retryable:
+                raise ModelFailure(error.code, retryable=True) from None
+            logger.warning(
+                "Model stream rejected (%s, event=%s, answer_bytes=%s, events=%s)",
+                error.code,
+                current_event or "none",
+                len(answer.encode()),
+                event_count,
+            )
+            raise
         except (TimeoutError, httpx.TimeoutException):
             raise ModelFailure("AGENT_MODEL_TIMEOUT") from None
         except httpx.HTTPError as exc:
@@ -266,6 +306,8 @@ class ResponsesClient:
                 headers_received,
             )
             # 网络错误可能已被计费；不自动重试不确定的连接结果。
+            # The provider may have accepted and billed the request even when
+            # the connection fails, so transport errors are never replayed.
             raise ModelFailure("AGENT_MODEL_UNAVAILABLE") from None
 
     @staticmethod
@@ -280,9 +322,49 @@ class ResponsesClient:
     ) -> tuple[FunctionCall, ...]:
         response = event.get("response")
         if not isinstance(response, dict) or response.get("status") != "completed":
+            logger.warning(
+                "Invalid completed model response (response_type=%s, status=%s)",
+                type(response).__name__,
+                str(response.get("status", "missing"))[:32]
+                if isinstance(response, dict)
+                else "missing",
+            )
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         output = response.get("output")
+        # Some Responses-compatible providers omit or rewrite the aggregate
+        # output in `response.completed`, even though every streamed delta was
+        # valid. For a no-tool answer the deltas are the canonical text; the
+        # aggregate is only needed to decode tool calls and continuation items.
+        if not allow_tools:
+            if not answer.strip():
+                raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+            if result is not None and public_summary and isinstance(output, list):
+                for item in output:
+                    if isinstance(item, dict) and item.get("type") == "reasoning":
+                        result.reasoning_summary = ResponsesClient._public_reasoning_summary(item)
+            returned_model = response.get("model")
+            if isinstance(returned_model, str) and re.fullmatch(
+                r"[a-zA-Z0-9_./:@+-]{1,200}", returned_model
+            ):
+                attempt.returned_model = returned_model
+            usage = response.get("usage")
+            if isinstance(usage, dict):
+                values = [usage.get("input_tokens"), usage.get("output_tokens")]
+                if all(
+                    isinstance(value, int)
+                    and not isinstance(value, bool)
+                    and 0 <= value <= 10_000_000
+                    for value in values
+                ):
+                    attempt.input_tokens = cast(int, values[0])
+                    attempt.output_tokens = cast(int, values[1])
+                    attempt.usage_source = "provider"
+            attempt.finish_reason = "completed"
+            return ()
         if not isinstance(output, list):
+            logger.warning(
+                "Invalid completed model output container (type=%s)", type(output).__name__
+            )
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         texts: list[str] = []
         calls: list[FunctionCall] = []
@@ -290,7 +372,8 @@ class ResponsesClient:
         continuation_items: list[dict[str, Any]] = []
         for item in output:
             if not isinstance(item, dict):
-                raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+                logger.warning("Invalid completed model output item (type=%s)", type(item).__name__)
+                raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE", retryable=not answer)
             if item.get("type") == "reasoning":
                 if public_summary:
                     reasoning_summary = ResponsesClient._public_reasoning_summary(item)
@@ -300,12 +383,17 @@ class ResponsesClient:
                 continue
             if item.get("type") == "function_call" and allow_tools:
                 if item.get("status", "completed") != "completed":
+                    logger.warning(
+                        "Incomplete completed-model function call (status=%s)",
+                        str(item.get("status", "missing"))[:32],
+                    )
                     raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
                 try:
                     call = FunctionCall.model_validate(
                         {key: item.get(key) for key in ("call_id", "name", "arguments")}
                     )
                 except ValidationError:
+                    logger.warning("Invalid completed-model function-call envelope")
                     raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE") from None
                 if len(call.arguments.encode()) > 8192 or len(calls) >= 32:
                     raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
@@ -313,6 +401,11 @@ class ResponsesClient:
                 continuation_items.append(call.input_item())
                 continue
             if item.get("type") != "message" or item.get("role") != "assistant":
+                logger.warning(
+                    "Unsupported completed model output (type=%s, role=%s)",
+                    str(item.get("type", "missing"))[:64],
+                    str(item.get("role", "missing"))[:32],
+                )
                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
             content = item.get("content")
             if not isinstance(content, list):
@@ -323,13 +416,33 @@ class ResponsesClient:
                     or part.get("type") != "output_text"
                     or not isinstance(part.get("text"), str)
                 ):
+                    logger.warning(
+                        "Unsupported completed model content (type=%s)",
+                        str(part.get("type", "missing"))[:64]
+                        if isinstance(part, dict)
+                        else type(part).__name__,
+                    )
                     raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
                 texts.append(part["text"])
-        if "".join(texts) != answer:
-            raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
-        if (calls and answer) or (not calls and not answer.strip()):
+        # The live `output_text.delta` sequence is what the client saw. Some
+        # Responses-compatible providers rewrite or omit aggregate output in
+        # `response.completed`; once the provider marks the response completed,
+        # retain the validated deltas as canonical text. Tool calls still come
+        # from the aggregate and cannot be mixed with answer text.
+        # Tool-selection turns may include explanatory text alongside one or
+        # more function calls. ReAct never emits this text to the user; it is
+        # discarded while the validated calls are executed. Rejecting this
+        # otherwise valid shape caused intermittent failures with compatible
+        # providers that include a brief preamble in completed output.
+        if not calls and not answer.strip():
+            logger.warning(
+                "Invalid completed model answer/call combination (calls=%s, answer_bytes=%s)",
+                len(calls),
+                len(answer.encode()),
+            )
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         if len({call.call_id for call in calls}) != len(calls):
+            logger.warning("Duplicate call identifiers in completed model response")
             raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
         if calls:
             attempt.output_tokens = sum(

@@ -128,7 +128,10 @@ class ProviderConfig(ImmutableConfig):
     first_token_timeout_seconds: float = Field(default=20, gt=0, le=120)
     idle_timeout_seconds: float = Field(default=15, gt=0, le=60)
     request_timeout_seconds: float = Field(default=30, gt=0, le=300)
-    max_retries: int = Field(default=0, ge=0, le=2, strict=True)
+    # Retry only failures that happen before any public answer token is
+    # emitted. Once text is visible, replaying the request would duplicate
+    # part of the answer, so DirectAnswer deliberately does not retry it.
+    max_retries: int = Field(default=1, ge=0, le=2, strict=True)
 
 
 class AgentConfig(ImmutableConfig):

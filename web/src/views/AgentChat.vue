@@ -72,6 +72,16 @@
           streaming && !message.text ? '正在等待模型回答…' : '回答未完成'
         }}</span>
         <button
+          v-if="
+            message.role === 'assistant' && (message.failure || message.incomplete) && !streaming
+          "
+          class="link retry-answer"
+          type="button"
+          @click="retryMessage(message)"
+        >
+          重新发送
+        </button>
+        <button
           v-if="message.role === 'assistant' && message.text"
           class="link copy-answer"
           type="button"
@@ -228,6 +238,13 @@
       FORBID_ATTR: ['style'],
       ADD_ATTR: ['target'],
     })
+  }
+  function retryMessage(message: Message) {
+    const index = messages.value.findIndex((item) => item.id === message.id)
+    const previous = index > 0 ? messages.value[index - 1] : undefined
+    if (!previous || previous.role !== 'user' || streaming.value) return
+    draft.value = previous.text
+    void send()
   }
   const targetKey = () => (typeof route.query.agent_key === 'string' ? route.query.agent_key : '')
   function directoryError(error: unknown) {

@@ -18,7 +18,7 @@ from app.graphs.model_runtime import ModelRuntime
 from app.graphs.service import RunService
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
 from app.models.memory import ConfirmedFact, ConversationSummary
-from app.models.provider import ModelFailure
+from app.models.provider import ModelAttempt, ModelFailure
 from app.models.runtime import AgentState, ChatRequest, HistoryMessage, StreamEvent
 from tests.test_runtime import MemoryStore, Reader, state
 
@@ -213,7 +213,6 @@ async def test_http_failure_is_sanitized_and_never_completed(status: int, code: 
     [
         frame(delta()),
         frame(complete()),
-        frame(delta()) + frame(complete("different")),
         frame({"type": "response.output_item.added", "item": {"type": "function_call"}}),
         frame({"type": "response.refusal.delta", "delta": "private refusal"}),
         b"data: \xff\n\n",
@@ -228,7 +227,6 @@ async def test_http_failure_is_sanitized_and_never_completed(status: int, code: 
     ids=[
         "eof",
         "no-delta",
-        "mismatch",
         "tool",
         "refusal",
         "invalid-utf8",
@@ -256,6 +254,38 @@ async def test_invalid_or_partial_stream_is_not_saved_as_success(body: bytes) ->
         assert store.record is not None and store.record.status == "FAILED" and not store.answers
     finally:
         await client.close()
+
+
+async def test_streamed_text_is_authoritative_when_completed_output_is_rewritten() -> None:
+    client = client_for(
+        lambda request: httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame(delta()), frame(complete("different"))]),
+        )
+    )
+    value = configured()
+    try:
+        events = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert events[-1].type == "done"
+        assert "二分查找" in "".join(
+            event.data.get("text", "") for event in events if event.type == "token"
+        )
+    finally:
+        await client.close()
+
+
+def test_react_text_delta_survives_completed_output_rewrite() -> None:
+    attempt = ModelAttempt(
+        provider_id=str(uuid4()),
+        model_profile_id=str(uuid4()),
+        model="deepseek-v4.1-flash",
+    )
+    calls = ResponsesClient._complete(
+        complete("rewritten aggregate"), attempt, "validated streaming answer", allow_tools=True
+    )
+    assert calls == ()
+    assert attempt.finish_reason == "completed"
 
 
 async def test_network_split_utf8_reasoning_is_hidden_and_missing_usage_is_estimated() -> None:
@@ -325,6 +355,40 @@ async def test_retry_is_bounded_and_keeps_the_same_provider() -> None:
                 {"role": "user", "content": value.user_message},
             ]
         )
+    finally:
+        await client.close()
+
+
+async def test_malformed_stream_retries_before_public_output() -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            # The provider closes after metadata and never sends a complete
+            # response. No public answer token has been emitted yet.
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                stream=Stream([frame({"type": "response.created"})]),
+            )
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame(delta()), frame(complete())]),
+        )
+
+    client = client_for(handler)
+    value = configured()
+    value.config_snapshot["provider_config"]["max_retries"] = 1
+    try:
+        events = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert events[-1].type == "done"
+        assert calls == 2
+        assert value.model_summary is not None
+        assert len(value.model_summary.attempts) == 2
+        assert value.model_summary.attempts[0].error_code == "AGENT_MODEL_INVALID_RESPONSE"
     finally:
         await client.close()
 
