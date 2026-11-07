@@ -48,7 +48,11 @@ func NewSubmissionClient(ctx context.Context, config *conf.Bootstrap) (*Submissi
 			return internalauth.Actor{ID: rc.GetUserId(), Roles: rc.GetRoles(), RequestID: rc.GetRequestId(), TraceID: rc.GetTraceId()}
 		}))
 	}
-	conn, cleanup, err := newGRPCConn(ctx, config.GetClients().GetSubmission(), interceptors...)
+	discovery, err := newDiscovery(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn, cleanup, err := newGRPCConnWithDiscovery(ctx, config.GetClients().GetSubmission(), discovery, interceptors...)
 	if err != nil {
 		return nil, nil, err
 	}

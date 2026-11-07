@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kratos/kratos/v3/registry"
 	"github.com/google/wire"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -13,6 +14,7 @@ import (
 	kgrpc "github.com/go-kratos/kratos/v3/transport/grpc"
 
 	userv1 "github.com/viggggil/go_oj_agent/api/user/v1"
+	"github.com/viggggil/go_oj_agent/pkg/servicediscovery"
 	"github.com/viggggil/go_oj_agent/services/gateway/internal/conf"
 )
 
@@ -32,7 +34,11 @@ func NewUserClient(ctx context.Context, config *conf.Bootstrap) (*UserClient, fu
 		return nil, nil, fmt.Errorf("gateway user client config is required")
 	}
 	clientConfig := config.GetClients().GetUser()
-	conn, cleanup, err := newGRPCConn(ctx, clientConfig)
+	discovery, err := newDiscovery(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn, cleanup, err := newGRPCConnWithDiscovery(ctx, clientConfig, discovery)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,6 +50,10 @@ func ProvideUserServiceClient(client *UserClient) userv1.UserServiceClient {
 }
 
 func newGRPCConn(ctx context.Context, config *conf.ClientProto, interceptors ...grpc.UnaryClientInterceptor) (*grpc.ClientConn, func(), error) {
+	return newGRPCConnWithDiscovery(ctx, config, nil, interceptors...)
+}
+
+func newGRPCConnWithDiscovery(ctx context.Context, config *conf.ClientProto, discovery registry.Discovery, interceptors ...grpc.UnaryClientInterceptor) (*grpc.ClientConn, func(), error) {
 	if config == nil || strings.TrimSpace(config.GetEndpoint()) == "" {
 		return nil, nil, fmt.Errorf("gateway client endpoint is required")
 	}
@@ -51,10 +61,20 @@ func newGRPCConn(ctx context.Context, config *conf.ClientProto, interceptors ...
 	if parsed, err := time.ParseDuration(config.GetTimeout()); err == nil && parsed > 0 {
 		timeout = parsed
 	}
+	endpoint := config.GetEndpoint()
+	if discovery != nil {
+		if strings.TrimSpace(config.GetName()) == "" {
+			return nil, nil, fmt.Errorf("gateway client service name is required when Consul discovery is enabled")
+		}
+		endpoint = servicediscovery.Target(true, config.GetName(), endpoint)
+	}
 	options := []kgrpc.ClientOption{
-		kgrpc.WithEndpoint(config.GetEndpoint()),
+		kgrpc.WithEndpoint(endpoint),
 		kgrpc.WithTimeout(timeout),
 		kgrpc.WithOptions(grpc.WithStatsHandler(otelgrpc.NewClientHandler())),
+	}
+	if discovery != nil {
+		options = append(options, kgrpc.WithDiscovery(discovery))
 	}
 	if len(interceptors) > 0 {
 		options = append(options, kgrpc.WithUnaryInterceptor(interceptors...))
@@ -64,4 +84,15 @@ func newGRPCConn(ctx context.Context, config *conf.ClientProto, interceptors ...
 		return nil, nil, err
 	}
 	return conn, func() { _ = conn.Close() }, nil
+}
+
+func newDiscovery(config *conf.Bootstrap) (registry.Discovery, error) {
+	if config == nil || config.GetRegistry() == nil || config.GetRegistry().GetConsul() == nil {
+		return nil, nil
+	}
+	c := config.GetRegistry().GetConsul()
+	return servicediscovery.New(servicediscovery.Config{
+		Enabled: c.GetEnabled(), Address: c.GetAddress(), Scheme: c.GetScheme(),
+		Datacenter: c.GetDatacenter(), Token: c.GetToken(),
+	})
 }

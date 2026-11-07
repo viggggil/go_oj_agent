@@ -15,7 +15,9 @@ data:
   mysql_dsn: "root:local-root-password@tcp(mysql:3306)/oj_contest?parseTime=true"
 registry:
   consul:
-    enabled: false
+    enabled: true
+    address: consul:8500
+    scheme: http
 internal_auth:
   public_key_file: "/run/auth-keys/gateway-public.pem"
   key_id: "gateway-internal-2026-09"

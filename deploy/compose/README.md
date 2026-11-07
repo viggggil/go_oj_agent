@@ -10,7 +10,10 @@ HTTP Client -> gateway-service -> gRPC -> user-service -> MySQL / Redis
 MySQL 保存用户、角色、题目、标签和测试点元数据；Redis 保存 Refresh Token
 及题目详情缓存；MinIO 的 `problem-data` bucket 保存测试点正文。当前环境
 启动 user-service、problem-service、judge-service、contest-service、3 个 judge-worker 实例、go-judge、
-RabbitMQ、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜，Consul 默认关闭。
+RabbitMQ、Consul、gateway-service 和 Web。Contest 消费判题结果并维护本地 MySQL 排行榜。
+Consul 提供 Go/Kratos 服务注册和健康实例发现；Gateway、Contest、Judge 的 gRPC 客户端通过 Consul 解析
+User、Problem、Judge 和 Contest 服务。Consul 每 10 秒执行注册实例的 TCP 检查，Gateway 的 Discovery 只解析
+健康检查通过的实例。Consul UI/API 仅绑定宿主机 loopback 的 `127.0.0.1:8500`。
 `make infra-up` 默认启动全部应用组件，包括 Agent Service，并开启 Gateway Agent 路由。
 启动顺序为 MySQL 健康 → `agent-db-init` 准备数据库 → Agent 健康 → Gateway → Web。
 
@@ -44,6 +47,7 @@ make infra-up
 | --- | --- | --- |
 | Gateway | `http://127.0.0.1:8080` | 外部 REST API |
 | Web | `http://127.0.0.1:5173` | Vue 3 认证前端 |
+| Consul | `http://127.0.0.1:8500` | Go 服务注册、健康检查和服务发现 |
 | user-service | `127.0.0.1:9001` | 内部 gRPC，仅用于本地调试 |
 | problem-service | `127.0.0.1:9002` | 内部 gRPC，仅用于本地调试 |
 | MySQL | `127.0.0.1:3306` | `oj_user`、`oj_problem` 数据库 |
@@ -60,7 +64,7 @@ curl http://127.0.0.1:8080/healthz
 
 浏览器访问 `http://127.0.0.1:5173` 可使用注册、登录和个人资料页面。Compose 构建时通过 `WEB_API_BASE_URL` 注入 Gateway 地址；如果修改了 `GATEWAY_HTTP_PORT`，应同步设置 `WEB_API_BASE_URL`，例如 `WEB_API_BASE_URL=http://127.0.0.1:18080 GATEWAY_HTTP_PORT=18080 make infra-up`。
 
-停止服务但保留 MySQL、Redis 和 MinIO 数据：
+停止服务但保留 MySQL、Redis、MinIO 和 Consul 数据：
 
 ```bash
 make infra-down
