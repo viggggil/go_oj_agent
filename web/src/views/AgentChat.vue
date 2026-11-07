@@ -72,7 +72,9 @@
           streaming && !message.text ? '正在等待模型回答…' : '回答未完成'
         }}</span>
         <button
-          v-if="message.role === 'assistant' && (message.failure || message.incomplete) && !streaming"
+          v-if="
+            message.role === 'assistant' && (message.failure || message.incomplete) && !streaming
+          "
           class="link retry-answer"
           type="button"
           @click="retryMessage(message)"
