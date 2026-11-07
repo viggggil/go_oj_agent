@@ -173,8 +173,16 @@ def build_react_graph(
         ids = set(state["seen_call_ids"])
         fingerprints = set(state["seen_tool_fingerprints"])
         parsed_calls = []
+        pending_rejections: dict[str, str] = {}
 
-        async def reject(call: Any, code: str, failure: str, *, invalid: bool = False) -> None:
+        async def reject(
+            call: Any,
+            code: str,
+            *,
+            invalid: bool = False,
+            failure: str = "AGENT_MODEL_UNSUPPORTED_OUTPUT",
+            recoverable: bool = False,
+        ) -> None:
             value = state["agent_state"]
             step = state["tool_call_count"] + 1
             trace = ToolTraceStep(
@@ -214,19 +222,32 @@ def build_react_graph(
                         sequence=1,
                     )
                 )
+            if recoverable:
+                pending_rejections[call.call_id] = code
+                return
             raise ModelFailure(failure)
 
         for call in calls:
             if call.name not in allowed:
-                await reject(call, "TOOL_PERMISSION_DENIED", "AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                await reject(call, "TOOL_PERMISSION_DENIED")
+                parsed_calls.append({})
+                continue
             if call.call_id in ids:
-                await reject(call, "TOOL_DUPLICATE_CALL_ID", "AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                await reject(call, "TOOL_DUPLICATE_CALL_ID")
+                parsed_calls.append({})
+                continue
             try:
                 parsed = parse_arguments(call)
             except ModelFailure:
                 await reject(
-                    call, "TOOL_INVALID_ARGUMENT", "AGENT_MODEL_INVALID_RESPONSE", invalid=True
+                    call,
+                    "TOOL_INVALID_ARGUMENT",
+                    invalid=True,
+                    failure="AGENT_MODEL_INVALID_RESPONSE",
+                    recoverable=True,
                 )
+                parsed_calls.append({})
+                continue
             definition = registry.get(call.name)
             try:
                 ToolExecutor._authorize(
@@ -239,16 +260,20 @@ def build_react_graph(
                 )
                 definition.input_model.model_validate(parsed)
             except ValidationError:
-                await reject(
-                    call, "TOOL_INVALID_ARGUMENT", "AGENT_MODEL_UNSUPPORTED_OUTPUT", invalid=True
-                )
+                await reject(call, "TOOL_INVALID_ARGUMENT", invalid=True, recoverable=True)
+                parsed_calls.append({})
+                continue
             except ToolPermissionDenied:
-                await reject(call, "TOOL_PERMISSION_DENIED", "AGENT_MODEL_UNSUPPORTED_OUTPUT")
+                await reject(call, "TOOL_PERMISSION_DENIED")
+                parsed_calls.append({})
+                continue
             fingerprint = hashlib.sha256(
                 json.dumps([call.name, parsed], sort_keys=True, ensure_ascii=False).encode()
             ).hexdigest()
             if fingerprint in fingerprints:
-                await reject(call, "TOOL_REPEATED_CALL", "AGENT_TOOL_CALL_LIMIT")
+                await reject(call, "TOOL_REPEATED_CALL", failure="AGENT_TOOL_CALL_LIMIT")
+                parsed_calls.append({})
+                continue
             ids.add(call.call_id)
             fingerprints.add(fingerprint)
             parsed_calls.append(parsed)
@@ -256,6 +281,7 @@ def build_react_graph(
             "seen_call_ids": ids,
             "seen_tool_fingerprints": fingerprints,
             "pending_arguments": parsed_calls,
+            "pending_rejections": pending_rejections,
         }
 
     async def act(state: ReActState) -> ReActState:
@@ -266,6 +292,18 @@ def build_react_graph(
         allowed = frozenset(tool["name"] for tool in state["tools"])
         for call, parsed in zip(state["decision"].calls, state["pending_arguments"], strict=True):
             remaining_seconds(state)
+            rejection = state.get("pending_rejections", {}).get(call.call_id)
+            if rejection is not None:
+                observations.append(
+                    ToolObservation(
+                        call.call_id,
+                        call.name,
+                        False,
+                        rejection,
+                        json.dumps({"ok": False, "error_code": rejection}),
+                    )
+                )
+                continue
             step = state["tool_call_count"] + len(observations) + 1
             await emit(StreamEvent.progress(value, "executing_tool", "正在读取授权信息", 1))
             await emit(

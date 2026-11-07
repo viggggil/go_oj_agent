@@ -47,6 +47,7 @@ class ReActState(TypedDict, total=False):
     final_answer: str
     failure_code: str | None
     pending_arguments: list[dict[str, Any]]
+    pending_rejections: dict[str, str]
     token_parts: tuple[str, ...]
 
 
