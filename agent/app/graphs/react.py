@@ -172,7 +172,7 @@ def build_react_graph(
         allowed = frozenset(tool["name"] for tool in state["tools"])
         ids = set(state["seen_call_ids"])
         fingerprints = set(state["seen_tool_fingerprints"])
-        parsed_calls = []
+        parsed_calls: list[dict[str, Any]] = []
         pending_rejections: dict[str, str] = {}
 
         async def reject(
