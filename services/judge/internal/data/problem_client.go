@@ -62,7 +62,7 @@ func NewProblemClient(config *conf.Bootstrap) (*ProblemClient, func(), error) {
 	}
 	if discoveryClient != nil {
 		endpoint = "discovery:///problem-service"
-		grpcOptions = append(grpcOptions, grpc.WithResolvers(grpcdiscovery.NewBuilder(discoveryClient)))
+		grpcOptions = append(grpcOptions, grpc.WithResolvers(grpcdiscovery.NewBuilder(discoveryClient, grpcdiscovery.WithInsecure(true))))
 	}
 	conn, err := grpc.NewClient(endpoint, grpcOptions...)
 	if err != nil {

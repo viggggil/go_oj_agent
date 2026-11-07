@@ -23,5 +23,5 @@ func addDiscovery(options []grpc.DialOption, discovery registry.Discovery) []grp
 	if discovery == nil {
 		return options
 	}
-	return append(options, grpc.WithResolvers(grpcdiscovery.NewBuilder(discovery)))
+	return append(options, grpc.WithResolvers(grpcdiscovery.NewBuilder(discovery, grpcdiscovery.WithInsecure(true))))
 }
