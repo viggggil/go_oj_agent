@@ -1,6 +1,21 @@
 name: go-oj-agent
 
 services:
+  consul:
+    image: hashicorp/consul:1.21.4
+    command: ["agent", "-server", "-bootstrap-expect=1", "-ui", "-client=0.0.0.0", "-data-dir=/consul/data", "-node=oj-consul"]
+    ports:
+      - "127.0.0.1:${CONSUL_HTTP_PORT:-8500}:8500"
+    volumes:
+      - consul-data:/consul/data
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
   mysql:
     image: mysql:8.4
     environment:
@@ -196,13 +211,16 @@ services:
       KRATOS_AUTH_ACCESS_TOKEN_KEY_ID: "user-access-2026-09"
       KRATOS_AUTH_ISSUER: "go-oj-agent"
       KRATOS_AUTH_AUDIENCE: "go-oj-gateway"
-      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "true"
+      KRATOS_REGISTRY_CONSUL_ADDRESS: "consul:8500"
     ports:
       - "127.0.0.1:${USER_GRPC_PORT:-9001}:9001"
     volumes:
       - ./configs/user.yaml:/app/config.yaml:ro
       - auth-keys:/run/auth-keys:ro
     depends_on:
+      consul:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       redis:
@@ -234,13 +252,16 @@ services:
       KRATOS_STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       KRATOS_STORAGE_MINIO_BUCKET: "problem-data"
       KRATOS_STORAGE_MINIO_USE_SSL: "false"
-      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "true"
+      KRATOS_REGISTRY_CONSUL_ADDRESS: "consul:8500"
     ports:
       - "127.0.0.1:${PROBLEM_GRPC_PORT:-9002}:9002"
     volumes:
       - ./configs/problem.yaml:/app/config.yaml:ro
       - auth-keys:/run/auth-keys:ro
     depends_on:
+      consul:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       redis:
@@ -267,7 +288,8 @@ services:
       KRATOS_STORAGE_MINIO_ENDPOINT: "minio:9000"
       KRATOS_STORAGE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       KRATOS_STORAGE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "true"
+      KRATOS_REGISTRY_CONSUL_ADDRESS: "consul:8500"
       KRATOS_MESSAGING_RABBITMQ_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
       KRATOS_MESSAGING_RABBITMQ_EXCHANGE: "oj.events"
       KRATOS_MESSAGING_RABBITMQ_RESULT_QUEUE: "judge.results"
@@ -280,6 +302,8 @@ services:
       - ./configs/judge.yaml:/app/config.yaml:ro
       - auth-keys:/run/auth-keys:ro
     depends_on:
+      consul:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       minio-init:
@@ -307,13 +331,16 @@ services:
       KRATOS_SERVER_GRPC_MAX_RECEIVE_MESSAGE_BYTES: "35651584"
       KRATOS_DATA_MYSQL_DSN: "root:${MYSQL_ROOT_PASSWORD:-local-root-password}@tcp(mysql:3306)/oj_contest?parseTime=true"
       KRATOS_MESSAGING_URL: "amqp://${RABBITMQ_USER:-judge}:${RABBITMQ_PASSWORD:-judge-password}@rabbitmq:5672/"
-      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "true"
+      KRATOS_REGISTRY_CONSUL_ADDRESS: "consul:8500"
     ports:
       - "127.0.0.1:${CONTEST_GRPC_PORT:-9005}:9005"
     volumes:
       - ./configs/contest.yaml:/app/config.yaml:ro
       - auth-keys:/run/auth-keys:ro
     depends_on:
+      consul:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       judge-service:
@@ -388,13 +415,16 @@ services:
       KRATOS_CLIENTS_CONTEST_ENDPOINT: "contest-service:9005"
       KRATOS_CLIENTS_AGENT_ENABLED: "${AGENT_ENABLED:-true}"
       KRATOS_CLIENTS_AGENT_ENDPOINT: "http://agent-service:8000"
-      KRATOS_REGISTRY_CONSUL_ENABLED: "false"
+      KRATOS_REGISTRY_CONSUL_ENABLED: "true"
+      KRATOS_REGISTRY_CONSUL_ADDRESS: "consul:8500"
     ports:
       - "127.0.0.1:${GATEWAY_HTTP_PORT:-8080}:8080"
     volumes:
       - ./configs/gateway.yaml:/app/config.yaml:ro
       - auth-keys:/run/auth-keys:ro
     depends_on:
+      consul:
+        condition: service_healthy
       user-service:
         condition: service_healthy
       problem-service:
@@ -576,6 +606,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  consul-data:
   qdrant-data:
   agent-model-keys:
   mysql-data:

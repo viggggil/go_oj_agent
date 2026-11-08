@@ -21,4 +21,6 @@ auth:
     bcrypt_cost: 12
 registry:
   consul:
-    enabled: false
+    enabled: true
+    address: consul:8500
+    scheme: http
