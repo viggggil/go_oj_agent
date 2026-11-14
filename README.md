@@ -72,6 +72,6 @@ make agent-test-integration
 ## 文档
 
 - [文档索引](docs/README.md)：按主题分类的架构、接口、数据、Agent、可观测性、部署和测试文档。
-- [架构说明](docs/architecture.md) · [API 契约](docs/api.md) · [数据库设计](docs/database.md)
+- [架构说明](docs/design/architecture.md) · [API 契约](docs/design/api.md) · [数据库设计](docs/design/database.md)
 - [Agent 服务](agent/README.md) · [本地 Compose](deploy/compose/README.md)
-- [压力测试工具说明](docs/load-testing.md) · [云端压力测试报告](docs/reports/cloud-load-test-2026-11-01/REPORT.md)
+- [压力测试工具说明](docs/design/load-testing.md) · [云端压力测试报告](docs/reports/cloud-load-test-2026-11-01/REPORT.md)

@@ -75,7 +75,7 @@ Agent Chat 使用独立的总时长、空闲、响应头和写入预算，不受
 
 PR7 增加 `/api/v1/admin/agent/{agents,prompts,skills}` 管理路由、历史版本与归档/恢复/启停，以及只读 `model-options`、`tools`。管理接口要求 `admin`、`system_admin` 或 `agent_admin`；`/api/v1/agent/agents` 与其 Skill 目录要求登录，Agent Service 再按身份和配置可运行性过滤。写请求要求规范 UUID `X-Request-ID`，Gateway 将可信操作者与请求编号绑定到具体方法和路径签名；不接受 Provider/凭据管理或任意路径代理。
 
-管理 JSON 使用普通 HTTP 请求预算，与 Chat SSE 独立；沿用 Agent 的体积与并发限制，响应上限 1 MiB。Gateway 校验具体路由的响应字段和稳定错误码，不转发后端原始错误、身份 Header 或凭据。Agent 侧 `AGENT_ADMIN_ENABLED` 默认关闭，目录随数据库 Chat 启用。详见 [`docs/api.md`](../../docs/api.md)。
+管理 JSON 使用普通 HTTP 请求预算，与 Chat SSE 独立；沿用 Agent 的体积与并发限制，响应上限 1 MiB。Gateway 校验具体路由的响应字段和稳定错误码，不转发后端原始错误、身份 Header 或凭据。Agent 侧 `AGENT_ADMIN_ENABLED` 默认关闭，目录随数据库 Chat 启用。详见 [`docs/design/api.md`](../../docs/design/api.md)。
 
 Agent 配置位于 `clients.agent`，默认 `enabled=false`。开启时必须提供仅供 Gateway
 读取的内部 RSA 私钥和固定 `go-oj-gateway` issuer，Agent 侧配置对应的 Gateway 公钥。
@@ -103,7 +103,7 @@ clients:
 Compose 的 `KRATOS_CLIENTS_AGENT_ENABLED` 通过 `CLIENTS_AGENT_ENABLED` 环境开关覆盖
 typed 配置；这样不会把布尔值 placeholder 当成字符串传入配置扫描。Agent 超时、体积和
 并发配置在启动时严格校验，非法配置会阻止 Gateway 启动。前端请求仍使用
-`POST /api/v1/agent/chat`，详细请求和 SSE envelope 见 [`docs/api.md`](../../docs/api.md)。
+`POST /api/v1/agent/chat`，详细请求和 SSE envelope 见 [`docs/design/api.md`](../../docs/design/api.md)。
 
 ## 目录结构
 

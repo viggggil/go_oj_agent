@@ -49,4 +49,4 @@ Gateway 验证外部身份并签发短期内部委托身份。Agent Service 运�
 - OpenTelemetry 指标、日志与 Trace；本地观测栈包含 Prometheus、Grafana、Loki 和 Tempo。
 - 单元、集成、契约、端到端及 Agent Eval 检查。
 
-具体接口、数据结构、服务边界和部署方式见[文档索引](README.md)。
+具体接口、数据结构、服务边界和部署方式见[文档索引](../README.md)。

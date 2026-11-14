@@ -123,5 +123,5 @@ Gateway 使用固定 LogQL 模板查询，限制时间窗、服务范围、返�
 - [Observability 系统设计](../observability/design.md)
 - [Metrics 指标字典](../observability/metrics.md)
 - [Loki 日志架构与运行约束](../observability/loki.md)
-- [HTTP API 契约](../api.md)
+- [HTTP API 契约](../design/api.md)
 - [本地 Compose 配置](../../deploy/compose/README.md)

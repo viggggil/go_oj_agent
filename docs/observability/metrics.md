@@ -90,4 +90,4 @@ Gateway 只允许 `15m`、`1h`、`24h` 三个时间窗，使用服务端登记�
 
 Prometheus 当前保留 7 天；Contest、Go/Agent OTel Metrics 和 Prometheus 自身指标的进程重启可能造成短暂采集缺口。Prometheus 历史数据不作为业务事实回填，容量由部署卷和主机资源另行约束。
 
-相关配置和页面见 [Observability 系统设计](design.md)；观测 API 契约见 [`docs/api.md`](../api.md)。
+相关配置和页面见 [Observability 系统设计](design.md)；观测 API 契约见 [`docs/design/api.md`](../design/api.md)。

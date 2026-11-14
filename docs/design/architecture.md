@@ -637,7 +637,7 @@ Skill 只声明任务说明与授权工具，不再配置执行模式；历史 e
 
 工具执行前整批校验 JSON、Schema、call_id、相同参数重复调用、权限和预算；ToolExecutor 与拥有数据的 Go 服务仍做最终授权。失败返回 Observation，只有成功结果成为 Evidence。有工具的轮次确认 Finish 后才发正文，无工具的 Finish 保留实时 token 流和消费确认。进度、官方公开摘要和安全工具时间线与正文分离，摘要能力未启用时不生成虚构摘要。
 
-取消、deadline、背压及唯一终态继续由 RunService 协调；答案与 COMPLETED 在本地事务提交后才发 done。ModelSummary JSON 保存有界工具摘要（含 Run 归属），历史会话在归属校验后可恢复，失败/取消 Run 也保留已有工具轨迹。运行和评测数据由 Agent 自有存储持久化；评测结果及限制见 [ReAct 评测报告](agent/react-eval-comparison.md)。
+取消、deadline、背压及唯一终态继续由 RunService 协调；答案与 COMPLETED 在本地事务提交后才发 done。ModelSummary JSON 保存有界工具摘要（含 Run 归属），历史会话在归属校验后可恢复，失败/取消 Run 也保留已有工具轨迹。运行和评测数据由 Agent 自有存储持久化；评测结果及限制见 [ReAct 评测报告](../agent/react-eval-comparison.md)。
 
 ### 有界多轮上下文
 
@@ -696,7 +696,7 @@ retrieve_knowledge
 
 管理接口全部经 Gateway：管理员可分页查询、创建、替换、归档、恢复、停用和启用 Agent/Prompt/Skill，并查看历史版本、只读 Tools 元数据和 su8 模型选项。模型选择绑定 Model Profile UUID，Provider 和凭据无 HTTP 管理接口。写请求使用调用方保留的 UUID `X-Request-ID`，通过签名委托携带操作者和请求编号；仓储在事务内检查 `expected_id`、依赖、预算和工具白名单并写审计。管理端可以在 Chat 关闭时独立修复配置。
 
-普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/api.md`。Web 提供 Agent 管理页面和流式对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。多轮上下文和 RAG 已接入真实运行流程；质量信号可通过 Eval 运行结果查看。
+普通用户的 Agent/Skill 目录只返回名称、key、默认选项等聊天所需字段，按身份、有效期、停用依赖、运行模式和部署 Provider 网络策略在分页前过滤。目录在 Chat 开启且数据库配置模式时可用，独立于管理员管理开关；不返回 Prompt 正文、配置图或凭据。完整契约见 `docs/design/api.md`。Web 提供 Agent 管理页面和流式对话页面。Web 通过同源 Gateway fetch POST 消费 SSE，独立有界 parser 校验身份与终态；取消与代次隔离防止旧 Run 污染新会话。Chat 不继承 Axios 的自动重放，认证刷新后需用户再次发送。多轮上下文和 RAG 已接入真实运行流程；质量信号可通过 Eval 运行结果查看。
 
 Control Plane 管理以下可版本化资源：
 
@@ -878,7 +878,7 @@ RabbitMQ Header、事件 Envelope 与 Outbox 持久化字段携带 W3C Trace Con
 
 Gateway 的固定查询 API 为 Vue“监控”工作区提供指标、服务接入状态、活动告警摘要、日志查询和 Judge Trace 搜索链接；Agent 管理 API 提供 Run 安全摘要与详情。`admin`/`system_admin` 可查看系统范围，`agent_admin` 只可查看 Agent 范围。空数据、未配置、过期和查询故障保持独立状态。Grafana 是本地开发与详细排障工具，不作为产品正式监控页面。Prometheus 当前没有 Alertmanager 外发通知，基础设施 exporter、日志实时 tail、完整日志分页和硬磁盘配额尚未配置。开发环境的端口绑定 loopback，Grafana 使用匿名 Viewer，Alloy 读取 Docker socket；该配置不能直接作为共享或生产环境安全边界。
 
-详细数据流、查询范围和当前限制见 [Observability 系统设计](observability/design.md)、[Metrics 指标字典](observability/metrics.md) 与 [Loki 日志说明](observability/loki.md)。
+详细数据流、查询范围和当前限制见 [Observability 系统设计](../observability/design.md)、[Metrics 指标字典](../observability/metrics.md) 与 [Loki 日志说明](../observability/loki.md)。
 
 关键 Metrics：
 
