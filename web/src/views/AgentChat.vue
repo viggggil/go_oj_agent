@@ -52,15 +52,15 @@
         :class="message.role"
       >
         <div class="chat-role">{{ message.role === 'user' ? '我' : 'Agent' }}</div>
-        <details v-if="message.activity?.length" class="chat-activity">
-          <summary>思路与执行过程（{{ message.activity.length }}）</summary>
-          <ol>
-            <li v-for="(item, index) in message.activity" :key="index" :class="item.status">
-              <span>{{ item.text }}</span>
-              <small v-if="item.duration !== undefined"> · {{ item.duration }} ms</small>
-            </li>
-          </ol>
-        </details>
+        <div v-if="message.activity?.length" class="chat-activity">
+          <p
+            v-for="(item, index) in message.activity"
+            :key="index"
+            :class="item.kind === 'summary' ? 'chat-summary' : 'chat-status'"
+          >
+            {{ item.text }}
+          </p>
+        </div>
         <div
           v-if="message.role === 'assistant'"
           class="chat-content markdown"
@@ -171,7 +171,7 @@
     text: string
     incomplete?: boolean
     failure?: string
-    activity?: { text: string; status?: string; duration?: number; callId?: string }[]
+    activity?: { kind: 'summary' | 'status'; text: string }[]
   }
   const route = useRoute(),
     router = useRouter(),
@@ -404,32 +404,35 @@
         },
         (event) => {
           if (current !== generation || abort.signal.aborted) return
-          if (event.type === 'thinking') status.value = event.data.text || '正在回答…'
-          if (event.type === 'progress' || event.type === 'reasoning_summary') {
-            const text = event.data.message || event.data.text || ''
+          if (event.type === 'thinking' || event.type === 'progress') {
+            const text = event.data.message || event.data.text || '正在回答…'
             status.value = text
-            ;(assistant.activity ||= []).push({ text })
+            ;(assistant.activity ||= []).push({ kind: 'status', text })
+            void scrollBottom()
+          }
+          if (event.type === 'reasoning_summary' && event.data.text) {
+            ;(assistant.activity ||= []).push({ kind: 'summary', text: event.data.text })
+            void scrollBottom()
           }
           if (event.type === 'tool_call') {
             ;(assistant.activity ||= []).push({
-              text: `${event.data.label}：执行中`,
-              status: 'started',
-              callId: event.data.call_id,
+              kind: 'status',
+              text: '正在调用工具，核对相关信息…',
             })
+            void scrollBottom()
           }
           if (event.type === 'tool_result') {
-            const item = assistant.activity?.find((value) => value.callId === event.data.call_id)
-            if (item) {
-              const state =
-                event.data.status === 'succeeded'
-                  ? '成功'
-                  : event.data.status === 'rejected'
-                    ? '已拒绝'
-                    : '失败'
-              item.text = `${event.data.tool}：${state} · ${event.data.summary}`
-              item.status = event.data.status
-              item.duration = event.data.duration_ms
-            }
+            const outcome =
+              event.data.status === 'succeeded'
+                ? '工具调用完成'
+                : event.data.status === 'rejected'
+                  ? '工具调用被拒绝'
+                  : '工具调用失败'
+            ;(assistant.activity ||= []).push({
+              kind: 'status',
+              text: `${outcome} · ${event.data.duration_ms ?? 0} ms`,
+            })
+            void scrollBottom()
           }
           if (event.type === 'token') {
             const delta = event.data.text || ''
@@ -494,10 +497,8 @@
           activity:
             item.role === 'assistant'
               ? item.tool_steps?.map((step) => ({
-                  text: `${step.tool_name}：${step.status === 'succeeded' ? '成功' : step.status === 'rejected' ? '已拒绝' : '失败'} · ${step.summary}`,
-                  status: step.status,
-                  duration: step.duration_ms,
-                  callId: step.call_id,
+                  kind: 'status' as const,
+                  text: `${step.status === 'succeeded' ? '工具调用完成' : step.status === 'rejected' ? '工具调用被拒绝' : '工具调用失败'} · ${step.duration_ms} ms`,
                 }))
               : undefined,
         },
@@ -505,14 +506,12 @@
       if (item.role === 'user' && item.status && item.status !== 'COMPLETED') {
         result.push({
           id: 'failure-' + item.id,
-          activity: item.tool_steps?.map((step) => ({
-            text: `${step.tool_name}：${step.status === 'succeeded' ? '成功' : step.status === 'rejected' ? '已拒绝' : '失败'} · ${step.summary}`,
-            status: step.status,
-            duration: step.duration_ms,
-            callId: step.call_id,
-          })),
           role: 'assistant',
           text: '',
+          activity: item.tool_steps?.map((step) => ({
+            kind: 'status' as const,
+            text: `${step.status === 'succeeded' ? '工具调用完成' : step.status === 'rejected' ? '工具调用被拒绝' : '工具调用失败'} · ${step.duration_ms} ms`,
+          })),
           incomplete: true,
           failure:
             item.status === 'RUNNING'
@@ -674,24 +673,14 @@
 
 <style scoped>
   .chat-activity {
-    margin: 0.5rem 0;
-    padding: 0.75rem;
-    border: 1px solid var(--border, #dbe1e8);
-    border-radius: 0.75rem;
-    font-size: 0.875rem;
-  }
-  .chat-activity summary {
-    cursor: pointer;
-  }
-  .chat-activity ol {
-    padding-left: 1.5rem;
     line-height: 1.8;
+    overflow-wrap: anywhere;
   }
-  .chat-activity .failed,
-  .chat-activity .rejected {
-    color: #b42318;
+  .chat-activity p {
+    margin: 0 0 0.75rem;
   }
-  .chat-activity .succeeded {
-    color: #187043;
+  .chat-status {
+    color: var(--muted, #64748b);
+    font-size: 0.875rem;
   }
 </style>

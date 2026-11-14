@@ -91,7 +91,7 @@
             {{ selectedRun.hard_failures }} · 执行错误 {{ selectedRun.error_count }}
           </p>
           <div v-if="metrics" class="eval-metrics">
-            <span>程序检查通过 {{ metrics.check_passes }} / {{ metrics.recorded_cases }}</span
+            <span>执行检查通过 {{ metrics.check_passes }} / {{ metrics.recorded_cases }}</span
             ><span>最终通过 {{ metrics.effective_passes }} / {{ metrics.recorded_cases }}</span
             ><span>已人工评审 {{ metrics.reviewed_cases }}</span
             ><span
@@ -101,7 +101,7 @@
             ><span>平均耗时 {{ metrics.average_latency_ms ?? '—' }} ms</span>
           </div>
           <p class="muted">
-            执行完成表示本批次结束；质量结论需结合程序检查、模型评分和人工评审。最终通过率以已记录结果为分母。
+            执行完成表示本批次结束；质量结论需结合执行检查、模型评分和人工评审。最终通过率以已记录结果为分母。
           </p>
           <p v-if="selectedRun.cancel_requested && active">
             正在停止模型调用并记录剩余样例，请等待终态。
@@ -153,7 +153,7 @@
                   <tr>
                     <th>样例 / 次数</th>
                     <th>执行状态</th>
-                    <th>程序检查</th>
+                    <th>执行检查</th>
                     <th>人工 / 最终</th>
                     <th>耗时</th>
                     <th></th>
@@ -180,7 +180,7 @@
                           : '待评审'
                       }}
                       · 模型：{{ modelReviewStatus[item.model_review_status] }} /
-                      {{ item.effective_pass ? '通过' : '未通过' }}
+                      {{ evalVerdict(item) }}
                     </td>
                     <td>{{ item.latency_ms ?? '—' }} ms</td>
                     <td>
@@ -227,6 +227,7 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { evalVerdict } from '../../agent/evals'
   import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { agentError, agentStatus } from '../../agent/api'

@@ -57,7 +57,7 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
       headers,
       body:
         frame('progress', 1, { phase: 'analyzing', message: '正在分析任务' }) +
-        frame('reasoning_summary', 2, { step: 1, text: '先读取授权题目。' }) +
+        frame('reasoning_summary', 2, { step: 1, text: '先梳理题目目标和关键条件。' }) +
         frame('tool_call', 3, {
           step: 1,
           call_id: 'call_problem',
@@ -73,10 +73,12 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
           duration_ms: 12,
           summary: '已获取授权信息',
         }) +
-        frame('token', 5, {
+        frame('reasoning_summary', 5, { step: 2, text: '已确认题目条件，下面给出解释。' }) +
+        frame('progress', 6, { phase: 'answering', message: '正在整理最终回答' }) +
+        frame('token', 7, {
           text: '中文回答\n\n```cpp\nint x = 1;\n```\n\n<script>window.chatXSS=1</script>\n[jump](javascript:alert(1))',
         }) +
-        frame('done', 6),
+        frame('done', 8),
     })
   })
   await page.goto('/agent/chat')
@@ -91,9 +93,34 @@ test('目录选择、中文 IME、连续会话、安全 Markdown 与复制，桌
   await page.getByLabel('消息', { exact: true }).press('Control+Enter')
   await expect(page.getByRole('status')).toHaveText('回答完成')
   await expect(page.locator('.assistant')).toContainText('中文回答')
-  await page.locator('.chat-activity summary').click()
-  await expect(page.locator('.chat-activity')).toContainText('先读取授权题目。')
-  await expect(page.locator('.chat-activity .succeeded')).toContainText('get_problem：成功')
+  await expect(page.locator('.assistant .chat-summary')).toHaveText([
+    '先梳理题目目标和关键条件。',
+    '已确认题目条件，下面给出解释。',
+  ])
+  await expect(page.locator('.assistant .chat-activity p')).toHaveText([
+    '正在分析任务',
+    '先梳理题目目标和关键条件。',
+    '正在调用工具，核对相关信息…',
+    '工具调用完成 · 12 ms',
+    '已确认题目条件，下面给出解释。',
+    '正在整理最终回答',
+  ])
+  const styles = await page.locator('.assistant').evaluate((element) => ({
+    summary: getComputedStyle(element.querySelector('.chat-summary')!).color,
+    status: getComputedStyle(element.querySelector('.chat-status')!).color,
+  }))
+  expect(styles.status).not.toBe(styles.summary)
+  await expect(page.locator('.assistant details')).toHaveCount(0)
+  await expect(page.locator('.assistant')).not.toContainText('第 1 阶段')
+  await expect(page.locator('.assistant')).not.toContainText('get_problem')
+  await expect(page.locator('.assistant')).not.toContainText('授权')
+  expect(
+    await page.locator('.assistant').evaluate((element) => {
+      const summary = element.querySelector('.chat-activity')!
+      const answer = element.querySelector('.chat-content')!
+      return Boolean(summary.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING)
+    }),
+  ).toBe(true)
   await expect(page.locator('.chat-content.markdown')).not.toContainText('已获取授权信息')
   await expect(page.locator('.assistant script, .assistant a[href^="javascript:"]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '复制代码' })).toBeVisible()
@@ -261,6 +288,21 @@ test('恢复历史后续聊，失败在回答位置显示且不自动重发', as
         items: [
           { id: 1, role: 'user', content: '第一题', status: 'COMPLETED', error_code: null },
           { id: 2, role: 'assistant', content: '题目内容', status: 'COMPLETED', error_code: null },
+          {
+            id: 3,
+            role: 'user',
+            content: '失败题目',
+            status: 'FAILED',
+            error_code: 'AGENT_MODEL_TIMEOUT',
+            tool_steps: [
+              {
+                tool_name: 'get_problem',
+                status: 'succeeded',
+                duration_ms: 18,
+                summary: '已完成',
+              },
+            ],
+          },
         ],
         next_before: null,
       },
@@ -274,7 +316,8 @@ test('恢复历史后续聊，失败在回答位置显示且不自动重发', as
   })
   await page.goto('/agent/chat')
   await page.getByLabel('选择对话').selectOption(conversation)
-  await expect(page.locator('.assistant')).toContainText('题目内容')
+  await expect(page.locator('.assistant').first()).toContainText('题目内容')
+  await expect(page.locator('.assistant .chat-status')).toContainText('工具调用完成 · 18 ms')
   await expect(page.getByLabel('搜索 Agent')).toHaveCount(0)
   await page.getByLabel('消息', { exact: true }).fill('解释思路')
   await page.getByRole('button', { name: '发送', exact: true }).click()
