@@ -74,4 +74,4 @@ make observability-down
 
 `make observability-check` 校验 Compose、Loki 和 Alloy 配置；`make observability-smoke` 检查已启动的观测栈。`make loki-smoke` 在随机隔离的 Docker Compose 项目中，以五类服务日志验证采集、Trace ID 查询、非法 JSON 丢弃与 Alloy 重启读取位置；结束时清理自己的临时资源，不触碰业务 Compose 项目。上述检查不模拟 Loki 7 天 retention 到期后的物理清理或磁盘满场景。
 
-整体数据流、权限范围与 Metrics/Trace 关系见 [Observability 系统设计](design.md)；API 参数与响应状态见 [`docs/api.md`](../api.md)。
+整体数据流、权限范围与 Metrics/Trace 关系见 [Observability 系统设计](design.md)；API 参数与响应状态见 [`docs/design/api.md`](../design/api.md)。

@@ -4,10 +4,11 @@
 
 ## 项目概览与核心设计
 
-- [产品功能与当前范围](requirements.md)：当前用户角色、产品能力与业务链路。
-- [系统架构](architecture.md)：服务职责、通信、判题、Agent、存储和可观测性边界。
-- [API 与消息契约](api.md)：REST、gRPC、SSE、Protobuf 和 RabbitMQ 契约。
-- [数据库与存储设计](database.md)：MySQL Schema、Redis、MinIO、迁移及一致性约束。
+- [产品功能与当前范围](design/requirements.md)：当前用户角色、产品能力与业务链路。
+- [系统架构](design/architecture.md)：服务职责、通信、判题、Agent、存储和可观测性边界。
+- [API 与消息契约](design/api.md)：REST、gRPC、SSE、Protobuf 和 RabbitMQ 契约。
+- [数据库与存储设计](design/database.md)：MySQL Schema、Redis、MinIO、迁移及一致性约束。
+- [身份认证与业务授权](design/authentication-authorization.md)：外部令牌、内部委托和服务授权边界。
 - [Go-Kratos 工程规范](kratos.md)：服务目录、依赖方向和代码组织约定。
 
 ## Agent
@@ -31,10 +32,11 @@
 
 - [Compose 部署](../deploy/compose/README.md)
 - [比赛排行榜缓存运维](contest-cache-operations.md)
-- [压力测试工具](load-testing.md)
+- [压力测试工具](design/load-testing.md)
 
 ## 测试结果
 
+- [Prompt、Skill 与运行时评测对比（2026-11-14）](agent/prompt-skill-eval-comparison-2026-11-14.md)，包含脱敏逐题 JSON。
 - [云端压力测试报告（2026-11-01）](reports/cloud-load-test-2026-11-01/REPORT.md)，包含原始 JSON 数据。
 
 ## 架构决策

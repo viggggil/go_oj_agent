@@ -63,7 +63,7 @@ Vue 顶栏的“监控”工作区只进入总览页面；固定 Metrics、Agent
 | `GET /api/v1/admin/observability/logs` | Gateway 使用固定 LogQL 模板查询 Loki | 平台管理员查系统；`agent_admin` 仅查 Agent 服务范围 |
 | `GET /api/v1/admin/agent/observability/runs` 和 `/runs/{run_id}` | Gateway 委托 Agent，返回 Run 安全摘要与详情 | `admin`、`system_admin`、`agent_admin` |
 
-所有观测查询由后端鉴权、检查角色范围并限制上游地址、查询表达式、时间窗和响应大小。前端路由保护只改善交互，不构成授权。普通用户不能访问管理员监控 API。接口完整参数与 JSON DTO 见 [`docs/api.md`](../api.md)。
+所有观测查询由后端鉴权、检查角色范围并限制上游地址、查询表达式、时间窗和响应大小。前端路由保护只改善交互，不构成授权。普通用户不能访问管理员监控 API。接口完整参数与 JSON DTO 见 [`docs/design/api.md`](../design/api.md)。
 
 ## 可靠性、安全与容量
 

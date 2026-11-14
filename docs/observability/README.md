@@ -6,5 +6,5 @@
 - [Trace 能力现状](trace.md)：已接入的 Trace 采集、传播、查询入口与当前边界。
 - [Metrics 指标字典](metrics.md)：指标名称、类型、单位、标签与计数语义。
 - [Loki 日志架构与运行约束](loki.md)：日志字段、采集范围、查询、保留、轮转和安全边界。
-- [HTTP API 契约](../api.md)：监控、日志和 Trace 查询接口参数与响应约束。
+- [HTTP API 契约](../design/api.md)：监控、日志和 Trace 查询接口参数与响应约束。
 - [本地 Compose 配置](../../deploy/compose/README.md)：启动、停止和开发环境配置。
