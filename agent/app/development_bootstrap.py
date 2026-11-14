@@ -246,12 +246,13 @@ async def bootstrap_su8(
             if current is None:
                 await ensure("agent", settings.default_agent_key, content)
             else:
-                # 保留运行参数与模型绑定，只升级受管 Prompt/Skill 的不可变引用。
+                # 保留运行参数与模型绑定，同步受管 Skill 引用及当前部署可用的工具权限。
                 content = {
                     **current.content.model_dump(mode="json"),
                     "prompt_id": prompt.id,
                     "skill_ids": list(dict.fromkeys([skill.id, direct.id])),
                     "default_skill_id": skill.id,
+                    "allowed_tools": tools,
                 }
                 await upgrade_seed(current, content)
         # 专用评审资源固定为只读、无知识库、单次模型调用的管理员 Agent。
