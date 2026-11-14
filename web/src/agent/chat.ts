@@ -83,6 +83,14 @@ export function modelErrorMessage(code: string): string {
         AGENT_MODEL_AUTH_FAILED: '模型认证失败，请联系管理员检查 Provider 凭据。',
         AGENT_MODEL_QUOTA: '模型额度不足，请联系管理员。',
         AGENT_MODEL_RATE_LIMIT: '模型请求受限，请稍后重新发送。',
+        AGENT_MODEL_EVENT_LIMIT: '模型响应事件超过处理上限，请缩小问题范围或联系管理员。',
+        AGENT_EVENT_LIMIT: '回答事件超过处理上限，请缩小问题范围。',
+        AGENT_OUTPUT_LIMIT: '回答超过字符上限，请要求分段或简短回答。',
+        AGENT_MODEL_OUTPUT_LIMIT: '模型输出 Token 预算不足，请要求简短回答或联系管理员调整预算。',
+        AGENT_MODEL_INPUT_LIMIT: '上下文超过输入预算，请缩小问题范围或新建对话。',
+        AGENT_MODEL_CALL_LIMIT: '本轮分析次数已达上限，请缩小问题范围。',
+        AGENT_TOOL_CALL_LIMIT: '本轮信息查询次数已达上限，请减少一次查询的题目数量。',
+        AGENT_TOOL_RESULT_LIMIT: '返回信息超过大小上限，请缩小查询范围。',
         AGENT_MODEL_INVALID_RESPONSE: '模型返回的流式回答不完整，请重新发送。',
       } as Record<string, string>
     )[code] || '回答失败或未完成，请重新发送或开启新对话。'

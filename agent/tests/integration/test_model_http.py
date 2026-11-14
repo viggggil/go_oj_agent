@@ -47,6 +47,7 @@ async def test_gateway_receives_first_token_before_provider_completion_and_persi
             "progress",
             "progress",
             "token",
+            "reasoning_summary",
             "done",
         ]
         assert received[3]["data"]["text"] == "中文算法回答"
@@ -255,7 +256,8 @@ async def test_configured_react_skill_reads_signed_grpc_evidence_and_maps_denial
             assert events[-1]["type"] == "done", response.text
             assert expected in response.text
             assert all(
-                event["type"] in {"progress", "tool_call", "tool_result", "token", "done"}
+                event["type"]
+                in {"progress", "reasoning_summary", "tool_call", "tool_result", "token", "done"}
                 for event in events
             )
             assert [event["type"] for event in events].count("tool_call") == 1

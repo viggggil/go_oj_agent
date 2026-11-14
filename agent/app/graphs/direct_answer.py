@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from pydantic import SecretStr
 
+from app.answer_policy import ALGORITHM_SKILL, PUBLIC_ANSWER_PROMPT
 from app.clients.model import ResponsesClient
 from app.models.configuration import ConfigError, ModelProfileConfig, ProviderConfig, RuntimeBudget
 from app.models.provider import ModelAttempt, ModelFailure, ModelResponse, ModelSummary
@@ -99,9 +100,15 @@ class DirectAnswer:
             styles = {
                 "low": "回答简洁，优先给出结论。",
                 "medium": "回答提供必要的解释和例子。",
-                "high": "回答详尽，说明关键依据、步骤和必要的例子；不要输出内部推理过程。",
+                "high": "说明关键依据、步骤和必要的例子；用户要求简短时优先简短，不要无关扩展。",
             }
             instructions += "\n\n" + styles[profile.verbosity]
+        # 最后附加稳定的交互规范，旧数据库 Prompt/Skill 同样受此约束；评审员保留 JSON 输出。
+        if state.agent_key != "eval_reviewer":
+            if PUBLIC_ANSWER_PROMPT not in instructions:
+                instructions += "\n\n" + PUBLIC_ANSWER_PROMPT
+            if ALGORITHM_SKILL not in instructions:
+                instructions += "\n\n" + ALGORITHM_SKILL
         # 任意 Byte-level tokenizer 的保守输入上界；不承诺精确 Token。
         input_estimate = (
             len(instructions.encode()) + len(state.user_message.encode()) + 128 + tool_bytes
@@ -183,7 +190,6 @@ class DirectAnswer:
                     max_output,
                     attempt,
                     max_output_chars=budget.max_output_chars,
-                    max_events=budget.max_events,
                     history=prepared.history,
                     input_items=input_items,
                     tools=tools,

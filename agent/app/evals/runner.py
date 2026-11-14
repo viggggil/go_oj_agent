@@ -459,9 +459,23 @@ class EvalRunner:
         principal: Principal,
         cancel_event: asyncio.Event | None,
     ) -> dict[str, Any]:
+        profile = reviewer_snapshot.model_profile or {}
+        context_window = profile.get("context_window_tokens", 32000)
+        if not isinstance(context_window, int) or isinstance(context_window, bool):
+            context_window = 32000
+        input_budget = min(
+            reviewer_snapshot.budget.max_input_tokens,
+            context_window - reviewer_snapshot.budget.max_output_tokens,
+        )
         request = ChatRequest(
             agent_key=REVIEWER_AGENT_KEY,
-            message=reviewer_input(case, answer, checks, summary),
+            message=reviewer_input(
+                case,
+                answer,
+                checks,
+                summary,
+                max_payload_bytes=max(1024, min(24000, input_budget - 7000)),
+            ),
         )
         turn_snapshot = reviewer_snapshot
         if isinstance(self.reader, DatabaseConfigReader):
@@ -512,57 +526,17 @@ class EvalRunner:
         error_code: str | None,
         summary: ModelSummary | None,
     ) -> dict[str, Any]:
-        folded = answer.casefold()
-        expectations = case.expectations
-        required_facts = {fact: fact.casefold() in folded for fact in expectations.required_facts}
-        forbidden_claims = {
-            claim: claim.casefold() in folded for claim in expectations.forbidden_claims
-        }
-        leaks = {value: value.casefold() in folded for value in expectations.must_not_leak}
-        knowledge = summary.knowledge if summary is not None else []
+        # 回答内容由模型/人工按语义评审。这里只检查执行状态和真实发生的禁用动作；
+        # 保留工具/证据诊断供评审参考，不把指定工具或措辞当作质量结论。
         tools = set(summary.tools) if summary is not None else set()
-        required_tools = {tool: tool in tools for tool in expectations.required_tools}
-        forbidden_tools = {tool: tool in tools for tool in expectations.forbidden_tools}
-        sources = [source for attempt in knowledge if attempt.ok for source in attempt.sources]
-
-        def has_evidence(selector: str) -> bool:
-            # 结构化选择器按字段精确匹配，避免 problem_id:2 命中题号 22。
-            for field in ("problem_id", "document_id", "version_id"):
-                prefix = field + ":"
-                if selector.startswith(prefix):
-                    expected = selector[len(prefix) :]
-                    return any(str(getattr(source, field)) == expected for source in sources)
-            return any(
-                selector.casefold() in f"{source.title} {source.section}".casefold()
-                for source in sources
-            )
-
-        required_evidence = {
-            evidence: has_evidence(evidence) for evidence in expectations.required_evidence
-        }
-        hard_fail = (
-            status != "COMPLETED"
-            or any(forbidden_claims.values())
-            or any(leaks.values())
-            or any(forbidden_tools.values())
-        )
-        passed = (
-            not hard_fail
-            and all(required_facts.values())
-            and all(required_tools.values())
-            and all(required_evidence.values())
-            and not any(forbidden_tools.values())
-            and not any(forbidden_claims.values())
-            and not any(leaks.values())
-        )
+        forbidden_tools = {tool: tool in tools for tool in case.expectations.forbidden_tools}
+        hard_fail = status != "COMPLETED" or any(forbidden_tools.values())
         return {
-            "pass": passed,
+            "grading_mode": "semantic_v2",
+            "pass": not hard_fail,
             "hard_fail": hard_fail,
-            "required_facts": required_facts,
-            "forbidden_claims": forbidden_claims,
-            "must_not_leak": leaks,
-            "required_tools": required_tools,
+            "execution_pass": status == "COMPLETED",
+            "required_tools": {tool: tool in tools for tool in case.expectations.required_tools},
             "forbidden_tools": forbidden_tools,
-            "required_evidence": required_evidence,
             "error_code": error_code,
         }

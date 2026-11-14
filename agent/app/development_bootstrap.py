@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import SecretStr
 from sqlalchemy import select
 
+from app.answer_policy import ALGORITHM_SKILL, PUBLIC_ANSWER_PROMPT
 from app.clients.business import build_business_clients
 from app.core.credentials import CredentialCipher
 from app.core.database import DatabaseProbe
@@ -19,6 +20,7 @@ from app.models.configuration import (
     ConfigKind,
     ConfigWrite,
     ProviderConfig,
+    config_hash,
 )
 from app.storage.configuration import ConfigurationStore, ConfigVersion
 from app.storage.credentials import CredentialStore, CredentialWrite
@@ -28,6 +30,25 @@ from app.tools.business import build_business_tool_registry
 from app.tools.registry import ToolRegistry
 
 SU8_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4.1-flash")
+
+
+def seed_upgrade_request(value: ConfigVersion, content: dict[str, Any]) -> str:
+    """相同版本转换可重放，不同依赖绑定不能复用审计请求 ID。"""
+    digest = config_hash({"source_id": value.id, "content": content})[:32]
+    return f"compose.su8.v6.{value.kind}.{value.key}.{digest}"
+
+
+def is_seed_request(value: ConfigVersion, request_id: str) -> bool:
+    legacy = {f"compose.su8.v{n}.{value.kind}.{value.key}" for n in range(1, 7)}
+    if request_id in legacy:
+        return True
+    prefix = f"compose.su8.v6.{value.kind}.{value.key}."
+    digest = request_id.removeprefix(prefix)
+    return (
+        request_id.startswith(prefix)
+        and len(digest) == 32
+        and all(char in "0123456789abcdef" for char in digest)
+    )
 
 
 async def bootstrap_su8(
@@ -81,6 +102,27 @@ async def bootstrap_su8(
                 content,
             )
 
+        async def is_seed_version(value: ConfigVersion) -> bool:
+            async with engine.connect() as connection:
+                requests = await connection.scalars(
+                    select(audits.c.request_id).where(audits.c.new_id == value.id)
+                )
+            return any(is_seed_request(value, request_id) for request_id in requests)
+
+        async def upgrade_seed(value: ConfigVersion, content: dict[str, Any]) -> ConfigVersion:
+            if value.content.model_dump(mode="json") == content or not await is_seed_version(value):
+                return value
+            return await store.create_or_replace(
+                ConfigWrite(
+                    kind=value.kind,
+                    key=value.key,
+                    actor_id=1,
+                    request_id=seed_upgrade_request(value, content),
+                    expected_id=UUID(value.id),
+                ),
+                content,
+            )
+
         provider = await existing("provider", "su8")
         if provider is None:
 
@@ -127,34 +169,23 @@ async def bootstrap_su8(
                         "model": model,
                         "verbosity": "high",
                         "max_output_tokens": 8000,
-                        "context_window_tokens": 32000,
+                        "context_window_tokens": 64000,
                     },
                 )
             )
         current = await existing("agent", settings.default_agent_key)
-        # 只升级仍指向 Compose 首次创建版本的默认助手，管理员另存过的版本完整保留。
-        async with engine.connect() as connection:
-            original_id = await connection.scalar(
-                select(audits.c.new_id).where(
-                    audits.c.request_id == f"compose.su8.v1.agent.{settings.default_agent_key}"
-                )
-            )
-        upgrade = (
-            current is not None
-            and current.id == original_id
-            and not getattr(current.content, "allowed_tools", ())
-        )
-        if current is None or upgrade:
+        # 只升级 Compose 自动创建的版本；管理员另存过的 Agent 与依赖保持原样。
+        if current is None or await is_seed_version(current):
             prompt = await ensure(
                 "prompt",
                 "su8_learning_identity",
                 {
                     "name": "编程学习助手基础规则",
-                    "text": (
-                        "你是编程学习助手，用中文准确解释算法，根据用户提供的信息回答。"
-                        "缺少必要信息时明确说明。"
-                    ),
+                    "text": PUBLIC_ANSWER_PROMPT,
                 },
+            )
+            prompt = await upgrade_seed(
+                prompt, {**prompt.content.model_dump(mode="json"), "text": PUBLIC_ANSWER_PROMPT}
             )
             direct = await ensure(
                 "skill",
@@ -162,8 +193,11 @@ async def bootstrap_su8(
                 {
                     "name": "直接回答",
                     "description": "解释编程与算法问题，给出关键思路和例子。",
-                    "text": "直接回答用户的问题，解释关键思路、适用条件、复杂度和必要的例子。",
+                    "text": ALGORITHM_SKILL,
                 },
+            )
+            direct = await upgrade_seed(
+                direct, {**direct.content.model_dump(mode="json"), "text": ALGORITHM_SKILL}
             )
             tools = ["get_problem", "list_problems"] if settings.business_tools_enabled else []
             skill = direct
@@ -178,7 +212,19 @@ async def bootstrap_su8(
                         "text": (
                             "用户提到题号时，先通过 get_problem 读取真实题目，再根据题意回答。"
                             "需要查找题目时使用 list_problems。不能编造题目内容；"
-                            "工具返回不可用或无权限时明确说明。"
+                            "信息不可用时说明具体缺少什么，不展示内部工具、检索和权限流程。"
+                            + ALGORITHM_SKILL
+                        ),
+                    },
+                )
+                skill = await upgrade_seed(
+                    skill,
+                    {
+                        **skill.content.model_dump(mode="json"),
+                        "text": (
+                            "用户提到题号时，先读取真实题目，再根据题意回答。不能编造题目内容；"
+                            "信息不可用时说明具体缺少什么，不展示内部工具、检索和权限流程。\n"
+                            + ALGORITHM_SKILL
                         ),
                     },
                 )
@@ -190,32 +236,24 @@ async def bootstrap_su8(
                 "model_profile_id": model_versions[0].id,
                 "allowed_tools": tools,
                 "visibility": "user",
-                "budget": {"max_run_seconds": 120},
+                "budget": {
+                    "max_run_seconds": 120,
+                    "max_input_tokens": 64000,
+                    "max_tool_calls": 16,
+                    "max_model_calls": 16,
+                },
             }
             if current is None:
                 await ensure("agent", settings.default_agent_key, content)
-            elif tools:
-                # 保留首次版本的不可变绑定和预算，不因独立 Prompt/Model 编辑而隐式重绑。
+            else:
+                # 保留运行参数与模型绑定，只升级受管 Prompt/Skill 的不可变引用。
                 content = {
                     **current.content.model_dump(mode="json"),
-                    "skill_ids": list(
-                        dict.fromkeys(
-                            [skill.id, *current.content.model_dump(mode="json")["skill_ids"]]
-                        )
-                    ),
+                    "prompt_id": prompt.id,
+                    "skill_ids": list(dict.fromkeys([skill.id, direct.id])),
                     "default_skill_id": skill.id,
-                    "allowed_tools": tools,
                 }
-                await store.create_or_replace(
-                    ConfigWrite(
-                        kind="agent",
-                        key=settings.default_agent_key,
-                        actor_id=1,
-                        request_id=f"compose.su8.v2.agent.{settings.default_agent_key}",
-                        expected_id=UUID(current.id),
-                    ),
-                    content,
-                )
+                await upgrade_seed(current, content)
         # 专用评审资源固定为只读、无知识库、单次模型调用的管理员 Agent。
         from app.evals.reviewer import (
             REVIEWER_AGENT_KEY,
@@ -241,34 +279,14 @@ async def bootstrap_su8(
             },
         )
 
-        async def upgrade_initial_reviewer(
-            value: ConfigVersion, content: dict[str, Any]
-        ) -> ConfigVersion:
-            # 仅升级未被管理员修改的 Compose 初始配置或本次自动升级版本。
-            async with engine.connect() as connection:
-                seeds = await connection.scalars(
-                    select(audits.c.new_id).where(
-                        audits.c.request_id.in_(
-                            [
-                                f"compose.su8.v1.{value.kind}.{value.key}",
-                                f"compose.su8.v3.{value.kind}.{value.key}",
-                            ]
-                        )
-                    )
-                )
-                is_seed = value.id in set(seeds)
-            if not is_seed:
-                return value
-            return await store.create_or_replace(
-                ConfigWrite(
-                    kind=value.kind,
-                    key=value.key,
-                    actor_id=1,
-                    request_id=f"compose.su8.v4.{value.kind}.{value.key}",
-                    expected_id=UUID(value.id),
-                ),
-                content,
-            )
+        reviewer_prompt = await upgrade_seed(
+            reviewer_prompt,
+            {**reviewer_prompt.content.model_dump(mode="json"), "text": REVIEWER_PROMPT},
+        )
+        reviewer_skill = await upgrade_seed(
+            reviewer_skill,
+            {**reviewer_skill.content.model_dump(mode="json"), "text": REVIEWER_SKILL},
+        )
 
         reviewer_model = await existing("model", REVIEWER_MODEL_KEY)
         if reviewer_model is None:
@@ -281,15 +299,19 @@ async def bootstrap_su8(
                     "model": "deepseek-v4-pro",
                     "verbosity": "high",
                     "max_output_tokens": 8000,
-                    "context_window_tokens": 24000,
+                    "context_window_tokens": 48000,
                 },
             )
-        elif getattr(reviewer_model.content, "max_output_tokens", None) == 2000:
-            reviewer_model = await upgrade_initial_reviewer(
+        elif (
+            getattr(reviewer_model.content, "max_output_tokens", None) == 2000
+            or getattr(reviewer_model.content, "context_window_tokens", 0) < 48000
+        ):
+            reviewer_model = await upgrade_seed(
                 reviewer_model,
                 {
                     **reviewer_model.content.model_dump(mode="json"),
                     "max_output_tokens": 8000,
+                    "context_window_tokens": 48000,
                 },
             )
         reviewer_agent = await existing("agent", REVIEWER_AGENT_KEY)
@@ -310,24 +332,27 @@ async def bootstrap_su8(
                         "max_events": 10000,
                         "max_tool_calls": 0,
                         "max_model_calls": 1,
-                        "max_input_tokens": 16000,
+                        "max_input_tokens": 32000,
                         "max_output_tokens": 8000,
                     },
                     "visibility": "admin",
                 },
             )
-        elif isinstance(reviewer_agent.content, AgentConfig) and (
-            reviewer_agent.content.budget.max_output_tokens == 2000
-            or reviewer_agent.content.budget.max_events < 10000
-        ):
+        elif isinstance(reviewer_agent.content, AgentConfig):
             content = reviewer_agent.content.model_dump(mode="json")
-            content["model_profile_id"] = reviewer_model.id
+            content.update(
+                prompt_id=reviewer_prompt.id,
+                skill_ids=[reviewer_skill.id],
+                default_skill_id=reviewer_skill.id,
+                model_profile_id=reviewer_model.id,
+            )
             content["budget"] = {
                 **reviewer_agent.content.budget.model_dump(),
                 "max_output_tokens": 8000,
+                "max_input_tokens": 32000,
                 "max_events": 10000,
             }
-            await upgrade_initial_reviewer(reviewer_agent, content)
+            await upgrade_seed(reviewer_agent, content)
         print(
             "su8 Provider、三个真实模型及 Eval 专用评审 Agent 已准备，保留所有已有配置。",
             flush=True,

@@ -7,6 +7,7 @@ import re
 from collections.abc import AsyncGenerator
 from time import monotonic
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import SecretStr, ValidationError
@@ -19,6 +20,7 @@ from app.models.runtime import HistoryMessage
 logger = logging.getLogger(__name__)
 
 MAX_FRAME_BYTES = 262_144
+MAX_PROVIDER_EVENTS = 100_000
 
 
 async def sse_data(response: httpx.Response) -> AsyncGenerator[tuple[str | None, dict[str, Any]]]:
@@ -96,7 +98,7 @@ class ResponsesClient:
         attempt: ModelAttempt,
         *,
         max_output_chars: int,
-        max_events: int,
+        max_events: int = MAX_PROVIDER_EVENTS,
         history: tuple[HistoryMessage, ...] = (),
         input_items: list[dict[str, Any]] | None = None,
         tools: tuple[dict[str, Any], ...] = (),
@@ -126,6 +128,11 @@ class ResponsesClient:
             body["include"] = ["reasoning.encrypted_content"]
         if input_items is not None:
             body["input"] = input_items
+        # su8 的 Responses 兼容层静默忽略 instructions；显式 system 消息才能传入
+        # Prompt/Skill、安全规则与阶段摘要要求。每轮重建列表，不能污染续接上下文。
+        if urlsplit(provider.base_url).hostname == "www.su8.codes":
+            body.pop("instructions")
+            body["input"] = [{"role": "system", "content": instructions}, *body["input"]]
         if tools:
             body.update(tools=tools, parallel_tool_calls=False)
         started = monotonic()
@@ -133,6 +140,8 @@ class ResponsesClient:
         completed = False
         headers_received = False
         event_count = 0
+        pending_text = ""
+        last_emitted_at = monotonic()
         current_event: str | None = None
         output_index: int | None = None
         argument_bytes = 0
@@ -176,7 +185,7 @@ class ResponsesClient:
                                 break
                             event_count += 1
                             if event_count > max_events:
-                                raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                                raise ModelFailure("AGENT_MODEL_EVENT_LIMIT")
                             kind = event.get("type")
                             current_event = kind if isinstance(kind, str) else None
                             if not isinstance(kind, str) or (name is not None and name != kind):
@@ -193,13 +202,22 @@ class ResponsesClient:
                                 output_index = index
                                 answer += text
                                 if len(answer) > max_output_chars:
-                                    raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                                    raise ModelFailure("AGENT_OUTPUT_LIMIT")
                                 # 明确标记为保守估算，不把字节数作为 Provider usage。
                                 attempt.output_tokens = len(answer.encode())
                                 if text:
                                     if attempt.first_token_ms is None:
                                         attempt.first_token_ms = int((monotonic() - started) * 1000)
-                                    yield text
+                                    # 立即发送首段，合并后续细碎 delta。
+                                    pending_text += text
+                                    if (
+                                        answer == text
+                                        or len(pending_text) >= 64
+                                        or monotonic() - last_emitted_at >= 0.05
+                                    ):
+                                        yield pending_text
+                                        pending_text = ""
+                                        last_emitted_at = monotonic()
                             elif kind == "response.completed":
                                 calls = self._complete(
                                     event,
@@ -212,6 +230,8 @@ class ResponsesClient:
                                 if result is not None:
                                     result.calls = calls
                                 completed = True
+                                if pending_text:
+                                    yield pending_text
                                 return
                             elif kind in {"response.failed", "response.incomplete", "error"}:
                                 code = "AGENT_MODEL_INVALID_RESPONSE"
@@ -258,7 +278,7 @@ class ResponsesClient:
                                     attempt.first_token_ms = int((monotonic() - started) * 1000)
                                 argument_bytes += len(argument.encode())
                                 if argument_bytes > 32 * 8192 * 2:
-                                    raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                                    raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
                             elif "function_call" in kind or "tool" in kind:
                                 logger.warning("Unsupported model tool event (%s)", kind[:96])
                                 raise ModelFailure("AGENT_MODEL_UNSUPPORTED_OUTPUT")
@@ -395,8 +415,10 @@ class ResponsesClient:
                 except ValidationError:
                     logger.warning("Invalid completed-model function-call envelope")
                     raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE") from None
-                if len(call.arguments.encode()) > 8192 or len(calls) >= 32:
-                    raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                if len(call.arguments.encode()) > 8192:
+                    raise ModelFailure("AGENT_MODEL_INVALID_RESPONSE")
+                if len(calls) >= 32:
+                    raise ModelFailure("AGENT_TOOL_CALL_LIMIT")
                 calls.append(call)
                 continuation_items.append(call.input_item())
                 continue

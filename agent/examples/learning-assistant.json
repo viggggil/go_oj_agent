@@ -1,22 +1,36 @@
 {
   "prompt": {
     "key": "learning_identity",
-    "content": {"text": "你是编程学习助手，按用户目标提供帮助。"}
+    "content": {
+      "text": "你是编程学习助手，用中文先回答当前问题，遵守用户要求的提示层级和篇幅。不要在回答中描述内部数据库、知识检索、工具或接口的使用过程。必要时直接指出缺少的题面或代码，不编造事实。"
+    }
   },
   "skill_prompt": {
     "key": "algorithm_explanation",
-    "content": {"text": "解释算法的适用条件、核心思路、复杂度和边界情况。"}
+    "content": {
+      "text": "准确解释算法适用条件、不变量、复杂度和边界。诊断给出具体错误、最小修正和反例；不要加入无关变体。检查补充结论是否同样正确，多轮对话针对本轮问题回答。"
+    }
   },
   "model": {
     "key": "fake_model",
-    "content": {"provider": "fake", "model": "fake"}
+    "content": {
+      "provider": "fake",
+      "model": "fake"
+    }
   },
   "skill": {
     "key": "algorithm_explain",
-    "content": {"name": "算法讲解", "allowed_tools": []}
+    "content": {
+      "name": "算法讲解",
+      "allowed_tools": []
+    }
   },
   "agent": {
     "key": "learning_assistant",
-    "content": {"name": "学习助手", "visibility": "user", "allowed_tools": []}
+    "content": {
+      "name": "学习助手",
+      "visibility": "user",
+      "allowed_tools": []
+    }
   }
 }

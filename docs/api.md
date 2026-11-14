@@ -749,14 +749,14 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 | type | data 字段及限制 |
 | --- | --- |
 | progress | phase 为 preparing/analyzing/executing_tool/answering；message 为 1–256 字符 |
-| reasoning_summary | step 为 1–128 整数；text 为 1–400 字符，仅来自配置启用的 Provider 官方公开摘要 |
+| reasoning_summary | step 为 1–128 整数；text 为 1–400 字符，每个已完成的 reason 节点发送一条公开阶段摘要 |
 | tool_call | step 为 1–128；call_id 为 1–128 字母数字/下划线/横线；tool 为合法工具名；status=started；label 为 1–128 字符 |
 | tool_result | 同一 step/call_id/tool；status=succeeded/failed/rejected；duration_ms 为 0–300000 整数；summary 为 1–256 字符 |
 | token | text 最多 32,000 字符；只有该事件参与答案正文拼接 |
 | done | 空 data；表示答案及 COMPLETED 已成功持久化 |
 | error | 仅包含公开稳定 code |
 
-保留历史 `thinking`（text 最多 256 字符）读取兼容；它不代表内部推理。Provider 不支持公开摘要时省略 reasoning_summary。进度不提供虚构百分比；工具事件不返回参数、原始结果、源码、私有片段或证据内部标识。
+保留历史 `thinking`（text 最多 256 字符）读取兼容；它不代表内部推理。公开阶段摘要优先采用模型明确生成的 `<progress>...</progress>` 前缀，其次采用配置启用的 Provider 官方公开摘要；均不读取原始 reasoning。摘要缺失或包含内部工具、数据库、检索、凭据等信息时使用简短的阶段状态兜底。前缀会从正式回答及持久化答案中分离。评审 Agent 保持严格 JSON 输出，不生成阶段摘要。进度不提供虚构百分比；工具事件不返回参数、原始结果、源码、私有片段或证据内部标识。
 
 同一 Run 的 sequence 严格递增，Gateway 和 Web 严格拒绝额外 payload 字段、错身份、重复调用开始、未关联/重复的结果以及含未完成工具的 done。错误终态允许中断尚未完成的工具。保持 UTF-8、UUID、公开错误码、帧大小、事件预算、背压和超时约束。心跳仍使用 SSE 注释，不提供 Last-Event-ID 续传。
 
@@ -773,6 +773,8 @@ data: {"type":"done","run_id":"...","conversation_id":"...","sequence":3,"data":
 
 内部 Provider 接口使用 Responses：POST `<base_url>/responses`，Bearer 凭据，`stream=true`、`store=false`。请求在 input 中按 user/assistant 角色加入预算内已完成的会话问答，最后追加本轮 user 消息；instructions 仅保留安全前缀和解析后的配置提示，不混入历史，不使用 previous_response_id；没有授权工具时不传 tools，仍使用同一 ReAct Graph。只消费 output_text.delta 和经校验的 completed 终态，推理/工具/拒绝不作为回答转发。每个 Run 固定一个 Provider/Model；配置需要管理员手动替换，没有自动切换 API。
 
+su8（`www.su8.codes`）兼容接口不应用 `instructions`：该 Provider 将相同指令作为 `input` 的第一条 `system` 消息发送，并省略 `instructions`，每次工具续接重新添加一次且不修改原始续接列表。其他 Provider 保持标准字段。该适配不改变公开 REST/SSE 契约或配置格式。
+
 同会话续聊自动取本人最近最多 20 个成功完整轮次（候选最多 64,000 字符），再为本轮必需输入和输出预留预算，按 UTF-8 字节上界与逐消息开销裁剪最旧整轮。失败、取消、中断、RUNNING 和残缺消息不进入模型输入。历史被裁剪不会新增 SSE 事件；必需输入本身超限仍返回已有 AGENT_MODEL_INPUT_LIMIT。新对话没有历史。外部 Chat 请求、响应、错误码、Gateway 委托和 SSE envelope 不变，无需前端传递历史正文或供应商会话 ID。
 
 没有公开凭据读写 API。`app.credential_cli` 仅提供本机 create/get/list/revoke 和 init-keyring，读取 Key 使用 600 文件或 stdin；查询不会返回原始 Key。`app.config_cli` 扩展 provider kind 和可选的 bootstrap credential-id；仍不能把 actor-id 当作可信管理员角色。
@@ -787,7 +789,7 @@ Responses 请求携带 function schema、parallel_tool_calls=false；校验 comp
 工具结果仅进入本次模型输入；SSE 工具事件仅返回安全执行元数据，模型最终答案可以引用已授权证据。
 工具失败回传稳定 Tool 错误，拥有数据的 Go 服务仍校验授权；未读取成功不得声称已获取证据。
 
-每次模型尝试（含重试）累计消耗模型次数、输入和输出预算；工具批次累计限制 max_tool_calls。
+每次模型尝试（含重试）累计消耗模型次数、输入和输出预算；工具批次累计限制 max_tool_calls。 Provider 原始 SSE 帧数单独使用固定硬上限，不复用 Agent 公开运行事件预算；超过帧数返回 `AGENT_MODEL_EVENT_LIMIT`，输出字符、输出 Token、工具结果字节数和 Agent 公开事件数分别返回对应的 `AGENT_OUTPUT_LIMIT`、`AGENT_MODEL_OUTPUT_LIMIT`、`AGENT_TOOL_RESULT_LIMIT` 和 `AGENT_EVENT_LIMIT`。
 参数为最多 8 KiB 的 JSON 对象，拒绝重复键、非有限数字及重复 call_id；批次先校验再执行，
 越权/未知工具不执行。工具结果受字节、模型窗口与累计输入上限限制，循环没有自动恢复。
 新增稳定 SSE 错误 AGENT_TOOL_CALL_LIMIT；Gateway 明确允许既有模型错误码，仍拒绝任意上游错误。
@@ -1034,14 +1036,15 @@ Run 列表使用 page/page_size（最多 100），可选 status，按 created_at
 结果列表同样分页，可选 status=COMPLETED/FAILED/CANCELLED，按 case_id/attempt 稳定排序。
 支持 `verdict=pass|fail|hard_fail|unreviewed`、精确 `category`、精确 `error_code` 及字面包含 `search`（Case ID），筛选发生在分页前。
 pass/fail 按有效结论，unreviewed 按 review_version=0。
-未知 Run 返回 404。列表只返回基础元数据、类别/标题、512 字符 `answer_preview`、checks 的 pass/hard_fail、
+未知 Run 返回 404。列表只返回基础元数据、类别/标题、512 字符 `answer_preview`、checks 的 pass/hard_fail/grading_mode（历史结果可能没有 grading_mode）、
 `review_version`、`manual_review: null | {pass}` 和 `effective_pass`，
 避免完整回答与检查在一页聚合后超出 Gateway 的 1 MiB 响应上限。
 `GET /runs/{run_id}/results/{result_id}` 返回 `{result}`，包含各轮回答（至多 32000 字符）、
 完整程序化检查、有界模型/工具/知识摘要及不可变数据集 `case`、完整 `manual_review`；未知结果或 run/result 不属于同一批次返回 404。
 不保存 Provider 原始响应、内部推理、工具原文和凭据。
-required_facts/forbidden_claims/must_not_leak 是对实际回答的大小写不敏感字面检查，
-required_tools/forbidden_tools 使用实际调用名称，required_evidence 使用实际来源题号/标题/章节。
+新结果的 `checks.grading_mode=semantic_v2`：程序只检查执行终态与实际禁止动作，
+不再对回答做关键词或字面匹配。required_facts/forbidden_claims/must_not_leak 由模型和人工按语义判断；
+required_tools/required_evidence 是评审参考，不能单独决定质量通过；forbidden_tools 按实际调用名称检查。
 
 同一管理员和同一正文使用相同 `X-Request-ID` 创建只返回已有运行，正文或创建者不同返回
 409 AGENT_EVAL_REQUEST_CONFLICT；重试不重新解析活动配置。达到部署准入上限返回
@@ -1816,7 +1819,8 @@ attempts 最多 32，每项来源最多 5，仅记录实际送回模型的来源
 `model_reviewed_cases`、`model_review_unavailable`、`model_passes`、`average_latency_ms`（无结果时为 null）。
 统计按已落库结果计算，不因结果分页或当前筛选变化。
 `effective_pass` 只在执行 COMPLETED 且无 hard_fail 时可能为 true：有人工评审则取最新人工 pass，
-否则启用模型评审时取可用模型 pass，否则取程序 checks.pass；启用模型评审但不可用时不通过。
+否则取可用模型 pass；新语义结果未完成模型或人工评审时显示“待评审”且不计为通过。
+仅历史结果在未启用模型评审时兼容程序 checks.pass；模型评审不可用时不计为通过。
 硬失败和非 COMPLETED 结果始终不通过。COMPLETED 状态只表示执行结束。
 
 `POST /evals/results/{result_id}/review` 正文：

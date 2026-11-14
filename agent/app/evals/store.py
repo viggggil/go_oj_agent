@@ -515,7 +515,11 @@ class EvalStore:
                         results.c.model_review["hard_fail"].as_boolean().is_(False),
                     ),
                 ),
-                else_=results.c.checks["pass"].as_boolean(),
+                else_=and_(
+                    func.coalesce(results.c.checks["grading_mode"].as_string(), "legacy")
+                    != "semantic_v2",
+                    results.c.checks["pass"].as_boolean().is_(True),
+                ),
             ).is_(True),
         )
 
@@ -575,7 +579,10 @@ class EvalStore:
                 and value["model_review"].get("hard_fail") is False
             )
         else:
-            semantic_pass = bool(value["checks"].get("pass", False))
+            semantic_pass = bool(
+                value["checks"].get("grading_mode") != "semantic_v2"
+                and value["checks"].get("pass", False)
+            )
         value["effective_pass"] = bool(
             value["status"] == "COMPLETED"
             and not value["checks"].get("hard_fail", True)
@@ -584,7 +591,11 @@ class EvalStore:
         if not detail:
             value["answer_preview"] = (value.pop("answer", None) or "")[:512]
             value.pop("model_summary", None)
-            value["checks"] = {key: value["checks"][key] for key in ("pass", "hard_fail")}
+            value["checks"] = {
+                key: value["checks"][key]
+                for key in ("pass", "hard_fail", "grading_mode")
+                if key in value["checks"]
+            }
             value["manual_review"] = {"pass": manual["pass"]} if isinstance(manual, dict) else None
             value["model_review"] = (
                 {

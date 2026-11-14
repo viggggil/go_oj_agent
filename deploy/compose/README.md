@@ -92,7 +92,10 @@ make infra-up
 开发环境自动准备 su8 Provider（`https://www.su8.codes/v1`，Responses/Bearer，`store=false`）
 及三个模型：`deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4.1-flash`。模型 verbosity 配置为
 high；su8 当前不支持 `text.verbosity`，请求省略该字段，通过回答风格指令表达详尽程度。
-模型参数采用本项目保守限制：32,000 上下文、8,000 输出 Token，不代表供应商公布的容量。
+su8 的 Responses 兼容接口还会静默忽略 `instructions`；Agent 将安全规则、Prompt、Skill 和公开阶段摘要要求作为 `input` 首条 `system` 消息发送，每次工具续接同样携带，其他 Provider 继续使用标准 `instructions`。
+
+启动准备仅自动升级有审计记录的受管配置，管理员修改过的助手保留原绑定。运行时会附加公开回答规范，但前端管理页面展示的是数据库中绑定的不可变 Prompt/Skill 版本；要让页面内容与新策略一致，需要显式保存新版配置并重新绑定助手。已有会话历史不会补生成阶段摘要；新对话中的阶段进度以实时 SSE 事件展示。
+默认编程助手的模型上下文窗口和累计输入预算为 64,000，单次运行最多调用工具 16 次、模型 16 次，输出预算保持 8,000 Token；这些是项目限制，不代表供应商公布的容量。Compose 的系统输入预算、模型调用上限、工具调用上限分别由 `AGENT_MAX_INPUT_TOKENS`、`AGENT_MAX_MODEL_CALLS` 和 `AGENT_MAX_TOOL_CALLS` 控制，运行时仍取系统、Agent、Skill 和模型上下文窗口的共同限制。
 
 默认真实助手 key 为 `su8_learning_assistant`，演示助手仍为 `learning_assistant`，
 可通过 `AGENT_DEFAULT_AGENT_KEY` 指定。旧 Fake 助手、已有资源版本和停用/归档状态完整保留；
