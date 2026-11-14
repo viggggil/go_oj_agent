@@ -53,7 +53,8 @@
         <p v-if="reviewerLoading" class="muted">正在检查评审 Agent 配置…</p>
         <p v-if="reviewerError" class="error" role="alert">{{ reviewerError }}</p>
         <p class="muted">
-          每条通过程序检查的回答都会由专用评审 Agent 评分；评审配置在本批次启动时固定。
+          每条执行完成且无禁止动作的回答都会由专用评审 Agent
+          按语义评分；评审配置在本批次启动时固定。
         </p>
         <div class="eval-score-grid">
           <label

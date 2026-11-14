@@ -128,7 +128,7 @@ export const resourceNames: Record<Resource, string> = {
 export const budgetFields = [
   ['max_run_seconds', '运行时长（秒）', 0.1, 300, 0.1],
   ['max_output_chars', '输出字符数', 1, 32000, 1],
-  ['max_events', '事件数', 3, 10000, 1],
+  ['max_events', '运行事件数', 3, 10000, 1],
   ['max_tool_calls', '工具调用次数', 0, 32, 1],
   ['max_model_calls', '模型调用次数', 1, 16, 1],
   ['max_input_tokens', '输入 Token', 1, 128000, 1],

@@ -10,10 +10,8 @@
     <template v-if="result">
       <h3>{{ result.case_id }} · {{ result.title }} · 第 {{ result.attempt }} 次</h3>
       <p>
-        执行：{{ result.status }} · 程序检查：{{ result.checks.pass ? '通过' : '未通过' }} ·
-        最终结论：{{ result.effective_pass ? '通过' : '未通过' }} · 耗时：{{
-          result.latency_ms ?? '—'
-        }}
+        执行：{{ result.status }} · 执行检查：{{ result.checks.pass ? '通过' : '未通过' }} ·
+        最终结论：{{ evalVerdict(result) }} · 耗时：{{ result.latency_ms ?? '—' }}
         ms
       </p>
       <p v-if="result.checks.hard_fail" class="error">
@@ -35,7 +33,7 @@
       <h3>实际回答</h3>
       <pre class="eval-answer">{{ result.answer || '没有生成回答' }}</pre>
       <details open>
-        <summary>程序检查</summary>
+        <summary>执行检查</summary>
         <pre>{{ pretty(result.checks) }}</pre>
       </details>
       <details>
@@ -45,7 +43,7 @@
       <section class="eval-review">
         <h3>评审 Agent 评分</h3>
         <p v-if="result.model_review_status === 'SKIPPED'" class="muted">
-          此结果为执行失败或程序化硬失败，已跳过模型评审。
+          此结果为执行失败或执行硬失败，已跳过模型评审。
         </p>
         <p
           v-else-if="
@@ -102,7 +100,9 @@
       </section>
       <section class="eval-review">
         <h3>人工评审</h3>
-        <p class="muted">五个维度各 0–4 分。人工结论可调整语义判断；程序检查与硬失败始终保留。</p>
+        <p class="muted">
+          五个维度各 0–4 分。人工结论可调整模型语义判断；执行失败与禁止动作的记录始终保留。
+        </p>
         <p v-if="result.manual_review">
           当前评分版本 {{ result.review_version }} · 评审人 #{{
             result.manual_review.reviewed_by
@@ -200,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+  import { evalVerdict } from '../../agent/evals'
   import { onMounted, onBeforeUnmount, reactive, ref } from 'vue'
   import { agentError, agentStatus } from '../../agent/api'
   import {

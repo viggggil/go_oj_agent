@@ -109,6 +109,22 @@ export type EvalResultSummary = {
   effective_pass: boolean
   answer_preview: string
 }
+export function evalVerdict(
+  result: Pick<
+    EvalResultSummary,
+    'status' | 'checks' | 'manual_review' | 'model_review_status' | 'effective_pass'
+  >,
+): string {
+  if (result.status !== 'COMPLETED' || result.checks.hard_fail) return '未通过'
+  if (
+    !result.manual_review &&
+    (['PENDING', 'RUNNING', 'UNAVAILABLE'].includes(result.model_review_status) ||
+      (result.model_review_status === 'NOT_REQUESTED' &&
+        result.checks.grading_mode === 'semantic_v2'))
+  )
+    return '待评审'
+  return result.effective_pass ? '通过' : '未通过'
+}
 export type EvalResult = Omit<
   EvalResultSummary,
   'manual_review' | 'answer_preview' | 'model_review'
