@@ -28,7 +28,7 @@ async def next_type(iterator: Any, kind: str) -> StreamEvent:
         event = await anext(iterator)
         if event.type == kind:
             return cast(StreamEvent, event)
-        assert event.type == "progress"
+        assert event.type in {"progress", "reasoning_summary"}
 
 
 def frame(event: dict[str, Any]) -> bytes:
@@ -93,18 +93,71 @@ class Credentials:
         return SecretStr("private-api-key")
 
 
-async def test_provider_event_budget_reports_output_limit_not_malformed_response() -> None:
+async def test_model_progress_is_separated_from_streamed_and_persisted_answer() -> None:
+    wire = "<progress>已明确需要解释状态转移和边界。</progress>最终回答。"
+    client = client_for(
+        lambda _request: httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([b"".join(frame(delta(char)) for char in wire) + frame(complete(wire))]),
+        )
+    )
+    try:
+        events = [event async for event in ModelRuntime(client, Credentials()).run(configured())]
+        answer = "".join(e.data["text"] for e in events if e.type == "token")
+        assert answer == "最终回答。"
+        summaries = [e for e in events if e.type == "reasoning_summary"]
+        assert len(summaries) == 1
+        assert summaries[0].data == {"step": 1, "text": "已明确需要解释状态转移和边界。"}
+        assert events[-1].type == "done"
+    finally:
+        await client.close()
+
+
+async def test_provider_events_are_independent_of_public_event_budget() -> None:
     value = configured()
-    value.config_snapshot["budget"]["max_events"] = 3
-    payload = frame({"type": "response.created"}) * 4
+    value.config_snapshot["budget"]["max_events"] = 1000
+    # 以前 1001 个细碎摘要/正文事件会误报输出 Token 超限。
+    payload = (
+        frame({"type": "response.reasoning_summary_text.delta", "delta": "摘要"}) * 1500
+        + frame(delta("字")) * 1500
+        + frame(complete("字" * 1500))
+    )
     client = client_for(
         lambda _request: httpx.Response(
             200, headers={"content-type": "text/event-stream"}, stream=Stream([payload])
         )
     )
     try:
-        with pytest.raises(ModelFailure, match="AGENT_MODEL_OUTPUT_LIMIT"):
-            async for _ in ModelRuntime(client, Credentials()).run(value):
+        events = [event async for event in ModelRuntime(client, Credentials()).run(value)]
+        assert events[-1].type == "done"
+        assert "".join(e.data["text"] for e in events if e.type == "token") == "字" * 1500
+        assert len(events) < 1000
+    finally:
+        await client.close()
+
+
+async def test_provider_hard_event_limit_has_its_own_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.clients.model import ResponsesClient
+
+    original = ResponsesClient.stream
+
+    async def limited(self: Any, *args: Any, **kwargs: Any) -> Any:
+        kwargs["max_events"] = 3
+        async for part in original(self, *args, **kwargs):
+            yield part
+
+    monkeypatch.setattr(ResponsesClient, "stream", limited)
+    client = client_for(
+        lambda _request: httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame({"type": "response.created"}) * 4]),
+        )
+    )
+    try:
+        with pytest.raises(ModelFailure, match="AGENT_MODEL_EVENT_LIMIT"):
+            async for _ in ModelRuntime(client, Credentials()).run(configured()):
                 pass
     finally:
         await client.close()
@@ -133,6 +186,65 @@ def client_for(handler: Any) -> ResponsesClient:
     )
 
 
+@pytest.mark.parametrize("continuation", [False, True])
+async def test_su8_receives_policy_as_system_message_on_every_round(continuation: bool) -> None:
+    value = configured()
+    provider = ProviderConfig.model_validate(
+        {**value.config_snapshot["provider_config"], "base_url": "https://www.su8.codes/v1"}
+    )
+    items = [
+        {"role": "user", "content": "解释二分查找"},
+        *(
+            [{"type": "function_call_output", "call_id": "call_1", "output": "结果"}]
+            if continuation
+            else []
+        ),
+    ]
+    original = json.loads(json.dumps(items))
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=Stream([frame(delta()), frame(complete())]),
+        )
+
+    client = ResponsesClient(
+        ProviderPolicy(Settings(provider_allowed_origins=("https://www.su8.codes",))),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        for _ in range(2):
+            attempt = ModelAttempt(
+                provider_id=value.config_snapshot["provider_id"],
+                model_profile_id=value.config_snapshot["model_profile_id"],
+                model="deepseek-v4-flash",
+            )
+            _ = [
+                text
+                async for text in client.stream(
+                    provider,
+                    ModelProfileConfig.model_validate(value.config_snapshot["model_profile"]),
+                    SecretStr("test-key"),
+                    "系统规则与阶段摘要",
+                    "问题",
+                    1000,
+                    attempt,
+                    max_output_chars=8000,
+                    input_items=items,
+                )
+            ]
+        assert items == original
+        for body in requests:
+            assert "instructions" not in body
+            assert body["input"] == [{"role": "system", "content": "系统规则与阶段摘要"}, *original]
+            assert sum(item.get("role") == "system" for item in body["input"]) == 1
+    finally:
+        await client.close()
+
+
 @pytest.mark.parametrize("native_verbosity", [True, False])
 async def test_first_token_precedes_completion_and_incomplete_history_is_excluded(
     native_verbosity: bool,
@@ -159,13 +271,13 @@ async def test_first_token_precedes_completion_and_incomplete_history_is_exclude
         if native_verbosity:
             assert calls[0]["text"] == {"verbosity": "high"}
         else:
-            assert "text" not in calls[0] and "回答详尽" in calls[0]["instructions"]
+            assert "text" not in calls[0] and "说明关键依据" in calls[0]["instructions"]
         assert calls[0]["store"] is False and calls[0]["stream"] is True
         assert calls[0]["input"] == [{"role": "user", "content": value.user_message}]
         assert "history-must-not-be-sent" not in json.dumps(calls)
         assert "解释算法" in calls[0]["instructions"] and "用中文" in calls[0]["instructions"]
         gate.set()
-        assert (await anext(iterator)).type == "done"
+        assert (await next_type(iterator, "done")).type == "done"
         assert value.model_summary is not None
         assert value.model_summary.attempts[0].usage_source == "provider"
         assert value.model_summary.attempts[0].output_tokens == 8
@@ -612,7 +724,7 @@ async def test_budget_and_revocation_fail_without_completed_answer(kind: str) ->
             Exception,
             match={
                 "input": "AGENT_MODEL_INPUT_LIMIT",
-                "output": "AGENT_MODEL_OUTPUT_LIMIT",
+                "output": "AGENT_OUTPUT_LIMIT",
                 "credential": "AGENT_CREDENTIAL_UNAVAILABLE",
             }[kind],
         ):
@@ -697,7 +809,7 @@ async def test_graph_backpressure_and_tracing_stay_local(monkeypatch: pytest.Mon
             await asyncio.sleep(0)
             assert stages == ["prepare", "read"]
             assert (await next_type(iterator, "token")).data["text"] == "后"
-            assert (await anext(iterator)).type == "done"
+            assert (await next_type(iterator, "done")).type == "done"
             assert stages == ["prepare", "read", "read", "read", "validate"]
             assert get_tracing_context()["enabled"] is True
     finally:

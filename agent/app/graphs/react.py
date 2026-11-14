@@ -14,6 +14,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 from pydantic import ValidationError
 
+from app.answer_policy import PublicAnswerStream, public_progress
 from app.graphs.direct_answer import DirectAnswer
 from app.graphs.react_state import (
     ReActContext,
@@ -116,6 +117,7 @@ def build_react_graph(
         await emit(StreamEvent.progress(value, "analyzing", "正在分析任务并选择下一步", 1))
         response = ModelResponse()
         parts: list[str] = []
+        public_stream = PublicAnswerStream() if value.agent_key != "eval_reviewer" else None
         stream = answerer.stream(
             value,
             state["current"],
@@ -128,6 +130,10 @@ def build_react_graph(
         async with business_step(step, "reason"):
             try:
                 async for text in stream:
+                    if public_stream is not None:
+                        text = public_stream.feed(text)
+                    if not text:
+                        continue
                     # 工具轮次可能在正式调用前产生不可信正文；确认 Finish 后才能发送。
                     parts.append(text)
                     # 无工具时唯一合法决策为 Finish，保留即时 token 流和背压。
@@ -142,11 +148,18 @@ def build_react_graph(
                 raise
             finally:
                 await stream.aclose()
+        if public_stream is not None:
+            public_stream.finish()
         runtime.context.continuation_items = response.continuation_items
         response.continuation_items = ()
-        if response.reasoning_summary:
+        if value.agent_key != "eval_reviewer":
             await emit(
-                StreamEvent.reasoning_summary(value, response.reasoning_summary, 1, step=step)
+                StreamEvent.reasoning_summary(
+                    value,
+                    public_progress(response, public_stream.progress if public_stream else ""),
+                    1,
+                    step=step,
+                )
             )
         return {
             "model_response": response,
@@ -305,7 +318,7 @@ def build_react_graph(
                 )
                 continue
             step = state["tool_call_count"] + len(observations) + 1
-            await emit(StreamEvent.progress(value, "executing_tool", "正在读取授权信息", 1))
+            await emit(StreamEvent.progress(value, "executing_tool", "正在核对相关信息", 1))
             await emit(
                 StreamEvent.tool_call(
                     value,
@@ -333,7 +346,7 @@ def build_react_graph(
             summary = "已获取授权信息" if result.ok else "读取失败：" + str(result.error_code)
             output = result.model_dump_json()
             if len(output.encode()) > tool_max_result_bytes:
-                raise ModelFailure("AGENT_MODEL_OUTPUT_LIMIT")
+                raise ModelFailure("AGENT_TOOL_RESULT_LIMIT")
             # 原始业务结果仅供下一轮 Provider 请求使用。
             observations.append(
                 ToolObservation(call.call_id, call.name, result.ok, result.error_code, output)

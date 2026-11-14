@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     provider_allowed_origins: tuple[str, ...] = ()
     provider_allow_private_network: bool = False
     max_model_calls: int = Field(default=8, ge=1, le=16)
+    max_tool_calls: int = Field(default=8, ge=0, le=32)
     max_input_tokens: int = Field(default=32_000, ge=1, le=128_000)
     max_output_tokens: int = Field(default=8_000, ge=1, le=32_000)
 

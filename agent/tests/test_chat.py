@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,8 @@ from app.models.runtime import AgentState, ChatRequest, Principal, StreamEvent
 from app.storage.repository import ActiveRunConflict, ConversationNotFound
 from tests.test_health import FakeProbe
 from tests.test_runtime import MemoryStore, Reader
+
+AUTH_TEST_NOW = 1_800_000_000
 
 
 @pytest.fixture(scope="session")
@@ -95,17 +98,29 @@ def test_trusted_delegation(settings: Settings, key: rsa.RSAPrivateKey) -> None:
         {"request_id": 7},
         {"request_id": "x" * 129},
         {"request_id": "\ud800"},
-        {"iat": int(time.time()) + 30},
-        {"exp": int(time.time()) - 1},
-        {"exp": int(time.time()) + 120},
-        {"iat": str(int(time.time()))},
+        {"iat": AUTH_TEST_NOW + 30},
+        {"exp": AUTH_TEST_NOW - 1},
+        {"exp": AUTH_TEST_NOW + 120},
+        {"iat": str(AUTH_TEST_NOW)},
     ],
 )
 def test_invalid_claims_are_rejected(
-    settings: Settings, key: rsa.RSAPrivateKey, updates: dict[str, Any]
+    settings: Settings,
+    key: rsa.RSAPrivateKey,
+    updates: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # 签发、过期与验签使用同一时钟，避免收集用例到执行期间的墙钟变化影响边界。
+    monkeypatch.setattr(jwt.api_jwt, "datetime", FrozenJWTDateTime)
+    claims = {"iat": AUTH_TEST_NOW, "exp": AUTH_TEST_NOW + 30, **updates}
     with pytest.raises(InvalidDelegation, match="Invalid Gateway delegation"):
-        DelegationVerifier(settings).verify("Bearer " + token(key, **updates))
+        DelegationVerifier(settings).verify("Bearer " + token(key, **claims))
+
+
+class FrozenJWTDateTime(datetime):
+    @classmethod
+    def now(cls, tz: Any = None) -> "FrozenJWTDateTime":
+        return cls.fromtimestamp(AUTH_TEST_NOW, tz=tz or UTC)
 
 
 def test_signature_algorithm_kid_and_required_claims(

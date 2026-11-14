@@ -60,6 +60,29 @@ def call_output(name: str = "read_number", arguments: str = "{}", call_id: str =
     )
 
 
+async def test_tool_result_bytes_have_a_distinct_limit_error() -> None:
+    async def read(_: BaseModel, principal: Principal) -> BaseModel:
+        return Evidence(number=739216)
+
+    client = client_for(
+        lambda _request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=Stream([call_output()])
+        )
+    )
+    value = configured()
+    value.allowed_tools = ("read_number",)
+    events = []
+    try:
+        with pytest.raises(ModelFailure, match="AGENT_TOOL_RESULT_LIMIT"):
+            async for event in ModelRuntime(
+                client, Credentials(), registry(read), tool_max_result_bytes=1
+            ).run(value):
+                events.append(event)
+        assert not any(event.type in {"token", "done"} for event in events)
+    finally:
+        await client.close()
+
+
 @pytest.mark.parametrize(
     "failure",
     [None, "unknown", "arguments", "tool_budget", "model_budget", "input_budget", "output_budget"],
@@ -110,7 +133,20 @@ async def test_tool_loop_keeps_trusted_identity_and_bounded_protocol(failure: st
     if failure == "model_budget":
         budget["max_model_calls"] = 1
     if failure == "input_budget":
-        budget["max_input_tokens"] = 1400
+        from app.graphs.direct_answer import DirectAnswer
+        from app.graphs.tool_loop import tool_catalog
+
+        tools = tool_catalog(value, registry(read))
+        estimate = (
+            DirectAnswer(client, Credentials())
+            .prepare(
+                value,
+                tool_bytes=len(json.dumps(tools, ensure_ascii=False).encode()),
+                has_tools=True,
+            )
+            .input_estimate
+        )
+        budget["max_input_tokens"] = estimate + 10
     if failure == "output_budget":
         budget["max_output_tokens"] = 1
     try:
@@ -174,6 +210,7 @@ async def test_cancellation_closes_pending_tool_and_never_starts_next_model_roun
     try:
         assert (await anext(iterator)).data["phase"] == "preparing"
         assert (await anext(iterator)).data["phase"] == "analyzing"
+        assert (await anext(iterator)).type == "reasoning_summary"
         assert (await anext(iterator)).data["phase"] == "executing_tool"
         assert (await anext(iterator)).type == "tool_call"
         task = asyncio.create_task(anext(iterator))
@@ -384,6 +421,11 @@ async def test_public_summary_and_opaque_continuation_are_separate(supported: bo
             "opaque-secret" not in repr(events)
             and "opaque-secret" not in value.model_summary.model_dump_json()
         )
-        assert any(event.type == "reasoning_summary" for event in events) is supported
+        summaries = [event for event in events if event.type == "reasoning_summary"]
+        assert [event.data["step"] for event in summaries] == [1, 2]
+        assert all("授权" not in event.data["text"] for event in summaries)
+        assert events.index(summaries[0]) < next(
+            i for i, event in enumerate(events) if event.type == "tool_call"
+        )
     finally:
         await client.close()

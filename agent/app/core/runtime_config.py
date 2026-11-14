@@ -223,6 +223,7 @@ class DatabaseConfigReader:
             max_output_chars=self._settings.max_output_chars,
             max_events=self._settings.max_run_events,
             max_model_calls=self._settings.max_model_calls,
+            max_tool_calls=self._settings.max_tool_calls,
             max_input_tokens=self._settings.max_input_tokens,
             max_output_tokens=self._settings.max_output_tokens,
         )

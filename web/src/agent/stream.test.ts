@@ -59,6 +59,11 @@ it('error 是失败终态；EOF、非法 UTF-8、帧和总量超限不能伪装 
     'AGENT_UPSTREAM_TIMEOUT',
     'AGENT_UPSTREAM_INTERRUPTED',
     'AGENT_UPSTREAM_INVALID_EVENT',
+    'AGENT_MODEL_EVENT_LIMIT',
+    'AGENT_TOOL_RESULT_LIMIT',
+    'AGENT_OUTPUT_LIMIT',
+    'AGENT_MODEL_OUTPUT_LIMIT',
+    'AGENT_EVENT_LIMIT',
   ]) {
     const gateway = new AgentStreamParser(identity, (value) => expect(value.data.code).toBe(code))
     gateway.push(encode.encode(frame(event('error', 1, { code }))))

@@ -537,7 +537,8 @@ async def test_manual_reviews_are_atomic_audited_idempotent_and_cannot_override_
     value = detail.json()["result"]
     assert value["review_version"] == 2 and value["effective_pass"]
     assert value["manual_review"]["note"].startswith("并发管理员")
-    assert not value["checks"]["pass"] and not value["checks"]["hard_fail"]
+    assert value["checks"]["pass"] and not value["checks"]["hard_fail"]
+    assert value["checks"]["grading_mode"] == "semantic_v2"
     assert value["case"]["id"] == "soft" and value["case"]["expectations"]["required_facts"]
     conflict = await http.post(
         path, json={**body, "note": "不同内容"}, headers={"X-Request-ID": request_id}
@@ -590,7 +591,8 @@ async def test_manual_reviews_are_atomic_audited_idempotent_and_cannot_override_
         older.json()["items"][0]["version"] == 1 and older.json()["items"][0]["old_value"] is None
     )
     metrics = (await http.get(BASE + f"/runs/{run_id}")).json()["metrics"]
-    assert metrics["recorded_cases"] == 3 and metrics["check_passes"] == 1
+    # good 和 soft 均执行完成；内容事实由模型/人工评审，不再按关键词扣执行检查。
+    assert metrics["recorded_cases"] == 3 and metrics["check_passes"] == 2
     assert metrics["effective_passes"] == 2 and metrics["reviewed_cases"] == 2
     assert metrics["average_latency_ms"] >= 0
     for query, total in (

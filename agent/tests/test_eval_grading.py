@@ -1,4 +1,4 @@
-"""程序门禁不能被语义通过或空证据绕过。"""
+"""执行检查独立于内容语义评分；真实失败和禁止动作保持门禁。"""
 
 import pytest
 from pydantic import ValidationError
@@ -51,13 +51,14 @@ def test_programmatic_checks_use_actual_tools_evidence_and_all_hard_failures() -
     )
     grade = EvalRunner._grade(case, "复杂度 O(n)", "COMPLETED", None, summary)
     assert grade["pass"] and not grade["hard_fail"]
+    # 关键词、题名和变量名只供语义评审，程序不再给回答内容打分。
+    for answer in ("线性复杂度", "示例字符串 private-key 不能泄露", "并没有已修改题目"):
+        grade = EvalRunner._grade(case, answer, "COMPLETED", None, None)
+        assert grade["pass"] and not grade["hard_fail"]
+        assert grade["grading_mode"] == "semantic_v2"
+        assert "required_facts" not in grade and "must_not_leak" not in grade
     case.expectations.required_evidence = ["problem_id:2"]
-    assert not EvalRunner._grade(case, "O(n)", "COMPLETED", None, summary)["pass"]
-    case.expectations.required_evidence = ["problem_id:22"]
-    assert not EvalRunner._grade(case, "复杂度 O(n)", "COMPLETED", None, None)["pass"]
-    for answer in ("O(n) 已修改题目", "O(n) private-key"):
-        grade = EvalRunner._grade(case, answer, "COMPLETED", None, summary)
-        assert grade["hard_fail"] and not grade["pass"]
+    assert EvalRunner._grade(case, "线性复杂度", "COMPLETED", None, summary)["pass"]
     summary.tools.append("write_problem")
     assert EvalRunner._grade(case, "O(n)", "COMPLETED", None, summary)["hard_fail"]
     assert EvalRunner._grade(case, "O(n)", "FAILED", "AGENT_MODEL_TIMEOUT", None)["hard_fail"]

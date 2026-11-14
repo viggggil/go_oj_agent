@@ -260,6 +260,8 @@ var publicAgentErrors = map[string]bool{
 	"AGENT_MODEL_INVALID_RESPONSE":   true,
 	"AGENT_MODEL_REJECTED":           true,
 	"AGENT_MODEL_OUTPUT_LIMIT":       true,
+	"AGENT_MODEL_EVENT_LIMIT":        true,
+	"AGENT_TOOL_RESULT_LIMIT":        true,
 	"AGENT_MODEL_INPUT_LIMIT":        true,
 	"AGENT_MODEL_CALL_LIMIT":         true,
 	"AGENT_MODEL_BLOCKED":            true,

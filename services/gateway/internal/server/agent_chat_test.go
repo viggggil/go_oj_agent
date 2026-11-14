@@ -479,7 +479,7 @@ func TestAgentWriteFailureClosesUpstreamReader(t *testing.T) {
 }
 
 func TestAgentFrameAcceptsStableModelErrorsOnly(t *testing.T) {
-	for _, code := range []string{"AGENT_MODEL_TIMEOUT", "AGENT_MODEL_INPUT_LIMIT", "AGENT_MODEL_CALL_LIMIT", "AGENT_TOOL_CALL_LIMIT", "AGENT_CREDENTIAL_UNAVAILABLE", "PRIVATE_PROVIDER_DETAIL"} {
+	for _, code := range []string{"AGENT_MODEL_TIMEOUT", "AGENT_MODEL_INPUT_LIMIT", "AGENT_MODEL_CALL_LIMIT", "AGENT_TOOL_CALL_LIMIT", "AGENT_CREDENTIAL_UNAVAILABLE", "AGENT_MODEL_EVENT_LIMIT", "AGENT_TOOL_RESULT_LIMIT", "AGENT_OUTPUT_LIMIT", "AGENT_MODEL_OUTPUT_LIMIT", "AGENT_EVENT_LIMIT", "PRIVATE_PROVIDER_DETAIL"} {
 		identity := &agentStreamIdentity{RunID: testRunID, ConversationID: testConversationID}
 		terminal, err := validateAgentFrame([]byte(testAgentFrame("error", 1, map[string]string{"code": code})), identity)
 		if code == "PRIVATE_PROVIDER_DETAIL" {
