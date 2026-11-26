@@ -98,6 +98,7 @@ class RuntimeStore(Protocol):
         *,
         after_message_id: int | None = None,
         limit: int = 20,
+        oldest_first: bool = False,
     ) -> list[CompletedTurnRecord]: ...
 
     async def get_conversation_summary(
@@ -237,16 +238,11 @@ class RunService:
                 summary = await self._store.get_conversation_summary(
                     principal.user_id, record.conversation_id
                 )
-                turns = await self._store.list_completed_turn_records(
-                    principal.user_id,
-                    record.conversation_id,
-                    after_message_id=summary.covered_until_message_id if summary else None,
-                    limit=24,
-                )
-                assembled = self._context_assembler.assemble(summary, turns)
+                async with asyncio.timeout(snapshot.budget.max_run_seconds):
+                    assembled = await self._context_assembler.load(self._store, state, summary)
                 state.history = assembled.history
                 state.memory_summary = assembled.summary
-                context_span.set_attribute("agent.history_turn_count", len(turns))
+                context_span.set_attribute("agent.history_turn_count", len(assembled.turns))
                 context_span.set_attribute(
                     "agent.history_summary_used", assembled.summary is not None
                 )

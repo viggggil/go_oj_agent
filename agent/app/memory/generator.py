@@ -21,7 +21,28 @@ def _clip(value: str, maximum: int = 1_800) -> str:
     value = " ".join(value.split())
     if len(value) <= maximum:
         return value
-    return value[: maximum - 1].rstrip() + "…"
+    head = (maximum - 1) // 2
+    return value[:head].rstrip() + "…" + value[-(maximum - 1 - head) :].lstrip()
+
+
+def bounded_summary(summary: ConversationSummary) -> ConversationSummary:
+    """整条缩减旧记忆，给前台上下文和后台摘要使用相同的大小边界。"""
+    values = summary.model_dump(mode="python")
+    result = summary
+    while len(result.model_dump_json().encode()) > 12_000:
+        fields = (
+            "context_notes",
+            "attempted_actions",
+            "open_questions",
+            "confirmed_facts",
+            "user_constraints",
+        )
+        shrink_field = next((name for name in fields if values[name]), None)
+        if shrink_field is None:
+            raise ValueError("Summary exceeds storage budget")
+        values[shrink_field] = values[shrink_field][1:]
+        result = ConversationSummary.model_validate(values)
+    return result
 
 
 class IncrementalSummaryGenerator:
@@ -34,7 +55,7 @@ class IncrementalSummaryGenerator:
     """
 
     _RECENT_NOTES = 8
-    _COMPACT_NOTE_CHARS = 2_400
+    _COMPACT_NOTE_CHARS = 1_800
     _TOTAL_NOTE_CHARS = 6_000
 
     async def generate(
@@ -49,7 +70,10 @@ class IncrementalSummaryGenerator:
         base = previous or ConversationSummary()
         notes = list(base.context_notes)
         for turn in turns:
-            notes.append(_clip(f"用户：{turn.user_content}\n助手：{turn.assistant_content}"))
+            notes.append(
+                f"用户原文节选：{_clip(turn.user_content, 850)}\n"
+                f"助手原文节选（未经独立验证）：{_clip(turn.assistant_content, 850)}"
+            )
         notes = list(dict.fromkeys(note for note in notes if note.strip()))
 
         # Keep a compact rolling record of older context and preserve the latest
