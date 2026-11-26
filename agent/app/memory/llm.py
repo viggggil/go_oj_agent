@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from collections import deque
 from collections.abc import Sequence
 from typing import Any, Literal, TypedDict
@@ -26,6 +27,10 @@ SUMMARY_FIELDS: tuple[SummaryField, ...] = (
     "attempted_actions",
     "open_questions",
     "context_notes",
+)
+_SENSITIVE = re.compile(
+    r"(?i)\b(?:bearer\s+\S+|sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|"
+    r"github_pat_[a-z0-9_]{20,}|eyJ[a-z0-9_-]{20,}\.[a-z0-9_-]{10,})"
 )
 
 
@@ -131,7 +136,7 @@ def _validate_evidence(
     by_id = {source["source_message_id"]: source for source in sources}
 
     def check(item: SupportedItem, *, user_only: bool = False) -> None:
-        if not item.content.strip():
+        if not item.content.strip() or _SENSITIVE.search(item.content):
             raise ValueError("Blank summary item")
         for evidence in item.evidence:
             source = by_id.get(evidence.source_message_id)
@@ -232,7 +237,7 @@ class LLMSummaryGenerator:
                     max_output,
                     attempt,
                     max_output_chars=16_000,
-                    max_events=100_000,
+                    max_events=min(budget.max_events, 100_000),
                 )
             ]
         if attempt.finish_reason != "completed":
