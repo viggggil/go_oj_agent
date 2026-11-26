@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -12,6 +13,7 @@ from app.observability import job_span, job_status, record_job_retry, traced_job
 from app.storage.repository import (
     CompletedTurnRecord,
     ConversationSummaryRecord,
+    RunRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,7 @@ class ConversationMemoryWorker:
         store: MemoryStore,
         *,
         generator: SummaryGenerator | None = None,
+        snapshot_loader: Callable[[int, str], Awaitable[RunRecord]] | None = None,
         queue_size: int = 256,
         recent_turns: int = 6,
         batch_size: int = 6,
@@ -74,6 +77,7 @@ class ConversationMemoryWorker:
             raise ValueError("Memory worker delays must be valid")
         self._store = store
         self._generator = generator or IncrementalSummaryGenerator()
+        self._snapshot_loader = snapshot_loader
         self._queue: asyncio.Queue[MemoryJob] = asyncio.Queue(maxsize=queue_size)
         self._pending: set[tuple[int, str]] = set()
         self._rerun: set[tuple[int, str]] = set()
@@ -214,9 +218,14 @@ class ConversationMemoryWorker:
             if not archive:
                 return
             batch = archive[: self._batch_size]
+            snapshot = (
+                (await self._snapshot_loader(job.user_id, batch[-1].run_id)).config_snapshot
+                if self._snapshot_loader is not None
+                else {}
+            )
             async with job_span("agent.memory.generate", "memory"):
                 summary = await self._generator.generate(
-                    record.summary if record else None, batch, {}
+                    record.summary if record else None, batch, snapshot
                 )
             async with job_span("agent.memory.persist", "memory"):
                 await self._store.save_conversation_summary(

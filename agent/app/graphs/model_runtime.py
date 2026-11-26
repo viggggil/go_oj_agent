@@ -8,8 +8,9 @@ from app.clients.model import ResponsesClient
 from app.graphs.direct_answer import CredentialReader, DirectAnswer
 from app.graphs.react import build_react_graph
 from app.graphs.react_state import ReActContext, StreamItem
+from app.graphs.tool_loop import tool_catalog
 from app.models.provider import ModelFailure
-from app.models.runtime import AgentState, StreamEvent
+from app.models.runtime import AgentState, HistoryMessage, StreamEvent
 from app.tools.registry import ToolRegistry
 
 # 兼容历史导入名称，所有调用仍构建同一张 ReAct 图。
@@ -26,12 +27,25 @@ class ModelRuntime:
         tool_max_result_bytes: int = 256_000,
         tool_timeout_seconds: float = 5,
     ) -> None:
+        self._answerer = DirectAnswer(client, credentials)
+        self._registry = registry
         self._graph = build_react_graph(
-            DirectAnswer(client, credentials),
+            self._answerer,
             registry,
             tool_max_result_bytes=tool_max_result_bytes,
             tool_timeout_seconds=tool_timeout_seconds,
         )
+
+    def select_history(self, state: AgentState) -> tuple[HistoryMessage, ...]:
+        """让摘要衔接与实际模型请求使用完全相同的上下文预算。"""
+        import json
+
+        tools = tool_catalog(state, self._registry)
+        return self._answerer.prepare(
+            state,
+            tool_bytes=len(json.dumps(tools, ensure_ascii=False).encode()) if tools else 0,
+            has_tools=bool(tools),
+        ).history
 
     async def run(self, state: AgentState) -> AsyncGenerator[StreamEvent, None]:
         state.model_summary = None

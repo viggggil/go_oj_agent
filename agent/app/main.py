@@ -27,9 +27,11 @@ from app.core.resources import AppResources
 from app.core.runtime_config import ConfigSnapshotReader, DatabaseConfigReader, DemoConfigReader
 from app.core.settings import ConfigurationError, Settings, load_settings
 from app.evals.api import router as eval_router
+from app.graphs.context import ContextAssembler
 from app.graphs.runtime import AgentRuntime, FakeModelClient, FakeRuntime
 from app.graphs.service import RunService
 from app.langsmith_exporter import new_exporter
+from app.memory.llm import LLMSummaryGenerator
 from app.memory.worker import ConversationMemoryWorker
 from app.observability import configure as configure_observability
 from app.storage.configuration import ConfigurationStore
@@ -141,6 +143,8 @@ def create_app(
                     if not isinstance(database, DatabaseProbe) or database.engine is None:
                         raise ConfigurationError("Chat requires an Agent database")
                     runtime: AgentRuntime
+                    context_assembler = ContextAssembler()
+                    summary_generator = None
                     policy = ProviderPolicy(config)
                     if config.runtime_mode == "model":
                         from app.graphs.model_runtime import ModelRuntime
@@ -150,12 +154,17 @@ def create_app(
                             allow_insecure_test_file=config.environment == "test",
                         )
                         model_client = ResponsesClient(policy)
+                        credentials = CredentialStore(database.engine, cipher)
                         runtime = ModelRuntime(
                             model_client,
-                            CredentialStore(database.engine, cipher),
+                            credentials,
                             business_tools,
                             tool_max_result_bytes=config.tool_max_result_bytes,
                             tool_timeout_seconds=config.tool_timeout_seconds,
+                        )
+                        summary_generator = LLMSummaryGenerator(model_client, credentials)
+                        context_assembler = ContextAssembler(
+                            history_selector=runtime.select_history
                         )
                     elif config.runtime_mode == "langgraph_fake":
                         from app.graphs.langgraph_runtime import LangGraphRuntime
@@ -164,7 +173,9 @@ def create_app(
                     else:
                         runtime = FakeRuntime(tool_executor=tool_executor)
                     store = AgentStore(database.engine)
-                    memory_worker = ConversationMemoryWorker(store)
+                    memory_worker = ConversationMemoryWorker(
+                        store, generator=summary_generator, snapshot_loader=store.get_run
+                    )
                     registry = business_tools or ToolRegistry()
                     config_reader: ConfigSnapshotReader = (
                         DatabaseConfigReader(
@@ -180,6 +191,7 @@ def create_app(
                         store,
                         runtime,
                         config_reader,
+                        context_assembler=context_assembler,
                         memory_trigger=memory_worker,
                         langsmith_exporter=langsmith_exporter,
                         langsmith_export_requested=config.langsmith_export_enabled,

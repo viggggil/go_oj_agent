@@ -354,15 +354,13 @@ class AgentStore:
         if after_message_id is not None:
             if after_message_id <= 0:
                 raise ValueError("Invalid completed turn cursor")
-            query = query.where(answers.c.id > after_message_id).order_by(
-                users.c.id.asc() if oldest_first else users.c.id.desc()
-            )
-        else:
-            query = query.order_by(users.c.id.desc())
+            query = query.where(answers.c.id > after_message_id)
+        # 首次摘要没有游标，也必须从最早的完整轮次开始，不能先 LIMIT 最近记录。
+        query = query.order_by(answers.c.id.asc() if oldest_first else answers.c.id.desc())
         query = query.limit(min(max(limit, 1), 200))
         async with self._engine.connect() as connection:
             rows = (await connection.execute(query)).mappings().all()
-        if after_message_id is None or not oldest_first:
+        if not oldest_first:
             rows = list(reversed(rows))
         return [CompletedTurnRecord(**row) for row in rows]
 
