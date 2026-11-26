@@ -232,6 +232,7 @@ class LLMSummaryGenerator:
                     max_output,
                     attempt,
                     max_output_chars=16_000,
+                    max_events=100_000,
                 )
             ]
         if attempt.finish_reason != "completed":
